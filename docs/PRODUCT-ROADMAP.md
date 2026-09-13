@@ -59,9 +59,11 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
   source re3/reVC used Panfrost GLES 3.1, reached `GS_FRONTEND`, ran for 120 seconds
   and returned cleanly; attended gameplay/audio/controls/save/relaunch remain open.
   R45 then preloaded the actual Gallium provider and ran Stardew for its complete
-  120.6-second target bound; attended gameplay/audio/controls/save/relaunch remain
-  open. The separate SA Android-loader/direct-evdev findings do not establish a
-  working target port.
+  120.6-second target bound. R47's exact package fixed and passed fresh-`/run`
+  Ports startup, its bounded UI return and service recovery; no operator input or
+  save import occurred. Attended gameplay/audio/controls/save/relaunch remain open.
+  The separate SA Android-loader/direct-evdev findings do not establish a working
+  target port.
 - **U1:** shared controls, headers, icons, font/spacing/motion rules and frame
   diagnostics are implemented; R35 displayed actual battery/charge/Wi-Fi status,
   and R32 adds the bounded HUD-independent first-frame
@@ -80,9 +82,9 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
 
 ## Delivery sequence
 
-1. Target-check R46's guarded Stardew save import and attended duration, then run
-   Stardew and source GTA III/Vice City for gameplay, LCD/audio/controls and
-   save/exit/relaunch; keep every save generation isolated.
+1. Run R47's guarded Stardew save import, then Stardew and source GTA III/Vice
+   City for gameplay, LCD/audio/controls and save/exit/relaunch; keep every save
+   generation isolated.
 2. Keep Moonlight paused until the user resumes it; its prepared Linux host,
    controller-test program and accepted v3 fallback remain available.
 3. Keep SA's loader/input adaptation

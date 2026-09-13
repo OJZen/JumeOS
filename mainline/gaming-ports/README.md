@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-13: **R42 GTA TARGET AUTOMATION PASS / R45 STARDEW TARGET AUTOMATION PASS / ATTENDED OPEN**.
+Status 2026-09-13: **R42/R45 TARGET AUTOMATION PASS / R47 PORTS INFRA TARGET PASS / ATTENDED OPEN**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -465,7 +465,7 @@ boundary.
 Target automation accepts the loader fix. LCD motion, audio, physical controls,
 gameplay and save/reload remain operator-open.
 
-## R46 attended ports preparation
+## R46/R47 attended ports preparation
 
 The existing native worker already supports a 35-minute operator-present bound.
 `probe-r46h.sh --attended-ports SHELL_SHA256` now exposes it through the same
@@ -483,9 +483,27 @@ refused and source/copy hashes remained equal. The exact package from source
 38,146,119 bytes, SHA-256
 `c5e30a853d7aba1a60ee6c0604abbeb3af66dd0314bbf89a856f8a192f7b2305`.
 Its 1,630 regular files rehashed after independent extraction; only the Shell
-and probe differ from R45. The adjacent receipt owns the host boundary. The
-fixed R46H must repeat the package hashes, import behavior and attended worker
-before any physical save/load result is accepted.
+and probe differ from R45. The adjacent receipt owns the host boundary.
+
+A clean target repeated all R46 hashes, then exposed a probe-only defect before
+the UI: root-protected fresh `/run` staging lacked the private `state/` log
+directory. After explicit `ark:0700` preparation, the 1,800-second attended UI
+bound returned status 0 and recovered ES-DE, but received no operator input.
+R47 fixes that shared Ports guard at source `da0b2febfd0f8d8c7ccf8b2cec70be6d8ad34f66`:
+it refuses a linked or wrongly owned state and creates the absent directory
+before launch. Its exact package is
+`mainline/out/.cache/r46h-attended-ports-20260913/r47/r46h-shell-preview-arm64.tar.gz`,
+38,146,124 bytes, SHA-256
+`6db8ded1f6814252b6f8ba645ca832d0169826c4f76ad6b6a477827adda0e287`.
+All 1,630 files rehashed on target; `--check` left state absent, `--ports`
+created `ark:0700` state, completed the 290-second UI bound and restored the
+frontend/mixer. Original save hashes and the sole managed `startup_preferences`
+file were unchanged. Both capped UI runs peaked at 67.692 C without a thermal
+abort; frequency limits, services and storage recovered, temporary scope/key
+were removed, and serial confirmed controlled poweroff. The adjacent R47 receipt
+and `mainline/out/.cache/r46h-r46-attended-device-20260913.Z7skfu/session.json`
+own exact evidence. Device import, LCD/audio/physical controls, gameplay,
+save/exit/relaunch and GTA attended checks remain open.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

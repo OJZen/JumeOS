@@ -27,8 +27,7 @@ full target checksum/readback was skipped, so equality remains unverified; see
 P2 v0.7 is the last fully attended fallback; p2 v0.15 is the last accepted
 automated device fallback. The current card's exact p2 v0.17 passed its p2-only
 write, two full readbacks, cold/warm infrastructure and attended dual-stick smoke.
-R45's exact full package ran Stardew for 120.6 seconds and recovered. R46's host
-package adds guarded save import and attended duration; target execution is next.
+R45 ran Stardew for 120.6 seconds; R47 passes fresh-`/run` Ports startup and recovery.
 Stardew/GTA attended proof, USB, Moonlight and PSP remain open or deferred.
 
 ## Capability ledger
@@ -93,10 +92,11 @@ Stardew/GTA attended proof, USB, Moonlight and PSP remain open or deferred.
 - **Qt shell — R17 CONTROLS + R35 STATUS BAR DEVICE PASS / FOCUS PACING OPEN.**
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
   reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope; Wi-Fi/swap/suspend remain open.
-- **Wayland/ports — R42 GTA TARGET PASS; R45 STARDEW TARGET PASS; R46 HOST PASS /
-  TARGET OPEN.** R45's exact package ran Stardew for 120.6 seconds. R46 safely
-  imports the retained save and exposes an attended bound; device import plus
-  LCD/audio/controls/save/relaunch remain open.
+- **Wayland/ports — R42 GTA TARGET PASS; R45 STARDEW TARGET PASS; R47 INFRA TARGET PASS / ATTENDED OPEN.**
+  R45's exact package ran Stardew for 120.6
+  seconds. R47 safely imports the retained save in host checks; all 1,630 target
+  files, fresh runtime-state creation, bounded UI return and recovery passed.
+  Device import plus LCD/audio/controls/save/relaunch remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**

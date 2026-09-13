@@ -12,7 +12,7 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **off** after the R45 full-package Stardew gate. Serial confirmed
+The device is **off** after the R47 fresh-Ports probe gate. Serial confirmed
 sync, filesystem unmount, loop detach and poweroff. Temporary target services,
 staging and the one-time public key were removed.
 
@@ -43,9 +43,10 @@ skipped, so content equality remains unverified. See
   exact 1,630-file package ran Stardew for the full 120.6-second bound, returned
   cleanly and kept the original saves read-only. LCD, audio, physical controls,
   gameplay, save/load and relaunch remain operator-open.
-- R46's exact 1,630-file host package safely imports the retained Stardew save
-  beside its startup preference and exposes the existing attended worker bound.
-  Device import and operator checks have not run.
+- A clean R46 target exposed a missing private log directory before its Ports
+  UI could start. R47 fixes that probe-only fresh-`/run` defect; its exact 1,630
+  files rehashed on target, the UI completed its bound, and ES-DE recovered.
+  Stardew import and all operator checks remain unrun.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -58,11 +59,11 @@ runbooks.
 
 ## Immediate next work
 
-1. Target-check the exact R46 package, Stardew import guard and attended duration.
-2. Run attended Stardew gameplay, audio, controls, save, exit, and relaunch checks.
-3. Batch the matching attended GTA III/Vice City checks where safe.
-4. Keep Moonlight paused until requested.
-5. Investigate a physically reachable USB peripheral route before writing gadget code.
+1. Run the R47 attended Stardew import, gameplay, audio, controls, save, exit,
+   and relaunch checks.
+2. Batch the matching attended GTA III/Vice City checks where safe.
+3. Keep Moonlight paused until requested.
+4. Investigate a physically reachable USB peripheral route before writing gadget code.
 
 ## Working rules
 
