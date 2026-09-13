@@ -1,0 +1,20 @@
+--- a/src/core/CdStreamPosix.cpp
++++ b/src/core/CdStreamPosix.cpp
+@@ -209,5 +209 @@ CdStreamInit(int32 numChannels)
+-#ifdef __linux__
+-	_gdwCdStreamFlags = O_RDONLY | O_NOATIME;
+-#else
+-	_gdwCdStreamFlags = O_RDONLY;
++	_gdwCdStreamFlags = O_RDONLY;
+-#endif
+--- a/src/core/re3.cpp
++++ b/src/core/re3.cpp
+@@ -372,3 +372,5 @@ void LoadINIControllerSettings()
+-	ReadIniIfExists("Controller", "RightStickSensX", &ControlsManager.m_rStickSensX);
+-	ReadIniIfExists("Controller", "RightStickSensY", &ControlsManager.m_rStickSensY);
+-	ReadIniIfExists("Controller", "RightStickDeadzone", &ControlsManager.m_rStickDeadzone);
++	ReadIniIfExists("Controller", "RightStickSensX", &ControlsManager.m_rStickSensX);
++	ReadIniIfExists("Controller", "RightStickSensY", &ControlsManager.m_rStickSensY);
++	ReadIniIfExists("Controller", "RightStickDeadzone", &ControlsManager.m_rStickDeadzone);
++	ControlsManager.m_lStickDeadzone = Max(ControlsManager.m_lStickDeadzone, 0.1f);
++	ControlsManager.m_rStickDeadzone = Max(ControlsManager.m_rStickDeadzone, 0.1f);

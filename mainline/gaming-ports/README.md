@@ -505,6 +505,22 @@ and `mainline/out/.cache/r46h-r46-attended-device-20260913.Z7skfu/session.json`
 own exact evidence. Device import, LCD/audio/physical controls, gameplay,
 save/exit/relaunch and GTA attended checks remain open.
 
+## R48 GTA media and D-pad repair candidate
+
+The R47 attended GTA III run reached `GS_INIT_PLAYING_GAME`, then asserted in
+`CdStreamAddImage`. Target `strace` proved that the case-correct
+`./models/gta3.img` exists but its `O_NOATIME` open fails with `EPERM` for the
+unprivileged game user on the read-only exFAT content mount. The same run's
+operator reported that D-pad Down required many presses. A non-grabbing evdev
+sample then showed the combined pad's idle `ABS_Y` around 501--506 against a
+511.5 centre while the imported GTA configuration selected zero stick deadzone;
+re3 treats that small upward drift and D-pad Down as conflicting directions.
+
+`r46h-gta-runtime.patch` removes the optional `O_NOATIME` optimization and keeps
+a 10% minimum configurable deadzone in both pinned GTA engines. It does not
+change the global controller mapping or original content. A fresh ARM64 build
+and target gameplay repeat remain required before this candidate is accepted.
+
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
 manifests and fixed identities passed. The final run peaked at 78.461 C under the
