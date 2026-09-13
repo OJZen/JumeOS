@@ -94,6 +94,17 @@ private slots:
         const auto backups = QDir(state + "/tools/backups").entryList(QDir::Dirs | QDir::NoDotAndDotDot); QCOMPARE(backups.size(), 1);
         const auto backup = state + "/tools/backups/" + backups.first(); QCOMPARE(get(backup + "/Saves/farm/save"), QByteArray("new progress"));
         const auto receipt = QJsonDocument::fromJson(get(backup + "/r46h-copy-receipt.json")).object(); QCOMPARE(receipt.value("files").toArray().size(), 1);
+        const auto initializedState = dir.filePath("initialized-state"), initialized = initializedState + "/tools/ports/stardew/saves";
+        for (const auto &path : {initializedState + "/tools", initializedState + "/tools/ports", initializedState + "/tools/ports/stardew", initialized}) {
+            QVERIFY(QDir().mkpath(path)); QVERIFY(QFile::setPermissions(path, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+        }
+        QVERIFY(put(initialized + "/startup_preferences", "preferences"));
+        QVERIFY(QFile::setPermissions(initialized + "/startup_preferences", QFile::ReadOwner | QFile::WriteOwner));
+        QCOMPARE(ToolState::worker("import", "stardew", content, initializedState), 0);
+        QCOMPARE(get(initialized + "/startup_preferences"), QByteArray("preferences"));
+        QCOMPARE(get(initialized + "/Saves/farm/save"), QByteArray("original"));
+        QVERIFY(QFileInfo::exists(initialized + "/r46h-copy-receipt.json"));
+        QCOMPARE(ToolState::worker("import", "stardew", content, initializedState), 1);
         QCOMPARE(ToolState::worker("import", "../../escape", content, state), 1);
         QVERIFY(put(content + "/ports/gta3/userfiles/save", "safe"));
         QVERIFY(QFile::link(dir.filePath("original-outside"), content + "/ports/gta3/userfiles/link"));

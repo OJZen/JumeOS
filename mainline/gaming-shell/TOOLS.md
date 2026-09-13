@@ -1,6 +1,6 @@
 # Independent tool applications
 
-Status 2026-09-13: **R42 GTA TARGET AUTOMATION PASS / STARDEW FAIL / DRI HOST CHECK PASS**.
+Status 2026-09-13: **R42 GTA TARGET AUTOMATION PASS / R45 STARDEW TARGET AUTOMATION PASS / ATTENDED OPEN**.
 The normal home/library has separate Neo, PortMaster and USB entries. Each uses
 [shared UI defaults](controls/README.md), its own route and the existing controller,
 modal, keyboard and remote-control paths. No persistent launcher was replaced.
@@ -27,6 +27,9 @@ its backup includes both native and quick states. Existing generic RetroArch
 saves are not silently imported. Backups are unique directories under
 `STATE/tools/backups`. Copying rejects symlinks and stops at 2,048 files/64 MiB;
 file size, mtime and SHA-256 are checked before atomic directory promotion.
+Stardew may create `startup_preferences` before an import. If that is the only
+managed file, import atomically adds the original `Saves` directory beside it;
+any other existing entry still refuses the copy without overwrite.
 Hidden placeholders and copy receipts are not game saves. Normal navigation or
 window close waits for an active copy/export; forced termination may leave a
 bounded `.incoming-*` partial copy, never replacing an existing save. Inspect
@@ -201,6 +204,8 @@ normal/error/timeout/invalid-request cleanup. The Linux builder runs the relocat
 package, existing application/stream lifecycle and packaged keyboard checks.
 No host check proves physical controls, audio, port playability or USB enumeration.
 
-`--ports` / `--remote-ports` add a persistent-data native ports session. The
+`--ports` / `--remote-ports` add a persistent-data native ports session;
+`--attended-ports` reuses the same direct path with a 35-minute per-game ceiling
+inside the existing 90-minute outer guard. The
 [ports runbook](../gaming-ports/README.md#native-ports-session-candidate) owns
 Mono mounting, private libraries, exit reporting and pending physical gates.

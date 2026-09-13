@@ -103,6 +103,15 @@ QVariantMap copySaves(const QString &content, const QString &state, const QStrin
     if (backup) source = game + "/saves";
     else if (port) source = content + "/ports/" + port->directory + "/" + port->save;
     else return toolError(QStringLiteral("Neo 只备份本工具管理的存档。"));
+    QString parent = game, destination = game + "/saves";
+    bool initializedStardew = false;
+    if (!backup && id == "stardew" && (QFileInfo(destination).exists() || QFileInfo(destination).isSymLink())) {
+        if (!privateDirectory(destination)) return toolError(QStringLiteral("已有存档，未覆盖。请先备份并检查。"));
+        const auto entries = QDir(destination).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
+        if (entries.size() > 1 || (entries.size() == 1 && (entries.first().fileName() != "startup_preferences" || !privateFile(entries.first().filePath()))))
+            return toolError(QStringLiteral("已有存档，未覆盖。请先备份并检查。"));
+        source += "/Saves"; parent = destination; destination += "/Saves"; initializedStardew = true;
+    }
     QStringList paths;
     if (QFileInfo(source).isSymLink()) return toolError(QStringLiteral("存档包含不安全的链接，未导入。"));
     if (!backup && QFileInfo(source).exists() && !contained(content, source)) return toolError(QStringLiteral("原存档路径不在资源目录内。"));
@@ -127,7 +136,6 @@ QVariantMap copySaves(const QString &content, const QString &state, const QStrin
     }
     if (paths.isEmpty()) return toolError(QStringLiteral("没有找到可复制的存档。"));
     if (paths.size() > 2048 || bytes > 64 * 1024 * 1024) return toolError(QStringLiteral("存档超过导入上限。"));
-    QString parent = game, destination = game + "/saves";
     if (backup) {
         parent = tools + "/backups";
         if (!privateDirectory(parent)) return toolError(QStringLiteral("备份目录不可用。"));
@@ -148,9 +156,12 @@ QVariantMap copySaves(const QString &content, const QString &state, const QStrin
         if (digest.isEmpty() || digest != hash(path) || QFileInfo(path).size() != size || QFileInfo(path).lastModified() != modified) { ok = false; break; }
         entries.append(QJsonObject{{"name", name}, {"bytes", size}, {"sha256", digest}});
     }
-    if (ok) ok = writeJson(incoming + "/r46h-copy-receipt.json", {{"version", 1}, {"game", id}, {"files", entries}});
+    const QJsonObject receipt{{"version", 1}, {"game", id}, {"files", entries}};
+    if (ok && !initializedStardew) ok = writeJson(incoming + "/r46h-copy-receipt.json", receipt);
     if (ok) ok = QDir().rename(incoming, destination);
     if (!ok) { QDir(incoming).removeRecursively(); return toolError(QStringLiteral("复制未完成，原存档和已有存档均已保留。")); }
+    if (initializedStardew && !writeJson(parent + "/r46h-copy-receipt.json", receipt))
+        return toolError(QStringLiteral("原存档已导入，但收据未写入。请先检查，不要重复导入。"));
     return {{"ok", true}, {"message", backup ? QStringLiteral("存档已备份") : QStringLiteral("原存档已导入副本")}, {"files", paths.size()}};
 }
 }

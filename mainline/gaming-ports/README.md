@@ -465,6 +465,22 @@ boundary.
 Target automation accepts the loader fix. LCD motion, audio, physical controls,
 gameplay and save/reload remain operator-open.
 
+## R46 attended ports preparation
+
+The existing native worker already supports a 35-minute operator-present bound.
+`probe-r46h.sh --attended-ports SHELL_SHA256` now exposes it through the same
+fixed identity, read-only ROM, Mono lease, cgroup, mixer and ES-DE recovery
+guards; the outer session remains limited to 90 minutes.
+
+Stardew's first successful start created only `startup_preferences` in its
+managed save directory. Import now accepts that exact initialized state (or an
+empty directory), publishes the original `Saves` subtree without replacing the
+preference, and refuses every other existing entry. The ARM64 C++ fixture and a
+read-only run against the retained two-file farm save passed; a second import was
+refused and source/copy hashes remained equal. This is host preparation only.
+The next R46 package must repeat it on the fixed R46H before any attended
+save/load result is accepted.
+
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
 manifests and fixed identities passed. The final run peaked at 78.461 C under the

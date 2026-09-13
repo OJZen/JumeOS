@@ -55,11 +55,11 @@ runbooks.
 
 ## Immediate next work
 
-1. Run attended Stardew gameplay, audio, controls, save, exit, and relaunch checks.
-2. Batch the matching attended GTA III/Vice City checks where safe.
-3. Keep Moonlight paused until requested.
-4. Investigate a physically reachable USB peripheral route before writing gadget code.
-5. Batch remaining physical L3/R3, LCD, audio, and stream-control observations.
+1. Build and target-check the R46 attended Ports package and Stardew import guard.
+2. Run attended Stardew gameplay, audio, controls, save, exit, and relaunch checks.
+3. Batch the matching attended GTA III/Vice City checks where safe.
+4. Keep Moonlight paused until requested.
+5. Investigate a physically reachable USB peripheral route before writing gadget code.
 
 ## Working rules
 

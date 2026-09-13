@@ -38,7 +38,8 @@ claim and from R46H input proof; the R16 receipt retains both results.
 `test-gaming-probe.py` executes the shell/Embedded-stream launchers' actual Bash
 preflight and recovery blocks with mocked processes/services: busy clients,
 PPSSPP argv, check errors, missing libraries, cleanup failure and inactive
-frontend. It does not prove target systemd lifecycle or LCD restoration.
+frontend. It also checks the attended Ports duration/worker route. It does not
+prove target systemd lifecycle or LCD restoration.
 
 `test-wayland-probe.py` checks the shared-display launcher's busy/error guard,
 transient-unit failure, exact leftover seat-socket cleanup and frontend recovery

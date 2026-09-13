@@ -1,8 +1,8 @@
 #!/bin/bash
 # Prepared attended probe, not an installer. Stage the receipt-bound tar first.
 set -Eeuo pipefail
-[[ ( $# == 2 && ( $1 == --check || $1 == --run || $1 == --profile || $1 == --device || $1 == --native || $1 == --ports ) || $# == 3 && ( $1 == --streaming || $1 == --attended ) || $# == 5 && ( $1 == --remote || $1 == --remote-device || $1 == --remote-native || $1 == --remote-ports ) || $# == 6 && $1 == --remote-streaming ) && $2 =~ ^[0-9a-f]{64}$ ]] || {
-  echo 'Usage: probe-r46h.sh --check|--run|--profile|--device|--native|--ports SHELL_SHA256 | --streaming|--attended SHELL_SHA256 CLIENT_SHA256 | --remote|--remote-device|--remote-native|--remote-ports SHELL_SHA256 PUBLIC_KEY_SHA256 DEVICE_IP MAC_IP | --remote-streaming SHELL_SHA256 CLIENT_SHA256 PUBLIC_KEY_SHA256 DEVICE_IP MAC_IP' >&2; exit 2;
+[[ ( $# == 2 && ( $1 == --check || $1 == --run || $1 == --profile || $1 == --device || $1 == --native || $1 == --ports || $1 == --attended-ports ) || $# == 3 && ( $1 == --streaming || $1 == --attended ) || $# == 5 && ( $1 == --remote || $1 == --remote-device || $1 == --remote-native || $1 == --remote-ports ) || $# == 6 && $1 == --remote-streaming ) && $2 =~ ^[0-9a-f]{64}$ ]] || {
+  echo 'Usage: probe-r46h.sh --check|--run|--profile|--device|--native|--ports|--attended-ports SHELL_SHA256 | --streaming|--attended SHELL_SHA256 CLIENT_SHA256 | --remote|--remote-device|--remote-native|--remote-ports SHELL_SHA256 PUBLIC_KEY_SHA256 DEVICE_IP MAC_IP | --remote-streaming SHELL_SHA256 CLIENT_SHA256 PUBLIC_KEY_SHA256 DEVICE_IP MAC_IP' >&2; exit 2;
 }
 mode=$1
 expected=$2
@@ -45,7 +45,7 @@ if [[ $mode == --streaming || $mode == --attended || $mode == --remote-streaming
   saved_mux=$(amixer -c 0 cget numid=5 | awk -F= '/: values=/{print $2}')
   [[ $saved_mux =~ ^[0-9]+$ ]] || exit 1
 fi
-if [[ $mode == --native || $mode == --remote-native || $mode == --ports || $mode == --remote-ports ]]; then
+if [[ $mode == --native || $mode == --remote-native || $mode == --ports || $mode == --attended-ports || $mode == --remote-ports ]]; then
   [[ -x $scope/desktop-session.sh && -x /usr/bin/retroarch && -f /etc/r46h/retroarch.cfg ]] || exit 1
   saved_mux=$(amixer -c 0 cget numid=5 | awk -F= '/: values=/{print $2}')
   [[ $saved_mux =~ ^[0-9]+$ ]] || exit 1
@@ -74,7 +74,7 @@ if [[ -n ${R46H_SHELL_STATE_DIR:-} ]]; then
   [[ $R46H_SHELL_STATE_DIR == /home/ark/.local/share/r46h-preview ]] || { echo 'Unrecognized persistent preview state path.' >&2; exit 2; }
   runuser -u ark -- env R46H_SHELL_STATE_DIR="$R46H_SHELL_STATE_DIR" "$scope/shell-client.sh" --check-state || exit 1
 fi
-if [[ $mode == --ports || $mode == --remote-ports ]]; then
+if [[ $mode == --ports || $mode == --attended-ports || $mode == --remote-ports ]]; then
   [[ ${R46H_SHELL_STATE_DIR:-} == /home/ark/.local/share/r46h-preview && -x $scope/runtime-lease.sh ]] || exit 2
   [[ ! -e /run/r46h-port-runtime && ! -L /run/r46h-port-runtime && ! -e $scope/mono && ! -L $scope/mono ]] || exit 2
   linked_files=$(find "$scope" -path "$scope/state" -prune -o -type f -links +1 -print -quit) || exit 1
@@ -93,7 +93,10 @@ if [[ $mode == --profile ]]; then
   deadline=120
 fi
 entry="$scope/shell-client.sh"
-if [[ $mode == --ports ]]; then entry="$scope/desktop-session.sh"; args=(ports); deadline=900; fi
+if [[ $mode == --ports || $mode == --attended-ports ]]; then
+  entry="$scope/desktop-session.sh"; args=(ports); deadline=900
+  if [[ $mode == --attended-ports ]]; then args+=(--attended); deadline=5400; fi
+fi
 if [[ $mode == --native ]]; then entry="$scope/desktop-session.sh"; args=(native); deadline=900; fi
 if [[ $mode == --streaming || $mode == --attended ]]; then
   entry="$scope/desktop-session.sh"
@@ -118,7 +121,7 @@ fi
 if [[ -n ${R46H_SHELL_STATE_DIR:-} ]]; then
   render_env+=(R46H_SHELL_STATE_DIR="$R46H_SHELL_STATE_DIR")
 fi
-if [[ $mode == --ports || $mode == --remote-ports ]]; then
+if [[ $mode == --ports || $mode == --attended-ports || $mode == --remote-ports ]]; then
   unit_properties=(-p "ExecStartPre=/bin/bash $scope/runtime-lease.sh --acquire $unit" -p "ExecStopPost=/bin/bash $scope/runtime-lease.sh --release $unit")
 fi
 # Qt enables this diagnostic by presence, including a value of "0".
@@ -134,7 +137,7 @@ restore() {
       echo 'SHELL_END failed to stop preview; frontend left stopped.' >&2; exit 1;
     }
   fi
-  if [[ $mode == --ports || $mode == --remote-ports ]]; then
+  if [[ $mode == --ports || $mode == --attended-ports || $mode == --remote-ports ]]; then
     /bin/bash "$scope/runtime-lease.sh" --release "$unit" || { echo 'SHELL_END runtime_restore=failed; frontend left stopped.' >&2; exit 1; }
   fi
   mux_status=0

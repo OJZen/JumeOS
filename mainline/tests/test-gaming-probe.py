@@ -82,6 +82,8 @@ result = bash(options + '\n printf "%s\\n" "$entry" "${args[@]}" "$deadline"', m
 assert result.returncode == 0 and result.stdout.splitlines() == ["/owned/desktop-session.sh", "a"*64, "900"]
 result = bash(options + '\n printf "%s\\n" "$entry" "${args[@]}" "$deadline"', mode="--attended", scope="/owned", client_hash="a"*64)
 assert result.returncode == 0 and result.stdout.splitlines() == ["/owned/desktop-session.sh", "a"*64, "--attended", "5400"]
+result = bash(options + '\n printf "%s\\n" "$entry" "${args[@]}" "$deadline"', mode="--attended-ports", scope="/owned")
+assert result.returncode == 0 and result.stdout.splitlines() == ["/owned/desktop-session.sh", "ports", "--attended", "5400"]
 result = bash(options + '\n printf "%s\\n" "$entry" "${args[@]}" "$deadline"', mode="--remote", scope="/owned", listen_ip="192.0.2.2", peer_ip="192.0.2.1")
 assert result.returncode == 0 and result.stdout.splitlines() == ["/owned/remote-session.sh", "192.0.2.2", "192.0.2.1", "1860"]
 result = bash(options + '\n printf "%s\\n" "$entry" "${args[@]}" "$deadline" "${render_env[@]}"', mode="--remote-streaming", scope="/owned", listen_ip="192.0.2.2", peer_ip="192.0.2.1", client_hash="a"*64)
