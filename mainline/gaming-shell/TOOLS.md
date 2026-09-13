@@ -1,6 +1,6 @@
 # Independent tool applications
 
-Status 2026-09-13: **R42 GTA TARGET AUTOMATION PASS / R45 STARDEW TARGET AUTOMATION PASS / ATTENDED OPEN**.
+Status 2026-09-13: **R45 STARDEW TARGET AUTOMATION PASS / R46 ATTENDED PORTS HOST PACKAGE PASS / TARGET OPEN**.
 The normal home/library has separate Neo, PortMaster and USB entries. Each uses
 [shared UI defaults](controls/README.md), its own route and the existing controller,
 modal, keyboard and remote-control paths. No persistent launcher was replaced.

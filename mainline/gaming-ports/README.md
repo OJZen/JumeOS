@@ -477,9 +477,15 @@ managed save directory. Import now accepts that exact initialized state (or an
 empty directory), publishes the original `Saves` subtree without replacing the
 preference, and refuses every other existing entry. The ARM64 C++ fixture and a
 read-only run against the retained two-file farm save passed; a second import was
-refused and source/copy hashes remained equal. This is host preparation only.
-The next R46 package must repeat it on the fixed R46H before any attended
-save/load result is accepted.
+refused and source/copy hashes remained equal. The exact package from source
+`882ea1d298db0c6eeb1fa45356d3596ed87df78a` is
+`mainline/out/.cache/r46h-attended-ports-20260913/r46/r46h-shell-preview-arm64.tar.gz`,
+38,146,119 bytes, SHA-256
+`c5e30a853d7aba1a60ee6c0604abbeb3af66dd0314bbf89a856f8a192f7b2305`.
+Its 1,630 regular files rehashed after independent extraction; only the Shell
+and probe differ from R45. The adjacent receipt owns the host boundary. The
+fixed R46H must repeat the package hashes, import behavior and attended worker
+before any physical save/load result is accepted.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

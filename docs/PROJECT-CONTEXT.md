@@ -43,6 +43,9 @@ skipped, so content equality remains unverified. See
   exact 1,630-file package ran Stardew for the full 120.6-second bound, returned
   cleanly and kept the original saves read-only. LCD, audio, physical controls,
   gameplay, save/load and relaunch remain operator-open.
+- R46's exact 1,630-file host package safely imports the retained Stardew save
+  beside its startup preference and exposes the existing attended worker bound.
+  Device import and operator checks have not run.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -55,7 +58,7 @@ runbooks.
 
 ## Immediate next work
 
-1. Build and target-check the R46 attended Ports package and Stardew import guard.
+1. Target-check the exact R46 package, Stardew import guard and attended duration.
 2. Run attended Stardew gameplay, audio, controls, save, exit, and relaunch checks.
 3. Batch the matching attended GTA III/Vice City checks where safe.
 4. Keep Moonlight paused until requested.
