@@ -19,8 +19,10 @@ commit=$(git -C "$repo" rev-parse HEAD)
 image=cgutman/moonlight-packaging@sha256:f25a3e2ad90b85d1a4358e2d612ed311165cddd62aa194455a5dbed844d66d69
 portmaster=${R46H_PORTMASTER_BUNDLE:-$cache/r46h-portmaster/portmaster-backend.tar.gz}
 native=${R46H_PORT_NATIVE_CACHE:-$cache/r46h-ports-native}
+gta=${R46H_GTA_SOURCE_OUTPUT:-$cache/r46h-gta-source-r48-20260913}
 [[ -f $portmaster && $(shasum -a 256 "$portmaster" | cut -d ' ' -f 1) == "$(cat "$(dirname "$portmaster")/runtime.sha256")" ]]
 python3 -B "$repo/mainline/gaming-ports/prepare-native.py" "$native" --check
+[[ -f $gta/BUILD-INFO && -f $gta/SHA256SUMS ]] && (cd "$gta" && sha256sum --check --quiet SHA256SUMS)
 # Retained font/client plugins are test inputs; the candidate itself uses the hashed runtime.
 mkdir -p "$output/share/fonts/truetype/droid" "$output/qt-wayland"
 cp "$cache/r46h-compositor-20260910/share/fonts/truetype/droid/DroidSansFallbackFull.ttf" "$output/share/fonts/truetype/droid/"
@@ -31,13 +33,13 @@ docker run --rm --init --network none --memory 1536m --cpus 3 --pids-limit 256 -
   -v "$repo/mainline/gaming-shell:/src:ro" -v "$repo/mainline/gaming-shell:/project/mainline/gaming-shell:ro" \
   -v "$repo/mainline/gaming-remote-screen:/project/mainline/gaming-remote-screen:ro" \
   -v "$repo/mainline/gaming-ports:/project/mainline/gaming-ports:ro" -v "$repo/mainline/tests:/project/mainline/tests:ro" \
-  -v "$portmaster:/portmaster-backend.tar.gz:ro" -v "$native:/native-debs:ro" \
+  -v "$portmaster:/portmaster-backend.tar.gz:ro" -v "$native:/native-debs:ro" -v "$gta:/gta-source:ro" \
   -v "$cache/r46h-compositor-20260910/ssh-debs:/ssh-debs:ro" \
   -v "$output:/out" -v "$output/desktop:/project/mainline/out" \
   -v "$cache/r46h-shell/linux-build:/out/linux-build" \
   -v "$cache/r46h-ports-backend-20260910/game-debs:/debs:ro" -v "$cache/r46h-wayland/deb-cache:/wayland-debs:ro" \
   -v "$cache/r46h-wayland/r46h-wayland-preview-arm64.tar.gz:/wayland-runtime.tar.gz:ro" \
-  "${client_bindings[@]}" \
+  ${client_bindings[@]+"${client_bindings[@]}"} \
   "$image" -c 'set -Eeuo pipefail
     timeout 240 bash /wayland/check-desktop.sh > /out/desktop-check.log 2>&1
     rm /dev/uinput

@@ -54,11 +54,12 @@ def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 manifest = ''.join(f'{digest(f)}  {f.relative_to(root)}\n' for f in sorted(root.rglob('*'))
                    if f.is_file() and not f.is_symlink() and f != root / 'SHA256SUMS')
 (root / 'SHA256SUMS').write_text(manifest)
-record = {'revision': 39, 'status': 'UNPRIVILEGED_SHARED_SESSION_HOST_PASS_R46H_UNTESTED',
+record = {'revision': 49, 'status': 'SHARED_GTA_OVERLAY_HOST_PASS_R46H_UNTESTED',
           'source_commit': sys.argv[2], 'base_runtime_sha256': digest(pathlib.Path('/wayland-runtime.tar.gz')),
           'manifest_sha256': digest(root / 'SHA256SUMS'),
-          'binaries': {str(f.relative_to(root)): digest(f) for f in [root / 'usr/bin/r46h-shell',
-                       root / 'usr/bin/input-router', root / 'usr/lib/aarch64-linux-gnu/weston/handheld-shell.so']},
+          'binaries': {str(f.relative_to(root)): digest(f) for f in [root / 'usr/bin/r46h-shell', root / 'usr/bin/input-router',
+                       root / 'usr/lib/r46h-ports/re3', root / 'usr/lib/r46h-ports/reVC',
+                       root / 'usr/lib/aarch64-linux-gnu/weston/handheld-shell.so']},
           'moonlight_sha256': (root / 'MOONLIGHT_SHA256').read_text().strip() if (root / 'MOONLIGHT_SHA256').exists() else None,
           'boundary': 'Headless diagnostic and optional management UI; shared stream uses a fake transport. No R46H DRM/input/audio, target cgroup/seatd or actual Moonlight stream acceptance.'}
 pathlib.Path('/out/receipt.json.incoming').write_text(json.dumps(record, indent=2) + '\n')
