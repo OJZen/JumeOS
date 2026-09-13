@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
 ''')
     subprocess.run(['gcc', '-shared', '-fPIC', str(root / 'dependency.c'), '-o', str(root / 'libdep.so')], check=True)
     providers = ('libGLX_mesa.so.0', 'libEGL_mesa.so.0', 'libgbm.so.1', 'panfrost_dri.so')
-    for name in (*providers, 'unrelated.so'):
+    for name in (*providers, 'unrelated.so', 'constructor-provider.so'):
         subprocess.run(['gcc', '-shared', '-fPIC', str(root / 'provider.c'), '-L' + str(root), '-ldep', '-Wl,-rpath,$ORIGIN', '-o', str(root / name)], check=True)
     binary = root / 'fixture'
     subprocess.run(['gcc', '-rdynamic', str(root / 'main.c'), '-ldl', '-o', str(binary)], check=True)
@@ -45,6 +45,12 @@ int main(int argc, char **argv) {
         assert baseline.returncode == patched.returncode == 0
         assert baseline.stdout == b'1\n'
         assert patched.stdout == (b'2\n' if name in providers else b'1\n')
+    provider = root / 'constructor-provider.so'
+    baseline = subprocess.run([str(binary), str(provider)], capture_output=True, timeout=3)
+    patched = subprocess.run([str(binary), str(provider)], env={**env, 'R46H_MESA_PROVIDER': str(provider)}, capture_output=True, timeout=3)
+    assert baseline.returncode == patched.returncode == 0
+    assert baseline.stdout == b'1\n' and patched.stdout == b'2\n'
+    assert b'R46H_MESA_PROVIDER_SCOPE' in patched.stderr
     self_exit = subprocess.run([str(binary), 'kill'], env=env, capture_output=True, timeout=3)
     assert self_exit.returncode == -signal.SIGKILL and b'R46H_PORT_SELF_EXIT' in self_exit.stderr
     child = subprocess.Popen([str(binary), 'wait'], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -58,4 +64,4 @@ int main(int argc, char **argv) {
     finally:
         if child.poll() is None:
             child.kill(); child.wait()
-print('MONO_COMPAT_PASS: provider-local ELF symbols, unrelated lookup unchanged, deliberate versus external kill distinguished')
+print('MONO_COMPAT_PASS: provider preload and local ELF symbols, unrelated lookup unchanged, deliberate versus external kill distinguished')

@@ -12,9 +12,10 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **off** after the R42 ports batch. Linux-stage serial confirmed
-poweroff, and temporary target services, files, and credentials were removed.
-Rediscover UART and network identity at the next boot.
+The device is **on at ES-DE** after the R45 differential Stardew probe. The
+fixed kernel, card CID, root UUID and read-only ROM mount were reconfirmed from
+a cold-boot serial capture. Temporary package staging remains only for the
+immediate clean-package follow-up.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -38,9 +39,12 @@ skipped, so content equality remains unverified. See
 - R42 source-built GTA III and Vice City used Panfrost OpenGL ES 3.1, reached
   their target frontends, ran for 120 seconds, and returned to the tools UI.
   Gameplay, display, audio, controls, saves, and relaunch are not yet accepted.
-- Stardew Valley still fails during SDL/GBM window creation. R43 freezes the
-  DRI-isolation follow-up as an exact 1,630-file ARM64 package with host proof;
-  it has not run on the R46H.
+- R43 repeated all 1,630 hashes but still failed in SDL/GBM after 10.31 seconds;
+  neither its DRI match nor R44's Gallium-name match reached the real loader.
+  R45 instead preloads the exact Debian Gallium provider with local symbol
+  scope. Its differential probe ran Stardew for the full 120.7-second bound,
+  returned cleanly and kept the original saves read-only. A clean full-package
+  repeat is still required before promotion.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -53,7 +57,7 @@ runbooks.
 
 ## Immediate next work
 
-1. Perform R43's first Stardew DRI device gate using its exact frozen package.
+1. Build and repeat R45 as an exact clean-source package, then remove its temporary target state.
 2. Run attended GTA III/Vice City gameplay, audio, controls, save, exit, and relaunch checks.
 3. Keep Moonlight paused until requested.
 4. Investigate a physically reachable USB peripheral route before writing gadget code.

@@ -27,8 +27,9 @@ full target checksum/readback was skipped, so equality remains unverified; see
 P2 v0.7 is the last fully attended fallback; p2 v0.15 is the last accepted
 automated device fallback. The current card's exact p2 v0.17 passed its p2-only
 write, two full readbacks, cold/warm infrastructure and attended dual-stick smoke.
-R43's Stardew DRI package passed its host gate; target execution is next. GTA
-III/VC need gameplay/save proof; USB, Moonlight and PSP are deferred.
+R43/R44 failed the unchanged Stardew SDL/GBM boundary. R45's exact-shim probe
+ran the full 120.7-second bound; a clean package repeat is next. GTA III/VC need
+gameplay/save proof; USB, Moonlight and PSP are deferred.
 
 ## Capability ledger
 
@@ -92,11 +93,10 @@ III/VC need gameplay/save proof; USB, Moonlight and PSP are deferred.
 - **Qt shell — R17 CONTROLS + R35 STATUS BAR DEVICE PASS / FOCUS PACING OPEN.**
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
   reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope; Wi-Fi/swap/suspend remain open.
-- **Wayland/ports — R36 NEO/CATALOG PASS; R42 GTA TARGET AUTOMATION PASS;
-  R43 STARDEW DRI HOST PACKAGE PASS / TARGET OPEN.** Retired failures stay retired.
-  R42's 1,630 hashes passed; source GTA III/VC reached `GS_FRONTEND` on GLES 3.1
-  and ran 120 seconds. Gameplay/audio/controls/saves remain open; Stardew still
-  failed in SDL/GBM. R43 freezes the DRI hypothesis in an exact package; target remains open.
+- **Wayland/ports — R36 NEO/CATALOG PASS; R42 GTA TARGET PASS; R43/R44 STARDEW
+  FAIL; R45 DIFFERENTIAL PASS / CLEAN PACKAGE OPEN.** R42 ran GTA III/VC for
+  120 seconds. R43/R44 missed the actual Gallium loader; R45 preloaded it, ran
+  Stardew for 120.7 seconds and kept source saves read-only; LCD/audio/controls remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**

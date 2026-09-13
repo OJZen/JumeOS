@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-13: **R42 GTA TARGET AUTOMATION PASS / R43 STARDEW DRI HOST PACKAGE PASS / TARGET OPEN**.
+Status 2026-09-13: **R42 GTA TARGET AUTOMATION PASS / R45 STARDEW DIFFERENTIAL TARGET PASS / CLEAN PACKAGE OPEN**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -430,10 +430,30 @@ archive. Two package builds produced that same shim and file set; only the Qt
 and only the exact archive above is the candidate. The adjacent receipt, source
 archive and file manifest own the full host boundary.
 
-No R43 target operation has run. The fixed R46H must repeat the 1,630 hashes,
-then show whether Stardew crosses the prior `SDL_CreateWindow` /
-`gbm_create_device` failure. A process start does not prove LCD, audio, controls,
-gameplay, saves or recovery.
+The fixed R46H repeated all 1,630 hashes, but R43 still crashed through the same
+`SDL_CreateWindow` / `gbm_create_device` path after 10.31 seconds and emitted no
+scope marker. Target inspection then showed `panfrost_dri.so` is only a symlink
+to the small `libdril_dri.so`; the real LLVM 19 consumer is
+`libgallium-25.0.7-2+deb13u1.so`. Matching that basename in R44 still emitted no
+marker and failed after 10.48 seconds because `libgbm` called glibc's loader
+without passing through the preload wrapper. Both hypotheses are retired.
+
+## R45 Stardew Gallium preload
+
+R45 directly preloads the fixed Debian 13 Gallium provider with
+`RTLD_DEEPBIND` during shim initialization. The focused ARM64 fixture covers
+that constructor path. A target differential probe used the fully read-back R43
+package with only the shim replaced by SHA-256
+`28164fe9af77f8b02e6f7caef18e48c5de146ac5351fb28a1d63fb60f140354e`.
+Stardew stayed alive past the old crash, mapped the shim, Gallium 25, LLVM 19 and
+GBM, then completed the 120.7-second bound with deliberate self-exit and no
+forced kill. Three provider-scope markers were retained, source saves stayed at
+three files on read-only `/roms`, one startup file appeared only in the managed
+save tree, and the tools UI recovered. The 85 C guard peaked at 68.846 C.
+
+This accepts the loader hypothesis only. Freeze and repeat a clean full package
+before promotion; LCD motion, audio, physical controls, gameplay and save/reload
+remain operator-open.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

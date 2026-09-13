@@ -3,17 +3,31 @@
 #include <dlfcn.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sys/syscall.h>
 
 static void *(*system_dlopen)(const char *, int);
+static void *mesa_provider;
 static pthread_once_t resolve_once = PTHREAD_ONCE_INIT;
 
 static void resolve_dlopen(void)
 {
     system_dlopen = dlsym(RTLD_NEXT, "dlopen");
+}
+
+__attribute__((constructor)) static void preload_mesa_provider(void)
+{
+    const char *provider = getenv("R46H_MESA_PROVIDER");
+    if (!provider || !*provider)
+        provider = "/usr/lib/aarch64-linux-gnu/libgallium-25.0.7-2+deb13u1.so";
+    if (access(provider, R_OK))
+        return;
+    pthread_once(&resolve_once, resolve_dlopen);
+    mesa_provider = system_dlopen ? system_dlopen(provider, RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND) : NULL;
+    fputs(mesa_provider ? "R46H_MESA_PROVIDER_SCOPE\n" : "R46H_MESA_PROVIDER_SCOPE_FAILED\n", stderr);
 }
 
 void *dlopen(const char *filename, int flags)
