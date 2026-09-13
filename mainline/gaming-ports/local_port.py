@@ -25,8 +25,8 @@ ORIGINAL_PROFILES = {
     'gtavc': ('reVC', 'ab149ae9c2372ee7f5f4384fe8b2ffc37446fe0ccbf0a48722289fc5a803d5b9'),
 }
 SOURCE_PROFILES = {
-    'gta3': ('re3', 'c7f9d60c65148228523c4c12f7178be295f3aa8f6278a69ecca1e735c0ff085d'),
-    'gtavc': ('reVC', '2ad92a8b22d963d8f7104a1a8ea40a0f6174e10b451e58373bb0021347dcd005'),
+    'gta3': ('re3', 'f4865b71ac0a2a9dac10e4cd98a4ba1be5e43bfee94f3d8f9542bf9637e4253e'),
+    'gtavc': ('reVC', '233d8b574b666208c31872429fa766bdaa6cb30d930b3739cd0311bf541e1156'),
 }
 
 STARDEW = {

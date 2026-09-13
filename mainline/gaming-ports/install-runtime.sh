@@ -17,8 +17,8 @@ install -m 644 "$code/manager.py" "$code/local_port.py" "$stage/usr/share/r46h/p
 install -m 755 "$code/runtime-lease.sh" "$stage/"
 gcc -shared -fPIC -O2 -Wall -Wextra -Werror -Wl,-z,relro,-z,now \
   "$code/mono-compat.c" -o "$stage/usr/lib/r46h-ports/libmono-compat.so" -ldl -pthread
-[[ $(sha256sum /gta-source/re3 | cut -d ' ' -f 1) == c7f9d60c65148228523c4c12f7178be295f3aa8f6278a69ecca1e735c0ff085d ]]
-[[ $(sha256sum /gta-source/reVC | cut -d ' ' -f 1) == 2ad92a8b22d963d8f7104a1a8ea40a0f6174e10b451e58373bb0021347dcd005 ]]
+[[ $(sha256sum /gta-source/re3 | cut -d ' ' -f 1) == f4865b71ac0a2a9dac10e4cd98a4ba1be5e43bfee94f3d8f9542bf9637e4253e ]]
+[[ $(sha256sum /gta-source/reVC | cut -d ' ' -f 1) == 233d8b574b666208c31872429fa766bdaa6cb30d930b3739cd0311bf541e1156 ]]
 install -m 755 /gta-source/re3 /gta-source/reVC "$stage/usr/lib/r46h-ports/"
 python3 -B "$tests/test-mono-compat.py" --library "$stage/usr/lib/r46h-ports/libmono-compat.so"
 native=$(mktemp -d /run/r46h-native-libraries.XXXXXX)

@@ -518,8 +518,15 @@ re3 treats that small upward drift and D-pad Down as conflicting directions.
 
 `r46h-gta-runtime.patch` removes the optional `O_NOATIME` optimization and keeps
 a 10% minimum configurable deadzone in both pinned GTA engines. It does not
-change the global controller mapping or original content. A fresh ARM64 build
-and target gameplay repeat remain required before this candidate is accepted.
+change the global controller mapping or original content. Clean source
+`825cdda7816599814f50fb838f9a708e873737e0` produced re3 SHA-256
+`f4865b71ac0a2a9dac10e4cd98a4ba1be5e43bfee94f3d8f9542bf9637e4253e`
+and reVC SHA-256
+`233d8b574b666208c31872429fa766bdaa6cb30d930b3739cd0311bf541e1156`;
+their build receipt records runtime patch SHA-256
+`1a9a8ca56459d87936d0df8274031e2e9d803a9aa584d554e3e70d1efe10d92b`.
+The hash-bound isolated workspace check passed. A packaged ARM64 run and target
+gameplay repeat remain required before this candidate is accepted.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
