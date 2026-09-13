@@ -67,6 +67,22 @@ source = (repo / "mainline/gaming-shell/probe-r46h.sh").read_text()
 guard = source[source.index("if [[ $closure"):source.index("printf 'SHELL_PREFLIGHT")]
 for closure, expected in (("libQt6Quick.so.6 => /bundle/libQt6Quick.so.6", 0), ("libQt6Quick.so.6 => not found", 1)):
     assert bash(guard, closure=closure, mode="--check").returncode == expected
+ports_guard = source[source.index("if [[ $mode == --ports || $mode == --attended-ports || $mode == --remote-ports ]]"):
+                     source.index("printf 'SHELL_PREFLIGHT")]
+with tempfile.TemporaryDirectory(prefix="ports-probe-state-", dir=repo / "mainline/out/.cache") as temporary:
+    scope = Path(temporary); runtime = scope / "runtime-lease.sh"; runtime.touch(); runtime.chmod(0o700)
+    fake = '''find() { return 0; }
+chown() { return 0; }
+chmod() { return 0; }
+install() { printf 'INSTALL %s\\n' "$*"; }
+'''
+    result = bash(fake + ports_guard, mode="--attended-ports", scope=str(scope),
+                  R46H_SHELL_STATE_DIR="/home/ark/.local/share/r46h-preview")
+    assert result.returncode == 0 and result.stdout.strip() == f"INSTALL -d -o ark -g ark -m 700 {scope}/state", result
+    (scope / "state").symlink_to(scope)
+    result = bash(fake + ports_guard, mode="--attended-ports", scope=str(scope),
+                  R46H_SHELL_STATE_DIR="/home/ark/.local/share/r46h-preview")
+    assert result.returncode == 2 and not result.stdout, result
 options = source[source.index("unit=r46h-shell"):source.index("restore() {")]
 for mode, seconds, deadline, extra in (("--run", 290, 300, []), ("--profile", 110, 120, ["--profile-ui"])):
     result = bash(options + '\n printf "%s\\n" "${args[@]}" "$deadline"', mode=mode, scope="/owned")

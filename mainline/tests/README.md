@@ -39,7 +39,8 @@ claim and from R46H input proof; the R16 receipt retains both results.
 preflight and recovery blocks with mocked processes/services: busy clients,
 PPSSPP argv, check errors, missing libraries, cleanup failure and inactive
 frontend. It also checks the attended Ports duration/worker route. It does not
-prove target systemd lifecycle or LCD restoration.
+prove target systemd lifecycle or LCD restoration. The Ports guard additionally
+creates its private runtime log directory on a fresh `/run` and refuses a link.
 
 `test-wayland-probe.py` checks the shared-display launcher's busy/error guard,
 transient-unit failure, exact leftover seat-socket cleanup and frontend recovery

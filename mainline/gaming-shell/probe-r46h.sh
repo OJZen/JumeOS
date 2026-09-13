@@ -77,11 +77,13 @@ fi
 if [[ $mode == --ports || $mode == --attended-ports || $mode == --remote-ports ]]; then
   [[ ${R46H_SHELL_STATE_DIR:-} == /home/ark/.local/share/r46h-preview && -x $scope/runtime-lease.sh ]] || exit 2
   [[ ! -e /run/r46h-port-runtime && ! -L /run/r46h-port-runtime && ! -e $scope/mono && ! -L $scope/mono ]] || exit 2
+  [[ ! -L $scope/state && ( ! -e $scope/state || $(stat -c %U:%a "$scope/state") == ark:700 ) ]] || exit 2
   linked_files=$(find "$scope" -path "$scope/state" -prune -o -type f -links +1 -print -quit) || exit 1
   [[ -z $linked_files ]] || exit 2
   find "$scope" -path "$scope/state" -prune -o -exec chown -h root:root {} +
   find "$scope" -path "$scope/state" -prune -o ! -type l -exec chmod go-w {} +
   chmod 755 "$scope"
+  install -d -o ark -g ark -m 700 "$scope/state"
 fi
 printf 'SHELL_PREFLIGHT PASS kernel=v0.15 rootfs=v0.17 scope=tmpfs binary=%s\n' "$expected"
 [[ $mode != --check ]] || exit 0

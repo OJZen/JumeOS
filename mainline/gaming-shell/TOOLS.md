@@ -206,6 +206,8 @@ No host check proves physical controls, audio, port playability or USB enumerati
 
 `--ports` / `--remote-ports` add a persistent-data native ports session;
 `--attended-ports` reuses the same direct path with a 35-minute per-game ceiling
-inside the existing 90-minute outer guard. The
+inside the existing 90-minute outer guard. Port modes provision the private
+`state/` log directory before root-protecting fresh `/run` staging; a link or
+wrong existing owner is refused. The
 [ports runbook](../gaming-ports/README.md#native-ports-session-candidate) owns
 Mono mounting, private libraries, exit reporting and pending physical gates.
