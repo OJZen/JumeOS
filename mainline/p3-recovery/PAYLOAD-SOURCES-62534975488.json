@@ -1,0 +1,52 @@
+{
+  "artifact_id": "r46h-easyroms-p3-62534975488-v1",
+  "builder_image": "arkos4clone/r46h-debian13-p2-mvp:v0.1",
+  "builder_image_id": "sha256:bd09bf6db6f1fb8f882621e98d70f01f976fd8dfba1bc897766afebd64cf51b9",
+  "cluster_size": 32768,
+  "cluster_count": 1577010,
+  "cluster_heap_offset_sectors": 16384,
+  "fat_length_sectors": 12321,
+  "fat_offset_sectors": 2048,
+  "format_version": 1,
+  "image_name": "easyroms-p3-62534975488-v1.img",
+  "image_size": 51683880448,
+  "payloads": [
+    {
+      "action_policy": "legacy-full",
+      "build_id": "v0.8-bootloader-handoff",
+      "destination": "r46h-v0.8-bootloader-handoff",
+      "manifest_sha256": "7f824b5cabc1a1d6bee540fe56a95e4b32128ec5d603784f8a0a363117152bb5",
+      "source_bundle": "mainline/out/r46h-easyroms-v0.8-bootloader-handoff",
+      "source_git_commit": "6bc39c6a0d33a385d2e10cf910b16616c33491b3",
+      "stage_complete_sha256": "7de695c19cd6a475143d9e78271877e1adce358584d9ac81e7b1b3276141d2e9",
+      "stage_sources_sha256": "fd5f744b75de5849702718493bc87286f41e54acd4be904d657a28858dadbcf8"
+    },
+    {
+      "action_policy": "install-modules-only",
+      "build_id": "v0.9-adc-joystick-fix",
+      "destination": "r46h-v0.9-adc-joystick-fix",
+      "manifest_sha256": "a3b597811ef1afd468ec870e46d1e3d8e435776328adecf95a1700c1cfbdce18",
+      "source_bundle": "mainline/out/r46h-easyroms-v0.9-adc-joystick-fix",
+      "source_git_commit": "41633957e53fce1548b1ad90b45c2be589898ae8",
+      "stage_complete_sha256": "adee1d1eeb7a9925c808130d568bddd1254a64f798b0d4cbe69f2fc4f9cf5f04",
+      "stage_sources_sha256": "65d55b36d89597c1086289bb06ed77b8f497283516945d4fa2b8fd72d7902d42"
+    },
+    {
+      "action_policy": "install-modules-only",
+      "build_id": "v0.10-adc-full-range",
+      "destination": "r46h-v0.10-adc-full-range",
+      "manifest_sha256": "7413a2faa9503c448c84ace1dce248c67cc9bb3b983d3ccdb479007911488379",
+      "source_bundle": "mainline/out/r46h-easyroms-v0.10-adc-full-range",
+      "source_git_commit": "fd3a7dbcbad46ce9c437b2244f95cbec22f1f314",
+      "stage_complete_sha256": "be3c9a670999cc91617aac5ff1ee6467d963576cd5a3d6c9cc53192912668b5e",
+      "stage_sources_sha256": "f7e16d20cb975998084f1ee4b11a40ef56407623c863c4bae414d78c9754c63d"
+    }
+  ],
+  "profile_id": "hl-r46h-v22-g92-62534975488-v1",
+  "root_directory_cluster": 10,
+  "sector_size": 512,
+  "source_date_epoch": 1785369600,
+  "volume_guid": "62534975-4880-4A4A-ACB7-625349754881",
+  "volume_label": "EASYROMS",
+  "volume_serial": "62534975"
+}

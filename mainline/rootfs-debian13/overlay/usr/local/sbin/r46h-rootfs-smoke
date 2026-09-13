@@ -1,0 +1,224 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+readonly EXPECTED_RELEASE=6.12.99-r46h-mainline-v0.8-bootloader-handoff
+readonly EXPECTED_ROOT_PARTUUID=c9f931c9-02
+readonly EXPECTED_ROOT_UUID=d3130001-46a4-4d56-9001-000000000001
+readonly GPU_LOG=/run/r46h-rootfs-smoke-gpu.$$
+readonly DMESG_BEFORE=/run/r46h-rootfs-smoke-dmesg-before.$$
+readonly DMESG_AFTER=/run/r46h-rootfs-smoke-dmesg-after.$$
+readonly DMESG_DELTA=/run/r46h-rootfs-smoke-dmesg-delta.$$
+readonly EXT4_ERRORS=/sys/fs/ext4/mmcblk0p2/errors_count
+readonly GPU_TIMEOUT_SECONDS=30
+fault_pattern='panfrost.*(fault|error|timeout|reset|hang|warning|bug|oops|panic|drm_sched)'
+fault_pattern+='|(warning|bug|oops|panic).*(panfrost|gpu|drm|mmu)'
+fault_pattern+='|(^|[^[:alnum:]_])BUG(:|[[:space:]])|Oops:|kernel panic|Call trace:|cut here'
+fault_pattern+='|drm_sched.*(timedout|timeout|hang|fault|error)'
+fault_pattern+='|\b(mmu|gpu).*(fault|timeout|hang|reset|error)'
+fault_pattern+='|mmc.*(I/O error|error[[:space:]]+-[0-9]+|timed out|timeout|CRC|fail(ed|ure)?)'
+fault_pattern+='|I/O error.*mmc'
+fault_pattern+='|(blk_update_request|end_request|blk_print_req_error).*(error|failure)'
+fault_pattern+='|Buffer I/O error'
+fault_pattern+='|JBD2.*(error([ :]|$)|warning|abort|fail(ed|ure)?)'
+fault_pattern+='|EXT4-fs.*(error([ :]|$)|warning|abort|fail(ed|ure)?)'
+mode=base
+failures=0
+
+# Invoked by the EXIT trap.
+# shellcheck disable=SC2317
+cleanup() {
+  rm -f -- "$GPU_LOG" "$DMESG_BEFORE" "$DMESG_AFTER" "$DMESG_DELTA"
+}
+trap cleanup EXIT
+
+usage() {
+  printf 'usage: r46h-rootfs-smoke [--base|--network]\n'
+}
+
+case ${1:---base} in
+  --base) mode=base ;;
+  --network) mode=network ;;
+  -h|--help) usage; exit 0 ;;
+  *) usage >&2; exit 2 ;;
+esac
+
+check() {
+  local label=$1
+  shift
+  if "$@"; then
+    printf 'R46H_ROOTFS_CHECK name=%s result=pass\n' "$label"
+  else
+    printf 'R46H_ROOTFS_CHECK name=%s result=fail\n' "$label"
+    failures=$((failures + 1))
+  fi
+}
+
+# Invoked indirectly by check().
+# shellcheck disable=SC2317
+wifi_link_up() {
+  [[ -n "$wifi_iface" ]] && ip -o link show dev "$wifi_iface" | grep -q 'state UP'
+}
+
+# Invoked indirectly by check().
+# shellcheck disable=SC2317
+wifi_has_ipv4() {
+  [[ -n "$wifi_iface" ]] && ip -4 -o addr show dev "$wifi_iface" scope global | grep -q .
+}
+
+# Invoked indirectly by check().
+# shellcheck disable=SC2317
+wifi_has_default_route() {
+  [[ -n "$wifi_iface" ]] && ip route show default dev "$wifi_iface" | grep -q '^default '
+}
+
+[[ "$(id -u)" == 0 ]] || {
+  printf 'R46H_ROOTFS_SMOKE result=fail reason=not-root\n' >&2
+  exit 1
+}
+
+check debian13 grep -Fqx 'VERSION_ID="13"' /etc/os-release
+check kernel test "$(uname -r)" = "$EXPECTED_RELEASE"
+check pid1 test "$(cat /proc/1/comm)" = systemd
+check cpu-count test "$(getconf _NPROCESSORS_ONLN)" = 4
+check root-source test "$(findmnt -n -o PARTUUID /)" = "$EXPECTED_ROOT_PARTUUID"
+check root-uuid test "$(findmnt -n -o UUID /)" = "$EXPECTED_ROOT_UUID"
+check root-fstype test "$(findmnt -n -o FSTYPE /)" = ext4
+container_type=$(systemd-detect-virt --container 2>/dev/null || true)
+check no-container test "$container_type" = none
+check module-tree test -d "/lib/modules/$EXPECTED_RELEASE"
+check serial-getty systemctl is-active --quiet serial-getty@ttyS2.service
+check ssh systemctl is-active --quiet ssh.service
+check network-manager systemctl is-active --quiet NetworkManager.service
+check firstboot grep -Fqx 'release=debian13-p2-mvp-v0.1' /var/lib/r46h/firstboot-complete
+check machine-id grep -Eq '^[0-9a-f]{32}$' /etc/machine-id
+check ssh-host-keys bash -c "compgen -G '/etc/ssh/ssh_host_*_key' >/dev/null"
+check ssh-config /usr/sbin/sshd -t
+check failed-units test "$(systemctl --failed --no-legend --plain | wc -l | tr -d ' ')" = 0
+check firmware test -f /lib/firmware/rtlwifi/rtl8188eufw.bin
+check panfrost-dri test -f /usr/lib/aarch64-linux-gnu/dri/panfrost_dri.so
+check render-node test -c /dev/dri/renderD128
+
+wifi_iface=""
+wifi_mac=""
+wifi_status=$(cat /run/r46h-wifi-mac.status 2>/dev/null || true)
+wifi_status_pattern='^R46H_WIFI_MAC result=pass interface=(wlan[0-9]+) source=usb-serial mac=(([0-9a-f]{2}:){5}[0-9a-f]{2})$'
+if [[ "$wifi_status" =~ $wifi_status_pattern ]]; then
+  wifi_iface=${BASH_REMATCH[1]}
+  wifi_mac=${BASH_REMATCH[2]}
+  wifi_live_mac=$(cat "/sys/class/net/$wifi_iface/address" 2>/dev/null || true)
+  if [[ "${wifi_live_mac,,}" == "$wifi_mac" ]]; then
+    printf 'R46H_ROOTFS_CHECK name=wifi-stable-mac result=pass interface=%s mac=%s\n' \
+      "$wifi_iface" "$wifi_mac"
+  else
+    printf 'R46H_ROOTFS_CHECK name=wifi-stable-mac result=fail reason=live-mac-mismatch status_mac=%s live_mac=%s\n' \
+      "$wifi_mac" "${wifi_live_mac:-missing}"
+    failures=$((failures + 1))
+  fi
+else
+  printf 'R46H_ROOTFS_CHECK name=wifi-stable-mac result=fail status=%s\n' \
+    "${wifi_status:-missing}"
+  failures=$((failures + 1))
+fi
+
+ext4_before=$(cat "$EXT4_ERRORS" 2>/dev/null || true)
+if [[ "$ext4_before" =~ ^[0-9]+$ && "$ext4_before" -eq 0 ]]; then
+  printf 'R46H_ROOTFS_CHECK name=ext4-errors-before result=pass value=%s\n' "$ext4_before"
+else
+  printf 'R46H_ROOTFS_CHECK name=ext4-errors-before result=fail value=%s\n' "${ext4_before:-missing}"
+  failures=$((failures + 1))
+fi
+
+before_bytes=0
+if dmesg > "$DMESG_BEFORE"; then
+  before_bytes=$(wc -c < "$DMESG_BEFORE" | tr -d ' ')
+fi
+if [[ ! "$before_bytes" =~ ^[1-9][0-9]*$ ]]; then
+  printf 'R46H_ROOTFS_CHECK name=dmesg-before result=fail\n'
+  failures=$((failures + 1))
+  before_bytes=0
+fi
+
+probe_status=0
+if timeout -s TERM -k 2 "$GPU_TIMEOUT_SECONDS" runuser -u ark -- env \
+    EGL_PLATFORM=surfaceless \
+    GALLIUM_DRIVER=panfrost \
+    MESA_LOADER_DRIVER_OVERRIDE=panfrost \
+    MESA_SHADER_CACHE_DISABLE=true \
+    /usr/local/libexec/r46h-gles2-fbo-probe > "$GPU_LOG" 2>&1; then
+  probe_status=0
+else
+  probe_status=$?
+fi
+
+if [[ "$probe_status" -eq 0 ]] &&
+   grep -Fq 'renderer=Mali-G31 (Panfrost)' "$GPU_LOG" &&
+   grep -Fqx 'R46H_MESA_PROBE pixel=51,102,153,255 expected=51,102,153,255' "$GPU_LOG" &&
+   grep -Fqx 'R46H_MESA_PROBE result=pass' "$GPU_LOG" &&
+   ! grep -Eiq 'llvmpipe|softpipe|libMali' "$GPU_LOG"; then
+  printf 'R46H_ROOTFS_CHECK name=panfrost-fbo result=pass\n'
+else
+  cat "$GPU_LOG"
+  printf 'R46H_ROOTFS_CHECK name=panfrost-fbo result=fail\n'
+  failures=$((failures + 1))
+fi
+
+sleep 3
+ext4_after=$(cat "$EXT4_ERRORS" 2>/dev/null || true)
+ext4_changed=1
+if [[ "$ext4_before" =~ ^[0-9]+$ && "$ext4_after" =~ ^[0-9]+$ &&
+      "$ext4_before" == "$ext4_after" ]]; then
+  ext4_changed=0
+fi
+
+dmesg_ring_wrapped=1
+fault_detected=1
+if [[ "$before_bytes" -gt 0 ]] && dmesg > "$DMESG_AFTER"; then
+  after_bytes=$(wc -c < "$DMESG_AFTER" | tr -d ' ')
+  if [[ "$after_bytes" =~ ^[0-9]+$ ]] && (( after_bytes >= before_bytes )) &&
+     head -c "$before_bytes" "$DMESG_AFTER" | cmp -s "$DMESG_BEFORE" -; then
+    dmesg_ring_wrapped=0
+    tail -c "+$((before_bytes + 1))" "$DMESG_AFTER" > "$DMESG_DELTA"
+    if grep -Eiq "$fault_pattern" "$DMESG_DELTA"; then
+      fault_detected=1
+    else
+      fault_detected=0
+    fi
+  fi
+fi
+
+printf 'R46H_ROOTFS_GPU_AUDIT probe_exit_status=%s ext4_errors_before=%s ext4_errors_after=%s ext4_changed=%s dmesg_ring_wrapped=%s fault_detected=%s\n' \
+  "$probe_status" "${ext4_before:-missing}" "${ext4_after:-missing}" "$ext4_changed" \
+  "$dmesg_ring_wrapped" "$fault_detected"
+if [[ -s "$DMESG_DELTA" ]]; then
+  printf 'R46H_ROOTFS_GPU_AUDIT dmesg_delta_begin\n'
+  sed -n '1,160p' "$DMESG_DELTA"
+  printf 'R46H_ROOTFS_GPU_AUDIT dmesg_delta_end\n'
+fi
+if [[ "$ext4_changed" -ne 0 || "$dmesg_ring_wrapped" -ne 0 || "$fault_detected" -ne 0 ]]; then
+  printf 'R46H_ROOTFS_CHECK name=gpu-post-audit result=fail\n'
+  failures=$((failures + 1))
+else
+  printf 'R46H_ROOTFS_CHECK name=gpu-post-audit result=pass\n'
+fi
+
+if dmesg | grep -Eiq "$fault_pattern"; then
+  printf 'R46H_ROOTFS_CHECK name=kernel-faults result=fail\n'
+  dmesg | grep -Ein "$fault_pattern" | tail -n 80 || true
+  failures=$((failures + 1))
+else
+  printf 'R46H_ROOTFS_CHECK name=kernel-faults result=pass\n'
+fi
+
+if [[ "$mode" == network ]]; then
+  check wlan-up wifi_link_up
+  check ipv4 wifi_has_ipv4
+  check default-route wifi_has_default_route
+fi
+
+if (( failures == 0 )); then
+  printf 'R46H_ROOTFS_SMOKE mode=%s result=pass\n' "$mode"
+  exit 0
+fi
+printf 'R46H_ROOTFS_SMOKE mode=%s result=fail failures=%d\n' "$mode" "$failures"
+exit 1

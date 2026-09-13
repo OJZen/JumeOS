@@ -1,0 +1,142 @@
+From 4f907353040fdbfdbf8461a437ad9d40e99f2f5e Mon Sep 17 00:00:00 2001
+From: Codex <codex@local.invalid>
+Date: Sat, 1 Aug 2026 21:10:00 +0800
+Subject: [PATCH] drm: rockchip: use downstream R46H DSI lane rate
+
+The R46H vendor boot chain drives its 1024x768 panel at 396 Mbps per
+lane, while the upstream Rockchip host's 25 percent margin selects
+450 Mbps. Preserve that known-good physical link rate during bring-up.
+
+PX30 uses the external Inno DPHY, so configure both the DesignWare host
+timing and the external PHY request. Keep the quirk restricted to the
+provisional R46H machine compatible, leaving all other Rockchip boards
+on the existing calculation. Add diagnostic messages for the requested
+host rate and the actual PLL result.
+
+Signed-off-by: Codex <codex@local.invalid>
+---
+diff --git a/drivers/gpu/drm/panel/panel-r46h.c b/drivers/gpu/drm/panel/panel-r46h.c
+index 9b44ab4..6844c0e 100644
+--- a/drivers/gpu/drm/panel/panel-r46h.c
++++ b/drivers/gpu/drm/panel/panel-r46h.c
+@@ -261,6 +261,9 @@ static int r46h_panel_probe(struct mipi_dsi_device *dsi)
+ 			  MIPI_DSI_MODE_VIDEO_BURST |
+ 			  MIPI_DSI_MODE_NO_EOT_PACKET |
+ 			  MIPI_DSI_MODE_LPM;
++	dev_info(dev,
++		 "R46H_DSI_CFG lanes=%u format=%u mode_flags=0x%08lx\n",
++		 dsi->lanes, dsi->format, dsi->mode_flags);
+ 
+ 	mipi_dsi_set_drvdata(dsi, ctx);
+ 	drm_panel_init(&ctx->panel, dev, &r46h_panel_funcs,
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
+index 58a44af..9c7555e 100644
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
+@@ -11,6 +11,7 @@
+ #include <linux/math64.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/of_platform.h>
+ #include <linux/phy/phy.h>
+@@ -64,6 +65,8 @@
+ 
+ #define PHY_STATUS_TIMEOUT_US		10000
+ #define CMD_PKT_STATUS_TIMEOUT_US	20000
++
++#define R46H_DSI_LANE_MBPS		396
+ 
+ #define BYPASS_VCO_RANGE	BIT(7)
+ #define VCO_RANGE_CON_SEL(val)	(((val) & 0x7) << 3)
+@@ -552,8 +555,11 @@ dw_mipi_dsi_get_lane_mbps(void *priv_data, const struct drm_display_mode *mode,
+ 			  unsigned int *lane_mbps)
+ {
+ 	struct dw_mipi_dsi_rockchip *dsi = priv_data;
+-	int bpp;
++	bool fixed_r46h_rate;
++	int bpp, ret;
++	u64 fixed_hs_clk_rate;
+ 	unsigned long mpclk, tmp;
++	unsigned int auto_mbps;
+ 	unsigned int target_mbps = 1000;
+ 	unsigned int max_mbps = dppa_map[ARRAY_SIZE(dppa_map) - 1].max_mbps;
+ 	unsigned long best_freq = 0;
+@@ -572,6 +578,9 @@ dw_mipi_dsi_get_lane_mbps(void *priv_data, const struct drm_display_mode *mode,
+ 		return bpp;
+ 	}
+ 
++	fixed_r46h_rate = dsi->phy &&
++		of_machine_is_compatible("rockchip,rk3326-r46h-linux");
++
+ 	mpclk = DIV_ROUND_UP(mode->clock, MSEC_PER_SEC);
+ 	if (mpclk) {
+ 		/* take 1 / 0.8, since mbps must big than bandwidth of RGB */
+@@ -583,13 +592,34 @@ dw_mipi_dsi_get_lane_mbps(void *priv_data, const struct drm_display_mode *mode,
+ 				      "DPHY clock frequency is out of range\n");
+ 	}
+ 
++	auto_mbps = target_mbps;
++	if (fixed_r46h_rate)
++		target_mbps = R46H_DSI_LANE_MBPS;
++
+ 	/* for external phy only a the mipi_dphy_config is necessary */
+ 	if (dsi->phy) {
+-		phy_mipi_dphy_get_default_config(mode->clock * 1000 * 10 / 8,
+-						 bpp, lanes,
+-						 &dsi->phy_opts.mipi_dphy);
++		if (fixed_r46h_rate) {
++			fixed_hs_clk_rate = (u64)target_mbps * USEC_PER_SEC;
++			ret = phy_mipi_dphy_get_default_config_for_hsclk(fixed_hs_clk_rate,
++									 lanes,
++									 &dsi->phy_opts.mipi_dphy);
++			if (ret)
++				return ret;
++		} else {
++			phy_mipi_dphy_get_default_config(mode->clock * 1000 * 10 / 8,
++							 bpp, lanes,
++							 &dsi->phy_opts.mipi_dphy);
++		}
++
+ 		dsi->lane_mbps = target_mbps;
+ 		*lane_mbps = dsi->lane_mbps;
++
++		if (fixed_r46h_rate)
++			dev_info(dsi->dev,
++				 "R46H_DSI_RATE mode=%d bpp=%d lanes=%u auto=%u effective=%u phy=%lu\n",
++				 mode->clock, bpp, lanes, auto_mbps,
++				 dsi->lane_mbps,
++				 dsi->phy_opts.mipi_dphy.hs_clk_rate);
+ 
+ 		return 0;
+ 	}
+diff --git a/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c b/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c
+index 6405943..361f414 100644
+--- a/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c
++++ b/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c
+@@ -367,6 +367,7 @@ static void inno_dsidphy_mipi_mode_enable(struct inno_dsidphy *inno)
+ {
+ 	struct phy_configure_opts_mipi_dphy *cfg = &inno->dphy_cfg;
+ 	const struct inno_mipi_dphy_timing *timings;
++	unsigned long actual_rate;
+ 	u32 t_txbyteclkhs, t_txclkesc;
+ 	u32 txbyteclkhs, txclkesc, esc_clk_div;
+ 	u32 hs_exit, clk_post, clk_pre, wakeup, lpx, ta_go, ta_sure, ta_wait;
+@@ -375,7 +376,13 @@ static void inno_dsidphy_mipi_mode_enable(struct inno_dsidphy *inno)
+ 
+ 	timings = inno->pdata->inno_mipi_dphy_timing_table;
+ 
+-	inno_dsidphy_pll_calc_rate(inno, cfg->hs_clk_rate);
++	actual_rate = inno_dsidphy_pll_calc_rate(inno, cfg->hs_clk_rate);
++	if (of_machine_is_compatible("rockchip,rk3326-r46h-linux"))
++		dev_info(inno->dev,
++			 "R46H_DPHY_PLL requested_hz=%lu actual_hz=%lu ref_hz=%lu prediv=%u fbdiv=%u lanes=%u\n",
++			 cfg->hs_clk_rate, actual_rate,
++			 clk_get_rate(inno->ref_clk), inno->pll.prediv,
++			 inno->pll.fbdiv, cfg->lanes);
+ 
+ 	/* Select MIPI mode */
+ 	phy_update_bits(inno, REGISTER_PART_LVDS, 0x03,
+-- 
+2.50.1

@@ -1,0 +1,516 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+readonly EXPECTED_MANIFEST_SHA256="@DEPLOY_MANIFEST_SHA256@"
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+readonly SCRIPT_DIR
+readonly R46H_MANIFEST="${SCRIPT_DIR}/DEPLOY-MANIFEST"
+readonly TRUSTED_PAYLOAD=${R46H_DEPLOY_TRUSTED_PAYLOAD:-}
+readonly EXTERNAL_RECEIPT=${R46H_DEPLOY_EXTERNAL_RECEIPT:-}
+readonly EXTERNAL_RECEIPT_SHA256=${R46H_DEPLOY_EXTERNAL_RECEIPT_SHA256:-}
+readonly SECURE_ROMS_MOUNT=${R46H_DEPLOY_SECURE_ROMS_MOUNT:-}
+
+bootstrap_fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+bootstrap_value() {
+  local key=$1 count value
+  count=$(grep -c "^${key}=" "$R46H_MANIFEST" 2>/dev/null || true)
+  [[ "$count" -eq 1 ]] || bootstrap_fail "manifest key ${key} must appear exactly once"
+  value=$(sed -n "s/^${key}=//p" "$R46H_MANIFEST")
+  [[ "$value" != *$'\n'* ]] || bootstrap_fail "manifest key ${key} is multiline"
+  printf '%s' "$value"
+}
+
+[[ "$(id -u)" -eq 0 ]] || bootstrap_fail "run through the verified root-owned bootstrap"
+[[ "$TRUSTED_PAYLOAD" == "$SCRIPT_DIR" && -d "$SCRIPT_DIR" && ! -L "$SCRIPT_DIR" ]] ||
+  bootstrap_fail "switch is not running from the bootstrap trusted copy"
+[[ "$(stat -c '%u:%a' -- "$SCRIPT_DIR")" == 0:700 ]] ||
+  bootstrap_fail "trusted payload directory must be root-owned 0700"
+[[ "$EXTERNAL_RECEIPT" == "$SCRIPT_DIR/EXTERNAL-STAGE-RECEIPT" &&
+   "$EXTERNAL_RECEIPT_SHA256" =~ ^[0-9a-f]{64}$ &&
+   -f "$EXTERNAL_RECEIPT" && ! -L "$EXTERNAL_RECEIPT" ]] ||
+  bootstrap_fail "missing trusted external stage receipt"
+[[ "$(stat -c '%u:%a' -- "$EXTERNAL_RECEIPT")" == 0:600 &&
+   "$(sha256sum "$EXTERNAL_RECEIPT" | awk '{print $1}')" == "$EXTERNAL_RECEIPT_SHA256" ]] ||
+  bootstrap_fail "trusted external stage receipt mismatch"
+[[ -f "$R46H_MANIFEST" && ! -L "$R46H_MANIFEST" ]] || bootstrap_fail "unsafe deployment manifest"
+[[ "$(sha256sum "$R46H_MANIFEST" | awk '{print $1}')" == "$EXPECTED_MANIFEST_SHA256" ]] ||
+  bootstrap_fail "deployment manifest SHA-256 mismatch"
+common_path="${SCRIPT_DIR}/$(bootstrap_value target_common)"
+[[ -f "$common_path" && ! -L "$common_path" ]] || bootstrap_fail "unsafe target common"
+[[ "$(stat -c '%s' "$common_path")" == "$(bootstrap_value target_common_size)" ]] || bootstrap_fail "target common size mismatch"
+[[ "$(sha256sum "$common_path" | awk '{print $1}')" == "$(bootstrap_value target_common_sha256)" ]] || bootstrap_fail "target common SHA-256 mismatch"
+# shellcheck source=/dev/null
+source "$common_path"
+
+R46H_ROOT=$(r46h_test_root)
+readonly R46H_ROOT
+readonly boot_mount="${R46H_ROOT}/boot"
+readonly roms_mount="$SECURE_ROMS_MOUNT"
+readonly modules_parent="${R46H_ROOT}/lib/modules"
+readonly lock_parent="${R46H_ROOT}/run/r46h-deploy"
+
+payload_name=$(r46h_manifest_value payload_name)
+current_payload_name=$(r46h_manifest_value current_payload_name)
+baseline_id=$(r46h_manifest_value current_baseline_id)
+fallback_release=$(r46h_manifest_value fallback_release)
+current_release=$(r46h_manifest_value current_release)
+new_release=$(r46h_manifest_value kernel_release)
+source_commit=$(r46h_manifest_value source_git_commit)
+source_snapshot=$(r46h_manifest_value source_snapshot_sha256)
+active_boot="${boot_mount}/$(r46h_manifest_value current_active_path)"
+fallback_boot="${boot_mount}/$(r46h_manifest_value fallback_boot_path)"
+fallback_test_boot="${boot_mount}/$(r46h_manifest_value fallback_boot_test_path)"
+fallback_image="${boot_mount}/$(r46h_manifest_value fallback_image_path)"
+fallback_dtb="${boot_mount}/$(r46h_manifest_value fallback_dtb_path)"
+current_boot="${boot_mount}/$(r46h_manifest_value current_candidate_path)"
+current_image="${boot_mount}/$(r46h_manifest_value current_image_path)"
+current_dtb="${boot_mount}/$(r46h_manifest_value current_dtb_path)"
+new_boot="${boot_mount}/$(r46h_manifest_value boot_candidate)"
+new_image="${boot_mount}/$(r46h_manifest_value boot_image)"
+new_dtb="${boot_mount}/$(r46h_manifest_value boot_dtb)"
+source_boot="${SCRIPT_DIR}/$(r46h_manifest_value boot_candidate)"
+source_image="${SCRIPT_DIR}/$(r46h_manifest_value boot_image)"
+source_dtb="${SCRIPT_DIR}/$(r46h_manifest_value boot_dtb)"
+readonly payload_name current_payload_name baseline_id fallback_release current_release
+readonly new_release source_commit source_snapshot active_boot fallback_boot fallback_test_boot
+readonly fallback_image fallback_dtb current_boot current_image current_dtb
+readonly new_boot new_image new_dtb source_boot source_image source_dtb
+
+readonly old_payload="${roms_mount}/${current_payload_name}"
+readonly receipt_payload="${roms_mount}/${payload_name}"
+readonly retired_boot="${old_payload}/BOOT-RETIRED-${baseline_id}"
+readonly retired_boot_receipt="/roms/${current_payload_name}/BOOT-RETIRED-${baseline_id}"
+readonly retired_stage="${old_payload}/.BOOT-RETIRED-${baseline_id}.stage"
+readonly retired_marker="BACKUP-COMPLETE"
+readonly module_receipt="${receipt_payload}/MODULES-INSTALLED"
+readonly switch_receipt="${receipt_payload}/BOOT-SWITCHED"
+readonly switch_receipt_temp="${receipt_payload}/.BOOT-SWITCHED.stage"
+
+fallback_boot_size=$(r46h_manifest_value fallback_boot_size)
+fallback_boot_hash=$(r46h_manifest_value fallback_boot_sha256)
+current_boot_size=$(r46h_manifest_value current_candidate_size)
+current_boot_hash=$(r46h_manifest_value current_candidate_sha256)
+new_boot_size=$(r46h_manifest_value boot_candidate_size)
+new_boot_hash=$(r46h_manifest_value boot_candidate_sha256)
+new_tree=$(r46h_manifest_value module_tree_sha256)
+new_module_count=$(r46h_manifest_value module_count)
+new_module_files=$(r46h_manifest_value module_tree_file_count)
+fallback_trees=$(r46h_manifest_value fallback_module_tree_sha256_allowed)
+fallback_module_count=$(r46h_manifest_value fallback_module_count)
+fallback_module_files=$(r46h_manifest_value fallback_module_file_count)
+readonly fallback_boot_size fallback_boot_hash current_boot_size current_boot_hash
+readonly new_boot_size new_boot_hash new_tree new_module_count new_module_files
+readonly fallback_trees fallback_module_count fallback_module_files
+
+active_state=unknown
+rollback_new_active=0
+switch_complete=0
+
+check_boot_file() {
+  local path=$1 size=$2 hash=$3 label=$4
+  r46h_check_file "$path" "$size" "$hash" "$label"
+}
+
+boot_file_matches() {
+  local path=$1 size=$2 hash=$3
+  [[ -f "$path" && ! -L "$path" && "$(r46h_size "$path")" == "$size" &&
+     "$(r46h_hash "$path")" == "$hash" ]]
+}
+
+verify_fallback() {
+  check_boot_file "$fallback_boot" "$fallback_boot_size" "$fallback_boot_hash" "known-good fallback boot.ini"
+  check_boot_file "$fallback_test_boot" "$fallback_boot_size" "$fallback_boot_hash" "fallback boot.ini.test"
+  check_boot_file "$fallback_image" "$(r46h_manifest_value fallback_image_size)" "$(r46h_manifest_value fallback_image_sha256)" "fallback Image"
+  check_boot_file "$fallback_dtb" "$(r46h_manifest_value fallback_dtb_size)" "$(r46h_manifest_value fallback_dtb_sha256)" "fallback DTB"
+  check_boot_file "${boot_mount}/$(r46h_manifest_value uboot_root_dtb_path)" "$(r46h_manifest_value uboot_dtb_size)" "$(r46h_manifest_value uboot_dtb_sha256)" "root U-Boot DTB"
+  check_boot_file "${boot_mount}/$(r46h_manifest_value uboot_console_dtb_path)" "$(r46h_manifest_value uboot_dtb_size)" "$(r46h_manifest_value uboot_dtb_sha256)" "console U-Boot DTB"
+  r46h_verify_module_tree "$modules_parent" "$fallback_release" "$fallback_trees" \
+    "$fallback_module_count" "$fallback_module_files" "fallback"
+}
+
+verify_new_sources() {
+  check_boot_file "$source_image" "$(r46h_manifest_value boot_image_size)" "$(r46h_manifest_value boot_image_sha256)" "new source Image"
+  check_boot_file "$source_dtb" "$(r46h_manifest_value boot_dtb_size)" "$(r46h_manifest_value boot_dtb_sha256)" "new source DTB"
+  check_boot_file "$source_boot" "$new_boot_size" "$new_boot_hash" "new source boot.ini"
+  r46h_validate_receipt "$module_receipt" "$current_release" "$new_release" "$new_tree" "$new_module_count" "$new_module_files"
+  r46h_verify_module_tree "$modules_parent" "$new_release" "$new_tree" "$new_module_count" "$new_module_files" "new"
+}
+
+verify_current_payload_anchors() {
+  local r46h_pa_count r46h_pa_index=1 r46h_pa_path
+  [[ -d "$old_payload" && ! -L "$old_payload" ]] || r46h_fail "unsafe current payload directory"
+  r46h_pa_count=$(r46h_manifest_value current_anchor_count)
+  [[ "$r46h_pa_count" =~ ^[1-9][0-9]*$ ]] || r46h_fail "invalid current anchor count"
+  while (( r46h_pa_index <= r46h_pa_count )); do
+    r46h_pa_path=$(r46h_manifest_value "current_anchor_${r46h_pa_index}_path")
+    [[ "$r46h_pa_path" =~ ^[A-Za-z0-9._+-]+$ ]] || r46h_fail "unsafe current anchor path"
+    r46h_check_file "$old_payload/$r46h_pa_path" \
+      "$(r46h_manifest_value "current_anchor_${r46h_pa_index}_size")" \
+      "$(r46h_manifest_value "current_anchor_${r46h_pa_index}_sha256")" \
+      "current payload anchor ${r46h_pa_path}"
+    r46h_pa_index=$((r46h_pa_index + 1))
+  done
+}
+
+detect_active() {
+  local hash size
+  [[ -f "$active_boot" && ! -L "$active_boot" ]] || r46h_fail "active boot.ini is unsafe"
+  hash=$(r46h_hash "$active_boot")
+  size=$(r46h_size "$active_boot")
+  case "$hash:$size" in
+    "$current_boot_hash:$current_boot_size") active_state=current ;;
+    "$fallback_boot_hash:$fallback_boot_size") active_state=fallback ;;
+    "$new_boot_hash:$new_boot_size") active_state=new ;;
+    *) r46h_fail "active boot.ini is not a recognized current/fallback/new state" ;;
+  esac
+}
+
+retired_backup_matches() {
+  local dir=$1 marker="${1}/${retired_marker}" count unsafe
+  [[ -d "$dir" && ! -L "$dir" ]] || return 1
+  boot_file_matches "$dir/$(r46h_manifest_value current_image_path)" \
+    "$(r46h_manifest_value current_image_size)" "$(r46h_manifest_value current_image_sha256)" || return 1
+  boot_file_matches "$dir/$(r46h_manifest_value current_dtb_path)" \
+    "$(r46h_manifest_value current_dtb_size)" "$(r46h_manifest_value current_dtb_sha256)" || return 1
+  boot_file_matches "$dir/$(r46h_manifest_value current_candidate_path)" \
+    "$current_boot_size" "$current_boot_hash" || return 1
+  [[ -f "$marker" && ! -L "$marker" ]] || return 1
+  unsafe=$(find "$dir" -mindepth 1 -maxdepth 1 ! -type f -print -quit)
+  [[ -z "$unsafe" ]] || return 1
+  count=$(find "$dir" -mindepth 1 -maxdepth 1 -print | wc -l | tr -d '[:space:]')
+  [[ "$count" == 4 ]] || return 1
+  [[ "$(awk 'END {print NR}' "$marker")" == 5 ]] || return 1
+  grep -Fxq 'status=complete' "$marker" || return 1
+  grep -Fxq "release=${current_release}" "$marker" || return 1
+  grep -Fxq "image_sha256=$(r46h_manifest_value current_image_sha256)" "$marker" || return 1
+  grep -Fxq "dtb_sha256=$(r46h_manifest_value current_dtb_sha256)" "$marker" || return 1
+  grep -Fxq "boot_sha256=${current_boot_hash}" "$marker" || return 1
+}
+
+recover_retired_stage() {
+  local entry name
+  [[ -e "$retired_stage" || -L "$retired_stage" ]] || return 0
+  [[ -d "$retired_stage" && ! -L "$retired_stage" ]] || r46h_fail "unsafe retired backup staging path"
+  if retired_backup_matches "$retired_stage"; then
+    [[ ! -e "$retired_boot" && ! -L "$retired_boot" ]] ||
+      r46h_fail "both retired backup and complete staging backup exist"
+    mv -T -- "$retired_stage" "$retired_boot"
+    sync || r46h_fail "cannot sync recovered retired BOOT backup"
+    retired_backup_matches "$retired_boot" || r46h_fail "recovered retired backup verification failed"
+    return
+  fi
+  while IFS= read -r entry; do
+    [[ -f "$entry" && ! -L "$entry" ]] || r46h_fail "retired staging contains an unsafe entry"
+    name=${entry##*/}
+    case "$name" in
+      "$(r46h_manifest_value current_image_path)"|\
+      "$(r46h_manifest_value current_dtb_path)"|\
+      "$(r46h_manifest_value current_candidate_path)"|\
+      "$retired_marker") ;;
+      *) r46h_fail "retired staging contains an unexpected entry: ${name}" ;;
+    esac
+  done < <(find "$retired_stage" -mindepth 1 -maxdepth 1 -print | LC_ALL=C sort)
+  for name in \
+    "$(r46h_manifest_value current_image_path)" \
+    "$(r46h_manifest_value current_dtb_path)" \
+    "$(r46h_manifest_value current_candidate_path)" \
+    "$retired_marker"; do
+    [[ ! -e "$retired_stage/$name" && ! -L "$retired_stage/$name" ]] || rm -- "$retired_stage/$name"
+  done
+  rmdir -- "$retired_stage" || r46h_fail "cannot remove incomplete retired staging directory"
+  sync || r46h_fail "cannot sync retired BOOT staging recovery"
+}
+
+ensure_retired_backup() {
+  recover_retired_stage
+  if [[ -e "$retired_boot" || -L "$retired_boot" ]]; then
+    retired_backup_matches "$retired_boot" || r46h_fail "retired current BOOT backup is invalid"
+    return
+  fi
+  check_boot_file "$current_image" "$(r46h_manifest_value current_image_size)" "$(r46h_manifest_value current_image_sha256)" "current Image"
+  check_boot_file "$current_dtb" "$(r46h_manifest_value current_dtb_size)" "$(r46h_manifest_value current_dtb_sha256)" "current DTB"
+  check_boot_file "$current_boot" "$current_boot_size" "$current_boot_hash" "current boot candidate"
+  mkdir -- "$retired_stage"
+  cp -- "$current_image" "$retired_stage/$(r46h_manifest_value current_image_path)"
+  cp -- "$current_dtb" "$retired_stage/$(r46h_manifest_value current_dtb_path)"
+  cp -- "$current_boot" "$retired_stage/$(r46h_manifest_value current_candidate_path)"
+  printf '%s\n' \
+    'status=complete' \
+    "release=${current_release}" \
+    "image_sha256=$(r46h_manifest_value current_image_sha256)" \
+    "dtb_sha256=$(r46h_manifest_value current_dtb_sha256)" \
+    "boot_sha256=${current_boot_hash}" > "$retired_stage/$retired_marker"
+  sync || r46h_fail "cannot sync staged retired BOOT backup"
+  retired_backup_matches "$retired_stage" || r46h_fail "staged retired backup verification failed"
+  mv -T -- "$retired_stage" "$retired_boot"
+  sync || r46h_fail "cannot sync published retired BOOT backup"
+  retired_backup_matches "$retired_boot" || r46h_fail "published retired backup verification failed"
+}
+
+publish_active() {
+  local source=$1 desired_size=$2 desired_hash=$3 prior_size=$4 prior_hash=$5 label=$6
+  local temp="${boot_mount}/.boot.ini.${payload_name}.stage"
+  [[ ! -e "$temp" && ! -L "$temp" ]] || rm -f -- "$temp"
+  check_boot_file "$active_boot" "$prior_size" "$prior_hash" "active boot before ${label}"
+  cp -- "$source" "$temp"
+  check_boot_file "$temp" "$desired_size" "$desired_hash" "staged ${label}"
+  r46h_flush_boot
+  check_boot_file "$active_boot" "$prior_size" "$prior_hash" "active boot after staging ${label}"
+  mv -T -f -- "$temp" "$active_boot"
+  if [[ -n "$R46H_ROOT" && "$label" == "new boot.ini" &&
+        "${R46H_DEPLOY_TARGET_TEST_FAIL_AFTER_NEW_ACTIVE_MOVE:-0}" == 1 ]]; then
+    r46h_fail "injected failure after publishing active new boot.ini"
+  fi
+  r46h_flush_boot
+  check_boot_file "$active_boot" "$desired_size" "$desired_hash" "active ${label}"
+}
+
+remove_old() {
+  local path=$1 size=$2 hash=$3 label=$4
+  [[ -e "$path" || -L "$path" ]] || return 0
+  check_boot_file "$active_boot" "$fallback_boot_size" "$fallback_boot_hash" "active fallback before removing ${label}"
+  check_boot_file "$path" "$size" "$hash" "$label"
+  retired_backup_matches "$retired_boot" || r46h_fail "backup missing before removing ${label}"
+  rm -- "$path"
+  r46h_flush_boot
+  [[ ! -e "$path" && ! -L "$path" ]] || r46h_fail "failed to remove ${label}"
+}
+
+publish_new() {
+  local source=$1 final=$2 size=$3 hash=$4 label=$5 temp="${2}.r46h-stage"
+  if [[ -e "$final" || -L "$final" ]]; then
+    check_boot_file "$final" "$size" "$hash" "$label"
+    return
+  fi
+  if [[ -e "$temp" || -L "$temp" ]]; then
+    if [[ ! -f "$temp" || -L "$temp" || "$(r46h_size "$temp")" != "$size" || "$(r46h_hash "$temp")" != "$hash" ]]; then
+      rm -f -- "$temp"
+    fi
+  fi
+  if [[ ! -e "$temp" && ! -L "$temp" ]]; then
+    cp -- "$source" "$temp"
+    check_boot_file "$temp" "$size" "$hash" "staged ${label}"
+    r46h_flush_boot
+  fi
+  check_boot_file "$active_boot" "$fallback_boot_size" "$fallback_boot_hash" "active fallback before publishing ${label}"
+  mv -T -- "$temp" "$final"
+  r46h_flush_boot
+  check_boot_file "$final" "$size" "$hash" "$label"
+}
+
+validate_switch_receipt() {
+  local receipt=$1
+  [[ -f "$receipt" && ! -L "$receipt" ]] || r46h_fail "unsafe switch receipt"
+  [[ "$(awk 'END {print NR}' "$receipt")" == 11 ]] || r46h_fail "switch receipt field count mismatch"
+  [[ "$(r46h_file_value "$receipt" format_version)" == 1 ]] || r46h_fail "switch receipt format mismatch"
+  [[ "$(r46h_file_value "$receipt" status)" == complete ]] || r46h_fail "switch receipt status mismatch"
+  [[ "$(r46h_file_value "$receipt" switched_from)" == "$current_release" ]] || r46h_fail "switch receipt source mismatch"
+  [[ "$(r46h_file_value "$receipt" fallback_release)" == "$fallback_release" ]] || r46h_fail "switch receipt fallback mismatch"
+  [[ "$(r46h_file_value "$receipt" active_release)" == "$new_release" ]] || r46h_fail "switch receipt release mismatch"
+  [[ "$(r46h_file_value "$receipt" source_git_commit)" == "$source_commit" ]] || r46h_fail "switch receipt commit mismatch"
+  [[ "$(r46h_file_value "$receipt" source_snapshot_sha256)" == "$source_snapshot" ]] || r46h_fail "switch receipt source snapshot mismatch"
+  [[ "$(r46h_file_value "$receipt" active_boot_sha256)" == "$new_boot_hash" ]] || r46h_fail "switch receipt active BOOT mismatch"
+  [[ "$(r46h_file_value "$receipt" fallback_boot_sha256)" == "$fallback_boot_hash" ]] || r46h_fail "switch receipt fallback BOOT mismatch"
+  [[ "$(r46h_file_value "$receipt" module_tree_sha256)" == "$new_tree" ]] || r46h_fail "switch receipt module tree mismatch"
+  [[ "$(r46h_file_value "$receipt" retired_boot)" == "$retired_boot_receipt" ]] || r46h_fail "switch receipt retired backup mismatch"
+}
+
+write_switch_receipt() {
+  if [[ -e "$switch_receipt" || -L "$switch_receipt" ]]; then
+    validate_switch_receipt "$switch_receipt"
+    return
+  fi
+  [[ ! -e "$switch_receipt_temp" && ! -L "$switch_receipt_temp" ]] ||
+    r46h_fail "switch receipt stage appeared concurrently"
+  (
+    set -o noclobber
+    printf '%s\n' \
+      'format_version=1' \
+      'status=complete' \
+      "switched_from=${current_release}" \
+      "fallback_release=${fallback_release}" \
+      "active_release=${new_release}" \
+      "source_git_commit=${source_commit}" \
+      "source_snapshot_sha256=${source_snapshot}" \
+      "active_boot_sha256=${new_boot_hash}" \
+      "fallback_boot_sha256=${fallback_boot_hash}" \
+      "module_tree_sha256=${new_tree}" \
+      "retired_boot=${retired_boot_receipt}" > "$switch_receipt_temp"
+  ) || r46h_fail "cannot stage switch receipt"
+  sync || r46h_fail "cannot sync staged switch receipt"
+  mv -T -- "$switch_receipt_temp" "$switch_receipt"
+  sync || r46h_fail "cannot sync published switch receipt"
+  validate_switch_receipt "$switch_receipt"
+}
+
+recover_interrupted_switch_receipt_stage() {
+  local size
+  [[ -e "$switch_receipt_temp" || -L "$switch_receipt_temp" ]] || return 0
+  [[ -f "$switch_receipt_temp" && ! -L "$switch_receipt_temp" ]] ||
+    r46h_fail "unsafe interrupted switch receipt stage"
+  size=$(r46h_size "$switch_receipt_temp")
+  [[ "$size" =~ ^[0-9]+$ && "$size" -le 4096 ]] ||
+    r46h_fail "interrupted switch receipt stage is unexpectedly large"
+  rm -- "$switch_receipt_temp"
+  sync || r46h_fail "cannot sync interrupted switch receipt recovery"
+  [[ ! -e "$switch_receipt_temp" && ! -L "$switch_receipt_temp" ]] ||
+    r46h_fail "interrupted switch receipt stage remains after recovery"
+}
+
+restore_fallback_after_rootfs_health_failure() {
+  local health_error=$1
+  publish_active "$fallback_boot" "$fallback_boot_size" "$fallback_boot_hash" \
+    "$new_boot_size" "$new_boot_hash" "known-good fallback after rootfs health failure"
+  active_state=fallback
+  check_boot_file "$active_boot" "$fallback_boot_size" "$fallback_boot_hash" \
+    "active fallback after rootfs health failure"
+  r46h_fail "${health_error}; active boot.ini was restored to the known-good fallback"
+}
+
+verify_complete() {
+  r46h_verify_card_mounts
+  verify_fallback
+  verify_new_sources
+  retired_backup_matches "$retired_boot" || r46h_fail "retired backup missing"
+  [[ ! -e "$current_image" && ! -L "$current_image" ]] || r46h_fail "current Image was not retired"
+  [[ ! -e "$current_dtb" && ! -L "$current_dtb" ]] || r46h_fail "current DTB was not retired"
+  [[ ! -e "$current_boot" && ! -L "$current_boot" ]] || r46h_fail "current boot candidate was not retired"
+  check_boot_file "$new_image" "$(r46h_manifest_value boot_image_size)" "$(r46h_manifest_value boot_image_sha256)" "new Image"
+  check_boot_file "$new_dtb" "$(r46h_manifest_value boot_dtb_size)" "$(r46h_manifest_value boot_dtb_sha256)" "new DTB"
+  check_boot_file "$new_boot" "$new_boot_size" "$new_boot_hash" "new boot candidate"
+  check_boot_file "$active_boot" "$new_boot_size" "$new_boot_hash" "active new boot.ini"
+  if ! r46h_rootfs_health_check_at switch-before-receipt; then
+    restore_fallback_after_rootfs_health_failure "$R46H_ROOTFS_HEALTH_ERROR"
+  fi
+  write_switch_receipt
+}
+
+rollback_active_new_best_effort() {
+  local temp="${boot_mount}/.boot.ini.${payload_name}.rollback"
+  boot_file_matches "$fallback_boot" "$fallback_boot_size" "$fallback_boot_hash" || return 1
+  boot_file_matches "$active_boot" "$new_boot_size" "$new_boot_hash" || return 1
+  if [[ -e "$temp" || -L "$temp" ]]; then
+    [[ -f "$temp" && ! -L "$temp" ]] || return 1
+    rm -f -- "$temp" || return 1
+  fi
+  cp -- "$fallback_boot" "$temp" || return 1
+  boot_file_matches "$temp" "$fallback_boot_size" "$fallback_boot_hash" || return 1
+  sync || return 1
+  if [[ -n "$R46H_ROOT" ]]; then
+    printf 'rollback-flush\n' >> "$R46H_ROOT/test-state/boot-flush.log" || return 1
+  else
+    blockdev --flushbufs /dev/mmcblk0p1 || return 1
+  fi
+  sync || return 1
+  boot_file_matches "$active_boot" "$new_boot_size" "$new_boot_hash" || return 1
+  mv -T -f -- "$temp" "$active_boot" || return 1
+  sync || return 1
+  if [[ -n "$R46H_ROOT" ]]; then
+    printf 'rollback-flush\n' >> "$R46H_ROOT/test-state/boot-flush.log" || return 1
+  else
+    blockdev --flushbufs /dev/mmcblk0p1 || return 1
+  fi
+  sync || return 1
+  boot_file_matches "$active_boot" "$fallback_boot_size" "$fallback_boot_hash"
+}
+
+switch_cleanup() {
+  local status=$?
+  trap - EXIT
+  trap '' INT TERM HUP
+  if [[ "$status" -ne 0 && "$rollback_new_active" -eq 1 &&
+        "$switch_complete" -ne 1 ]]; then
+    if boot_file_matches "$active_boot" "$new_boot_size" "$new_boot_hash"; then
+      if rollback_active_new_best_effort; then
+        printf 'WARNING: incomplete switch restored active boot.ini to the known-good fallback\n' >&2
+      elif boot_file_matches "$active_boot" "$fallback_boot_size" "$fallback_boot_hash"; then
+        printf 'WARNING: fallback is active, but the rollback flush proof was incomplete\n' >&2
+      else
+        printf 'WARNING: failed to restore active boot.ini to the known-good fallback; do not reboot\n' >&2
+      fi
+    elif ! boot_file_matches "$active_boot" "$fallback_boot_size" "$fallback_boot_hash"; then
+      printf 'WARNING: active boot.ini is neither the expected new state nor the known-good fallback; do not reboot\n' >&2
+    fi
+  fi
+  exit "$status"
+}
+trap switch_cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+[[ "$roms_mount" == "$SCRIPT_DIR/card-roms" && -d "$roms_mount" && ! -L "$roms_mount" ]] ||
+  r46h_fail "missing private root-only EASYROMS mount"
+[[ "$SCRIPT_DIR" == "${lock_parent}/${payload_name}.trusted."* ]] ||
+  r46h_fail "trusted payload directory path mismatch"
+r46h_acquire_deploy_lock "$lock_parent"
+r46h_verify_card_mounts
+r46h_verify_modules_parent "$modules_parent"
+r46h_verify_rootfs_health_at switch-initial
+[[ -d "$receipt_payload" && ! -L "$receipt_payload" &&
+   "$(stat -c '%u:%g:%a' -- "$receipt_payload")" == 0:0:700 ]] ||
+  r46h_fail "EASYROMS receipt payload is not root-only after secure remount"
+r46h_check_file "$receipt_payload/.r46h-stage-owner" \
+  "$(r46h_manifest_value stage_owner_size)" "$(r46h_manifest_value stage_owner_sha256)" "card stage owner"
+r46h_check_file "$receipt_payload/STAGE-COMPLETE" \
+  "$(r46h_manifest_value stage_complete_size)" "$(r46h_manifest_value stage_complete_sha256)" "card stage completion marker"
+recover_interrupted_switch_receipt_stage
+verify_current_payload_anchors
+verify_fallback
+verify_new_sources
+detect_active
+running_release=$(r46h_running_release)
+case "$running_release" in
+  "$current_release"|"$fallback_release"|"$new_release") ;;
+  *) r46h_fail "unsupported running release: ${running_release}" ;;
+esac
+if [[ "$running_release" == "$new_release" && "$active_state" != new ]]; then
+  r46h_fail "new kernel is running but active boot.ini is not new"
+fi
+if [[ "$active_state" == new ]]; then
+  rollback_new_active=1
+  verify_complete
+  switch_complete=1
+  rollback_new_active=0
+  printf 'PASS: %s is already selected and fallback invariants hold\n' "$new_release"
+  exit 0
+fi
+
+r46h_verify_rootfs_health_at switch-before-first-write
+ensure_retired_backup
+if [[ "$active_state" == current ]]; then
+  r46h_verify_rootfs_health_at switch-before-fallback-active
+  publish_active "$fallback_boot" "$fallback_boot_size" "$fallback_boot_hash" \
+    "$current_boot_size" "$current_boot_hash" "known-good fallback"
+  active_state=fallback
+fi
+check_boot_file "$active_boot" "$fallback_boot_size" "$fallback_boot_hash" "active fallback"
+
+r46h_verify_rootfs_health_at switch-before-retire-current
+remove_old "$current_image" "$(r46h_manifest_value current_image_size)" "$(r46h_manifest_value current_image_sha256)" "current Image"
+remove_old "$current_dtb" "$(r46h_manifest_value current_dtb_size)" "$(r46h_manifest_value current_dtb_sha256)" "current DTB"
+remove_old "$current_boot" "$current_boot_size" "$current_boot_hash" "current boot candidate"
+
+available_kib=$(df -Pk "$boot_mount" | awk 'END {print $4}')
+required_bytes=$(( $(r46h_manifest_value boot_image_size) + $(r46h_manifest_value boot_dtb_size) + new_boot_size + 524288 ))
+required_kib=$(( (required_bytes + 1023) / 1024 ))
+[[ "$available_kib" =~ ^[0-9]+$ ]] || r46h_fail "cannot read BOOT free space"
+(( available_kib >= required_kib )) || r46h_fail "BOOT free space below verified projection"
+
+r46h_verify_rootfs_health_at switch-before-new-boot-files
+publish_new "$source_image" "$new_image" "$(r46h_manifest_value boot_image_size)" "$(r46h_manifest_value boot_image_sha256)" "new Image"
+publish_new "$source_dtb" "$new_dtb" "$(r46h_manifest_value boot_dtb_size)" "$(r46h_manifest_value boot_dtb_sha256)" "new DTB"
+publish_new "$source_boot" "$new_boot" "$new_boot_size" "$new_boot_hash" "new boot candidate"
+r46h_verify_rootfs_health_at switch-before-new-active
+rollback_new_active=1
+publish_active "$new_boot" "$new_boot_size" "$new_boot_hash" "$fallback_boot_size" "$fallback_boot_hash" "new boot.ini"
+active_state=new
+if ! r46h_rootfs_health_check_at switch-after-new-active; then
+  restore_fallback_after_rootfs_health_failure "$R46H_ROOTFS_HEALTH_ERROR"
+fi
+verify_complete
+switch_complete=1
+rollback_new_active=0
+printf 'PASS: boot.ini now selects %s; fallback remains %s\n' "$new_release" "$fallback_release"
+printf 'No reboot was requested or performed.\n'

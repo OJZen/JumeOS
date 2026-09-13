@@ -1,0 +1,36 @@
+odroidgoa-uboot-config
+
+# R46H @BUILD_ID@ controlled mainline test.
+# Keep @FALLBACK_BOOT_PATH@ as the serial-observable fallback.
+setenv bootargs "root=@ROOT_SPEC@ rootwait rw fsck.repair=yes net.ifnames=0 console=@CONSOLE@ earlycon loglevel=7 ignore_loglevel plymouth.enable=0 clk_ignore_unused pd_ignore_unused"
+
+setenv loadaddr "0x02000000"
+setenv initrd_loadaddr "0x0a000000"
+setenv dtb_loadaddr "0x01f00000"
+
+setenv kernel_comp_addr "0x10000000"
+if load mmc 1:1 ${kernel_comp_addr} @IMAGE_NAME@; then
+  if itest ${filesize} -eq @IMAGE_COMPRESSED_SIZE_HEX@; then
+    if unzip ${kernel_comp_addr} ${loadaddr} 0x03000000; then
+      if itest ${filesize} -eq @IMAGE_UNCOMPRESSED_SIZE_HEX@; then
+        if load mmc 1:1 ${dtb_loadaddr} @DTB_NAME@; then
+          if itest ${filesize} -eq @DTB_SIZE_HEX@; then
+            booti ${loadaddr} - ${dtb_loadaddr}
+          else
+            echo "R46H @BUILD_ID@: DTB size mismatch"
+          fi
+        else
+          echo "R46H @BUILD_ID@: DTB load failed"
+        fi
+      else
+        echo "R46H @BUILD_ID@: decompressed Image size mismatch"
+      fi
+    else
+      echo "R46H @BUILD_ID@: Image unzip failed"
+    fi
+  else
+    echo "R46H @BUILD_ID@: compressed Image size mismatch"
+  fi
+else
+  echo "R46H @BUILD_ID@: compressed Image load failed"
+fi

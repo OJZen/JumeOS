@@ -1,0 +1,116 @@
+From 3b04c81e5797c648f1c17b78a41c19d96109904c Mon Sep 17 00:00:00 2001
+From: Codex <codex@local.invalid>
+Date: Wed, 5 Aug 2026 22:10:00 +0800
+Subject: [PATCH] drm: rockchip: use downstream R46H DSI host timers
+
+The vendor 4.4 driver programs fixed DesignWare host transition timers
+for the R46H panel.  At the fixed 396 Mbps lane rate, the upstream HSTT
+table instead chooses different clock and data LP-to-HS values.
+
+Use the existing platform timing callback to return the vendor tuple
+only for the provisional R46H machine, its external DPHY, and the exact
+396 Mbps lane rate.  Leave the generic DesignWare core responsible for
+writing the host registers at its normal initialization point.
+
+Read the two timer registers back during the external-PHY init callback,
+after the core has programmed them and before host enable and panel DCS,
+so the boot log proves whether the requested single variable reached the
+hardware.  The check is diagnostic and does not write registers or alter
+error propagation.
+
+Signed-off-by: Codex <codex@local.invalid>
+---
+ .../gpu/drm/rockchip/dw-mipi-dsi-rockchip.c   | 49 ++++++++++++++++++-
+ 1 file changed, 48 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
+index 9c7555e..4f75f80 100644
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
+@@ -67,6 +67,11 @@
+ #define CMD_PKT_STATUS_TIMEOUT_US	20000
+ 
+ #define R46H_DSI_LANE_MBPS		396
++#define R46H_DSI_VERSION		0x00
++#define R46H_DSI_PHY_TMR_LPCLK_CFG	0x98
++#define R46H_DSI_PHY_TMR_CFG		0x9c
++#define R46H_DSI_PHY_TMR_LPCLK_EXPECTED	0x00400040
++#define R46H_DSI_PHY_TMR_EXPECTED	0x14102710
+ 
+ #define BYPASS_VCO_RANGE	BIT(7)
+ #define VCO_RANGE_CON_SEL(val)	(((val) & 0x7) << 3)
+@@ -411,13 +416,46 @@ static inline unsigned int ns2ui(struct dw_mipi_dsi_rockchip *dsi, int ns)
+ 	return DIV_ROUND_UP(ns * dsi->lane_mbps, 1000);
+ }
+ 
++static bool
++dw_mipi_dsi_uses_r46h_host_timers(struct dw_mipi_dsi_rockchip *dsi,
++				  unsigned int lane_mbps)
++{
++	return dsi->phy && lane_mbps == R46H_DSI_LANE_MBPS &&
++		of_machine_is_compatible("rockchip,rk3326-r46h-linux");
++}
++
++static void
++dw_mipi_dsi_check_r46h_host_timers(struct dw_mipi_dsi_rockchip *dsi)
++{
++	u32 version = readl(dsi->base + R46H_DSI_VERSION);
++	u32 lpclk = readl(dsi->base + R46H_DSI_PHY_TMR_LPCLK_CFG);
++	u32 data = readl(dsi->base + R46H_DSI_PHY_TMR_CFG);
++
++	if (lpclk == R46H_DSI_PHY_TMR_LPCLK_EXPECTED &&
++	    data == R46H_DSI_PHY_TMR_EXPECTED) {
++		dev_info(dsi->dev,
++			 "R46H_DSI_HOST_TIMERS stage=pre-enable status=match version=0x%08x lane_mbps=%u lpclk=0x%08x data=0x%08x\n",
++			 version, dsi->lane_mbps, lpclk, data);
++		return;
++	}
++
++	dev_err(dsi->dev,
++		"R46H_DSI_HOST_TIMERS stage=pre-enable status=mismatch version=0x%08x lane_mbps=%u lpclk=0x%08x expected_lpclk=0x%08x data=0x%08x expected_data=0x%08x\n",
++		version, dsi->lane_mbps, lpclk,
++		R46H_DSI_PHY_TMR_LPCLK_EXPECTED, data,
++		R46H_DSI_PHY_TMR_EXPECTED);
++}
++
+ static int dw_mipi_dsi_phy_init(void *priv_data)
+ {
+ 	struct dw_mipi_dsi_rockchip *dsi = priv_data;
+ 	int ret, i, vco;
+ 
+-	if (dsi->phy)
++	if (dsi->phy) {
++		if (dw_mipi_dsi_uses_r46h_host_timers(dsi, dsi->lane_mbps))
++			dw_mipi_dsi_check_r46h_host_timers(dsi);
+ 		return 0;
++	}
+ 
+ 	/*
+ 	 * Get vco from frequency(lane_mbps)
+@@ -742,6 +780,7 @@ static int
+ dw_mipi_dsi_phy_get_timing(void *priv_data, unsigned int lane_mbps,
+ 			   struct dw_mipi_dsi_dphy_timing *timing)
+ {
++	struct dw_mipi_dsi_rockchip *dsi = priv_data;
+ 	int i;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(hstt_table); i++)
+@@ -752,6 +791,16 @@ dw_mipi_dsi_phy_get_timing(void *priv_data, unsigned int lane_mbps,
+ 		i--;
+ 
+ 	*timing = hstt_table[i].timing;
++	if (dw_mipi_dsi_uses_r46h_host_timers(dsi, lane_mbps)) {
++		timing->clk_lp2hs = 0x40;
++		timing->clk_hs2lp = 0x40;
++		timing->data_lp2hs = 0x10;
++		timing->data_hs2lp = 0x14;
++		dev_info(dsi->dev,
++			 "R46H_DSI_HOST_TIMING_REQUEST lane_mbps=%u clk_lp2hs=%u clk_hs2lp=%u data_lp2hs=%u data_hs2lp=%u\n",
++			 lane_mbps, timing->clk_lp2hs, timing->clk_hs2lp,
++			 timing->data_lp2hs, timing->data_hs2lp);
++	}
+ 
+ 	return 0;
+ }
+-- 
+2.50.1

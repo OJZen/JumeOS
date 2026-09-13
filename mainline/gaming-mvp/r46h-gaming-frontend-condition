@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+EXPECTED_RELEASE=6.12.99-r46h-mainline-v0.15-gaming-product
+RECEIPT=/var/lib/r46h/gaming-mvp-v0.6-installed
+
+[ "$(uname -r)" = "$EXPECTED_RELEASE" ] || exit 1
+[ -f "$RECEIPT" ] && [ ! -L "$RECEIPT" ] || exit 1
+[ "$(stat -c '%u:%a:%h' "$RECEIPT")" = 0:600:1 ] || exit 1
+grep -Fqx 'payload_id=r46h-gaming-mvp-v0.6' "$RECEIPT" || exit 1
+grep -Fqx "target_release=$EXPECTED_RELEASE" "$RECEIPT" || exit 1
+
+exit 0

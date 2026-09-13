@@ -1,0 +1,9 @@
+    <system>
+        <name>dreamcast</name>
+        <fullname>Sega Dreamcast</fullname>
+        <path>%ROMPATH%/dreamcast</path>
+        <extension>.cdi .CDI .chd .CHD .gdi .GDI</extension>
+        <command label="Flycast">/usr/bin/retroarch --config /etc/r46h/retroarch.cfg --appendconfig /etc/r46h/es-de-retroarch.cfg -L /usr/local/libexec/flycast_libretro.so %ROM%</command>
+        <platform>dreamcast</platform>
+        <theme>dreamcast</theme>
+    </system>

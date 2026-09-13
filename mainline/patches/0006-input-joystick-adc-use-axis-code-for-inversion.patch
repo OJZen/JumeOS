@@ -1,0 +1,46 @@
+From 4f24a3f1ce8ea509403e67884f9604ad0a1f13d9 Mon Sep 17 00:00:00 2001
+From: Codex <codex@local.invalid>
+Date: Mon, 10 Aug 2026 08:36:00 +0800
+Subject: [PATCH] Input: adc-joystick: use the event code when inverting an axis
+
+adc_joystick_invert() reads the configured minimum and maximum with the
+argument it receives.  The callers currently pass the channel array index,
+even though input_abs_get_min() and input_abs_get_max() expect an ABS event
+code.  An inverted axis whose linux,code differs from its channel index is
+therefore transformed with an unrelated or unset range.
+
+Pass the axis event code in both the polled and buffered paths.  On the R46H,
+the third ADC channel reports ABS_Y; using index 2 selects the unset ABS_Z
+range and turns a centered raw value of 517 into -517 despite the advertised
+180..800 range.
+
+Signed-off-by: Codex <codex@local.invalid>
+---
+ drivers/input/joystick/adc-joystick.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/input/joystick/adc-joystick.c b/drivers/input/joystick/adc-joystick.c
+index 02713f30ac4c..97142891cc7d 100644
+--- a/drivers/input/joystick/adc-joystick.c
++++ b/drivers/input/joystick/adc-joystick.c
+@@ -45,7 +45,7 @@ static void adc_joystick_poll(struct input_dev *input)
+ 		if (ret < 0)
+ 			return;
+ 		if (joy->axes[i].inverted)
+-			val = adc_joystick_invert(input, i, val);
++			val = adc_joystick_invert(input, joy->axes[i].code, val);
+ 		input_report_abs(input, joy->axes[i].code, val);
+ 	}
+ 	input_sync(input);
+@@ -95,7 +95,7 @@ static int adc_joystick_handle(const void *data, void *private)
+ 		else
+ 			val &= GENMASK(msb, 0);
+ 		if (joy->axes[i].inverted)
+-			val = adc_joystick_invert(joy->input, i, val);
++			val = adc_joystick_invert(joy->input, joy->axes[i].code, val);
+ 		input_report_abs(joy->input, joy->axes[i].code, val);
+ 	}
+ 
+-- 
+2.50.1
+

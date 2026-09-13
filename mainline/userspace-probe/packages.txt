@@ -1,0 +1,6 @@
+ca-certificates
+libdrm2
+libegl1
+libgbm1
+libgl1-mesa-dri
+libgles2

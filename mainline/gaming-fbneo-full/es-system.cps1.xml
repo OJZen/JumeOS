@@ -1,0 +1,9 @@
+    <system>
+        <name>cps1</name>
+        <fullname>Capcom Play System I</fullname>
+        <path>%ROMPATH%/cps1</path>
+        <extension>.7z .7Z .zip .ZIP</extension>
+        <command label="FinalBurn Neo">/usr/bin/retroarch --config /etc/r46h/retroarch.cfg --appendconfig /etc/r46h/es-de-retroarch.cfg -L /usr/local/libexec/fbneo_libretro.so %ROM%</command>
+        <platform>arcade</platform>
+        <theme>cps1</theme>
+    </system>

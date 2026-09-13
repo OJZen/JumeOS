@@ -1,0 +1,112 @@
+diff --git a/app/gui/CliStartStreamSegue.qml b/app/gui/CliStartStreamSegue.qml
+index 14b4b7d..9b528f9 100644
+--- a/app/gui/CliStartStreamSegue.qml
++++ b/app/gui/CliStartStreamSegue.qml
+@@ -24,14 +24,12 @@ Item {
+     }
+ 
+     function onLaunchFailed(message) {
+-        errorDialog.text = message
+-        errorDialog.open()
+         console.error(message)
++        Qt.exit(1)
+     }
+ 
+     function onAppQuitRequired(appName) {
+-        quitAppDialog.appName = appName
+-        quitAppDialog.open()
++        onLaunchFailed(qsTr("%1 is already running on the PC. Close it before starting another app.").arg(appName))
+     }
+ 
+     StackView.onActivated: {
+@@ -69,27 +67,4 @@ Item {
+         }
+     }
+ 
+-    ErrorMessageDialog {
+-        id: errorDialog
+-
+-        onClosed: {
+-            Qt.quit();
+-        }
+-    }
+-
+-    NavigableMessageDialog {
+-        id: quitAppDialog
+-        text:qsTr("Are you sure you want to quit %1? Any unsaved progress will be lost.").arg(appName)
+-        standardButtons: Dialog.Yes | Dialog.No
+-        property string appName : ""
+-
+-        function quitApp() {
+-            var component = Qt.createComponent("QuitSegue.qml")
+-            var params = {"appName": appName, "quitRunningAppFn": function() { launcher.quitRunningApp() }}
+-            stackView.push(component.createObject(stackView, params))
+-        }
+-
+-        onAccepted: quitApp()
+-        onRejected: Qt.quit()
+-    }
+ }
+diff --git a/app/gui/StreamSegue.qml b/app/gui/StreamSegue.qml
+index 1617792..fa82bdd 100644
+--- a/app/gui/StreamSegue.qml
++++ b/app/gui/StreamSegue.qml
+@@ -80,15 +80,9 @@ Item {
+         SdlGamepadKeyNavigation.enable()
+ 
+         if (quitAfter) {
+-            if (streamSegueErrorDialog.text) {
+-                // Quit when the error dialog is acknowledged
+-                streamSegueErrorDialog.quitAfter = quitAfter
+-                streamSegueErrorDialog.open()
+-            }
+-            else {
+-                // Quit immediately
+-                Qt.quit()
+-            }
++            // CLI callers restore their frontend after Moonlight exits.
++            // main() waits for deferred connection cleanup before returning.
++            Qt.exit(streamSegueErrorDialog.text ? 1 : 0)
+         } else {
+             // Exit this view
+             stackView.pop()
+@@ -165,7 +159,7 @@ Item {
+             // with Session.exec() which requires no concurrent
+             // gamepad usage.
+             hintText.text = qsTr("Tip:") + " " + qsTr("Press %1 to disconnect your session").arg(SdlGamepadKeyNavigation.getConnectedGamepads() > 0 ?
+-                                                  qsTr("Start+Select+L1+R1") : qsTr("Ctrl+Alt+Shift+Q"))
++                                                  qsTr("L1+R1") : qsTr("Ctrl+Alt+Shift+Q"))
+ 
+             // Stop GUI gamepad usage now
+             SdlGamepadKeyNavigation.disable()
+diff --git a/app/streaming/input/gamepad.cpp b/app/streaming/input/gamepad.cpp
+index 502511f..e8db98c 100644
+--- a/app/streaming/input/gamepad.cpp
++++ b/app/streaming/input/gamepad.cpp
+@@ -363,8 +363,10 @@ void SdlInputHandler::handleControllerButtonEvent(SDL_ControllerButtonEvent* eve
+         }
+     }
+ 
+-    // Handle Start+Select+L1+R1 as a gamepad quit combo
+-    if (state->buttons == (PLAY_FLAG | BACK_FLAG | LB_FLAG | RB_FLAG) && qgetenv("NO_GAMEPAD_QUIT") != "1") {
++    // R46H: both shoulders quit even while another game button is held.
++    if (event->state == SDL_PRESSED &&
++            (state->buttons & (LB_FLAG | RB_FLAG)) == (LB_FLAG | RB_FLAG) &&
++            qgetenv("NO_GAMEPAD_QUIT") != "1") {
+         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                     "Detected quit gamepad button combo");
+ 
+diff --git a/app/streaming/video/ffmpeg.cpp b/app/streaming/video/ffmpeg.cpp
+index 6e1f806..178b5ca 100644
+--- a/app/streaming/video/ffmpeg.cpp
++++ b/app/streaming/video/ffmpeg.cpp
+@@ -619,7 +619,9 @@ bool FFmpegVideoDecoder::completeInitialization(const AVCodec* decoder, enum AVP
+         av_frame_free(&frame);
+     }
+     else {
++        // R46H's V4L2 Request path needs the stream's original reference-frame metadata.
+         if ((params->videoFormat & VIDEO_FORMAT_MASK_H264) &&
++                !(m_HwDecodeCfg && m_HwDecodeCfg->device_type == AV_HWDEVICE_TYPE_DRM) &&
+                 !(m_BackendRenderer->getDecoderCapabilities() & CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC)) {
+             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                         "Using H.264 SPS fixup");

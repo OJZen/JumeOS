@@ -1,0 +1,729 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+LANG=C
+export PATH LC_ALL LANG
+umask 077
+
+fail() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+hash_file() {
+  sha256sum -- "$1" | awk '{print $1}'
+}
+
+file_value() {
+  local file=$1 key=$2 count value
+  count=$(grep -c "^${key}=" "$file" 2>/dev/null || true)
+  [[ "$count" -eq 1 ]] || fail "receipt key ${key} must appear exactly once"
+  value=$(sed -n "s/^${key}=//p" "$file")
+  [[ "$value" != *$'\n'* && -n "$value" ]] || fail "receipt key ${key} is empty or multiline"
+  printf '%s' "$value"
+}
+
+usage() {
+  cat <<'EOF'
+usage: bootstrap-target.sh \
+  --external-receipt /run/r46h-deploy/TARGET-TRUST-RECEIPT \
+  --external-receipt-sha256 <literal-hash-from-the-Mac-receipt> \
+  --action install-modules|switch-boot
+
+The staged manifest and external receipt may restrict this payload to
+install-modules only. An action is accepted only when both trust records allow it.
+EOF
+}
+
+external_receipt=""
+external_receipt_sha256=""
+action=""
+while (( $# > 0 )); do
+  case "$1" in
+    --external-receipt)
+      [[ $# -ge 2 ]] || fail "--external-receipt needs a value"
+      external_receipt=$2
+      shift 2
+      ;;
+    --external-receipt-sha256)
+      [[ $# -ge 2 ]] || fail "--external-receipt-sha256 needs a value"
+      external_receipt_sha256=$2
+      shift 2
+      ;;
+    --action)
+      [[ $# -ge 2 ]] || fail "--action needs a value"
+      action=$2
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *) fail "unknown option: $1" ;;
+  esac
+done
+
+[[ "$(id -u)" -eq 0 ]] || fail "run the already verified root-owned bootstrap with sudo"
+[[ "$external_receipt_sha256" =~ ^[0-9a-f]{64}$ ]] ||
+  fail "--external-receipt-sha256 must be the literal hash from the Mac receipt"
+case "$action" in
+  install-modules|switch-boot) ;;
+  *) fail "--action must be install-modules or switch-boot" ;;
+esac
+
+test_root=${R46H_DEPLOY_TARGET_TEST_ROOT:-}
+if [[ -n "$test_root" ]]; then
+  [[ -f /.dockerenv ]] || fail "target test mode is container-only"
+  [[ -d "$test_root" && ! -L "$test_root" ]] || fail "unsafe target test root"
+  test_root=$(cd "$test_root" && pwd -P)
+  [[ "$test_root" == /run/r46h-target-test.* ||
+     "$test_root" == /repo/mainline/out/.cache/.r46h-target-test.* ]] ||
+    fail "target test root must be under /run or the external repo cache"
+  [[ "$(stat -c '%u:%a' -- "$test_root")" == 0:700 ]] ||
+    fail "target test root must be root-owned 0700"
+fi
+readonly test_root
+readonly roms_mount="${test_root}/roms"
+trusted_parent="${test_root}/run/r46h-deploy"
+
+[[ -d "$trusted_parent" && ! -L "$trusted_parent" ]] || fail "missing trusted deployment directory"
+[[ "$(stat -c '%u:%a' -- "$trusted_parent")" == 0:700 ]] ||
+  fail "trusted deployment directory must be root-owned 0700"
+trusted_parent=$(cd "$trusted_parent" && pwd -P)
+readonly trusted_parent
+
+[[ "$external_receipt" == "$trusted_parent/"* ]] ||
+  fail "external receipt must first be copied into the trusted deployment directory"
+[[ -f "$external_receipt" && ! -L "$external_receipt" ]] || fail "unsafe external receipt"
+external_receipt=$(realpath -e -- "$external_receipt")
+[[ "$external_receipt" == "$trusted_parent/"* ]] || fail "external receipt escaped trusted directory"
+[[ "$(stat -c '%u:%a' -- "$external_receipt")" == 0:600 ]] ||
+  fail "external receipt must be root-owned 0600"
+[[ "$(hash_file "$external_receipt")" == "$external_receipt_sha256" ]] ||
+  fail "external receipt SHA-256 does not match the literal Mac value"
+readonly external_receipt
+
+expected_receipt_keys=$'format_version\nstatus\ntarget\npayload\nkernel_release\nallowed_actions\ncard_profile_sha256\nstage_complete_sha256\nbootstrap_target_sha256\nstage_sources_sha256\ncompletion_secret\ncompletion_secret_sha256\ng92_prefix_sha256\nboot_partition_sha256\nonly_written_partition\nroot_partition'
+actual_receipt_keys=$(awk -F= 'NF >= 2 {print $1} NF < 2 {print "<malformed>"}' "$external_receipt")
+[[ "$actual_receipt_keys" == "$expected_receipt_keys" ]] || fail "external receipt field set or order mismatch"
+[[ "$(file_value "$external_receipt" format_version)" == 1 ]] || fail "external receipt format mismatch"
+[[ "$(file_value "$external_receipt" status)" == complete ]] || fail "external receipt is not complete"
+[[ "$(file_value "$external_receipt" target)" == HL-R46H-V22 ]] || fail "external receipt target mismatch"
+[[ "$(file_value "$external_receipt" only_written_partition)" == 3 ]] || fail "external receipt write scope mismatch"
+[[ "$(file_value "$external_receipt" root_partition)" == never-mounted ]] || fail "external receipt root proof mismatch"
+
+payload_name=$(file_value "$external_receipt" payload)
+kernel_release=$(file_value "$external_receipt" kernel_release)
+allowed_actions=$(file_value "$external_receipt" allowed_actions)
+bootstrap_sha256=$(file_value "$external_receipt" bootstrap_target_sha256)
+source_list_sha256=$(file_value "$external_receipt" stage_sources_sha256)
+stage_complete_sha256=$(file_value "$external_receipt" stage_complete_sha256)
+card_profile_sha256=$(file_value "$external_receipt" card_profile_sha256)
+completion_secret_sha256=$(file_value "$external_receipt" completion_secret_sha256)
+[[ "$payload_name" =~ ^r46h-[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || fail "unsafe receipt payload name"
+[[ "$kernel_release" =~ ^6\.12\.99-r46h-mainline-[A-Za-z0-9._-]+$ ]] || fail "unsafe receipt kernel release"
+case "$allowed_actions" in
+  install-modules|install-modules,switch-boot) ;;
+  *) fail "external receipt has an unsupported action policy" ;;
+esac
+case ",$allowed_actions," in
+  *,"$action",*) ;;
+  *) fail "requested action is not authorized by the external receipt" ;;
+esac
+for value in "$bootstrap_sha256" "$source_list_sha256" "$stage_complete_sha256" "$card_profile_sha256" \
+  "$completion_secret_sha256" \
+  "$(file_value "$external_receipt" g92_prefix_sha256)" \
+  "$(file_value "$external_receipt" boot_partition_sha256)"; do
+  [[ "$value" =~ ^[0-9a-f]{64}$ ]] || fail "external receipt contains an invalid SHA-256"
+done
+readonly payload_name kernel_release allowed_actions bootstrap_sha256 source_list_sha256 stage_complete_sha256 card_profile_sha256
+readonly completion_secret_sha256
+case "$action" in
+  install-modules) readonly interrupted_marker_name=.MODULES-INSTALLED.stage ;;
+  switch-boot) readonly interrupted_marker_name=.BOOT-SWITCHED.stage ;;
+esac
+
+self_path=$(realpath -e -- "${BASH_SOURCE[0]}")
+[[ "$self_path" == "$trusted_parent/"* && -f "$self_path" && ! -L "$self_path" ]] ||
+  fail "bootstrap must be executed from its trusted root-owned copy"
+[[ "$(stat -c '%u:%a' -- "$self_path")" == 0:700 ]] || fail "bootstrap copy must be root-owned 0700"
+[[ "$(hash_file "$self_path")" == "$bootstrap_sha256" ]] || fail "bootstrap hash differs from the external Mac receipt"
+readonly self_path
+
+mount_has_read_only_option() {
+  local options=$1
+  [[ ",$options," == *,ro,* && ",$options," != *,rw,* ]]
+}
+
+mount_has_audited_roms_identity_options() {
+  local options=$1
+  [[ ",$options," == *,uid=1002,* && ",$options," == *,gid=1002,* ]] || return 1
+  [[ ",$options," == *,fmask=0000,* || ",$options," == *,fmask=0,* ]] || return 1
+  [[ ",$options," == *,dmask=0000,* || ",$options," == *,dmask=0,* ]]
+}
+
+mount_policy_from_options() {
+  local options=$1
+  if [[ ",$options," == *,ro,* && ",$options," != *,rw,* ]]; then
+    printf '%s' ro
+  elif [[ ",$options," == *,rw,* && ",$options," != *,ro,* ]]; then
+    printf '%s' rw
+  else
+    return 1
+  fi
+}
+
+trusted_dir=""
+trusted_identity=""
+private_roms_mount=""
+private_mounted=0
+roms_detached=0
+roms_frozen=0
+tools_was_mounted=0
+roms_original_policy=""
+tools_original_policy=""
+
+p3_mount_records() {
+  local p3_majmin
+  [[ -z "$test_root" ]] || fail "internal error: p3 mount enumeration in test mode"
+  [[ -r /sys/class/block/mmcblk0p3/dev ]] || fail "cannot read p3 device identity"
+  IFS= read -r p3_majmin < /sys/class/block/mmcblk0p3/dev
+  [[ "$p3_majmin" =~ ^[0-9]+:[0-9]+$ ]] || fail "invalid p3 device identity"
+  findmnt -rn -o MAJ:MIN,TARGET,FSTYPE,FSROOT |
+    awk -v device="$p3_majmin" '$1 == device {print $2 "\t" $3 "\t" $4}' |
+    LC_ALL=C sort
+}
+
+mount_exact_field() {
+  local target=$1 field=$2 actual_target
+  actual_target=$(findmnt -rn -T "$target" -o TARGET)
+  [[ "$actual_target" == "$target" ]] || return 1
+  findmnt -rn -T "$target" -o "$field"
+}
+
+remount_roms_read_only() {
+  local before_source before_type before_options after_source after_type after_options
+  local p3_records p3_target p3_type p3_root tools_root tools_options
+  if [[ -n "$test_root" ]]; then
+    [[ -f "$test_root/test-state/roms-mount-options" &&
+       ! -L "$test_root/test-state/roms-mount-options" ]] || fail "missing fake EASYROMS mount state"
+    before_options=$(tr -d '\r\n' < "$test_root/test-state/roms-mount-options")
+    mount_has_audited_roms_identity_options "$before_options" ||
+      fail "fake EASYROMS did not start with the audited ArkOS identity options"
+    roms_original_policy=$(mount_policy_from_options "$before_options") ||
+      fail "fake EASYROMS has an ambiguous initial read/write policy"
+    [[ -f "$test_root/test-state/tools-mount-state" &&
+       ! -L "$test_root/test-state/tools-mount-state" ]] ||
+      fail "missing fake /opt/system/Tools mount state"
+    tools_original_policy=$(tr -d '\r\n' < "$test_root/test-state/tools-mount-state")
+    [[ "$tools_original_policy" == ro || "$tools_original_policy" == rw ]] ||
+      fail "fake /opt/system/Tools has an invalid initial read/write policy"
+    tools_was_mounted=1
+    roms_frozen=1
+    printf '%s\n' 'ro,uid=1002,gid=1002,fmask=0000,dmask=0000' > \
+      "$test_root/test-state/roms-mount-options"
+    printf '%s\n' ro > "$test_root/test-state/tools-mount-state"
+    mount_has_read_only_option "$(tr -d '\r\n' < "$test_root/test-state/roms-mount-options")" ||
+      fail "fake EASYROMS read-only remount did not take effect"
+    return
+  fi
+
+  mountpoint -q -- /roms || fail "/roms is not a mount point"
+  before_source=$(findmnt -rn -o SOURCE /roms)
+  before_type=$(findmnt -rn -o FSTYPE /roms)
+  before_options=$(findmnt -rn -o OPTIONS /roms)
+  [[ "$before_source" == /dev/mmcblk0p3 && "$before_type" == exfat ]] ||
+    fail "EASYROMS mount identity mismatch before read-only remount"
+  mount_has_audited_roms_identity_options "$before_options" ||
+    fail "/roms does not have the audited ArkOS uid/gid/fmask/dmask identity options"
+  roms_original_policy=$(mount_policy_from_options "$before_options") ||
+    fail "/roms has an ambiguous initial read/write policy"
+  p3_records=$(p3_mount_records)
+  case "$p3_records" in
+    $'/roms\texfat\t/') tools_was_mounted=0 ;;
+    $'/opt/system/Tools\texfat\t/tools\n/roms\texfat\t/')
+      tools_was_mounted=1
+      tools_root=$(mount_exact_field /opt/system/Tools FSROOT)
+      [[ "$tools_root" == /tools && "$(mount_exact_field /opt/system/Tools FSTYPE)" == exfat ]] ||
+        fail "/opt/system/Tools is not the audited p3 /tools bind mount"
+      tools_options=$(mount_exact_field /opt/system/Tools OPTIONS)
+      mount_has_audited_roms_identity_options "$tools_options" ||
+        fail "/opt/system/Tools does not have the audited ArkOS identity options"
+      tools_original_policy=$(mount_policy_from_options "$tools_options") ||
+        fail "/opt/system/Tools has an ambiguous initial read/write policy"
+      if [[ "$tools_original_policy" == rw ]]; then
+        mount -o remount,bind,ro /opt/system/Tools ||
+          fail "cannot freeze /opt/system/Tools read-only"
+      fi
+      mount_has_read_only_option "$(mount_exact_field /opt/system/Tools OPTIONS)" ||
+        fail "/opt/system/Tools is not proven read-only"
+      ;;
+    *) fail "unexpected additional /dev/mmcblk0p3 mount topology" ;;
+  esac
+  roms_frozen=1
+  if [[ "$roms_original_policy" == rw ]]; then
+    mount -o remount,ro /roms || fail "cannot freeze EASYROMS read-only before payload verification"
+  fi
+  after_source=$(findmnt -rn -o SOURCE /roms)
+  after_type=$(findmnt -rn -o FSTYPE /roms)
+  after_options=$(findmnt -rn -o OPTIONS /roms)
+  [[ "$after_source" == "$before_source" && "$after_type" == "$before_type" ]] ||
+    fail "EASYROMS mount identity changed during read-only remount"
+  mount_has_read_only_option "$after_options" || fail "EASYROMS is not proven read-only"
+  while IFS=$'\t' read -r p3_target p3_type p3_root; do
+    [[ "$p3_type" == exfat && ( "$p3_root" == / || "$p3_root" == /tools ) ]] ||
+      fail "p3 mount identity changed during freeze: ${p3_target}"
+    mount_has_read_only_option "$(mount_exact_field "$p3_target" OPTIONS)" ||
+      fail "p3 still has a writable mount after freeze: ${p3_target}"
+  done < <(p3_mount_records)
+}
+
+restore_card_roms() {
+  local expected_tools=$tools_was_mounted expected_roms_policy=$roms_original_policy
+  local expected_tools_policy=$tools_original_policy restored_options restored_policy restored_records
+  local tools_options tools_policy tools_root
+
+  if [[ "$private_mounted" -eq 0 && "$roms_detached" -eq 0 && "$roms_frozen" -eq 0 &&
+        "$tools_was_mounted" -eq 0 && -z "$roms_original_policy" &&
+        -z "$tools_original_policy" ]]; then
+    return 0
+  fi
+
+  if [[ "$private_mounted" -eq 0 && -n "$private_roms_mount" ]]; then
+    if [[ -n "$test_root" && "$roms_detached" -eq 1 &&
+          -d "$private_roms_mount" && ! -L "$private_roms_mount" &&
+          ! -e "$roms_mount" && ! -L "$roms_mount" ]]; then
+      private_mounted=1
+    elif [[ -z "$test_root" ]] && mountpoint -q -- "$private_roms_mount"; then
+      private_mounted=1
+    fi
+  fi
+
+  if [[ "$private_mounted" -eq 1 ]]; then
+    if [[ -n "$test_root" ]]; then
+      [[ -d "$private_roms_mount" && ! -L "$private_roms_mount" &&
+         ! -e "$roms_mount" && ! -L "$roms_mount" ]] || return 1
+      mv -T -- "$private_roms_mount" "$roms_mount" || return 1
+    else
+      sync || return 1
+      umount -- "$private_roms_mount" || return 1
+      ! mountpoint -q -- "$private_roms_mount" || return 1
+    fi
+    private_mounted=0
+  fi
+
+  if [[ "$roms_detached" -eq 1 || "$roms_frozen" -eq 1 ]]; then
+    if [[ -n "$test_root" ]]; then
+      [[ -d "$roms_mount" && ! -L "$roms_mount" ]] || return 1
+      chown -R 1002:1002 -- "$roms_mount" || return 1
+      find "$roms_mount" -type d -exec chmod 0777 {} + || return 1
+      find "$roms_mount" -type f -exec chmod 0777 {} + || return 1
+      [[ "$expected_roms_policy" == ro || "$expected_roms_policy" == rw ]] || return 1
+      printf '%s,noatime,uid=1002,gid=1002,fmask=0000,dmask=0000\n' \
+        "$expected_roms_policy" > "$test_root/test-state/roms-mount-options"
+    elif mountpoint -q -- /roms; then
+      [[ "$(mount_exact_field /roms FSTYPE)" == exfat &&
+         "$(mount_exact_field /roms FSROOT)" == / ]] || return 1
+      restored_options=$(mount_exact_field /roms OPTIONS)
+      mount_has_audited_roms_identity_options "$restored_options" || return 1
+      restored_policy=$(mount_policy_from_options "$restored_options") || return 1
+      if [[ "$restored_policy" != "$expected_roms_policy" ]]; then
+        mount -o "remount,${expected_roms_policy}" /roms || return 1
+      fi
+    else
+      mount /roms || return 1
+    fi
+
+    if [[ -z "$test_root" ]]; then
+      [[ "$(mount_exact_field /roms FSTYPE)" == exfat &&
+         "$(mount_exact_field /roms FSROOT)" == / ]] || return 1
+      restored_options=$(mount_exact_field /roms OPTIONS)
+      mount_has_audited_roms_identity_options "$restored_options" || return 1
+      restored_policy=$(mount_policy_from_options "$restored_options") || return 1
+      if [[ "$restored_policy" != "$expected_roms_policy" ]]; then
+        mount -o "remount,${expected_roms_policy}" /roms || return 1
+        restored_options=$(mount_exact_field /roms OPTIONS)
+        mount_has_audited_roms_identity_options "$restored_options" || return 1
+        restored_policy=$(mount_policy_from_options "$restored_options") || return 1
+      fi
+      [[ "$restored_policy" == "$expected_roms_policy" ]] || return 1
+    fi
+    roms_detached=0
+    roms_frozen=0
+  fi
+
+  if [[ "$expected_tools" -eq 1 ]]; then
+    if [[ -n "$test_root" ]]; then
+      [[ -f "$test_root/test-state/tools-mount-state" &&
+         ! -L "$test_root/test-state/tools-mount-state" ]] || return 1
+      [[ "$expected_tools_policy" == ro || "$expected_tools_policy" == rw ]] || return 1
+      printf '%s\n' "$expected_tools_policy" > "$test_root/test-state/tools-mount-state"
+    elif mountpoint -q -- /opt/system/Tools; then
+      [[ "$(mount_exact_field /opt/system/Tools FSTYPE)" == exfat &&
+         "$(mount_exact_field /opt/system/Tools FSROOT)" == /tools ]] || return 1
+      tools_options=$(mount_exact_field /opt/system/Tools OPTIONS)
+      mount_has_audited_roms_identity_options "$tools_options" || return 1
+      tools_policy=$(mount_policy_from_options "$tools_options") || return 1
+      if [[ "$tools_policy" != "$expected_tools_policy" ]]; then
+        mount -o "remount,bind,${expected_tools_policy}" /opt/system/Tools || return 1
+      fi
+    else
+      mount /opt/system/Tools || return 1
+    fi
+
+    if [[ -z "$test_root" ]]; then
+      tools_root=$(mount_exact_field /opt/system/Tools FSROOT)
+      tools_options=$(mount_exact_field /opt/system/Tools OPTIONS)
+      [[ "$tools_root" == /tools &&
+         "$(mount_exact_field /opt/system/Tools FSTYPE)" == exfat ]] || return 1
+      mount_has_audited_roms_identity_options "$tools_options" || return 1
+      tools_policy=$(mount_policy_from_options "$tools_options") || return 1
+      if [[ "$tools_policy" != "$expected_tools_policy" ]]; then
+        mount -o "remount,bind,${expected_tools_policy}" /opt/system/Tools || return 1
+        tools_options=$(mount_exact_field /opt/system/Tools OPTIONS)
+        mount_has_audited_roms_identity_options "$tools_options" || return 1
+        tools_policy=$(mount_policy_from_options "$tools_options") || return 1
+      fi
+      [[ "$tools_policy" == "$expected_tools_policy" ]] || return 1
+    fi
+  fi
+
+  if [[ -n "$test_root" ]]; then
+    restored_options=$(tr -d '\r\n' < "$test_root/test-state/roms-mount-options")
+    mount_has_audited_roms_identity_options "$restored_options" || return 1
+    [[ "$(mount_policy_from_options "$restored_options")" == "$expected_roms_policy" ]] || return 1
+    if [[ "$expected_tools" -eq 1 ]]; then
+      [[ "$(tr -d '\r\n' < "$test_root/test-state/tools-mount-state")" == "$expected_tools_policy" ]] || return 1
+    fi
+  else
+    restored_records=$(p3_mount_records)
+    if [[ "$expected_tools" -eq 1 ]]; then
+      [[ "$restored_records" == $'/opt/system/Tools\texfat\t/tools\n/roms\texfat\t/' ]] || return 1
+    else
+      [[ "$restored_records" == $'/roms\texfat\t/' ]] || return 1
+    fi
+  fi
+  tools_was_mounted=0
+  roms_original_policy=""
+  tools_original_policy=""
+}
+
+bootstrap_verify_rootfs_health_preflight() {
+  local errors_file errors kernel_log root_majmin root_device_majmin
+  if [[ -n "$test_root" ]]; then
+    errors_file="$test_root/test-state/rootfs-errors-count"
+    [[ -f "$errors_file" && ! -L "$errors_file" ]] ||
+      fail "missing fake rootfs ext4 error counter"
+    errors=$(tr -d '\r\n' < "$errors_file")
+    [[ -f "$test_root/test-state/rootfs-kernel-log" &&
+       ! -L "$test_root/test-state/rootfs-kernel-log" ]] ||
+      fail "missing fake rootfs kernel log"
+    kernel_log=$(< "$test_root/test-state/rootfs-kernel-log")
+  else
+    [[ "$(findmnt -rn -o FSTYPE /)" == ext4 ]] || fail "root filesystem is not ext4"
+    [[ -r /sys/class/block/mmcblk0p2/dev ]] || fail "cannot read mmcblk0p2 identity"
+    root_majmin=$(findmnt -rn -o MAJ:MIN /)
+    IFS= read -r root_device_majmin < /sys/class/block/mmcblk0p2/dev
+    [[ "$root_majmin" == "$root_device_majmin" ]] || fail "root is not mmcblk0p2"
+    errors_file=/sys/fs/ext4/mmcblk0p2/errors_count
+    [[ -f "$errors_file" && ! -L "$errors_file" ]] ||
+      fail "cannot read mmcblk0p2 ext4 error counter"
+    errors=$(tr -d '\r\n' < "$errors_file")
+    kernel_log=$(dmesg 2>&1) || fail "cannot inspect kernel log for rootfs errors"
+  fi
+  [[ "$errors" =~ ^[0-9]+$ ]] || fail "invalid rootfs ext4 error counter"
+  [[ "$errors" == 0 ]] ||
+    fail "rootfs ext4 errors_count is nonzero; clone and repair offline before deployment"
+  if grep -Eiq \
+    '(EXT4-fs|JBD2).*((error|warn|corrupt|abort).*mmcblk0p2([^[:alnum:]_]|$)|mmcblk0p2([^[:alnum:]_]|$).*(error|warn|corrupt|abort))' \
+    <<< "$kernel_log"; then
+    fail "kernel log reports mmcblk0p2 ext4/JBD2 damage; clone and repair offline before deployment"
+  fi
+}
+
+cleanup() {
+  local status=$? identity restore_ok=1
+  trap - EXIT
+  trap '' INT TERM HUP
+  restore_card_roms || restore_ok=0
+  if [[ -n "$trusted_dir" && -n "$trusted_identity" &&
+        "$trusted_dir" == "$trusted_parent/${payload_name}.trusted."* &&
+        -d "$trusted_dir" && ! -L "$trusted_dir" ]]; then
+    identity=$(stat -c '%d:%i:%u' -- "$trusted_dir" 2>/dev/null || true)
+    if [[ "$restore_ok" -eq 1 && "$identity" == "$trusted_identity" ]]; then
+      rm -rf -- "$trusted_dir"
+    elif [[ "$restore_ok" -ne 1 ]]; then
+      printf 'WARNING: private EASYROMS mount recovery failed; preserving trusted directory: %s\n' \
+        "$trusted_dir" >&2
+    else
+      printf 'WARNING: refusing cleanup after trusted directory identity changed: %s\n' "$trusted_dir" >&2
+    fi
+  fi
+  [[ "$restore_ok" -eq 1 ]] || {
+    printf 'WARNING: /dev/mmcblk0p3 remains safely frozen, detached, or privately mounted; manual root recovery is required\n' >&2
+    [[ "$status" -ne 0 ]] || status=1
+  }
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+# This externally anchored bootstrap preflight must run before even a rw-to-ro
+# p3 remount, because a read-only remount may flush pre-existing exFAT metadata.
+bootstrap_verify_rootfs_health_preflight
+remount_roms_read_only
+
+completion_secret=$(file_value "$external_receipt" completion_secret)
+[[ "$completion_secret" =~ ^[0-9a-f]{64}$ ]] || fail "external receipt completion secret is invalid"
+[[ "$(printf '%s' "$completion_secret" | sha256sum | awk '{print $1}')" == "$completion_secret_sha256" ]] ||
+  fail "external completion secret commitment mismatch"
+readonly completion_secret
+
+readonly source_payload="${roms_mount}/${payload_name}"
+readonly source_list="${source_payload}/STAGE-SOURCES.sha256"
+readonly source_commitment="${source_payload}/FINAL-RECEIPT-COMMITMENT"
+[[ -d "$source_payload" && ! -L "$source_payload" ]] || fail "missing or unsafe staged payload directory"
+[[ -f "$source_list" && ! -L "$source_list" ]] || fail "missing or unsafe staged source list"
+[[ -f "$source_commitment" && ! -L "$source_commitment" ]] || fail "missing or unsafe final-receipt commitment"
+
+trusted_dir=$(mktemp -d "$trusted_parent/${payload_name}.trusted.XXXXXX") || fail "cannot create trusted payload copy"
+chmod 0700 -- "$trusted_dir"
+[[ "$(stat -c '%u:%a' -- "$trusted_dir")" == 0:700 ]] || fail "trusted payload copy is not root-owned 0700"
+trusted_identity=$(stat -c '%d:%i:%u' -- "$trusted_dir")
+readonly trusted_dir trusted_identity
+
+cp --no-preserve=ownership,mode,timestamps -- "$source_list" "$trusted_dir/STAGE-SOURCES.sha256"
+chmod 0600 -- "$trusted_dir/STAGE-SOURCES.sha256"
+[[ "$(hash_file "$trusted_dir/STAGE-SOURCES.sha256")" == "$source_list_sha256" ]] ||
+  fail "staged source list differs from the external Mac receipt"
+
+expected_entries="$trusted_dir/.expected-source-entries"
+actual_entries="$trusted_dir/.actual-source-entries"
+listed_names="$trusted_dir/.listed-names"
+: > "$listed_names"
+source_count=0
+while IFS= read -r line; do
+  [[ "$line" =~ ^([0-9a-f]{64})[[:space:]][[:space:]]payload/([A-Za-z0-9._+-]+)$ ]] ||
+    fail "malformed or unsafe staged source-list entry"
+  expected_hash=${BASH_REMATCH[1]}
+  name=${BASH_REMATCH[2]}
+  [[ "$name" != STAGE-SOURCES.sha256 && "$name" != MODULES-INSTALLED &&
+     "$name" != BOOT-SWITCHED && "$name" != .MODULES-INSTALLED.stage &&
+     "$name" != .BOOT-SWITCHED.stage ]] ||
+    fail "source list contains a reserved mutable name"
+  if grep -Fxq -- "$name" "$listed_names"; then
+    fail "duplicate staged source-list path: ${name}"
+  fi
+  printf '%s\n' "$name" >> "$listed_names"
+  source_file="$source_payload/$name"
+  [[ -f "$source_file" && ! -L "$source_file" ]] || fail "missing or unsafe staged source: ${name}"
+  cp --no-preserve=ownership,mode,timestamps -- "$source_file" "$trusted_dir/$name"
+  chmod 0600 -- "$trusted_dir/$name"
+  [[ "$(hash_file "$trusted_dir/$name")" == "$expected_hash" ]] ||
+    fail "staged source changed while copying: ${name}"
+  source_count=$((source_count + 1))
+done < "$trusted_dir/STAGE-SOURCES.sha256"
+(( source_count >= 10 )) || fail "staged source list is unexpectedly short"
+
+required_sources=(bootstrap-target.sh DEPLOY-MANIFEST STAGE-COMPLETE .r46h-stage-owner \
+  target-common.sh install-modules.sh)
+[[ "$allowed_actions" != install-modules,switch-boot ]] || required_sources+=(switch-boot.sh)
+for required in "${required_sources[@]}"; do
+  grep -Fxq -- "$required" "$listed_names" || fail "staged source list lacks ${required}"
+done
+if [[ "$allowed_actions" == install-modules ]]; then
+  ! grep -Fxq -- switch-boot.sh "$listed_names" || fail "modules-only source list contains switch-boot.sh"
+  [[ ! -e "$source_payload/BOOT-SWITCHED" && ! -L "$source_payload/BOOT-SWITCHED" &&
+     ! -e "$source_payload/.BOOT-SWITCHED.stage" && ! -L "$source_payload/.BOOT-SWITCHED.stage" ]] ||
+    fail "modules-only payload contains a boot-switch receipt or stage"
+fi
+
+interrupted_marker_path="$source_payload/$interrupted_marker_name"
+if [[ -e "$interrupted_marker_path" || -L "$interrupted_marker_path" ]]; then
+  [[ -f "$interrupted_marker_path" && ! -L "$interrupted_marker_path" ]] ||
+    fail "unsafe action-specific interrupted receipt marker: ${interrupted_marker_name}"
+  interrupted_marker_size=$(stat -c '%s' -- "$interrupted_marker_path")
+  [[ "$interrupted_marker_size" =~ ^[0-9]+$ && "$interrupted_marker_size" -le 4096 ]] ||
+    fail "action-specific interrupted receipt marker is unexpectedly large"
+fi
+readonly interrupted_marker_path
+
+{
+  cat "$listed_names"
+  printf '%s\n' STAGE-SOURCES.sha256
+  printf '%s\n' FINAL-RECEIPT-COMMITMENT
+  [[ ! -e "$source_payload/MODULES-INSTALLED" && ! -L "$source_payload/MODULES-INSTALLED" ]] ||
+    printf '%s\n' MODULES-INSTALLED
+  [[ ! -e "$source_payload/BOOT-SWITCHED" && ! -L "$source_payload/BOOT-SWITCHED" ]] ||
+    printf '%s\n' BOOT-SWITCHED
+  [[ ! -e "$interrupted_marker_path" && ! -L "$interrupted_marker_path" ]] ||
+    printf '%s\n' "$interrupted_marker_name"
+} | sort > "$expected_entries"
+find "$source_payload" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort > "$actual_entries"
+cmp -s -- "$expected_entries" "$actual_entries" ||
+  fail "staged payload has missing, extra, temporary, or untrusted entries"
+
+for mutable_receipt in MODULES-INSTALLED BOOT-SWITCHED; do
+  if [[ -e "$source_payload/$mutable_receipt" || -L "$source_payload/$mutable_receipt" ]]; then
+    [[ -f "$source_payload/$mutable_receipt" && ! -L "$source_payload/$mutable_receipt" ]] ||
+      fail "unsafe mutable payload receipt: ${mutable_receipt}"
+  fi
+done
+
+cp --no-preserve=ownership,mode,timestamps -- "$source_commitment" "$trusted_dir/FINAL-RECEIPT-COMMITMENT"
+chmod 0600 -- "$trusted_dir/FINAL-RECEIPT-COMMITMENT"
+expected_commitment_keys=$'format_version\nstatus\npurpose\npayload\ncompletion_secret_sha256'
+actual_commitment_keys=$(awk -F= 'NF >= 2 {print $1} NF < 2 {print "<malformed>"}' \
+  "$trusted_dir/FINAL-RECEIPT-COMMITMENT")
+[[ "$actual_commitment_keys" == "$expected_commitment_keys" ]] || fail "final-receipt commitment field mismatch"
+commitment_value() {
+  local key=$1 count value
+  count=$(grep -c "^${key}=" "$trusted_dir/FINAL-RECEIPT-COMMITMENT" 2>/dev/null || true)
+  [[ "$count" -eq 1 ]] || fail "commitment key ${key} must appear exactly once"
+  value=$(sed -n "s/^${key}=//p" "$trusted_dir/FINAL-RECEIPT-COMMITMENT")
+  [[ "$value" != *$'\n'* && -n "$value" ]] || fail "commitment key ${key} is empty or multiline"
+  printf '%s' "$value"
+}
+[[ "$(commitment_value format_version)" == 1 && "$(commitment_value status)" == committed &&
+   "$(commitment_value purpose)" == external-receipt-completion-secret &&
+   "$(commitment_value payload)" == "$payload_name" &&
+   "$(commitment_value completion_secret_sha256)" == "$completion_secret_sha256" ]] ||
+  fail "card commitment does not match the externally revealed completion secret"
+
+while IFS= read -r line; do
+  [[ "$line" =~ ^([0-9a-f]{64})[[:space:]][[:space:]]payload/([A-Za-z0-9._+-]+)$ ]] ||
+    fail "trusted source list changed"
+  [[ "$(hash_file "$trusted_dir/${BASH_REMATCH[2]}")" == "${BASH_REMATCH[1]}" ]] ||
+    fail "trusted payload verification failed: ${BASH_REMATCH[2]}"
+done < "$trusted_dir/STAGE-SOURCES.sha256"
+[[ "$(hash_file "$trusted_dir/bootstrap-target.sh")" == "$bootstrap_sha256" ]] || fail "trusted bootstrap mismatch"
+[[ "$(hash_file "$trusted_dir/STAGE-COMPLETE")" == "$stage_complete_sha256" ]] || fail "trusted stage gate mismatch"
+
+manifest="$trusted_dir/DEPLOY-MANIFEST"
+manifest_value() {
+  local key=$1 count value
+  count=$(grep -c "^${key}=" "$manifest" 2>/dev/null || true)
+  [[ "$count" -eq 1 ]] || fail "manifest key ${key} must appear exactly once"
+  value=$(sed -n "s/^${key}=//p" "$manifest")
+  [[ "$value" != *$'\n'* && -n "$value" ]] || fail "manifest key ${key} is empty or multiline"
+  printf '%s' "$value"
+}
+[[ "$(manifest_value target)" == HL-R46H-V22 ]] || fail "trusted manifest target mismatch"
+[[ "$(manifest_value payload_name)" == "$payload_name" ]] || fail "trusted manifest payload mismatch"
+[[ "$(manifest_value kernel_release)" == "$kernel_release" ]] || fail "trusted manifest release mismatch"
+[[ "$(manifest_value allowed_actions)" == "$allowed_actions" ]] || fail "trusted manifest action policy mismatch"
+[[ "$(manifest_value card_profile_sha256)" == "$card_profile_sha256" ]] || fail "trusted manifest card profile mismatch"
+[[ "$(manifest_value stage_complete_sha256)" == "$stage_complete_sha256" ]] || fail "trusted manifest gate mismatch"
+
+cp --no-preserve=ownership,mode,timestamps -- "$external_receipt" "$trusted_dir/EXTERNAL-STAGE-RECEIPT"
+chmod 0600 -- "$trusted_dir/EXTERNAL-STAGE-RECEIPT"
+[[ "$(hash_file "$trusted_dir/EXTERNAL-STAGE-RECEIPT")" == "$external_receipt_sha256" ]] ||
+  fail "trusted external receipt copy mismatch"
+
+# A writable exFAT mount can itself update persistent filesystem metadata.
+# Run the trusted rootfs health gate while p3 is still frozen read-only, then
+# let the selected target action repeat the gate immediately before its writes.
+# shellcheck disable=SC2034  # Consumed by the trusted sourced health gate.
+R46H_ROOT=$test_root
+# shellcheck source=/dev/null
+source "$trusted_dir/target-common.sh"
+r46h_verify_rootfs_health
+
+mount_roms_privately_root_only() {
+  local before_source before_type before_options private_source private_type private_options
+  local p3_records
+  private_roms_mount="$trusted_dir/card-roms"
+  [[ ! -e "$private_roms_mount" && ! -L "$private_roms_mount" ]] ||
+    fail "private EASYROMS mount path already exists"
+  mkdir -m 0700 -- "$private_roms_mount"
+  if [[ -n "$test_root" ]]; then
+    [[ -f "$test_root/test-state/roms-mount-options" &&
+       ! -L "$test_root/test-state/roms-mount-options" ]] || fail "missing fake EASYROMS mount state"
+    mount_has_read_only_option "$(tr -d '\r\n' < "$test_root/test-state/roms-mount-options")" ||
+      fail "fake EASYROMS was not frozen read-only before private mount"
+    [[ -f "$test_root/test-state/tools-mount-state" &&
+       ! -L "$test_root/test-state/tools-mount-state" &&
+       "$(tr -d '\r\n' < "$test_root/test-state/tools-mount-state")" == ro ]] ||
+      fail "fake /opt/system/Tools was not frozen read-only before detach"
+    rmdir -- "$private_roms_mount"
+    printf '%s\n' detached > "$test_root/test-state/tools-mount-state"
+    roms_detached=1
+    mv -T -- "$roms_mount" "$private_roms_mount" || fail "cannot detach fake EASYROMS mount"
+    roms_frozen=0
+    private_mounted=1
+    chown -R 0:0 -- "$private_roms_mount"
+    find "$private_roms_mount" -type d -exec chmod 0700 {} +
+    find "$private_roms_mount" -type f -exec chmod 0600 {} +
+    printf '%s\n' 'rw,noatime,nosuid,nodev,noexec,fmask=0077,dmask=0077' > \
+      "$test_root/test-state/roms-mount-options"
+    r46h_mount_options_secure "$(tr -d '\r\n' < "$test_root/test-state/roms-mount-options")" ||
+      fail "fake private EASYROMS mount did not acquire root-only options"
+    [[ "$(stat -c '%u:%g:%a' -- "$private_roms_mount/$payload_name")" == 0:0:700 ]] ||
+      fail "fake private staged payload is not root-owned 0700"
+    return
+  fi
+
+  mountpoint -q -- /roms || fail "/roms is not a mount point"
+  before_source=$(findmnt -rn -o SOURCE /roms)
+  before_type=$(findmnt -rn -o FSTYPE /roms)
+  before_options=$(findmnt -rn -o OPTIONS /roms)
+  [[ "$before_source" == /dev/mmcblk0p3 && "$before_type" == exfat ]] ||
+    fail "EASYROMS mount identity mismatch before private mount"
+  mount_has_read_only_option "$before_options" || fail "EASYROMS is not read-only before detach"
+  p3_records=$(p3_mount_records)
+  if [[ "$tools_was_mounted" -eq 1 ]]; then
+    [[ "$p3_records" == $'/opt/system/Tools\texfat\t/tools\n/roms\texfat\t/' ]] ||
+      fail "p3 mount topology changed before detach"
+    umount -- /opt/system/Tools ||
+      fail "cannot normally unmount /opt/system/Tools; refusing lazy or forced unmount"
+    ! mountpoint -q -- /opt/system/Tools || fail "/opt/system/Tools remained mounted after detach"
+    [[ "$(p3_mount_records)" == $'/roms\texfat\t/' ]] ||
+      fail "p3 retained an unexpected mount after detaching /opt/system/Tools"
+  else
+    [[ "$p3_records" == $'/roms\texfat\t/' ]] || fail "p3 mount topology changed before detach"
+  fi
+  sync
+  roms_detached=1
+  umount -- /roms || fail "cannot normally unmount /roms; refusing lazy or forced unmount"
+  roms_frozen=0
+  ! mountpoint -q -- /roms || fail "/roms remained mounted after detach"
+  [[ -z "$(p3_mount_records)" ]] || fail "p3 retained an unexpected public mount after detach"
+  mount -t exfat -o rw,noatime,nosuid,nodev,noexec,uid=0,gid=0,fmask=0077,dmask=0077 \
+    /dev/mmcblk0p3 "$private_roms_mount" || fail "cannot mount EASYROMS at the private root-only path"
+  private_mounted=1
+  private_source=$(findmnt -rn -o SOURCE "$private_roms_mount")
+  private_type=$(findmnt -rn -o FSTYPE "$private_roms_mount")
+  private_options=$(findmnt -rn -o OPTIONS "$private_roms_mount")
+  [[ "$private_source" == "$before_source" && "$private_type" == "$before_type" ]] ||
+    fail "private EASYROMS mount identity mismatch"
+  r46h_mount_options_secure "$private_options" ||
+    fail "private EASYROMS mount lacks effective root-only ownership and masks"
+  [[ "$(stat -c '%u:%g:%a' -- "$private_roms_mount")" == 0:0:700 ]] ||
+    fail "private EASYROMS mount root is not owned and masked as 0:0:700"
+  [[ "$(mount_exact_field "$private_roms_mount" FSROOT)" == / ]] ||
+    fail "private EASYROMS mount root mismatch"
+  [[ "$(p3_mount_records)" == "${private_roms_mount}"$'\texfat\t/' ]] ||
+    fail "p3 is not exclusively reachable through the private root-only mount"
+  ! mountpoint -q -- /opt/system/Tools ||
+    fail "/opt/system/Tools remained mounted during privileged deployment"
+  [[ "$(stat -c '%u:%g:%a' -- "$private_roms_mount/$payload_name")" == 0:0:700 ]] ||
+    fail "private staged payload is not root-owned 0700"
+}
+
+mount_roms_privately_root_only
+
+export R46H_DEPLOY_TRUSTED_PAYLOAD="$trusted_dir"
+export R46H_DEPLOY_EXTERNAL_RECEIPT="$trusted_dir/EXTERNAL-STAGE-RECEIPT"
+export R46H_DEPLOY_EXTERNAL_RECEIPT_SHA256="$external_receipt_sha256"
+export R46H_DEPLOY_SECURE_ROMS_MOUNT="$private_roms_mount"
+case "$action" in
+  install-modules) /bin/bash "$trusted_dir/install-modules.sh" ;;
+  switch-boot)
+    [[ "$allowed_actions" == install-modules,switch-boot ]] || fail "switch-boot is disabled for this payload"
+    /bin/bash "$trusted_dir/switch-boot.sh"
+    ;;
+esac

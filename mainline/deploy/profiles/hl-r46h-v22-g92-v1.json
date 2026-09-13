@@ -1,0 +1,55 @@
+{
+  "format_version": 1,
+  "profile_id": "hl-r46h-v22-g92-v1",
+  "target": "HL-R46H-V22",
+  "card": {
+    "whole_size": 31914983424,
+    "sector_size": 512,
+    "partition_scheme": "FDisk_partition_scheme",
+    "boot": {
+      "number": 1,
+      "offset": 16777216,
+      "size": 117440512,
+      "volume_uuid": "575BC58C-96FA-3E4F-958B-7A30D5210C3D"
+    },
+    "root": {
+      "number": 2,
+      "offset": 134217728,
+      "size": 10716877312,
+      "partuuid": "c9f931c9-02"
+    },
+    "easyroms": {
+      "number": 3,
+      "offset": 10851095040,
+      "size": 21063888384,
+      "volume_uuid": "2D584C38-94B7-38C2-B369-6A7A82C72CC2"
+    },
+    "g92_prefix_size": 16777216,
+    "g92_prefix_sha256": "91a1f0d5f84e9589843ebf1eb0889669a5da64632fd258ef872f890b446a998b"
+  },
+  "uboot": {
+    "root_dtb_path": "arkos4clone-uboot.dtb",
+    "console_dtb_path": "consoles/r46h/arkos4clone-uboot.dtb",
+    "dtb_size": 59991,
+    "dtb_sha256": "dd892bbd8dd1e5c51f7b3be2390faab4355e6932aef6a48b030b2591a7b0bf4c"
+  },
+  "fallback": {
+    "release": "6.12.99-r46h-mainline-v0.2",
+    "boot_path": "boot.ini.v0.2-known-good",
+    "boot_test_path": "boot.ini.test",
+    "boot_size": 1327,
+    "boot_sha256": "921f439aa602bb8bc84ffe39cdb00a9ffd03dab1bed1d8960d2e30fdff4703cc",
+    "image_path": "Image.mainline-test.gz",
+    "image_size": 14919642,
+    "image_sha256": "fb8b8d39262e087af5a9efa73c4cb8f5f7d0559f9d2b0d30acc4dd9156140abb",
+    "dtb_path": "rk3326-r46h-mainline-test.dtb",
+    "dtb_size": 49448,
+    "dtb_sha256": "074bb3121fafe5df96872628ab22db03ffd63adf53c990e779e5a0e2f54b7a2b",
+    "module_count": 1276,
+    "module_file_count": 1290,
+    "module_tree_sha256_allowed": [
+      "82b2e768c292a07d8c2901765d87dafa352f5dab4f86667d53c4086185017b60",
+      "a8c889a65a24cf6c953524b932ca6f6af94b59108e5185cada626b7832e0c2a8"
+    ]
+  }
+}

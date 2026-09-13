@@ -1,0 +1,813 @@
+#!/bin/bash
+set -euo pipefail
+
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+LC_ALL=C
+LANG=C
+COPYFILE_DISABLE=1
+export PATH LC_ALL LANG COPYFILE_DISABLE
+umask 077
+
+readonly EXPECTED_STAGE_SOURCES_SHA256="@STAGE_SOURCES_SHA256@"
+BUNDLE_DIR=$(cd "$(dirname "$0")" && /bin/pwd -P)
+readonly BUNDLE_DIR
+readonly BUNDLE_SOURCE_LIST="${BUNDLE_DIR}/STAGE-SOURCES.sha256"
+readonly BUNDLE_SOURCE_ROOT="${BUNDLE_DIR}/payload"
+SOURCE_LIST=$BUNDLE_SOURCE_LIST
+SOURCE_ROOT=$BUNDLE_SOURCE_ROOT
+R46H_MANIFEST="${SOURCE_ROOT}/DEPLOY-MANIFEST"
+
+fail() { echo "ERROR: $*" >&2; exit 1; }
+hash_file() {
+  if [[ -x /usr/bin/shasum ]]; then
+    /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'
+  else
+    /usr/bin/sha256sum "$1" | /usr/bin/awk '{print $1}'
+  fi
+}
+hash_literal() {
+  if [[ -x /usr/bin/shasum ]]; then
+    /usr/bin/printf '%s' "$1" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}'
+  else
+    /usr/bin/printf '%s' "$1" | /usr/bin/sha256sum | /usr/bin/awk '{print $1}'
+  fi
+}
+manifest_value() {
+  local key=$1 count value
+  count=$(/usr/bin/grep -c "^${key}=" "$R46H_MANIFEST" 2>/dev/null || true)
+  [[ "$count" -eq 1 ]] || fail "manifest key ${key} must appear exactly once"
+  value=$(/usr/bin/sed -n "s/^${key}=//p" "$R46H_MANIFEST")
+  [[ "$value" != *$'\n'* ]] || fail "manifest key ${key} is multiline"
+  /usr/bin/printf '%s' "$value"
+}
+
+[[ -f "$SOURCE_LIST" && ! -L "$SOURCE_LIST" ]] || fail "unsafe stage source list"
+[[ "$(hash_file "$SOURCE_LIST")" == "$EXPECTED_STAGE_SOURCES_SHA256" ]] || fail "stage source list SHA-256 mismatch"
+[[ -f "$R46H_MANIFEST" && ! -L "$R46H_MANIFEST" ]] || fail "unsafe deployment manifest"
+
+device=""
+confirm_device=""
+receipt_parent=""
+while (( $# > 0 )); do
+  case "$1" in
+    --device) [[ $# -ge 2 ]] || fail "--device needs a value"; device=$2; shift 2 ;;
+    --confirm-device) [[ $# -ge 2 ]] || fail "--confirm-device needs a value"; confirm_device=$2; shift 2 ;;
+    --receipt-parent) [[ $# -ge 2 ]] || fail "--receipt-parent needs a value"; receipt_parent=$2; shift 2 ;;
+    --resume-work-receipt)
+      fail "--resume-work-receipt is not implemented; preserve the failed work receipt for audited recovery"
+      ;;
+    -h|--help)
+      echo "usage: $0 --device /dev/diskN --confirm-device /dev/diskN --receipt-parent /Volumes/Ju/path"
+      exit 0 ;;
+    *) fail "unknown option: $1" ;;
+  esac
+done
+[[ "$device" =~ ^/dev/disk[1-9][0-9]*$ ]] || fail "unsafe or missing --device"
+[[ "$confirm_device" == "$device" ]] || fail "--confirm-device must exactly match --device"
+[[ -n "$receipt_parent" && "$receipt_parent" != / && -d "$receipt_parent" && ! -L "$receipt_parent" ]] ||
+  fail "unsafe --receipt-parent"
+receipt_parent=$(cd "$receipt_parent" && /bin/pwd -P)
+
+readonly raw_device="/dev/r${device#/dev/}"
+
+TEST_ROOT=${R46H_DEPLOY_STAGE_TEST_ROOT:-}
+if [[ -n "$TEST_ROOT" ]]; then
+  [[ -f /.dockerenv ]] || fail "stage test mode is container-only"
+  [[ -d "$TEST_ROOT" && ! -L "$TEST_ROOT" ]] || fail "unsafe stage test root"
+  TEST_ROOT=$(cd "$TEST_ROOT" && /bin/pwd -P)
+  [[ "$TEST_ROOT" == /run/r46h-stage-test.* ||
+     "$TEST_ROOT" == /repo/mainline/out/.cache/.r46h-stage-test.* ]] ||
+    fail "stage test root must be under /run or the external repo cache"
+  [[ "$(/usr/bin/stat -c '%u' "$TEST_ROOT")" == 0 && "$(/usr/bin/stat -c '%a' "$TEST_ROOT")" == 700 ]] ||
+    fail "stage test root must be root-owned 0700"
+  boot_mount="${TEST_ROOT}/card/boot"
+  roms_mount="${TEST_ROOT}/card/easyroms"
+else
+  [[ "$(/usr/bin/uname -s)" == Darwin ]] || fail "production stage requires macOS"
+  boot_mount=/Volumes/BOOT
+  roms_mount=/Volumes/EASYROMS
+fi
+readonly TEST_ROOT boot_mount roms_mount
+
+# A 2026-08-11 physical-card audit proved that macOS could return the expected
+# file hash immediately after staging while the raw exFAT chain contained
+# overwritten Image/DTB clusters.  Keep directory-backed integration fixtures
+# available, but fail closed before any production card access until staging
+# has an independent raw-media verification path.
+if [[ -z "$TEST_ROOT" ]]; then
+  fail "physical EASYROMS file staging is disabled pending raw exFAT verification; see mainline/deploy/EXFAT-FSKIT-POSTMORTEM.md"
+fi
+
+receipt_parent_is_safe() {
+  local owner_mode
+  if [[ -n "$TEST_ROOT" ]]; then
+    owner_mode=$(/usr/bin/stat -c '%u:%a' "$receipt_parent") || return 1
+  else
+    owner_mode=$(/usr/bin/stat -f '%u:%Lp' "$receipt_parent") || return 1
+  fi
+  [[ "$owner_mode" == "$(id -u):700" ]] || return 1
+
+  if [[ -n "$TEST_ROOT" ]]; then
+    [[ "$receipt_parent" == "${TEST_ROOT}/"* ]] || return 1
+    case "$receipt_parent" in
+      "$boot_mount"|"$boot_mount/"*|"$roms_mount"|"$roms_mount/"*) return 1 ;;
+    esac
+    return 0
+  fi
+
+  local receipt_source receipt_physical
+  case "$receipt_parent" in
+    /Volumes/BOOT|/Volumes/BOOT/*|/Volumes/EASYROMS|/Volumes/EASYROMS/*) return 1 ;;
+  esac
+  receipt_source=$(/bin/df -P "$receipt_parent" | /usr/bin/awk 'END {print $1}') || return 1
+  [[ "$receipt_source" == /dev/* ]] || return 1
+  receipt_physical=$(physical_whole_for_source "$receipt_source") || return 1
+  [[ "$receipt_physical" != "${device#/dev/}" ]]
+}
+
+physical_whole_for_source() {
+  local source=$1 source_info source_device source_whole physical_store physical_count
+  local store_info candidate whole_info whole_device
+  [[ "$source" =~ ^/dev/disk[0-9]+(s[0-9]+)?$ ]] || return 1
+  source_info=$(/usr/sbin/diskutil info "$source" 2>/dev/null) || return 1
+  source_device=$(/usr/bin/sed -n 's/^[[:space:]]*Device Identifier:[[:space:]]*//p' <<<"$source_info")
+  source_whole=$(/usr/bin/sed -n 's/^[[:space:]]*Part of Whole:[[:space:]]*//p' <<<"$source_info")
+  [[ -n "$source_device" ]] || return 1
+  physical_store=$(/usr/bin/sed -n 's/^[[:space:]]*APFS Physical Store:[[:space:]]*//p' <<<"$source_info")
+  physical_count=$(/usr/bin/sed -n 's/^[[:space:]]*APFS Physical Store:[[:space:]]*//p' <<<"$source_info" |
+    /usr/bin/awk 'NF {count++} END {print count+0}')
+  (( physical_count <= 1 )) || return 1
+  if [[ "$physical_count" -eq 1 ]]; then
+    [[ "$physical_store" =~ ^disk[0-9]+s[0-9]+$ ]] || return 1
+    store_info=$(/usr/sbin/diskutil info "/dev/${physical_store}" 2>/dev/null) || return 1
+    candidate=$(/usr/bin/sed -n 's/^[[:space:]]*Part of Whole:[[:space:]]*//p' <<<"$store_info")
+  else
+    candidate=$source_whole
+    [[ -n "$candidate" ]] || candidate=$source_device
+  fi
+  [[ "$candidate" =~ ^disk[0-9]+$ ]] || return 1
+  whole_info=$(/usr/sbin/diskutil info "/dev/${candidate}" 2>/dev/null) || return 1
+  whole_device=$(/usr/bin/sed -n 's/^[[:space:]]*Device Identifier:[[:space:]]*//p' <<<"$whole_info")
+  [[ "$whole_device" == "$candidate" ]] || return 1
+  /usr/bin/grep -Eq 'Whole:[[:space:]]+Yes$' <<<"$whole_info" || return 1
+  /usr/bin/grep -Eq 'Virtual:[[:space:]]+No$' <<<"$whole_info" || return 1
+  /usr/bin/printf '%s' "$candidate"
+}
+
+path_identity() {
+  if [[ -n "$TEST_ROOT" ]]; then
+    /usr/bin/stat -c '%d:%i:%u' "$1"
+  else
+    /usr/bin/stat -f '%d:%i:%u' "$1"
+  fi
+}
+
+external_receipt_dir_is_safe() {
+  local physical
+  [[ -n "$external_receipt_dir" && -d "$external_receipt_dir" &&
+     ! -L "$external_receipt_dir" ]] || return 1
+  physical=$(cd "$external_receipt_dir" && /bin/pwd -P) || return 1
+  [[ "$physical" == "$receipt_parent/"* ]] || return 1
+  receipt_parent_is_safe || return 1
+  [[ "$(path_identity "$external_receipt_dir")" == "$external_receipt_identity" ]]
+}
+
+publish_external_receipt() {
+  local source name expected_hash copied_count=0
+  receipt_parent_is_safe || fail "receipt parent changed or is no longer proven independent"
+  external_receipt_dir=$(/usr/bin/mktemp -d "${receipt_parent}/.r46h-${payload_name}-final.XXXXXX") ||
+    fail "cannot create final external receipt directory"
+  /bin/chmod 700 "$external_receipt_dir"
+  external_receipt_identity=$(path_identity "$external_receipt_dir")
+  readonly external_receipt_identity
+  external_receipt_dir_is_safe || fail "new external receipt directory is unsafe"
+
+  while IFS= read -r source; do
+    if [[ "$source" == "$source_snapshot_root" ]]; then
+      [[ -d "$source" && ! -L "$source" &&
+         "$(path_identity "$source")" == "$source_snapshot_identity" ]] ||
+        fail "private source snapshot identity changed"
+      continue
+    fi
+    [[ -f "$source" && ! -L "$source" ]] || fail "work receipt contains an unsafe entry"
+    name=${source##*/}
+    [[ "$name" != COMPLETE ]] || continue
+    external_receipt_dir_is_safe || fail "external receipt directory identity changed"
+    expected_hash=$(hash_file "$source")
+    /bin/cp -X "$source" "$external_receipt_dir/$name" 2>/dev/null ||
+      /bin/cp "$source" "$external_receipt_dir/$name"
+    [[ -f "$external_receipt_dir/$name" && ! -L "$external_receipt_dir/$name" &&
+       "$(hash_file "$external_receipt_dir/$name")" == "$expected_hash" ]] ||
+      fail "external receipt copy verification failed: ${name}"
+    copied_count=$((copied_count + 1))
+  done < <(/usr/bin/find "$receipt_dir" -mindepth 1 -maxdepth 1 -print | /usr/bin/sort)
+  (( copied_count >= 10 )) || fail "final receipt is unexpectedly incomplete"
+
+  external_receipt_dir_is_safe || fail "external receipt directory changed before completion publication"
+  [[ -f "$receipt_dir/COMPLETE" && ! -L "$receipt_dir/COMPLETE" ]] || fail "work receipt completion marker missing"
+  /bin/cp -X "$receipt_dir/COMPLETE" "$external_receipt_dir/COMPLETE" 2>/dev/null ||
+    /bin/cp "$receipt_dir/COMPLETE" "$external_receipt_dir/COMPLETE"
+  [[ -f "$external_receipt_dir/COMPLETE" && ! -L "$external_receipt_dir/COMPLETE" &&
+     "$(hash_file "$external_receipt_dir/COMPLETE")" == "$(hash_file "$receipt_dir/COMPLETE")" ]] ||
+    fail "external completion marker verification failed"
+  /bin/sync || fail "cannot sync external receipt publication"
+  external_receipt_dir_is_safe || fail "external receipt directory changed after publication"
+}
+
+receipt_dir=""
+external_receipt_dir=""
+external_receipt_identity=""
+source_snapshot_root=""
+source_snapshot_identity=""
+boot_partition=""
+boot_raw_partition=""
+root_partition=""
+roms_partition=""
+payload_name=""
+current_payload_name=""
+payload_final=""
+current_payload=""
+payload_root_sidecar=""
+completion_secret=""
+completion_secret_sha256=""
+commitment_source=""
+write_started=0
+complete_published=0
+final_verified=0
+completed=0
+
+file_size() {
+  if [[ -n "$TEST_ROOT" ]]; then /usr/bin/stat -c '%s' "$1"; else /usr/bin/stat -f '%z' "$1"; fi
+}
+target_exists() { if [[ -n "$TEST_ROOT" ]]; then [[ -e "$1" || -L "$1" ]]; else sudo -n /bin/test -e "$1" || sudo -n /bin/test -L "$1"; fi; }
+target_regular() { if [[ -n "$TEST_ROOT" ]]; then [[ -f "$1" && ! -L "$1" ]]; else sudo -n /bin/test -f "$1" && sudo -n /bin/test ! -L "$1"; fi; }
+target_size() { if [[ -n "$TEST_ROOT" ]]; then /usr/bin/stat -c '%s' "$1"; else sudo -n /usr/bin/stat -f '%z' "$1"; fi; }
+target_hash() { if [[ -n "$TEST_ROOT" ]]; then hash_file "$1"; else sudo -n /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'; fi; }
+target_remove() { if [[ -n "$TEST_ROOT" ]]; then /bin/rm -- "$1"; else sudo -n /bin/rm -- "$1"; fi; }
+
+verify_local() {
+  local path=$1 size=$2 hash=$3 label=$4
+  [[ -f "$path" && ! -L "$path" ]] || fail "missing or unsafe ${label}: ${path}"
+  [[ "$(file_size "$path")" == "$size" ]] || fail "${label} size mismatch"
+  [[ "$(hash_file "$path")" == "$hash" ]] || fail "${label} SHA-256 mismatch"
+}
+verify_target() {
+  local path=$1 size=$2 hash=$3 label=$4 actual_size actual_hash
+  target_regular "$path" || fail "missing or unsafe ${label}: ${path}"
+  if ! actual_size=$(target_size "$path"); then
+    fail "cannot read ${label} size: ${path}"
+  fi
+  [[ "$actual_size" =~ ^[0-9]+$ ]] || fail "invalid ${label} size output"
+  [[ "$actual_size" == "$size" ]] || fail "${label} size mismatch"
+  if ! actual_hash=$(target_hash "$path"); then
+    fail "cannot read ${label} SHA-256: ${path}"
+  fi
+  [[ "$actual_hash" =~ ^[0-9a-f]{64}$ ]] || fail "invalid ${label} SHA-256 output"
+  [[ "$actual_hash" == "$hash" ]] || fail "${label} SHA-256 mismatch"
+}
+require_absent() { ! target_exists "$1" || fail "$2 already exists: $1"; }
+
+validate_source_list() {
+  local hash path name count=0 actual_count previous_path=""
+  local saw_manifest=0 saw_complete=0 saw_bootstrap=0
+  while IFS='  ' read -r hash path; do
+    [[ "$hash" =~ ^[0-9a-f]{64}$ ]] || fail "malformed stage source hash"
+    [[ "$path" =~ ^payload/[A-Za-z0-9._+-]+$ ]] || fail "unsafe stage source path: ${path}"
+    if [[ -n "$previous_path" ]]; then
+      [[ "$path" > "$previous_path" ]] || fail "stage source paths must be unique and sorted"
+    fi
+    previous_path=$path
+    name=${path#payload/}
+    verify_local "${SOURCE_ROOT}/${name}" "$(file_size "${SOURCE_ROOT}/${name}")" "$hash" "stage source ${path}"
+    case "$path" in
+      payload/DEPLOY-MANIFEST) saw_manifest=1 ;;
+      payload/STAGE-COMPLETE) saw_complete=1 ;;
+      payload/bootstrap-target.sh) saw_bootstrap=1 ;;
+    esac
+    count=$((count + 1))
+  done < "$SOURCE_LIST"
+  (( count >= 9 )) || fail "stage source list is unexpectedly short"
+  actual_count=$(/usr/bin/find "$SOURCE_ROOT" -mindepth 1 -maxdepth 1 -print | /usr/bin/wc -l | /usr/bin/tr -d ' ')
+  [[ "$actual_count" =~ ^[0-9]+$ && "$actual_count" -eq "$count" ]] ||
+    fail "stage source list does not exactly cover the payload directory"
+  (( saw_manifest == 1 && saw_complete == 1 && saw_bootstrap == 1 )) ||
+    fail "stage source list is missing a required trust anchor"
+  verify_local "$SOURCE_ROOT/STAGE-COMPLETE" \
+    "$(manifest_value stage_complete_size)" "$(manifest_value stage_complete_sha256)" \
+    "manifest-bound STAGE-COMPLETE"
+  verify_local "$SOURCE_ROOT/bootstrap-target.sh" \
+    "$(manifest_value target_bootstrap_size)" "$(manifest_value target_bootstrap_sha256)" \
+    "manifest-bound bootstrap-target.sh"
+}
+
+freeze_source_snapshot() {
+  local snapshot_list snapshot_payload withdrawal_root hash path name count=0
+
+  source_snapshot_root="${receipt_dir}/.source-snapshot"
+  [[ ! -e "$source_snapshot_root" && ! -L "$source_snapshot_root" ]] ||
+    fail "private source snapshot path already exists"
+  /bin/mkdir -m 700 "$source_snapshot_root"
+  snapshot_list="${source_snapshot_root}/STAGE-SOURCES.sha256"
+  snapshot_payload="${source_snapshot_root}/payload"
+  /bin/mkdir -m 700 "$snapshot_payload"
+  /bin/cp -X "$SOURCE_LIST" "$snapshot_list" 2>/dev/null ||
+    /bin/cp "$SOURCE_LIST" "$snapshot_list"
+  /bin/chmod 600 "$snapshot_list"
+  [[ -f "$snapshot_list" && ! -L "$snapshot_list" &&
+     "$(hash_file "$snapshot_list")" == "$EXPECTED_STAGE_SOURCES_SHA256" ]] ||
+    fail "private source-list snapshot mismatch"
+
+  while IFS='  ' read -r hash path; do
+    [[ "$hash" =~ ^[0-9a-f]{64}$ && "$path" =~ ^payload/[A-Za-z0-9._+-]+$ ]] ||
+      fail "unsafe source entry while freezing private snapshot"
+    name=${path#payload/}
+    [[ -f "$SOURCE_ROOT/$name" && ! -L "$SOURCE_ROOT/$name" ]] ||
+      fail "source changed before private snapshot: ${name}"
+    /bin/cp -X "$SOURCE_ROOT/$name" "$snapshot_payload/$name" 2>/dev/null ||
+      /bin/cp "$SOURCE_ROOT/$name" "$snapshot_payload/$name"
+    /bin/chmod 600 "$snapshot_payload/$name"
+    verify_local "$snapshot_payload/$name" "$(file_size "$snapshot_payload/$name")" \
+      "$hash" "private source snapshot ${name}"
+    count=$((count + 1))
+  done < "$snapshot_list"
+  (( count >= 9 )) || fail "private source snapshot is unexpectedly short"
+
+  SOURCE_LIST=$snapshot_list
+  SOURCE_ROOT=$snapshot_payload
+  R46H_MANIFEST="${snapshot_payload}/DEPLOY-MANIFEST"
+  validate_source_list
+  source_snapshot_identity=$(path_identity "$source_snapshot_root")
+  [[ -n "$source_snapshot_identity" ]] || fail "cannot record private source snapshot identity"
+
+  if [[ -n "$TEST_ROOT" &&
+        "${R46H_DEPLOY_STAGE_TEST_WITHDRAW_SOURCE_AFTER_SNAPSHOT:-0}" == 1 ]]; then
+    [[ "$BUNDLE_DIR" == /repo/mainline/out/.cache/.r46h-*/* ]] ||
+      fail "source-withdrawal injection requires an ephemeral external-cache bundle"
+    withdrawal_root="${TEST_ROOT}/withdrawn-live-source"
+    [[ ! -e "$withdrawal_root" && ! -L "$withdrawal_root" ]] ||
+      fail "source-withdrawal destination already exists"
+    /bin/mkdir -m 700 "$withdrawal_root"
+    /bin/mv "$BUNDLE_SOURCE_LIST" "$withdrawal_root/STAGE-SOURCES.sha256"
+    /bin/mv "$BUNDLE_SOURCE_ROOT" "$withdrawal_root/payload"
+    [[ ! -e "$BUNDLE_SOURCE_LIST" && ! -e "$BUNDLE_SOURCE_ROOT" ]] ||
+      fail "live source withdrawal was incomplete"
+  fi
+}
+
+card_identity_matches() {
+  if [[ -n "$TEST_ROOT" ]]; then
+    [[ -f "$TEST_ROOT/card-profile.sha256" ]] || return 1
+    [[ "$(/usr/bin/tr -d '\r\n' < "$TEST_ROOT/card-profile.sha256")" == "$(manifest_value card_profile_sha256)" ]] || return 1
+    return 0
+  fi
+  local whole boot root roms disk_id=${device#/dev/}
+  [[ -b "$device" && -c "$raw_device" && -b "$boot_partition" && -c "$boot_raw_partition" &&
+     -b "$root_partition" && -b "$roms_partition" ]] || return 1
+  whole=$(/usr/sbin/diskutil info "$device" 2>/dev/null) || return 1
+  boot=$(/usr/sbin/diskutil info "$boot_partition" 2>/dev/null) || return 1
+  root=$(/usr/sbin/diskutil info "$root_partition" 2>/dev/null) || return 1
+  roms=$(/usr/sbin/diskutil info "$roms_partition" 2>/dev/null) || return 1
+  /usr/bin/grep -Eq "Device Identifier:[[:space:]]+${disk_id}$" <<<"$whole" || return 1
+  /usr/bin/grep -Eq 'Whole:[[:space:]]+Yes$' <<<"$whole" || return 1
+  /usr/bin/grep -Eq 'Content \(IOContent\):[[:space:]]+FDisk_partition_scheme$' <<<"$whole" || return 1
+  /usr/bin/grep -Eq 'Protocol:[[:space:]]+USB$' <<<"$whole" || return 1
+  /usr/bin/grep -Eq 'Device Location:[[:space:]]+External$' <<<"$whole" || return 1
+  /usr/bin/grep -Eq 'Removable Media:[[:space:]]+Removable$' <<<"$whole" || return 1
+  /usr/bin/grep -Eq 'Media Read-Only:[[:space:]]+No$' <<<"$whole" || return 1
+  /usr/bin/grep -Eq 'Virtual:[[:space:]]+No$' <<<"$whole" || return 1
+  /usr/bin/grep -Eq "Device Block Size:[[:space:]]+$(manifest_value card_sector_size) Bytes" <<<"$whole" || return 1
+  /usr/bin/grep -Fq "($(manifest_value card_whole_size) Bytes)" <<<"$whole" || return 1
+  /usr/bin/grep -Fq "Partition Offset:          $(manifest_value card_boot_offset) Bytes" <<<"$boot" || return 1
+  /usr/bin/grep -Fq "($(manifest_value card_boot_size) Bytes)" <<<"$boot" || return 1
+  /usr/bin/grep -Fq "Volume UUID:               $(manifest_value card_boot_uuid)" <<<"$boot" || return 1
+  /usr/bin/grep -Fq "Partition Offset:          $(manifest_value card_root_offset) Bytes" <<<"$root" || return 1
+  /usr/bin/grep -Fq "($(manifest_value card_root_size) Bytes)" <<<"$root" || return 1
+  /usr/bin/grep -Fq "Partition Offset:          $(manifest_value card_easyroms_offset) Bytes" <<<"$roms" || return 1
+  /usr/bin/grep -Fq "($(manifest_value card_easyroms_size) Bytes)" <<<"$roms" || return 1
+  /usr/bin/grep -Fq "Volume UUID:               $(manifest_value card_easyroms_uuid)" <<<"$roms" || return 1
+}
+
+mount_state_is() {
+  local expected=$1
+  if [[ -n "$TEST_ROOT" ]]; then
+    [[ "$(/usr/bin/tr -d '\r\n' < "$TEST_ROOT/mount-state")" == "$expected" ]] || return 1
+    return 0
+  fi
+  local boot root roms
+  boot=$(/usr/sbin/diskutil info "$boot_partition") || return 1
+  root=$(/usr/sbin/diskutil info "$root_partition") || return 1
+  roms=$(/usr/sbin/diskutil info "$roms_partition") || return 1
+  case "$expected" in
+    initial)
+      /usr/bin/grep -Eq 'Mounted:[[:space:]]+Yes$' <<<"$boot" &&
+      /usr/bin/grep -Eq 'Mount Point:[[:space:]]+/Volumes/BOOT$' <<<"$boot" &&
+      /usr/bin/grep -Eq 'Mounted:[[:space:]]+(No|Not applicable)' <<<"$root" &&
+      /usr/bin/grep -Eq 'Mounted:[[:space:]]+Yes$' <<<"$roms" &&
+      /usr/bin/grep -Eq 'Mount Point:[[:space:]]+/Volumes/EASYROMS$' <<<"$roms" ;;
+    unmounted)
+      /usr/bin/grep -Eq 'Mounted:[[:space:]]+No$' <<<"$boot" &&
+      /usr/bin/grep -Eq 'Mounted:[[:space:]]+(No|Not applicable)' <<<"$root" &&
+      /usr/bin/grep -Eq 'Mounted:[[:space:]]+No$' <<<"$roms" ;;
+    roms)
+      /usr/bin/grep -Eq 'Mounted:[[:space:]]+No$' <<<"$boot" &&
+      /usr/bin/grep -Eq 'Mounted:[[:space:]]+(No|Not applicable)' <<<"$root" &&
+      /usr/bin/grep -Eq 'Mounted:[[:space:]]+Yes$' <<<"$roms" &&
+      /usr/bin/grep -Eq 'Mount Point:[[:space:]]+/Volumes/EASYROMS$' <<<"$roms" ;;
+    *) return 1 ;;
+  esac
+}
+
+set_mount_state() {
+  local state=$1
+  if [[ -n "$TEST_ROOT" ]]; then
+    /usr/bin/printf '%s\n' "$state" > "$TEST_ROOT/mount-state"
+  else
+    case "$state" in
+      unmounted) /usr/sbin/diskutil unmountDisk "$device" >/dev/null ;;
+      roms) /usr/sbin/diskutil mount "$roms_partition" >/dev/null ;;
+      ejected) /usr/sbin/diskutil eject "$device" >/dev/null ;;
+      *) fail "invalid production mount transition" ;;
+    esac
+  fi
+}
+
+unmount_card() {
+  card_identity_matches || fail "card identity changed before unmount"
+  /bin/sync || fail "cannot sync before unmounting the card"
+  set_mount_state unmounted || fail "cannot unmount whole card"
+  mount_state_is unmounted || fail "card is not fully unmounted"
+}
+mount_roms_only() {
+  card_identity_matches || fail "card identity changed before mounting EASYROMS"
+  set_mount_state roms || fail "cannot mount EASYROMS"
+  mount_state_is roms || fail "mount state is not EASYROMS-only"
+}
+
+verify_boot_baseline() {
+  verify_target "$boot_mount/$(manifest_value current_active_path)" \
+    "$(manifest_value current_candidate_size)" "$(manifest_value current_candidate_sha256)" "active current boot.ini"
+  verify_target "$boot_mount/$(manifest_value current_candidate_path)" \
+    "$(manifest_value current_candidate_size)" "$(manifest_value current_candidate_sha256)" "current boot candidate"
+  verify_target "$boot_mount/$(manifest_value current_image_path)" \
+    "$(manifest_value current_image_size)" "$(manifest_value current_image_sha256)" "current Image"
+  verify_target "$boot_mount/$(manifest_value current_dtb_path)" \
+    "$(manifest_value current_dtb_size)" "$(manifest_value current_dtb_sha256)" "current DTB"
+  if [[ "$allowed_actions" == "install-modules,switch-boot" ]]; then
+    verify_target "$boot_mount/$(manifest_value fallback_boot_path)" \
+      "$(manifest_value fallback_boot_size)" "$(manifest_value fallback_boot_sha256)" "fallback boot.ini"
+    verify_target "$boot_mount/$(manifest_value fallback_boot_test_path)" \
+      "$(manifest_value fallback_boot_size)" "$(manifest_value fallback_boot_sha256)" "fallback boot.ini.test"
+    verify_target "$boot_mount/$(manifest_value fallback_image_path)" \
+      "$(manifest_value fallback_image_size)" "$(manifest_value fallback_image_sha256)" "fallback Image"
+    verify_target "$boot_mount/$(manifest_value fallback_dtb_path)" \
+      "$(manifest_value fallback_dtb_size)" "$(manifest_value fallback_dtb_sha256)" "fallback DTB"
+  fi
+  verify_target "$boot_mount/$(manifest_value uboot_root_dtb_path)" \
+    "$(manifest_value uboot_dtb_size)" "$(manifest_value uboot_dtb_sha256)" "root U-Boot DTB"
+  verify_target "$boot_mount/$(manifest_value uboot_console_dtb_path)" \
+    "$(manifest_value uboot_dtb_size)" "$(manifest_value uboot_dtb_sha256)" "console U-Boot DTB"
+}
+
+verify_current_payload_anchors() {
+  local count i path
+  count=$(manifest_value current_anchor_count)
+  [[ "$count" =~ ^[1-9][0-9]*$ ]] || fail "invalid current anchor count"
+  i=1
+  while (( i <= count )); do
+    path=$(manifest_value "current_anchor_${i}_path")
+    [[ "$path" =~ ^[A-Za-z0-9._+-]+$ ]] || fail "unsafe current anchor path"
+    verify_target "$current_payload/$path" "$(manifest_value "current_anchor_${i}_size")" \
+      "$(manifest_value "current_anchor_${i}_sha256")" "current payload anchor ${path}"
+    i=$((i + 1))
+  done
+}
+
+capture_raw() {
+  local suffix=$1
+  local prefix="$receipt_dir/prefix-${suffix}.bin"
+  local fdisk="$receipt_dir/fdisk-${suffix}.txt"
+  local p1="$receipt_dir/p1-${suffix}.sha256"
+  mount_state_is unmounted || fail "raw capture requires fully unmounted card"
+  if [[ -n "$TEST_ROOT" ]]; then
+    /bin/cp "$TEST_ROOT/raw/prefix.bin" "$prefix"
+    /bin/cp "$TEST_ROOT/raw/fdisk.txt" "$fdisk"
+    hash_file "$TEST_ROOT/raw/p1.bin" > "$p1"
+  else
+    sudo -n /bin/dd if="$raw_device" of="$prefix" bs=1m count=16 >/dev/null
+    sudo -n /usr/sbin/fdisk "$device" | /usr/bin/tee "$fdisk" >/dev/null
+    sudo -n /usr/bin/shasum -a 256 "$boot_raw_partition" | /usr/bin/awk '{print $1}' > "$p1"
+    sudo -n /usr/sbin/chown "$(id -u):$(id -g)" "$prefix"
+  fi
+  [[ "$(file_size "$prefix")" == "$(manifest_value card_g92_prefix_size)" ]] || fail "raw prefix size mismatch"
+  [[ "$(hash_file "$prefix")" == "$(manifest_value card_g92_prefix_sha256)" ]] || fail "g92 prefix SHA-256 mismatch"
+  if [[ "$suffix" != before ]]; then
+    /usr/bin/cmp -s "$receipt_dir/prefix-before.bin" "$prefix" || fail "g92 prefix changed"
+    /usr/bin/cmp -s "$receipt_dir/fdisk-before.txt" "$fdisk" || fail "partition table changed"
+    /usr/bin/cmp -s "$receipt_dir/p1-before.sha256" "$p1" || fail "BOOT raw SHA-256 changed"
+  fi
+}
+
+appledouble_magic() {
+  local path=$1 magic
+  target_regular "$path" || return 1
+  if [[ -n "$TEST_ROOT" ]]; then
+    magic=$(/usr/bin/od -An -tx1 -N4 "$path" | /usr/bin/tr -d '[:space:]')
+  else
+    magic=$(sudo -n /usr/bin/od -An -tx1 -N4 "$path" | /usr/bin/tr -d '[:space:]')
+  fi
+  [[ "$magic" == 00051607 ]]
+}
+remove_appledouble() {
+  local path=$1 label=$2
+  if target_exists "$path"; then
+    appledouble_magic "$path" || fail "${label} is not a proven AppleDouble file"
+    target_remove "$path" || fail "cannot remove ${label}"
+    ! target_exists "$path" || fail "${label} remains after removal"
+  fi
+}
+
+exclusive_copy() {
+  local source=$1 destination=$2
+  if [[ -n "$TEST_ROOT" ]]; then
+    ( set -o noclobber; /bin/cat "$source" > "$destination" ) || return 1
+  else
+    sudo -n /bin/bash -c 'set -euo pipefail; set -o noclobber; /bin/cat "$1" > "$2"' r46h-stage "$source" "$destination"
+  fi
+}
+target_move_no_clobber() {
+  if [[ -n "$TEST_ROOT" ]]; then /bin/mv -n "$1" "$2"; else sudo -n /bin/mv -n "$1" "$2"; fi
+}
+
+inject_test_appledouble() {
+  local path=$1
+  [[ -z "$TEST_ROOT" ]] || /usr/bin/printf '\x00\x05\x16\x07test-sidecar\n' > "$(dirname "$path")/._$(basename "$path")"
+}
+
+publish_source() {
+  local source=$1 destination=$2 expected_hash=$3 label=$4 partial partial_sidecar destination_sidecar size
+  size=$(file_size "$source")
+  partial="${payload_final}/.$(/usr/bin/basename "$destination").partial.$$"
+  partial_sidecar="${payload_final}/._$(/usr/bin/basename "$partial")"
+  destination_sidecar="${payload_final}/._$(/usr/bin/basename "$destination")"
+  mount_state_is roms || fail "${label} write requires EASYROMS-only mount"
+  require_absent "$destination" "$label"
+  require_absent "$partial" "${label} partial"
+  exclusive_copy "$source" "$partial" || fail "cannot exclusively copy ${label}"
+  inject_test_appledouble "$partial"
+  verify_target "$partial" "$size" "$expected_hash" "${label} partial"
+  remove_appledouble "$partial_sidecar" "${label} partial AppleDouble"
+  /bin/sync || fail "cannot sync staged ${label}"
+  require_absent "$destination" "$label"
+  target_move_no_clobber "$partial" "$destination" || fail "cannot atomically publish ${label}"
+  if [[ -n "$TEST_ROOT" && "$label" == STAGE-COMPLETE &&
+        "${R46H_DEPLOY_STAGE_TEST_FAIL_AFTER_GATE_MOVE:-0}" == 1 ]]; then
+    fail "injected failure after STAGE-COMPLETE publication"
+  fi
+  inject_test_appledouble "$destination"
+  require_absent "$partial" "consumed ${label} partial"
+  verify_target "$destination" "$size" "$expected_hash" "$label"
+  remove_appledouble "$destination_sidecar" "${label} AppleDouble"
+  /bin/sync || fail "cannot sync published ${label}"
+}
+
+write_expected_entries() {
+  local include_complete=$1 output=$2 hash path name
+  : > "$output"
+  while IFS='  ' read -r hash path; do
+    name=${path#payload/}
+    [[ "$include_complete" -eq 1 || "$name" != STAGE-COMPLETE ]] && /usr/bin/printf '%s\n' "$name" >> "$output"
+  done < "$SOURCE_LIST"
+  /usr/bin/printf '%s\n' STAGE-SOURCES.sha256 FINAL-RECEIPT-COMMITMENT >> "$output"
+  /usr/bin/sort -o "$output" "$output"
+}
+verify_exact_entries() {
+  local include_complete=$1 label=$2
+  local expected="$receipt_dir/expected-${include_complete}.txt"
+  local actual="$receipt_dir/actual-${include_complete}.txt"
+  write_expected_entries "$include_complete" "$expected"
+  if [[ -n "$TEST_ROOT" ]]; then /bin/ls -A1 "$payload_final"; else sudo -n /bin/ls -A1 "$payload_final"; fi | /usr/bin/sort > "$actual"
+  /usr/bin/cmp -s "$expected" "$actual" || fail "${label} contains missing, extra, temporary, or AppleDouble entries"
+}
+verify_payload_files() {
+  local include_complete=$1 hash path name
+  while IFS='  ' read -r hash path; do
+    name=${path#payload/}
+    if [[ "$include_complete" -eq 1 || "$name" != STAGE-COMPLETE ]]; then
+      verify_target "$payload_final/$name" "$(file_size "$SOURCE_ROOT/$name")" "$hash" "payload ${name}"
+    fi
+  done < "$SOURCE_LIST"
+  verify_target "$payload_final/STAGE-SOURCES.sha256" "$(file_size "$SOURCE_LIST")" \
+    "$EXPECTED_STAGE_SOURCES_SHA256" "payload STAGE-SOURCES.sha256"
+  verify_target "$payload_final/FINAL-RECEIPT-COMMITMENT" "$(file_size "$commitment_source")" \
+    "$(hash_file "$commitment_source")" "payload final-receipt commitment"
+  verify_exact_entries "$include_complete" "payload"
+}
+
+invalidate_gate() {
+  [[ "$complete_published" -eq 1 && "$final_verified" -eq 0 ]] || return 0
+  card_identity_matches || { echo "WARNING: cannot prove card identity while invalidating gate" >&2; return 1; }
+  set_mount_state unmounted >/dev/null 2>&1 || true
+  mount_state_is unmounted || { echo "WARNING: cannot unmount card while invalidating gate" >&2; return 1; }
+  set_mount_state roms >/dev/null 2>&1 || { echo "WARNING: cannot mount EASYROMS while invalidating gate" >&2; return 1; }
+  mount_state_is roms || { echo "WARNING: EASYROMS mount state is unsafe while invalidating gate" >&2; return 1; }
+  local gate="$payload_final/STAGE-COMPLETE"
+  if target_exists "$gate"; then
+    verify_target "$gate" "$(manifest_value stage_complete_size)" "$(manifest_value stage_complete_sha256)" "gate" || return 1
+    target_remove "$gate" || { echo "WARNING: cannot remove STAGE-COMPLETE" >&2; return 1; }
+    /bin/sync || { echo "WARNING: cannot sync gate invalidation" >&2; return 1; }
+  fi
+  remove_appledouble "$payload_final/._STAGE-COMPLETE" "gate AppleDouble" || return 1
+}
+
+cleanup() {
+  local status=$?
+  trap - EXIT
+  trap '' INT TERM HUP
+  [[ "$completed" -ne 1 ]] || exit 0
+  if [[ "$complete_published" -eq 1 && "$final_verified" -eq 0 ]]; then
+    invalidate_gate || echo "WARNING: STAGE-COMPLETE invalidation was not proven" >&2
+  fi
+  if [[ -n "$receipt_dir" && -d "$receipt_dir" ]]; then /usr/bin/touch "$receipt_dir/FAILED" 2>/dev/null || true; fi
+  if [[ "$write_started" -eq 1 ]]; then
+    echo "Stage failed; do not run target scripts unless STAGE-COMPLETE and the final receipt are proven." >&2
+    [[ -z "$receipt_dir" ]] || echo "WORK_RECEIPT_DIR=$receipt_dir" >&2
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+validate_source_list
+receipt_parent_is_safe || fail "receipt parent is on the target card or cannot be proven independent"
+if [[ -n "$TEST_ROOT" ]]; then
+  work_receipt_parent="${TEST_ROOT}/work-receipts"
+  /bin/mkdir -p "$work_receipt_parent"
+  /bin/chmod 700 "$work_receipt_parent"
+else
+  work_receipt_parent=$receipt_parent
+fi
+readonly work_receipt_parent
+receipt_dir=$(/usr/bin/mktemp -d "${work_receipt_parent}/.r46h-stage-work.XXXXXX") ||
+  fail "cannot create private work receipt directory"
+/bin/chmod 700 "$receipt_dir"
+receipt_identity=$(path_identity "$receipt_dir")
+readonly receipt_identity
+freeze_source_snapshot
+
+# No card identity, partition or destination path is derived from the live
+# bundle. All values below come from the source-list-bound private snapshot.
+[[ "$(manifest_value target)" == HL-R46H-V22 ]] || fail "target mismatch"
+allowed_actions=$(manifest_value allowed_actions)
+case "$allowed_actions" in
+  install-modules|install-modules,switch-boot) ;;
+  *) fail "unsupported target action policy" ;;
+esac
+if [[ "$allowed_actions" == install-modules ]]; then
+  [[ "$(manifest_value action_policy)" == install-modules-only &&
+     "$(manifest_value target_boot_switch)" == disabled ]] ||
+    fail "modules-only manifest policy mismatch"
+  [[ ! -e "$SOURCE_ROOT/switch-boot.sh" && ! -L "$SOURCE_ROOT/switch-boot.sh" ]] ||
+    fail "modules-only source unexpectedly contains switch-boot.sh"
+else
+  [[ "$(manifest_value action_policy)" == full &&
+     "$(manifest_value target_boot_switch)" == switch-boot.sh ]] ||
+    fail "full manifest policy mismatch"
+fi
+readonly allowed_actions
+boot_number=$(manifest_value card_boot_number)
+root_number=$(manifest_value card_root_number)
+roms_number=$(manifest_value card_easyroms_number)
+[[ "$boot_number" == 1 && "$root_number" == 2 && "$roms_number" == 3 ]] ||
+  fail "unexpected fixed partition numbers"
+payload_name=$(manifest_value payload_name)
+current_payload_name=$(manifest_value current_payload_name)
+[[ "$payload_name" =~ ^r46h-[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || fail "unsafe payload name"
+[[ "$current_payload_name" =~ ^r46h-[A-Za-z0-9][A-Za-z0-9._-]*$ ]] ||
+  fail "unsafe current payload name"
+boot_partition="${device}s${boot_number}"
+boot_raw_partition="/dev/r${device#/dev/}s${boot_number}"
+root_partition="${device}s${root_number}"
+roms_partition="${device}s${roms_number}"
+payload_final="${roms_mount}/${payload_name}"
+current_payload="${roms_mount}/${current_payload_name}"
+payload_root_sidecar="${roms_mount}/._${payload_name}"
+readonly boot_partition boot_raw_partition root_partition roms_partition
+readonly payload_name current_payload_name payload_final current_payload payload_root_sidecar
+
+card_identity_matches || fail "$device is not the audited R46H card"
+mount_state_is initial || fail "BOOT/EASYROMS initial mount state mismatch"
+if [[ -z "$TEST_ROOT" ]]; then
+  echo "One sudo authorization will be used only for audited raw reads and fixed ${roms_partition} payload writes."
+  sudo -v || fail "administrator authorization failed"
+  sudo -n /usr/bin/true || fail "administrator authorization cache unavailable"
+fi
+verify_boot_baseline
+verify_current_payload_anchors
+require_absent "$payload_final" "new payload directory"
+/bin/cp -X "$SOURCE_LIST" "$R46H_MANIFEST" "$receipt_dir/" 2>/dev/null || /bin/cp "$SOURCE_LIST" "$R46H_MANIFEST" "$receipt_dir/"
+
+completion_secret=$(/usr/bin/od -An -N32 -tx1 /dev/urandom | /usr/bin/tr -d '[:space:]')
+[[ "$completion_secret" =~ ^[0-9a-f]{64}$ ]] || fail "cannot generate the completion secret"
+completion_secret_sha256=$(hash_literal "$completion_secret")
+[[ "$completion_secret_sha256" =~ ^[0-9a-f]{64}$ ]] || fail "cannot hash the completion secret"
+commitment_source="$receipt_dir/FINAL-RECEIPT-COMMITMENT"
+/usr/bin/printf '%s\n' \
+  'format_version=1' \
+  'status=committed' \
+  'purpose=external-receipt-completion-secret' \
+  "payload=${payload_name}" \
+  "completion_secret_sha256=${completion_secret_sha256}" > "$commitment_source"
+
+unmount_card
+capture_raw before
+mount_roms_only
+verify_current_payload_anchors
+require_absent "$payload_final" "new payload directory after remount"
+write_started=1
+if [[ -n "$TEST_ROOT" ]]; then
+  /bin/mkdir "$payload_final"
+  /usr/bin/printf '\x00\x05\x16\x07test-directory-sidecar\n' > "$payload_root_sidecar"
+else
+  sudo -n /bin/mkdir "$payload_final"
+fi
+
+publish_source "$SOURCE_LIST" "$payload_final/STAGE-SOURCES.sha256" \
+  "$EXPECTED_STAGE_SOURCES_SHA256" "STAGE-SOURCES.sha256"
+publish_source "$commitment_source" "$payload_final/FINAL-RECEIPT-COMMITMENT" \
+  "$(hash_file "$commitment_source")" "FINAL-RECEIPT-COMMITMENT"
+while IFS='  ' read -r hash path; do
+  name=${path#payload/}
+  [[ "$name" == STAGE-COMPLETE ]] && continue
+  publish_source "$SOURCE_ROOT/$name" "$payload_final/$name" "$hash" "$name"
+done < "$SOURCE_LIST"
+remove_appledouble "$payload_root_sidecar" "payload directory AppleDouble"
+verify_payload_files 0
+unmount_card
+capture_raw after-body
+mount_roms_only
+verify_payload_files 0
+complete_hash=$(manifest_value stage_complete_sha256)
+verify_local "$SOURCE_ROOT/STAGE-COMPLETE" "$(manifest_value stage_complete_size)" \
+  "$complete_hash" "frozen STAGE-COMPLETE"
+complete_published=1
+publish_source "$SOURCE_ROOT/STAGE-COMPLETE" "$payload_final/STAGE-COMPLETE" "$complete_hash" "STAGE-COMPLETE"
+remove_appledouble "$payload_root_sidecar" "payload directory AppleDouble"
+verify_payload_files 1
+
+unmount_card
+capture_raw after-complete
+mount_roms_only
+verify_payload_files 1
+final_verified=1
+unmount_card
+set_mount_state ejected || fail "cannot safely eject card"
+/usr/bin/printf '%s\n' \
+  'format_version=1' \
+  'status=complete' \
+  "device=${device}" \
+  'only_written_partition=3' \
+  "payload=${payload_name}" \
+  'bootloader_prefix=unchanged' \
+  'partition_table=unchanged' \
+  'boot_partition=unchanged-raw-sha256' \
+  'root_partition=never-mounted' > "$receipt_dir/STAGE-RESULT"
+bootstrap_hash=$(manifest_value target_bootstrap_sha256)
+verify_local "$SOURCE_ROOT/bootstrap-target.sh" "$(manifest_value target_bootstrap_size)" \
+  "$bootstrap_hash" "frozen bootstrap-target.sh"
+p1_before_hash=$(/usr/bin/tr -d '[:space:]' < "$receipt_dir/p1-before.sha256")
+[[ "$bootstrap_hash" =~ ^[0-9a-f]{64}$ && "$p1_before_hash" =~ ^[0-9a-f]{64}$ ]] ||
+  fail "cannot derive final target trust anchors"
+/usr/bin/printf '%s\n' \
+  'format_version=1' \
+  'status=complete' \
+  'target=HL-R46H-V22' \
+  "payload=${payload_name}" \
+  "kernel_release=$(manifest_value kernel_release)" \
+  "allowed_actions=${allowed_actions}" \
+  "card_profile_sha256=$(manifest_value card_profile_sha256)" \
+  "stage_complete_sha256=$(manifest_value stage_complete_sha256)" \
+  "bootstrap_target_sha256=${bootstrap_hash}" \
+  "stage_sources_sha256=${EXPECTED_STAGE_SOURCES_SHA256}" \
+  "completion_secret=${completion_secret}" \
+  "completion_secret_sha256=${completion_secret_sha256}" \
+  "g92_prefix_sha256=$(manifest_value card_g92_prefix_sha256)" \
+  "boot_partition_sha256=${p1_before_hash}" \
+  'only_written_partition=3' \
+  'root_partition=never-mounted' > "$receipt_dir/TARGET-TRUST-RECEIPT"
+trust_receipt_hash=$(hash_file "$receipt_dir/TARGET-TRUST-RECEIPT")
+/usr/bin/printf '%s  %s\n' "$trust_receipt_hash" TARGET-TRUST-RECEIPT > \
+  "$receipt_dir/TARGET-TRUST-RECEIPT.sha256"
+/usr/bin/touch "$receipt_dir/EJECTED" "$receipt_dir/COMPLETE"
+publish_external_receipt
+completed=1
+trap - EXIT INT TERM HUP
+echo "PASS: ${payload_name} was staged to EASYROMS only and the card was safely ejected."
+echo "TARGET_TRUST_RECEIPT_SHA256=${trust_receipt_hash}"
+echo "RECEIPT_DIR=${external_receipt_dir}"
+if [[ "$(path_identity "$receipt_dir")" == "$receipt_identity" ]]; then
+  /bin/rm -rf "$receipt_dir"
+else
+  echo "WARNING: private work receipt identity changed; refusing cleanup: ${receipt_dir}" >&2
+fi

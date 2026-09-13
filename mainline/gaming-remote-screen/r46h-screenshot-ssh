@@ -1,0 +1,34 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+LANG=C
+export PATH LC_ALL LANG
+
+readonly HELPER=/usr/local/bin/r46h-screenshot
+readonly ORIGINAL_COMMAND=${SSH_ORIGINAL_COMMAND-}
+
+die() {
+  printf 'ERROR: screenshot key does not authorize this command\n' >&2
+  exit 1
+}
+
+(( EUID == 1000 )) || die
+[[ "$(id -g)" == 1000 ]] || die
+[[ -n "${SSH_CONNECTION-}" ]] || die
+[[ -z "${SSH_TTY-}" ]] || die
+[[ -x "$HELPER" && ! -L "$HELPER" ]] || die
+
+case $ORIGINAL_COMMAND in
+  "$HELPER")
+    exec "$HELPER"
+    ;;
+  *)
+    if [[ "$ORIGINAL_COMMAND" =~ ^/usr/local/bin/r46h-screenshot[[:space:]]+(--read|--remove)[[:space:]]+(r46h-screen-[0-9]{8}T[0-9]{6}Z-[1-9][0-9]*\.png)[[:space:]]+([1-9][0-9]*)[[:space:]]+([0-9a-f]{64})$ ]]; then
+      exec "$HELPER" "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" \
+        "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}"
+    fi
+    die
+    ;;
+esac

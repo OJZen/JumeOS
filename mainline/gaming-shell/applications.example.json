@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "applications": [
+    {
+      "id": "moonlight",
+      "title": "Moonlight",
+      "description": "电脑游戏串流",
+      "program": "/run/r46h-moonlight-qt-test/qt-client.sh",
+      "arguments": []
+    }
+  ]
+}

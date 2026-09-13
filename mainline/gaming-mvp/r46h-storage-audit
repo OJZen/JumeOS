@@ -1,0 +1,65 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+LANG=C
+export PATH LC_ALL LANG
+
+readonly EXPECTED_RELEASE=6.12.99-r46h-mainline-v0.15-gaming-product
+readonly EXPECTED_ROOT_PARTUUID=c9f931c9-02
+readonly CARD=/sys/bus/mmc/devices/mmc0:0001
+readonly BLOCK=/sys/block/mmcblk0
+readonly IOS=/sys/kernel/debug/mmc0/ios
+readonly EXT4_ERRORS=/sys/fs/ext4/mmcblk0p2/errors_count
+
+die() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+read_hex_register() {
+  local path=$1 digits=$2 value
+  [[ -f "$path" && ! -L "$path" ]] || die "missing card register: $path"
+  value=$(<"$path")
+  [[ "$value" =~ ^[0-9a-f]{$digits}$ ]] || die "malformed card register: $path"
+  printf '%s\n' "$value"
+}
+
+(( EUID == 0 )) || die 'root is required'
+[[ $# == 0 ]] || die 'this read-only audit accepts no arguments'
+[[ "$(uname -r)" == "$EXPECTED_RELEASE" ]] || die 'unexpected kernel release'
+[[ "$(findmnt -rn -o PARTUUID /)" == "$EXPECTED_ROOT_PARTUUID" ]] || \
+  die 'unexpected root partition'
+[[ "$(findmnt -rn -o FSTYPE /)" == ext4 ]] || die 'root is not ext4'
+[[ "$(cat "$EXT4_ERRORS")" == 0 ]] || die 'root filesystem reports errors'
+card_real=$(readlink -f "$CARD")
+block_real=$(readlink -f "$BLOCK")
+[[ -d "$card_real" && "$card_real" == /sys/devices/* ]] || \
+  die 'expected SD card sysfs device is absent'
+[[ -d "$block_real" && "$block_real" == /sys/devices/* ]] || \
+  die 'expected SD block device is absent'
+[[ "$(<"$CARD/type")" == SD ]] || die 'mmc0 is not an SD card'
+[[ -f "$IOS" && ! -L "$IOS" ]] || die 'MMC debugfs ios state is unavailable'
+
+cid=$(read_hex_register "$CARD/cid" 32)
+csd=$(read_hex_register "$CARD/csd" 32)
+scr=$(read_hex_register "$CARD/scr" 16)
+ssr=$(read_hex_register "$CARD/ssr" 128)
+timing=$(awk -F':[[:space:]]*' '/^timing spec:/ {print $2; found=1} END {exit found ? 0 : 1}' "$IOS") || \
+  die 'cannot read MMC timing mode'
+timing=${timing// /_}
+clock_hz=$(awk -F':[[:space:]]*' '/^actual clock:/ {value=$2; sub(/ .*/, "", value); print value; found=1} END {exit found ? 0 : 1}' "$IOS") || \
+  die 'cannot read MMC actual clock'
+[[ "$clock_hz" =~ ^[0-9]+$ ]] || die 'malformed MMC actual clock'
+scheduler=$(tr ' ' '_' < "$BLOCK/queue/scheduler" | tr -d '\n')
+write_cache=unavailable
+if [[ -f "$BLOCK/queue/write_cache" && ! -L "$BLOCK/queue/write_cache" ]]; then
+  write_cache=$(tr ' ' '_' < "$BLOCK/queue/write_cache" | tr -d '\n')
+fi
+
+printf 'R46H_STORAGE_AUDIT result=pass device=mmcblk0 type=SD timing=%s actual_clock_hz=%s ext4_errors=0 a2_label=not-machine-verifiable a2_command_queue=not-available\n' \
+  "$timing" "$clock_hz"
+printf 'R46H_STORAGE_QUEUE scheduler=%s write_cache=%s\n' "$scheduler" "$write_cache"
+printf 'R46H_STORAGE_REGISTERS cid=%s csd=%s scr=%s ssr=%s\n' \
+  "$cid" "$csd" "$scr" "$ssr"

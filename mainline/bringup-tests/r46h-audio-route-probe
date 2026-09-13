@@ -1,0 +1,333 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+LANG=C
+export PATH LC_ALL LANG
+
+readonly PROBE_ID=r46h-audio-route-probe-v0.4
+readonly EXPECTED_RELEASE=6.12.99-r46h-mainline-v0.10-adc-full-range
+readonly EXPECTED_ROOT_SOURCE=/dev/mmcblk0p2
+readonly EXPECTED_ROOT_PARTUUID=c9f931c9-02
+readonly EXPECTED_ROOT_UUID=d3130001-46a4-4d56-9001-000000000001
+readonly REQUIRED_SCRIPT_PATH=/run/r46h-audio-route-probe
+readonly EXT4_ERRORS=/sys/fs/ext4/mmcblk0p2/errors_count
+readonly VOLUME_CONTROL=2
+readonly MUX_CONTROL=5
+readonly TEST_VOLUME=201,201
+readonly TEST_MUX=0
+readonly TEST_ROUTE=HP
+readonly TEST_FREQUENCY=440
+readonly TEST_SCALE=40
+test_mode=unknown
+test_seconds=unknown
+readonly SPEAKER_DAPM=/sys/kernel/debug/asoc/rk817_int/dapm/Speaker
+readonly HEADPHONES_DAPM=/sys/kernel/debug/asoc/rk817_int/dapm/Headphones
+
+runtime_dir=""
+saved_volume=""
+saved_mux=""
+child_pid=""
+state_changed=0
+completed=0
+failures=0
+
+fault_pattern='(^|[^[:alnum:]_])(BUG(:|[[:space:]])|Oops:|kernel panic|Call trace:|cut here)'
+fault_pattern+='|watchdog.*lockup|soft lockup|hard LOCKUP|rcu.*stall|hung task|task .*blocked for more than'
+fault_pattern+='|mmc.*(I/O error|error[[:space:]]+-[0-9]+|timed out|timeout|CRC|fail(ed|ure)?)'
+fault_pattern+='|I/O error.*mmc|(blk_update_request|end_request|blk_print_req_error).*(error|failure)'
+fault_pattern+='|Buffer I/O error|JBD2.*(error([ :]|$)|warning|abort|fail(ed|ure)?)'
+fault_pattern+='|EXT4-fs.*(error([ :]|$)|warning|abort|fail(ed|ure)?)'
+fault_pattern+='|(rk817|asoc|audio|i2s|codec).*(I/O error|error[[:space:]]+-[0-9]+|timed out|timeout|(^|[^[:alnum:]_])fault([^[:alnum:]_]|$)|fail(ed|ure)?)'
+readonly fault_pattern
+
+usage() {
+  cat <<'EOF'
+usage: r46h-audio-route-probe --hp-external-amp|--headphones-mechanical
+
+Run one bounded, attended RK817 playback probe on exact R46H v0.10. The probe
+keeps the physical Speaker endpoint active but selects the HP DAC path used by
+the downstream `use-ext-amplifier` implementation. The mechanical-headphone
+mode tests an already inserted headset while deliberately requiring the known
+unchanged DAPM state; it does not repeat jack detection. The probe saves and
+restores both ALSA controls, writes temporary evidence only to /run, and never
+reports an audible PASS by itself: the operator must state where the tone was
+heard.
+
+Install this reviewed file as root:root mode 0700 at
+/run/r46h-audio-route-probe and run it as root from the serial console.
+EOF
+}
+
+emit_marker() {
+  local result=$1
+  local cleanup=$2
+  local reason=$3
+  printf 'R46H_AUDIO_ROUTE_PROBE id=%s route=%s mode=%s result=%s failures=%d cleanup=%s reason=%s frequency=%s scale=%s volume=%s seconds=%s\n' \
+    "$PROBE_ID" "$TEST_ROUTE" "$test_mode" "$result" "$failures" "$cleanup" \
+    "$reason" "$TEST_FREQUENCY" "$TEST_SCALE" "$TEST_VOLUME" "$test_seconds"
+}
+
+pass() {
+  printf 'R46H_AUDIO_ROUTE_CHECK group=%s name=%s result=pass\n' "$1" "$2"
+}
+
+fail() {
+  printf 'R46H_AUDIO_ROUTE_CHECK group=%s name=%s result=fail reason=%s\n' "$1" "$2" "$3"
+  failures=$((failures + 1))
+}
+
+check() {
+  local group=$1
+  local name=$2
+  shift 2
+  if "$@"; then
+    pass "$group" "$name"
+  else
+    fail "$group" "$name" check-failed
+  fi
+}
+
+interactive_tty() {
+  [[ -t 0 && -t 1 && -t 2 ]]
+}
+
+control_values() {
+  local control=$1
+  amixer -c 0 cget "numid=$control" 2>/dev/null |
+    awk -F= '/^[[:space:]]*: values=/ { print $2; found=1 } END { exit found ? 0 : 1 }'
+}
+
+restore_state() {
+  local status=0
+  if (( state_changed == 1 )); then
+    if [[ "$saved_volume" =~ ^[0-9]+,[0-9]+$ ]]; then
+      amixer -q -c 0 cset "numid=$VOLUME_CONTROL" "$saved_volume" || status=74
+    else
+      status=74
+    fi
+    if [[ "$saved_mux" =~ ^[0-9]+$ ]]; then
+      amixer -q -c 0 cset "numid=$MUX_CONTROL" "$saved_mux" || status=74
+    else
+      status=74
+    fi
+    if (( status == 0 )); then
+      state_changed=0
+    fi
+  fi
+  printf 'R46H_AUDIO_ROUTE_RESTORE volume=%s mux=%s status=%d\n' \
+    "${saved_volume:-unknown}" "${saved_mux:-unknown}" "$status"
+  return "$status"
+}
+
+remove_runtime() {
+  local expected=$1
+  [[ -n "$runtime_dir" && "$runtime_dir" == /run/r46h-audio-route-probe.* &&
+     ! -L "$runtime_dir" && -d "$runtime_dir" &&
+     "$(stat -c '%u:%a:%d:%i' -- "$runtime_dir" 2>/dev/null || true)" == "0:700:$expected" ]] || return 1
+  rm -rf -- "$runtime_dir"
+  [[ ! -e "$runtime_dir" && ! -L "$runtime_dir" ]]
+}
+
+cleanup() {
+  local status=$?
+  local cleanup_status=0
+  local runtime_identity=""
+  trap - EXIT INT TERM HUP
+  trap '' INT TERM HUP
+  set +e
+  if [[ -n "$child_pid" ]] && kill -0 "$child_pid" 2>/dev/null; then
+    kill -TERM -- "-$child_pid" 2>/dev/null || kill -TERM "$child_pid" 2>/dev/null || true
+    wait "$child_pid" 2>/dev/null || true
+  fi
+  child_pid=""
+  restore_state || cleanup_status=74
+  if [[ -n "$runtime_dir" ]]; then
+    runtime_identity=$(stat -c '%d:%i' -- "$runtime_dir" 2>/dev/null || true)
+    if [[ "$runtime_identity" =~ ^[0-9]+:[0-9]+$ ]]; then
+      remove_runtime "$runtime_identity" || cleanup_status=74
+    else
+      cleanup_status=74
+    fi
+  fi
+  if (( status == 0 && completed == 1 && failures == 0 && cleanup_status == 0 )); then
+    emit_marker observation-required pass "$observation_reason"
+    exit 0
+  fi
+  (( status != 0 )) || status=1
+  if (( cleanup_status != 0 )); then
+    emit_marker fail fail cleanup-failed
+    exit "$cleanup_status"
+  fi
+  emit_marker fail pass checks-failed
+  exit "$status"
+}
+
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+if [[ ${1:-} == --help && $# == 1 ]]; then
+  trap - EXIT INT TERM HUP
+  usage
+  exit 0
+fi
+if [[ $# != 1 ]]; then
+  trap - EXIT INT TERM HUP
+  usage >&2
+  emit_marker fail pass invalid-arguments
+  exit 2
+fi
+case $1 in
+  --hp-external-amp)
+    test_mode=hp-external-amp
+    test_seconds=4
+    test_target=speaker
+    expected_speaker_state='Speaker: On'
+    expected_headphones_state='Headphones: Off'
+    observation_reason=operator-audibility-required
+    ;;
+  --headphones-mechanical)
+    test_mode=headphones-mechanical
+    test_seconds=2
+    test_target=headphones-mechanical
+    expected_speaker_state='Speaker: On'
+    expected_headphones_state='Headphones: Off'
+    observation_reason=operator-mechanical-headphone-audio-and-speaker-silence-required
+    ;;
+  *)
+    trap - EXIT INT TERM HUP
+    usage >&2
+    emit_marker fail pass invalid-arguments
+    exit 2
+    ;;
+esac
+readonly test_mode test_seconds test_target expected_speaker_state \
+  expected_headphones_state observation_reason
+
+if (( EUID != 0 )); then
+  fail preflight root-required not-root
+  exit 1
+fi
+if [[ ${BASH_SOURCE[0]} != "$REQUIRED_SCRIPT_PATH" ||
+      ! -f "$REQUIRED_SCRIPT_PATH" || -L "$REQUIRED_SCRIPT_PATH" ||
+      "$(stat -c '%u:%a:%h' -- "$REQUIRED_SCRIPT_PATH" 2>/dev/null || true)" != 0:700:1 ]]; then
+  fail preflight script-identity unsafe-script
+  exit 1
+fi
+for command_name in \
+  amixer awk cat chmod cmp dmesg findmnt grep head kill mkdir mktemp rm setsid \
+  pgrep sleep speaker-test stat systemctl tail timeout tr uname wc; do
+  check preflight "command-$command_name" command -v "$command_name"
+done
+(( failures == 0 )) || exit 1
+check preflight interactive-tty interactive_tty
+check preflight run-tmpfs test "$(findmnt -rn -T /run -o FSTYPE 2>/dev/null || true)" = tmpfs
+check identity kernel-release test "$(uname -r)" = "$EXPECTED_RELEASE"
+board_model=""
+if [[ -r /proc/device-tree/model ]]; then
+  board_model=$(tr -d '\000' < /proc/device-tree/model)
+fi
+check identity board-model test "$board_model" = 'GameConsole R46H'
+check identity root-source test "$(findmnt -rn -o SOURCE /)" = "$EXPECTED_ROOT_SOURCE"
+check identity root-partuuid test "$(findmnt -rn -o PARTUUID /)" = "$EXPECTED_ROOT_PARTUUID"
+check identity root-uuid test "$(findmnt -rn -o UUID /)" = "$EXPECTED_ROOT_UUID"
+check health failed-units-before test -z "$(systemctl --failed --no-legend --plain 2>/dev/null)"
+check health ext4-errors-before test "$(cat "$EXT4_ERRORS")" = 0
+check audio frontend-inactive test "$(systemctl is-active r46h-gaming-frontend.service 2>/dev/null || true)" != active
+check audio retroarch-inactive test -z "$(pgrep -x retroarch 2>/dev/null || true)"
+check audio playback-device grep -Fq 'rk817-hifi' /proc/asound/pcm
+check audio speaker-dapm test -r "$SPEAKER_DAPM"
+check audio headphones-dapm test -r "$HEADPHONES_DAPM"
+(( failures == 0 )) || exit 1
+
+if [[ "$test_mode" == headphones-mechanical ]]; then
+  printf 'R46H_AUDIO_ROUTE_READY mode=headphones-mechanical require=headset-fully-inserted-earpieces-away-from-ears token=R46H-HEADPHONE-READY\n'
+  printf 'Type R46H-HEADPHONE-READY and press Enter: '
+  confirmation=
+  if ! IFS= read -r confirmation; then
+    fail attended operator-ready confirmation-unreadable
+  elif [[ "$confirmation" == R46H-HEADPHONE-READY ]]; then
+    pass attended operator-ready
+  else
+    fail attended operator-ready confirmation-mismatch
+  fi
+  (( failures == 0 )) || exit 1
+fi
+
+runtime_dir=$(mktemp -d /run/r46h-audio-route-probe.XXXXXX)
+chmod 0700 "$runtime_dir"
+runtime_identity=$(stat -c '%u:%a:%d:%i' -- "$runtime_dir")
+[[ "$runtime_identity" =~ ^0:700:[0-9]+:[0-9]+$ ]] || {
+  fail preflight runtime-identity unsafe-runtime
+  exit 1
+}
+dmesg > "$runtime_dir/dmesg-before.txt"
+saved_volume=$(control_values "$VOLUME_CONTROL") || {
+  fail audio save-volume unreadable-control
+  exit 1
+}
+saved_mux=$(control_values "$MUX_CONTROL") || {
+  fail audio save-mux unreadable-control
+  exit 1
+}
+[[ "$saved_volume" =~ ^[0-9]+,[0-9]+$ ]] || {
+  fail audio save-volume invalid-value
+  exit 1
+}
+[[ "$saved_mux" =~ ^[0-9]+$ ]] || {
+  fail audio save-mux invalid-value
+  exit 1
+}
+pass audio controls-saved
+
+state_changed=1
+amixer -q -c 0 cset "numid=$VOLUME_CONTROL" "$TEST_VOLUME"
+amixer -q -c 0 cset "numid=$MUX_CONTROL" "$TEST_MUX"
+check audio test-volume test "$(control_values "$VOLUME_CONTROL")" = "$TEST_VOLUME"
+check audio test-mux test "$(control_values "$MUX_CONTROL")" = "$TEST_MUX"
+(( failures == 0 )) || exit 1
+
+printf 'R46H_AUDIO_ROUTE_OBSERVATION phase=start route=%s mode=%s target=%s frequency=%s scale=%s volume=%s seconds=%s listen-now=yes\n' \
+  "$TEST_ROUTE" "$test_mode" "$test_target" "$TEST_FREQUENCY" "$TEST_SCALE" \
+  "$TEST_VOLUME" "$test_seconds"
+setsid timeout -s TERM -k 2s "${test_seconds}s" \
+  speaker-test -D hw:0,0 -c 2 -t sine -f "$TEST_FREQUENCY" -S "$TEST_SCALE" -l 0 \
+  > "$runtime_dir/speaker-test.txt" 2>&1 &
+child_pid=$!
+sleep 1
+grep -F "$expected_speaker_state" "$SPEAKER_DAPM" >/dev/null || fail audio speaker-endpoint unexpected-state
+grep -F "$expected_headphones_state" "$HEADPHONES_DAPM" >/dev/null || fail audio headphones-endpoint unexpected-state
+probe_status=0
+wait "$child_pid" || probe_status=$?
+child_pid=""
+if [[ "$probe_status" == 124 ]]; then
+  pass audio bounded-playback
+else
+  fail audio bounded-playback "unexpected-status-$probe_status"
+fi
+printf 'R46H_AUDIO_ROUTE_OBSERVATION phase=complete route=%s mode=%s target=%s timeout_status=%s\n' \
+  "$TEST_ROUTE" "$test_mode" "$test_target" "$probe_status"
+
+restore_state || fail cleanup mixer-restore failed
+dmesg > "$runtime_dir/dmesg-after.txt"
+before_size=$(wc -c < "$runtime_dir/dmesg-before.txt")
+head -c "$before_size" "$runtime_dir/dmesg-after.txt" > "$runtime_dir/dmesg-prefix.txt"
+if cmp -s "$runtime_dir/dmesg-before.txt" "$runtime_dir/dmesg-prefix.txt"; then
+  pass health dmesg-prefix
+  tail -c "+$((before_size + 1))" "$runtime_dir/dmesg-after.txt" > "$runtime_dir/dmesg-delta.txt"
+  if grep -Eiq "$fault_pattern" "$runtime_dir/dmesg-delta.txt"; then
+    fail health dmesg-new-faults detected
+  else
+    pass health dmesg-new-faults
+  fi
+else
+  fail health dmesg-prefix ring-wrapped
+fi
+check health ext4-errors-after test "$(cat "$EXT4_ERRORS")" = 0
+check health failed-units-after test -z "$(systemctl --failed --no-legend --plain 2>/dev/null)"
+
+completed=1
+exit 0

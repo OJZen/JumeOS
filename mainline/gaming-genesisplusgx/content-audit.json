@@ -1,0 +1,773 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-09-04",
+  "package_sha256": "059f4dbecfc4e3083fd561f22d3bd31dc1c04fd73f4e224d72ab63cbf9087007",
+  "core_sha256": "f143cdc25c10acd0c5695ef11c7aaa7a42936fda426a9eec6dd4a248f5c73546",
+  "runtime": {
+    "retroarch_version": "1.20.0",
+    "video_driver": "null",
+    "audio_driver": "null",
+    "frames_per_content": 60,
+    "mandatory_firmware": [],
+    "geometry_counts": {
+      "160x144": 103,
+      "256x192": 2
+    },
+    "pass_markers": [
+      "[Environ]: SET_PIXEL_FORMAT: RGB565.",
+      "[Core]: Geometry: 160x144 or 256x192",
+      "[Core]: Content ran for a total of:",
+      "[Core]: Unloading game.."
+    ]
+  },
+  "original_gamelist": {
+    "path": "gamegear/gamelist.xml",
+    "size": 15724,
+    "sha256": "4bd89b5a50fba274cc937eed5635ee48500367d9fb2498c1e0b9ada158464d4d",
+    "entries": 105,
+    "present": 105,
+    "missing": 0
+  },
+  "content": [
+    {
+      "path": "gamegear/001.zip",
+      "size": 117836,
+      "sha256": "689a260bb46485f729d42e2eccb06e4c5ca968bcc75696171655c385bd169c71",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/002.zip",
+      "size": 165511,
+      "sha256": "1545ff4e1ab449286f71b5dd11ccb2f583138e30f1b8ba95019f3e185b408607",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/003.zip",
+      "size": 297494,
+      "sha256": "6b584a863d7d88ed6b6b67ad816a157218e89b62283fba5786735ea87df14116",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/004.zip",
+      "size": 282622,
+      "sha256": "a72414d7629f758f3dd665231c4e1479cfc3ec932a658f936aeb45f064fa3cc5",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/005.zip",
+      "size": 428436,
+      "sha256": "46f130f00fdd553b582f3e0c5878e36e81013799f4daa5b455353e015d2848ff",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/006.zip",
+      "size": 252102,
+      "sha256": "ab32681eeff849521afc68a7f68ce7f17ff5c47e317785dca19274fe2f5e4bde",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/007.zip",
+      "size": 258523,
+      "sha256": "2db0baeb117d5ff8c0a97294c740d4c89e5f4efdae2d37b413a41cad0d35e383",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/008.zip",
+      "size": 162569,
+      "sha256": "502223c4c5c73a13b1442d3406afbad08d78e3fe5bf64f5c2e819f38394a2b06",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/009.zip",
+      "size": 284725,
+      "sha256": "9023e147d33dddd19b678f3822d954e0855b45bcba69a280e6f42d5c60703a77",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/010.zip",
+      "size": 160366,
+      "sha256": "aae41b4fa4e3181cc1841fb2a1d3c4826bb784bd517f96cad1799afee3df62e1",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/011.zip",
+      "size": 279125,
+      "sha256": "60fb7235a6f22bdf950cdc62022b903ed82b738dba8ef47049daef1fe2351e12",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/012.zip",
+      "size": 262321,
+      "sha256": "b54a72980c54728b8264a8189c79176dc49b31ab9816e4550a4bffcdffd823b3",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/013.zip",
+      "size": 112018,
+      "sha256": "76675c8dba9b149361145a23ec9aa9e4044d9e3def1d9c7e2e5cae4ddf44bf2b",
+      "geometry": "256x192",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/014.zip",
+      "size": 47614,
+      "sha256": "babe7ff4370481737e5948bffefcd1837c36b55fd418e8be9e6df9654ec714f5",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/015.zip",
+      "size": 181991,
+      "sha256": "88071bc67e94c3cc8643eef9280a06a4aa730647875ee97a726b1d07ff95c880",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/016.zip",
+      "size": 171048,
+      "sha256": "d63a2f51c48eb971617cccf432928afb496b3fe990dc090846a7732de6f397a1",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/017.zip",
+      "size": 90165,
+      "sha256": "601c4971954881d9138cfd5e8d1205749c08c4ff349a1c96aa5d5b862667d6a4",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/018.zip",
+      "size": 21011,
+      "sha256": "27fa48d09a5c3ffead38dded5f82674547f310988707ebf650c7698d1305aa64",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/019.zip",
+      "size": 120850,
+      "sha256": "5d68315c91a5ad0b3d80fa66a20e49d1ec95f1613ddaaa43af83967bc4faf038",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/020.zip",
+      "size": 306530,
+      "sha256": "5c11e721f643be1147b67ba834dc33e19c7ed93173c54fcd8fe69a9c2ae8f62a",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/021.zip",
+      "size": 320920,
+      "sha256": "0be914871251fd948dec1cf8759a9a61d9d808deddce7d3f176f07b1eee324ae",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/022.zip",
+      "size": 297664,
+      "sha256": "044c8637eed39a8a4828c5457d81b2b6a22758144eb078f7c242bf19d5eeb5cc",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/023.zip",
+      "size": 78209,
+      "sha256": "443da5ebc52dacd8afb6a970506cc4ba782079304d6f984ec2ef770c42a43f33",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/024.zip",
+      "size": 122223,
+      "sha256": "efdc281dd5a57ad07b77c40bfa85ce8abfe12e9459038efe032544ecff65bff8",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/025.zip",
+      "size": 138506,
+      "sha256": "d6d951a9f969668653ad0de8337957bbdee7968f3bccf7e947996cc0c33e84be",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/026.zip",
+      "size": 290367,
+      "sha256": "51d8fbe8016e5d1a18b34f40c0d077dab7498f02c0b56b40c06d0e35f6188aa7",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/027.zip",
+      "size": 317321,
+      "sha256": "1398d6c79e8f97ec892cc59b062d9769e048ad42d71d4a02b3f103916e99a31a",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/028.zip",
+      "size": 378200,
+      "sha256": "f77500d5b75031e68375e3e2f221c2b2f57f0e12c90194b82fe3f855694e3037",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/029.zip",
+      "size": 402983,
+      "sha256": "66e234652783de2030706edeb79cce8bdb563773844cafb8cda321516ba98323",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/030.zip",
+      "size": 309431,
+      "sha256": "d3e21a24982b7108ebe2d10126295c9570be29fca010c3a62c2fcca31ce01a10",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/031.zip",
+      "size": 222697,
+      "sha256": "f68d2ffbb1bbc37084acd7612ae2e705aa4ba7cc5c255cc3aea727ba2ff564ca",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/032.zip",
+      "size": 220676,
+      "sha256": "e751a6d0d292d99d6733028b2f8f4f77051c7eb6fde668ca6a1eb99f9de5c596",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/033.zip",
+      "size": 54905,
+      "sha256": "b707adcff66fd5a6fab2031b1558e0571813fa635555033268524a9f6a70061e",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/034.zip",
+      "size": 65715,
+      "sha256": "2b594476f71ecec6d638e83f23bbb728a6944d2640b07ecd87dba699776053bd",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/035.zip",
+      "size": 290654,
+      "sha256": "ea11a06daa568213454095466a4ac24622dbc90c27521c8cdceeacd131677b24",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/036.zip",
+      "size": 287836,
+      "sha256": "e31c54da0ebbd7941073f117350f9abce8a3e66f30ca3f30c1378371af5c96d0",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/037.zip",
+      "size": 112820,
+      "sha256": "d4f1afbcd11b6f61e6bf34f98fda24677cf6cda658e2906c24ccef08b89d73c4",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/038.zip",
+      "size": 281006,
+      "sha256": "045cae4e15c6d81971f929ce28abbcf3594d5d3ff914a8a0215cd612cc3a485b",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/039.zip",
+      "size": 207010,
+      "sha256": "00f548ad5756ddd8a00632e570a0e2fbdd6841fe3f85646e06fbe38a717169c3",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/040.zip",
+      "size": 283329,
+      "sha256": "cc0f12b4c5660708b172f751feafd3a32ba76eb8f6e3d878fb352c4b5148ea91",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/041.zip",
+      "size": 309161,
+      "sha256": "ea85b6b6299a4dfe2c2ed85b8a468159dc792d09426c75f526b661bcf24809d7",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/042.zip",
+      "size": 197738,
+      "sha256": "ccf4bf1e59e21798305ec4c17952c5d61fdfb0b18000f6ef584e282546b97e7b",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/043.zip",
+      "size": 120114,
+      "sha256": "3331a93f17a9ea0bc46b545255de6e6ab6920e0d75c91212f1c6d70f3ceae25e",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/044.zip",
+      "size": 47850,
+      "sha256": "62653204beb115a3189457b46d61b3b400d862f9f736428e5b3d5c75106278df",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/045.zip",
+      "size": 106282,
+      "sha256": "ec75539f19e9acc20d504aca1c927061a8fbb77a5b953e3d9287142f55364253",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/046.zip",
+      "size": 267811,
+      "sha256": "7b026b6bf0ea9cd740ee65585def48688b79a550eec3778d897635c0c59a388b",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/047.zip",
+      "size": 65749,
+      "sha256": "d6ba1f1d507a5126b4f004031181d74ec584bc28e3f8830956fcb06171f488fb",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/048.zip",
+      "size": 159785,
+      "sha256": "4f99f55e142dc8ce9394e3026308f46dfe7c206c87740760009113bc6695f48b",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/049.zip",
+      "size": 306236,
+      "sha256": "d485838e6f15bb849667076f2b057acd8841d3e174b89c3e0545d3ebde8d8ba4",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/050.zip",
+      "size": 266534,
+      "sha256": "b5ce73de2b5af4ab6e7dc10f3ae16dde14ae84c915dc762bdaaeb11077bcb861",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/051.zip",
+      "size": 117447,
+      "sha256": "2d0a029e8df292437d661fe867735e53db59941349d2eb7251944ab189d1225c",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/052.zip",
+      "size": 147188,
+      "sha256": "cef85ebdae56a0d1f9660869f9c38dccd80808698743fe84e62d4e9e5c543e15",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/053.zip",
+      "size": 261329,
+      "sha256": "748b48466487c2c5f46155b09f75b669e11e73987194012312f9d4c5e62bf9ea",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/054.zip",
+      "size": 317641,
+      "sha256": "a1c5f51a9363fe305d35599b9da4671d3f9e56e76e1490224da681b45a9140e7",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/055.zip",
+      "size": 300801,
+      "sha256": "c35de5f1e01a149ddb19062d66bc5623a61e08cf1f49fdb3d0bde9e487eafa04",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/056.zip",
+      "size": 151782,
+      "sha256": "4e0879cf91479384688e263a41dcba896b66b032257170ee9e571673e600fb27",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/057.zip",
+      "size": 151137,
+      "sha256": "afdf3b1f49fceb651593696b2a6aea2a3fe2d5129027bc1188fc6d8d0498a114",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/058.zip",
+      "size": 251362,
+      "sha256": "c9576b2379b94d48892c202bff2f03e67a2c1909e0e0aad50b84eed3abded962",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/059.zip",
+      "size": 66408,
+      "sha256": "c7ae74e455ba58c7dc211f9adc9b3d16d29ef8083651a81ef9a226a9d5975811",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/060.zip",
+      "size": 161615,
+      "sha256": "11103c0a06cca3f9dbb2c901a6a26ab09b4515f93547fbfd3d4aa760a5cd7045",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/061.zip",
+      "size": 146154,
+      "sha256": "731af5a7712fbb589019fa66dd4fa203eb91f942d5d5b920d5fe1e24b3586e6c",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/062.zip",
+      "size": 277816,
+      "sha256": "920eb250e17da365afe98890ac67052b0caea1bc34b8aa3b23007f56e2180eae",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/063.zip",
+      "size": 318122,
+      "sha256": "d0d49a38e70020b8feeeb8e8d381a4bcb0d6c1075f5cc61dd5a5055e84529662",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/064.zip",
+      "size": 212794,
+      "sha256": "1fe59d2a169c0611110a8cd4a7852c4f35d27b6f0b37db6b3f8ee0e6f70c320e",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/065.zip",
+      "size": 180364,
+      "sha256": "6086e68b46109c1aa1d628963911329e15ade8ffc579dc6912ba1283ad40a027",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/066.zip",
+      "size": 52440,
+      "sha256": "8d5f0055e1d688d84a7b41029a2e41098d4957f15b8d9200c5e8321641800e72",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/067.zip",
+      "size": 156083,
+      "sha256": "99dd8ba4eb67f72530acd8b0ce21d7a1a12da167f3632bfd5619a1e4ff98f98c",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/068.zip",
+      "size": 223503,
+      "sha256": "ead613e6f6af5c9cf10f0823548747e4102f6d7b33206b0a05b8251376704280",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/069.zip",
+      "size": 229788,
+      "sha256": "b1cac0dea69ce648033bf3b09d0f336369791771be21f2d4e2fa2a10f94585c4",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/070.zip",
+      "size": 222220,
+      "sha256": "f9b4fcf5627b1efaceb0961dd0572751339311b11019550f170b3f7c0c79c69a",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/071.zip",
+      "size": 283042,
+      "sha256": "1e4990c89862491487f21c2eadade74e4c213a6928636d66850812a5e4dc1a46",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/072.zip",
+      "size": 212115,
+      "sha256": "6d3c4ddef4283e7b4bc598083d7ad1b94f20b5683e52e34d4346b4258071ca6c",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/073.zip",
+      "size": 182898,
+      "sha256": "70e19a7da13fad07c4e300fe5058053ceba870af1b10974c6c68c7ee7d39543e",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/074.zip",
+      "size": 294847,
+      "sha256": "02245ca4ccaf49ce9fcfa8c1b2818f5562e9cf1ff1619fbaeb95dc41033c00bc",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/075.zip",
+      "size": 243994,
+      "sha256": "a3bc3e5b305dee0c4b1c39968cc90c32bda4a1be8d610006fb49490baa33a65d",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/076.zip",
+      "size": 89180,
+      "sha256": "4035e69a6197dc4d8e450f87b66f1f39abc6d0637216779300a875072a6e7058",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/077.zip",
+      "size": 252205,
+      "sha256": "f7256a37ee50db1dd392ae50af8f4d716c59d7cefcb0347956956afe74b03ee7",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/078.zip",
+      "size": 161522,
+      "sha256": "0c0f5ec11378a4c311eb62d5af329fb7b565330f354fafee9a888ecc3cec7759",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/079.zip",
+      "size": 180254,
+      "sha256": "463ea1ff2832c4a4006c9591fedde7940cfd6e4b5e1734d254c50200f6c7dac4",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/080.zip",
+      "size": 114486,
+      "sha256": "867c48ff5227c5fb56ff7b29de6665e72111cc2af870f3beac58ad2853484495",
+      "geometry": "256x192",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/081.zip",
+      "size": 305709,
+      "sha256": "fbb4c4b547963ac04544f21f2c4195d395498041a5cf89adcca849057bcca054",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/082.zip",
+      "size": 92787,
+      "sha256": "f66c83ed4e6b274b72e55371c0e5efca9b5c7a1f7a94dfd7827d2bd515a6e2b1",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/083.zip",
+      "size": 164929,
+      "sha256": "0c689148af68c74b53fa8726c466d9aa56bebe8d0998ae820ea5d9d93ce33e02",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/084.zip",
+      "size": 186706,
+      "sha256": "4f06ab33cbd9f7d32b239aad04114274143fb99e22948ca523b218f6a8cf7f14",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/085.zip",
+      "size": 148072,
+      "sha256": "0a2da8c081491f32530b4c96f58aac1529234ab3c3a89949f4c80fd8153a4121",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/086.zip",
+      "size": 163730,
+      "sha256": "f32a2075540fd5e2591a15c56abe1332760191153e2265ad269f33198c2d62fa",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/087.zip",
+      "size": 275747,
+      "sha256": "715b1396a772c477183a6d769c0a283b645a113172b2dd1a77c5cfbcc7c2f54a",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/088.zip",
+      "size": 335177,
+      "sha256": "4178ee4bafa4666ec7cb213277fa77339585c559e5a32364e0279f0f25042063",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/089.zip",
+      "size": 150784,
+      "sha256": "084d5b40be56cfaafd50c0eadedb58de9e94b58bbb78be8040dbd60db23b829f",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/090.zip",
+      "size": 91273,
+      "sha256": "661de2605b52610ef4c54ca896331417ef962095165c7aa05f01585a63c7d6e8",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/091.zip",
+      "size": 246493,
+      "sha256": "90a60a268814bb54b4e3b6987be5dcfd4c9930a1e1c36683d73e2a8f9d0c0e70",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/092.zip",
+      "size": 239690,
+      "sha256": "86ea25576884805df056160d86a9a7bd35b3513c97423a8fd75153a7491f5849",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/093.zip",
+      "size": 135662,
+      "sha256": "7438cf93cc539483bebdb2f82921e76d9bdf8534b066e36bdcee27bb1fc85728",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/094.zip",
+      "size": 379360,
+      "sha256": "20bd18f137c47f9f80b0f6f829dbece05be49e47d09eac3ca366df34b76ab872",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/095.zip",
+      "size": 394881,
+      "sha256": "2b738106353fb7746d5e446090e31c0713b04a3c2d1534115a943114bc9a0a88",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/096.zip",
+      "size": 269689,
+      "sha256": "3291f13b9ebb3c2beb337c028127ba2e431353a40a6cf870188a140dd1a2eb14",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/097.zip",
+      "size": 230026,
+      "sha256": "1da312d6997b7dcba85e9d9df18f588c841a25eabe829f5c92ecf28162651ec2",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/098.zip",
+      "size": 151243,
+      "sha256": "a90048d85ccb4c05ef9ceab0cafde8cbf4830e50553e088ffe14622fcf58a6f0",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/099.zip",
+      "size": 222625,
+      "sha256": "db24aa60b18fe8056de27a863f01feeeb56500a60a2b4ec69d19e022e72b6a6e",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/100.zip",
+      "size": 143433,
+      "sha256": "5967812f9ba6dc4ca1d30122da72f72e4c104615e74b268d22caa1236f2e3b65",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/101.zip",
+      "size": 126948,
+      "sha256": "b1e3ee582f169828b9f3b3d4d53b9f67be35f65f4b59c25c8422c940abea4b54",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/102.zip",
+      "size": 258251,
+      "sha256": "b233d196639a4600c899fe7e90f5676461d8bb3589594ed1fc570c2f11db69ea",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/103.zip",
+      "size": 145131,
+      "sha256": "f7f186d54299470f763fb6ce7fe747aa92434944fc246b992c6bcbe53ab0ee6e",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/104.zip",
+      "size": 338541,
+      "sha256": "d26c010fb6de54781033c79532d2da3666b27a62632a4b0800c5fd4086828d9a",
+      "geometry": "160x144",
+      "result": "pass"
+    },
+    {
+      "path": "gamegear/105.zip",
+      "size": 106053,
+      "sha256": "fb0e8753018a242b99819e9e2ddb8200176791ee0e1c8d60f2dc740df52774c1",
+      "geometry": "160x144",
+      "result": "pass"
+    }
+  ],
+  "known_boundaries": [
+    "Null-video startup does not prove physical Mali rendering, LCD output, audio, controls, saving, pacing or gameplay.",
+    "No optional Game Gear firmware, ROM, save or original-card mutable state is packaged.",
+    "The two 256x192 files are retained because the core ran them cleanly through its Master System-compatible path."
+  ]
+}

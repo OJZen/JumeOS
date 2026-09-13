@@ -1,0 +1,6 @@
+kbd
+libretro-desmume
+libretro-gambatte
+libretro-mgba
+libretro-nestopia
+retroarch

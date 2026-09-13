@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/dts-v1/;
+/plugin/;
+
+/*
+ * First cold-MMC product candidate after the v0.5 non-recovery.
+ *
+ * The unqualified secondary SD host shares vcc_sd/vccio_sd with the system
+ * card.  Keep it out of this one-shot so mmc0 can initialize and power-cycle
+ * without a second consumer.  This deliberately makes the secondary slot
+ * unavailable; it does not change the accepted system-card speed policy.
+ */
+/ {
+	compatible = "rockchip,rk3326-r46h-linux", "rockchip,rk3326";
+
+	fragment@0 {
+		target-path = "/mmc@ff380000";
+
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+};

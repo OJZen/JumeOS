@@ -1,0 +1,34 @@
+From 97e1dcc2e4498eefb60a458f325e86c22126c3ea Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sat, 15 Aug 2026 23:59:00 +0800
+Subject: [PATCH] arm64: dts: rockchip: use the RK817 150 mA charge termination
+
+The downstream R46H charger uses analog termination mode with a configured
+value of 52 mA. Its RK817 driver maps every analog value below 200 mA to the
+hardware's 150 mA selection. The mainline port converted 52 to 52000 uA, but
+the upstream driver rejects values below 150 mA and falls back to 200 mA.
+
+Describe the effective downstream hardware selection directly as 150000 uA.
+This is the lowest supported RK817 analog termination setting and preserves
+the register selection without changing the charge-voltage, charge-current or
+input-limit policy.
+
+Signed-off-by: Codex <codex@openai.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3326-r46h.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts b/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
+index 81da882303cc..e526686794dc 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
+@@ -29,6 +29,6 @@ battery: battery {
+ 		compatible = "simple-battery";
+ 		charge-full-design-microamp-hours = <3380000>;
+-		charge-term-current-microamp = <52000>;
++		charge-term-current-microamp = <150000>;
+ 		constant-charge-current-max-microamp = <2000000>;
+ 		constant-charge-voltage-max-microvolt = <4200000>;
+ 		factory-internal-resistance-micro-ohms = <100000>;
+-- 
+2.50.1

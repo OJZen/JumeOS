@@ -1,0 +1,348 @@
+#!/usr/bin/env bash
+
+# Sourced only after the caller has verified this file against the trusted
+# deployment manifest.  This file deliberately contains no release constants.
+# shellcheck disable=SC2154  # R46H_ROOT, R46H_MANIFEST, and roms_mount are caller-owned globals.
+
+r46h_fail() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+r46h_hash() {
+  sha256sum -- "$1" | awk '{print $1}'
+}
+
+r46h_size() {
+  stat -c '%s' -- "$1"
+}
+
+r46h_manifest_value() {
+  r46h_file_value "$R46H_MANIFEST" "$1"
+}
+
+r46h_file_value() {
+  local r46h_fv_file=$1 r46h_fv_key=$2 r46h_fv_count r46h_fv_value
+  r46h_fv_count=$(grep -c "^${r46h_fv_key}=" "$r46h_fv_file" 2>/dev/null || true)
+  [[ "$r46h_fv_count" -eq 1 ]] || r46h_fail "manifest key ${r46h_fv_key} must appear exactly once"
+  r46h_fv_value=$(sed -n "s/^${r46h_fv_key}=//p" "$r46h_fv_file")
+  [[ "$r46h_fv_value" != *$'\n'* ]] || r46h_fail "manifest key ${r46h_fv_key} is multiline"
+  printf '%s' "$r46h_fv_value"
+}
+
+r46h_check_kv() {
+  local r46h_ck_key=$1 r46h_ck_expected=$2 r46h_ck_actual
+  r46h_ck_actual=$(r46h_manifest_value "$r46h_ck_key")
+  [[ "$r46h_ck_actual" == "$r46h_ck_expected" ]] || r46h_fail "manifest key ${r46h_ck_key} mismatch"
+}
+
+r46h_check_file() {
+  local r46h_cf_path=$1 r46h_cf_size=$2 r46h_cf_hash=$3 r46h_cf_label=$4
+  [[ -f "$r46h_cf_path" && ! -L "$r46h_cf_path" ]] || r46h_fail "missing or unsafe ${r46h_cf_label}: ${r46h_cf_path}"
+  [[ "$(r46h_size "$r46h_cf_path")" == "$r46h_cf_size" ]] || r46h_fail "${r46h_cf_label} size mismatch"
+  [[ "$(r46h_hash "$r46h_cf_path")" == "$r46h_cf_hash" ]] || r46h_fail "${r46h_cf_label} SHA-256 mismatch"
+}
+
+r46h_identity() {
+  stat -c '%d:%i:%u' -- "$1"
+}
+
+r46h_acquire_deploy_lock() {
+  local r46h_dl_dir=$1 r46h_dl_file r46h_dl_identity
+  if [[ ! -e "$r46h_dl_dir" && ! -L "$r46h_dl_dir" ]]; then
+    mkdir -m 0700 -- "$r46h_dl_dir" 2>/dev/null || true
+  fi
+  [[ -d "$r46h_dl_dir" && ! -L "$r46h_dl_dir" ]] || r46h_fail "unsafe deployment lock directory"
+  [[ "$(stat -c '%u:%a' -- "$r46h_dl_dir")" == 0:700 ]] ||
+    r46h_fail "deployment lock directory must be root-owned 0700"
+  r46h_dl_identity=$(r46h_identity "$r46h_dl_dir")
+  r46h_dl_file="${r46h_dl_dir}/deployment.lock"
+  if [[ ! -e "$r46h_dl_file" && ! -L "$r46h_dl_file" ]]; then
+    ( umask 077; set -o noclobber; : > "$r46h_dl_file" ) 2>/dev/null || true
+  fi
+  [[ -f "$r46h_dl_file" && ! -L "$r46h_dl_file" ]] || r46h_fail "unsafe deployment lock file"
+  [[ "$(stat -c '%u:%a' -- "$r46h_dl_file")" == 0:600 ]] ||
+    r46h_fail "deployment lock file must be root-owned 0600"
+  exec 9<> "$r46h_dl_file"
+  flock -n 9 || r46h_fail "another R46H deployment operation is running"
+  r46h_check_same_identity "$r46h_dl_dir" "$r46h_dl_identity" "deployment lock directory"
+  [[ -f "$r46h_dl_file" && ! -L "$r46h_dl_file" ]] || r46h_fail "deployment lock file changed"
+}
+
+r46h_check_same_identity() {
+  local r46h_ci_path=$1 r46h_ci_expected=$2 r46h_ci_label=$3
+  [[ "$(r46h_identity "$r46h_ci_path")" == "$r46h_ci_expected" ]] || r46h_fail "${r46h_ci_label} identity changed"
+}
+
+r46h_module_tree_hash() {
+  local r46h_mh_parent=$1 r46h_mh_release=$2 r46h_mh_file
+  (
+    cd "$r46h_mh_parent" || exit 1
+    find "$r46h_mh_release" -type f -print | LC_ALL=C sort |
+      while IFS= read -r r46h_mh_file; do
+        printf '%s  rootfs/lib/modules/%s\n' "$(r46h_hash "$r46h_mh_file")" "$r46h_mh_file"
+      done
+  ) | sha256sum | awk '{print $1}'
+}
+
+r46h_verify_module_tree() {
+  local r46h_vm_parent=$1 r46h_vm_release=$2 r46h_vm_hashes=$3
+  local r46h_vm_modules=$4 r46h_vm_files=$5 r46h_vm_label=$6
+  local r46h_vm_tree="${r46h_vm_parent}/${r46h_vm_release}"
+  local r46h_vm_unsafe r46h_vm_actual r46h_vm_module_count r46h_vm_file_count r46h_vm_candidate
+  local r46h_vm_matched=0
+  local -a r46h_vm_candidates
+  [[ -d "$r46h_vm_tree" && ! -L "$r46h_vm_tree" ]] || r46h_fail "missing or unsafe ${r46h_vm_label} module tree"
+  r46h_vm_unsafe=$(find "$r46h_vm_tree" -mindepth 1 ! \( -type d -o -type f \) -print -quit)
+  [[ -z "$r46h_vm_unsafe" ]] || r46h_fail "${r46h_vm_label} module tree contains unsafe entry: ${r46h_vm_unsafe}"
+  r46h_vm_module_count=$(find "$r46h_vm_tree" -type f \
+    \( -name '*.ko' -o -name '*.ko.gz' -o -name '*.ko.xz' -o -name '*.ko.zst' \) |
+    wc -l | tr -d '[:space:]')
+  r46h_vm_file_count=$(find "$r46h_vm_tree" -type f | wc -l | tr -d '[:space:]')
+  [[ "$r46h_vm_module_count" == "$r46h_vm_modules" ]] || r46h_fail "${r46h_vm_label} module count mismatch"
+  [[ "$r46h_vm_file_count" == "$r46h_vm_files" ]] || r46h_fail "${r46h_vm_label} module file count mismatch"
+  r46h_vm_actual=$(r46h_module_tree_hash "$r46h_vm_parent" "$r46h_vm_release")
+  IFS=, read -r -a r46h_vm_candidates <<< "$r46h_vm_hashes"
+  for r46h_vm_candidate in "${r46h_vm_candidates[@]}"; do
+    [[ "$r46h_vm_actual" != "$r46h_vm_candidate" ]] || r46h_vm_matched=1
+  done
+  [[ "$r46h_vm_matched" -eq 1 ]] || r46h_fail "${r46h_vm_label} module tree SHA-256 mismatch"
+}
+
+r46h_test_root() {
+  local r46h_tr_requested=${R46H_DEPLOY_TARGET_TEST_ROOT:-}
+  if [[ -z "$r46h_tr_requested" ]]; then
+    printf ''
+    return
+  fi
+  [[ -f /.dockerenv ]] || r46h_fail "target test mode is container-only"
+  [[ -d "$r46h_tr_requested" && ! -L "$r46h_tr_requested" ]] || r46h_fail "unsafe target test root"
+  r46h_tr_requested=$(cd "$r46h_tr_requested" && pwd -P)
+  [[ "$r46h_tr_requested" == /run/r46h-target-test.* ||
+     "$r46h_tr_requested" == /repo/mainline/out/.cache/.r46h-target-test.* ]] ||
+    r46h_fail "target test root must be under /run or the external repo cache"
+  [[ "$(stat -c '%u' "$r46h_tr_requested")" == 0 && "$(stat -c '%a' "$r46h_tr_requested")" == 700 ]] ||
+    r46h_fail "target test root must be root-owned 0700"
+  printf '%s' "$r46h_tr_requested"
+}
+
+r46h_running_release() {
+  if [[ -n "$R46H_ROOT" ]]; then
+    [[ -f "$R46H_ROOT/test-state/running-release" ]] || r46h_fail "missing test running release"
+    tr -d '\r\n' < "$R46H_ROOT/test-state/running-release"
+  else
+    uname -r
+  fi
+}
+
+r46h_mount_options_secure() {
+  local r46h_mo_options=$1 r46h_mo_option
+  local r46h_mo_rw=0 r46h_mo_ro=0 r46h_mo_uid=0 r46h_mo_gid=0
+  local r46h_mo_fmask=0 r46h_mo_dmask=0
+  local -a r46h_mo_list
+  IFS=, read -r -a r46h_mo_list <<< "$r46h_mo_options"
+  for r46h_mo_option in "${r46h_mo_list[@]}"; do
+    case "$r46h_mo_option" in
+      rw) r46h_mo_rw=$((r46h_mo_rw + 1)) ;;
+      ro) r46h_mo_ro=$((r46h_mo_ro + 1)) ;;
+      uid=0) r46h_mo_uid=$((r46h_mo_uid + 1)) ;;
+      gid=0) r46h_mo_gid=$((r46h_mo_gid + 1)) ;;
+      uid=*|gid=*) return 1 ;;
+      fmask=0077|fmask=77) r46h_mo_fmask=$((r46h_mo_fmask + 1)) ;;
+      dmask=0077|dmask=77) r46h_mo_dmask=$((r46h_mo_dmask + 1)) ;;
+      fmask=*|dmask=*) return 1 ;;
+    esac
+  done
+  # Linux exFAT suppresses its global-root uid/gid defaults in mountinfo.
+  # The surrounding card proof also requires the payload to stat as 0:0:700.
+  (( r46h_mo_rw == 1 && r46h_mo_ro == 0 &&
+     r46h_mo_uid <= 1 && r46h_mo_gid <= 1 &&
+     r46h_mo_fmask == 1 && r46h_mo_dmask == 1 ))
+}
+
+r46h_verify_card_mounts() {
+  if [[ -n "$R46H_ROOT" ]]; then
+    r46h_check_file "$R46H_ROOT/test-state/card-profile.sha256" 65 \
+      "$(printf '%s\n' "$(r46h_manifest_value card_profile_sha256)" | sha256sum | awk '{print $1}')" \
+      "test card profile receipt"
+    [[ -f "$R46H_ROOT/test-state/roms-mount-options" &&
+       ! -L "$R46H_ROOT/test-state/roms-mount-options" ]] ||
+      r46h_fail "missing fake EASYROMS mount options"
+    r46h_mount_options_secure "$(tr -d '\r\n' < "$R46H_ROOT/test-state/roms-mount-options")" ||
+      r46h_fail "fake EASYROMS mount is not root-only"
+    [[ -d "$roms_mount" && ! -L "$roms_mount" &&
+       "$(stat -c '%u:%g:%a' -- "$roms_mount")" == 0:0:700 ]] ||
+      r46h_fail "fake private EASYROMS mount is not root-owned 0700"
+    [[ ! -e "$R46H_ROOT/roms" && ! -L "$R46H_ROOT/roms" ]] ||
+      r46h_fail "fake public /roms path remained attached during deployment"
+    [[ -f "$R46H_ROOT/test-state/tools-mount-state" &&
+       ! -L "$R46H_ROOT/test-state/tools-mount-state" &&
+       "$(tr -d '\r\n' < "$R46H_ROOT/test-state/tools-mount-state")" == detached ]] ||
+      r46h_fail "fake /opt/system/Tools remained attached during deployment"
+    return
+  fi
+
+  local r46h_cm_boot_source r46h_cm_roms_source r46h_cm_root_majmin
+  local r46h_cm_root_device_majmin r46h_cm_partuuid r46h_cm_sector
+  local r46h_cm_boot_start r46h_cm_root_start r46h_cm_roms_start
+  local r46h_cm_prefix_size r46h_cm_prefix_hash r46h_cm_p3_majmin r46h_cm_p3_records
+  mountpoint -q -- /boot || r46h_fail "/boot is not a mount point"
+  ! mountpoint -q -- /roms || r46h_fail "/roms must be detached during privileged deployment"
+  ! mountpoint -q -- /opt/system/Tools ||
+    r46h_fail "/opt/system/Tools must be detached during privileged deployment"
+  mountpoint -q -- "$roms_mount" || r46h_fail "private EASYROMS path is not a mount point"
+  [[ "$(findmnt -rn -T "$roms_mount" -o TARGET)" == "$roms_mount" ]] ||
+    r46h_fail "private EASYROMS target mismatch"
+  r46h_cm_boot_source=$(findmnt -rn -o SOURCE /boot)
+  r46h_cm_roms_source=$(findmnt -rn -o SOURCE "$roms_mount")
+  [[ "$r46h_cm_boot_source" == /dev/mmcblk0p1 ]] || r46h_fail "/boot source mismatch"
+  [[ "$r46h_cm_roms_source" == /dev/mmcblk0p3 ]] || r46h_fail "/roms source mismatch"
+  [[ "$(findmnt -rn -o FSTYPE /boot)" == vfat ]] || r46h_fail "/boot filesystem mismatch"
+  [[ "$(findmnt -rn -o FSTYPE "$roms_mount")" == exfat ]] || r46h_fail "private EASYROMS filesystem mismatch"
+  [[ ",$(findmnt -rn -o OPTIONS /boot)," == *,rw,* ]] || r46h_fail "/boot is read-only"
+  r46h_mount_options_secure "$(findmnt -rn -o OPTIONS "$roms_mount")" ||
+    r46h_fail "private EASYROMS lacks effective root-only ownership and masks"
+  [[ "$(stat -c '%u:%g:%a' -- "$roms_mount")" == 0:0:700 ]] ||
+    r46h_fail "private EASYROMS mount root is not owned and masked as 0:0:700"
+  [[ "$(findmnt -rn -T "$roms_mount" -o FSROOT)" == / ]] ||
+    r46h_fail "private EASYROMS filesystem root mismatch"
+  [[ -r /sys/class/block/mmcblk0p3/dev ]] || r46h_fail "cannot read p3 device identity"
+  IFS= read -r r46h_cm_p3_majmin < /sys/class/block/mmcblk0p3/dev
+  [[ "$r46h_cm_p3_majmin" =~ ^[0-9]+:[0-9]+$ ]] || r46h_fail "invalid p3 device identity"
+  r46h_cm_p3_records=$(findmnt -rn -o MAJ:MIN,TARGET,FSTYPE,FSROOT |
+    awk -v device="$r46h_cm_p3_majmin" '$1 == device {print $2 "\t" $3 "\t" $4}' |
+    LC_ALL=C sort)
+  [[ "$r46h_cm_p3_records" == "${roms_mount}"$'\texfat\t/' ]] ||
+    r46h_fail "p3 has another reachable mount during privileged deployment"
+  r46h_cm_root_majmin=$(findmnt -rn -o MAJ:MIN /)
+  r46h_cm_root_device_majmin=$(< /sys/class/block/mmcblk0p2/dev)
+  [[ "$r46h_cm_root_majmin" == "$r46h_cm_root_device_majmin" ]] || r46h_fail "root is not mmcblk0p2"
+  r46h_cm_partuuid=$(blkid -s PARTUUID -o value /dev/mmcblk0p2)
+  [[ "$r46h_cm_partuuid" == "$(r46h_manifest_value card_root_partuuid)" ]] || r46h_fail "root PARTUUID mismatch"
+  [[ "$(blockdev --getsize64 /dev/mmcblk0)" == "$(r46h_manifest_value card_whole_size)" ]] || r46h_fail "card size mismatch"
+  [[ "$(blockdev --getsize64 /dev/mmcblk0p1)" == "$(r46h_manifest_value card_boot_size)" ]] || r46h_fail "BOOT size mismatch"
+  [[ "$(blockdev --getsize64 /dev/mmcblk0p2)" == "$(r46h_manifest_value card_root_size)" ]] || r46h_fail "root size mismatch"
+  [[ "$(blockdev --getsize64 /dev/mmcblk0p3)" == "$(r46h_manifest_value card_easyroms_size)" ]] || r46h_fail "EASYROMS size mismatch"
+  r46h_cm_sector=$(blockdev --getss /dev/mmcblk0)
+  [[ "$r46h_cm_sector" == "$(r46h_manifest_value card_sector_size)" ]] || r46h_fail "card sector size mismatch"
+  r46h_cm_boot_start=$(< /sys/class/block/mmcblk0p1/start)
+  r46h_cm_root_start=$(< /sys/class/block/mmcblk0p2/start)
+  r46h_cm_roms_start=$(< /sys/class/block/mmcblk0p3/start)
+  (( r46h_cm_boot_start * r46h_cm_sector == $(r46h_manifest_value card_boot_offset) )) || r46h_fail "BOOT offset mismatch"
+  (( r46h_cm_root_start * r46h_cm_sector == $(r46h_manifest_value card_root_offset) )) || r46h_fail "root offset mismatch"
+  (( r46h_cm_roms_start * r46h_cm_sector == $(r46h_manifest_value card_easyroms_offset) )) || r46h_fail "EASYROMS offset mismatch"
+  r46h_cm_prefix_size=$(r46h_manifest_value card_g92_prefix_size)
+  (( r46h_cm_prefix_size % 1048576 == 0 )) || r46h_fail "g92 prefix size is not MiB-aligned"
+  r46h_cm_prefix_hash=$(dd if=/dev/mmcblk0 bs=1048576 count=$((r46h_cm_prefix_size / 1048576)) status=none | sha256sum | awk '{print $1}')
+  [[ "$r46h_cm_prefix_hash" == "$(r46h_manifest_value card_g92_prefix_sha256)" ]] || r46h_fail "g92 prefix SHA-256 mismatch"
+}
+
+r46h_verify_modules_parent() {
+  local r46h_mp_path=$1 r46h_mp_root r46h_mp_mount
+  [[ -d "$r46h_mp_path" && ! -L "$r46h_mp_path" ]] || r46h_fail "unsafe modules parent"
+  if [[ -n "$R46H_ROOT" ]]; then
+    return
+  fi
+  r46h_mp_root=$(findmnt -rn -o MAJ:MIN /)
+  r46h_mp_mount=$(findmnt -rn -o MAJ:MIN -T "$r46h_mp_path")
+  [[ "$r46h_mp_mount" == "$r46h_mp_root" ]] || r46h_fail "/lib/modules is not on the root filesystem"
+}
+
+r46h_rootfs_log_reports_damage() {
+  local r46h_rl_log=$1
+  grep -Eiq \
+    '(EXT4-fs|JBD2).*((error|warn|corrupt|abort).*mmcblk0p2([^[:alnum:]_]|$)|mmcblk0p2([^[:alnum:]_]|$).*(error|warn|corrupt|abort))' \
+    <<< "$r46h_rl_log"
+}
+
+R46H_ROOTFS_HEALTH_ERROR=""
+
+r46h_rootfs_health_check() {
+  local r46h_rh_errors_file r46h_rh_errors r46h_rh_log
+  R46H_ROOTFS_HEALTH_ERROR=""
+  if [[ -n "$R46H_ROOT" ]]; then
+    r46h_rh_errors_file="$R46H_ROOT/test-state/rootfs-errors-count"
+    [[ -f "$r46h_rh_errors_file" && ! -L "$r46h_rh_errors_file" ]] ||
+      { R46H_ROOTFS_HEALTH_ERROR="missing fake rootfs ext4 error counter"; return 1; }
+    r46h_rh_errors=$(tr -d '\r\n' < "$r46h_rh_errors_file")
+    [[ -f "$R46H_ROOT/test-state/rootfs-kernel-log" &&
+       ! -L "$R46H_ROOT/test-state/rootfs-kernel-log" ]] ||
+      { R46H_ROOTFS_HEALTH_ERROR="missing fake rootfs kernel log"; return 1; }
+    r46h_rh_log=$(< "$R46H_ROOT/test-state/rootfs-kernel-log")
+  else
+    [[ "$(findmnt -rn -o FSTYPE /)" == ext4 ]] ||
+      { R46H_ROOTFS_HEALTH_ERROR="root filesystem is not ext4"; return 1; }
+    r46h_rh_errors_file=/sys/fs/ext4/mmcblk0p2/errors_count
+    [[ -f "$r46h_rh_errors_file" && ! -L "$r46h_rh_errors_file" ]] ||
+      { R46H_ROOTFS_HEALTH_ERROR="cannot read mmcblk0p2 ext4 error counter"; return 1; }
+    r46h_rh_errors=$(tr -d '\r\n' < "$r46h_rh_errors_file")
+    r46h_rh_log=$(dmesg 2>&1) ||
+      { R46H_ROOTFS_HEALTH_ERROR="cannot inspect kernel log for rootfs errors"; return 1; }
+  fi
+  [[ "$r46h_rh_errors" =~ ^[0-9]+$ ]] ||
+    { R46H_ROOTFS_HEALTH_ERROR="invalid rootfs ext4 error counter"; return 1; }
+  [[ "$r46h_rh_errors" == 0 ]] ||
+    { R46H_ROOTFS_HEALTH_ERROR="rootfs ext4 errors_count is nonzero; clone and repair offline before deployment"; return 1; }
+  if r46h_rootfs_log_reports_damage "$r46h_rh_log"; then
+    R46H_ROOTFS_HEALTH_ERROR="kernel log reports mmcblk0p2 ext4/JBD2 damage; clone and repair offline before deployment"
+    return 1
+  fi
+  return 0
+}
+
+r46h_test_inject_rootfs_fault() {
+  local r46h_ri_phase=$1 r46h_ri_file r46h_ri_requested
+  [[ -n "$R46H_ROOT" ]] || return 0
+  r46h_ri_file="$R46H_ROOT/test-state/rootfs-fault-phase"
+  [[ -e "$r46h_ri_file" || -L "$r46h_ri_file" ]] || return 0
+  [[ -f "$r46h_ri_file" && ! -L "$r46h_ri_file" ]] ||
+    r46h_fail "unsafe fake rootfs fault phase"
+  r46h_ri_requested=$(tr -d '\r\n' < "$r46h_ri_file")
+  [[ "$r46h_ri_requested" == "$r46h_ri_phase" ]] || return 0
+  printf '%s\n' 1 > "$R46H_ROOT/test-state/rootfs-errors-count"
+}
+
+r46h_rootfs_health_check_at() {
+  local r46h_rc_phase=$1
+  r46h_test_inject_rootfs_fault "$r46h_rc_phase"
+  r46h_rootfs_health_check
+}
+
+r46h_verify_rootfs_health_at() {
+  local r46h_rv_phase=$1
+  if ! r46h_rootfs_health_check_at "$r46h_rv_phase"; then
+    r46h_fail "$R46H_ROOTFS_HEALTH_ERROR"
+  fi
+}
+
+r46h_verify_rootfs_health() {
+  r46h_verify_rootfs_health_at general
+}
+
+r46h_flush_boot() {
+  sync
+  if [[ -n "$R46H_ROOT" ]]; then
+    printf 'flush\n' >> "$R46H_ROOT/test-state/boot-flush.log"
+  else
+    blockdev --flushbufs /dev/mmcblk0p1 || r46h_fail "cannot flush BOOT"
+  fi
+  sync
+  r46h_verify_card_mounts
+}
+
+r46h_validate_receipt() {
+  local r46h_vr_receipt=$1 r46h_vr_from=$2 r46h_vr_release=$3
+  local r46h_vr_tree=$4 r46h_vr_count=$5 r46h_vr_files=$6
+  [[ -f "$r46h_vr_receipt" && ! -L "$r46h_vr_receipt" ]] || r46h_fail "missing module receipt"
+  [[ "$(awk 'END {print NR}' "$r46h_vr_receipt")" == 10 ]] || r46h_fail "module receipt field count mismatch"
+  [[ "$(r46h_file_value "$r46h_vr_receipt" format_version)" == 1 ]] || r46h_fail "module receipt format mismatch"
+  [[ "$(r46h_file_value "$r46h_vr_receipt" status)" == complete ]] || r46h_fail "module receipt status mismatch"
+  [[ "$(r46h_file_value "$r46h_vr_receipt" installed_from)" == "$r46h_vr_from" ]] || r46h_fail "module receipt source mismatch"
+  [[ "$(r46h_file_value "$r46h_vr_receipt" installed_release)" == "$r46h_vr_release" ]] || r46h_fail "module receipt release mismatch"
+  [[ "$(r46h_file_value "$r46h_vr_receipt" source_git_commit)" == "$(r46h_manifest_value source_git_commit)" ]] || r46h_fail "module receipt commit mismatch"
+  [[ "$(r46h_file_value "$r46h_vr_receipt" source_snapshot_sha256)" == "$(r46h_manifest_value source_snapshot_sha256)" ]] || r46h_fail "module receipt source snapshot mismatch"
+  [[ "$(r46h_file_value "$r46h_vr_receipt" payload_tar_sha256)" == "$(r46h_manifest_value canonical_tar_sha256)" ]] || r46h_fail "module receipt tar mismatch"
+  [[ "$(r46h_file_value "$r46h_vr_receipt" module_tree_sha256)" == "$r46h_vr_tree" ]] || r46h_fail "module receipt tree mismatch"
+  [[ "$(r46h_file_value "$r46h_vr_receipt" module_count)" == "$r46h_vr_count" ]] || r46h_fail "module receipt module count mismatch"
+  [[ "$(r46h_file_value "$r46h_vr_receipt" module_tree_file_count)" == "$r46h_vr_files" ]] || r46h_fail "module receipt file count mismatch"
+}

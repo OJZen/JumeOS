@@ -1,0 +1,223 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+LANG=C
+export PATH LC_ALL LANG
+
+readonly EXPECTED_RELEASE=6.12.99-r46h-mainline-v0.15-gaming-product
+readonly EXPECTED_ROOT_PARTUUID=c9f931c9-02
+readonly CORE=/usr/local/libexec/r46h-smoke-libretro.so
+readonly NES_CORE=/usr/lib/aarch64-linux-gnu/libretro/nestopia_libretro.so
+readonly NES_ROM=/usr/local/share/r46h/r46h-nes-smoke.nes
+readonly CONFIG=/etc/r46h/retroarch.cfg
+readonly RECEIPT=/var/lib/r46h/gaming-mvp-v0.6-installed
+readonly VOLUME_CONTROL=2
+readonly MUX_CONTROL=5
+readonly GAME_VOLUME=201,201
+readonly GAME_MUX=0
+readonly SMOKE_RENDERER=software
+readonly PRODUCT_RENDERER=opengles2
+
+saved_volume=""
+saved_mux=""
+mixer_changed=0
+session_dir=""
+session_log=""
+launcher_pid=""
+signal_status=0
+process_cleanup=pass
+renderer=""
+
+usage() {
+  printf 'usage: sudo r46h-game-ui smoke|nes-smoke|menu\n'
+}
+
+control_values() {
+  amixer -c 0 cget "numid=$1" 2>/dev/null |
+    awk -F= '/^[[:space:]]*: values=/ { print $2; found=1 } END { exit found ? 0 : 1 }'
+}
+
+process_group_is_empty() {
+  local group_id=$1
+  local -a pipeline_status
+
+  /usr/bin/ps -eo pgid= |
+    awk -v group_id="$group_id" '$1 == group_id { found=1 } END { exit found ? 1 : 0 }'
+  pipeline_status=("${PIPESTATUS[@]}")
+  [[ "${pipeline_status[0]}" == 0 ]] || return 1
+  return "${pipeline_status[1]}"
+}
+
+stop_launcher_group() {
+  local poll
+  local own_group
+
+  [[ "$launcher_pid" =~ ^[1-9][0-9]*$ ]] || return 0
+  own_group=$(/usr/bin/ps -o pgid= -p $$ 2>/dev/null | awk '{ print $1 }')
+  [[ -n "$own_group" && "$launcher_pid" != "$own_group" ]] || return 1
+  if ! process_group_is_empty "$launcher_pid"; then
+    kill -TERM -- "-$launcher_pid" 2>/dev/null || true
+  fi
+  for ((poll=0; poll<30; poll++)); do
+    process_group_is_empty "$launcher_pid" && break
+    /usr/bin/sleep 0.1
+  done
+  if ! process_group_is_empty "$launcher_pid"; then
+    kill -KILL -- "-$launcher_pid" 2>/dev/null || true
+  fi
+  for ((poll=0; poll<10; poll++)); do
+    process_group_is_empty "$launcher_pid" && break
+    /usr/bin/sleep 0.1
+  done
+  process_group_is_empty "$launcher_pid"
+}
+
+cleanup() {
+  local status=$?
+  trap - EXIT INT TERM HUP
+  set +e
+  trap '' INT TERM HUP
+  if [[ -n "$launcher_pid" ]]; then
+    stop_launcher_group || {
+      process_cleanup=fail
+      status=1
+    }
+    wait "$launcher_pid" 2>/dev/null || true
+    launcher_pid=""
+  fi
+  if (( mixer_changed == 1 )); then
+    amixer -q -c 0 cset "numid=$VOLUME_CONTROL" "$saved_volume"
+    amixer -q -c 0 cset "numid=$MUX_CONTROL" "$saved_mux"
+  fi
+  if [[ $status != 0 && -n "$session_log" && -f "$session_log" && ! -L "$session_log" ]]; then
+    printf '%s\n' 'R46H_GAME_UI retroarch_log_tail=begin' >&2
+    tail -n 80 -- "$session_log" >&2
+    printf '%s\n' 'R46H_GAME_UI retroarch_log_tail=end' >&2
+  fi
+  if [[ -n "$session_log" ]]; then
+    rm -f -- "$session_log"
+  fi
+  if [[ -n "$session_dir" ]]; then
+    rmdir -- "$session_dir" 2>/dev/null || true
+  fi
+  chvt 1 >/dev/null 2>&1 || true
+  printf 'R46H_GAME_UI result=%s status=%d mixer_restored=%s process_cleanup=%s\n' \
+    "$([[ $status == 0 ]] && printf pass || printf fail)" "$status" \
+    "$([[ $mixer_changed == 1 ]] && printf yes || printf not-needed)" \
+    "$process_cleanup"
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'signal_status=130' INT
+trap 'signal_status=143' TERM
+trap 'signal_status=129' HUP
+
+[[ $# == 1 ]] || { usage >&2; exit 2; }
+case $1 in
+  smoke)
+    renderer=$SMOKE_RENDERER
+    retroarch_arguments=(-L "$CORE")
+    ;;
+  nes-smoke)
+    renderer=$PRODUCT_RENDERER
+    retroarch_arguments=(-L "$NES_CORE" "$NES_ROM")
+    ;;
+  menu)
+    renderer=$PRODUCT_RENDERER
+    retroarch_arguments=(--menu)
+    ;;
+  -h|--help) trap - EXIT INT TERM HUP; usage; exit 0 ;;
+  *) usage >&2; exit 2 ;;
+esac
+readonly renderer
+
+(( EUID == 0 )) || { printf 'ERROR: root is required\n' >&2; exit 1; }
+[[ "$(uname -r)" == "$EXPECTED_RELEASE" ]] || {
+  printf 'ERROR: boot the exact v0.15 gaming product kernel first\n' >&2
+  exit 1
+}
+[[ "$(findmnt -rn -o PARTUUID /)" == "$EXPECTED_ROOT_PARTUUID" ]] || {
+  printf 'ERROR: unexpected root partition\n' >&2
+  exit 1
+}
+[[ -f "$RECEIPT" && ! -L "$RECEIPT" ]] || {
+  printf 'ERROR: gaming product install receipt is missing\n' >&2
+  exit 1
+}
+[[ "$(stat -c '%u:%a:%h' "$RECEIPT")" == 0:600:1 ]] || {
+  printf 'ERROR: gaming product install receipt metadata is invalid\n' >&2
+  exit 1
+}
+grep -Fqx 'payload_id=r46h-gaming-mvp-v0.6' "$RECEIPT" || {
+  printf 'ERROR: gaming product install receipt identity is invalid\n' >&2
+  exit 1
+}
+grep -Fqx "target_release=$EXPECTED_RELEASE" "$RECEIPT" || {
+  printf 'ERROR: gaming product install receipt release is invalid\n' >&2
+  exit 1
+}
+for path in "$CORE" "$NES_CORE" "$NES_ROM" "$CONFIG" /bin/dash /usr/bin/retroarch /usr/bin/openvt \
+  /usr/bin/chvt /usr/bin/mktemp /usr/bin/ps /usr/bin/setsid /usr/bin/sleep \
+  /usr/sbin/runuser; do
+  [[ -e "$path" && ! -L "$path" ]] || { printf 'ERROR: missing runtime: %s\n' "$path" >&2; exit 1; }
+done
+[[ "$(id -u ark)" == 1000 ]] || { printf 'ERROR: unexpected ark user identity\n' >&2; exit 1; }
+for ark_path in "$CORE" "$NES_CORE" "$NES_ROM" "$CONFIG"; do
+  /usr/sbin/runuser -u ark -- /bin/dash -c 'test -r "$1"' \
+    r46h-game-ui-read-check "$ark_path" || {
+      printf 'ERROR: runtime is not readable by ark: %s\n' "$ark_path" >&2
+      exit 1
+    }
+done
+[[ -c /dev/dri/card0 && -c /dev/dri/renderD128 ]] || {
+  printf 'ERROR: DRM nodes are unavailable\n' >&2
+  exit 1
+}
+grep -Fq rk817-hifi /proc/asound/pcm || {
+  printf 'ERROR: RK817 playback device is unavailable\n' >&2
+  exit 1
+}
+
+install -d -o ark -g ark -m 0700 /home/ark/.config/retroarch \
+  /home/ark/.local/share/retroarch/saves /home/ark/.local/share/retroarch/states
+install -d -o ark -g ark -m 0700 /run/user/1000
+session_dir=$(/usr/bin/mktemp -d /run/r46h-game-ui.XXXXXX)
+chmod 0700 "$session_dir"
+session_log=$session_dir/retroarch.log
+install -o root -g root -m 0600 /dev/null "$session_log"
+saved_volume=$(control_values "$VOLUME_CONTROL")
+saved_mux=$(control_values "$MUX_CONTROL")
+[[ "$saved_volume" =~ ^[0-9]+,[0-9]+$ && "$saved_mux" =~ ^[0-9]+$ ]] || {
+  printf 'ERROR: cannot read RK817 mixer controls\n' >&2
+  exit 1
+}
+mixer_changed=1
+amixer -q -c 0 cset "numid=$VOLUME_CONTROL" "$GAME_VOLUME"
+amixer -q -c 0 cset "numid=$MUX_CONTROL" "$GAME_MUX"
+
+printf 'R46H_GAME_UI phase=start mode=%s vt=2 kernel=%s renderer=%s\n' \
+  "$1" "$(uname -r)" "$renderer"
+/usr/bin/setsid /usr/bin/openvt -e -c 2 -s -f -- /bin/dash -c '
+  session_log=$1
+  config=$2
+  renderer=$3
+  shift 3
+  case $renderer in software|opengles2) ;; *) exit 2 ;; esac
+  exec /usr/sbin/runuser -u ark -- /usr/bin/env \
+    XDG_RUNTIME_DIR=/run/user/1000 \
+    MESA_SHADER_CACHE_DISABLE=true \
+    SDL_RENDER_DRIVER="$renderer" \
+    /usr/bin/retroarch --config "$config" "$@" >"$session_log" 2>&1
+' r46h-game-ui-session "$session_log" "$CONFIG" "$renderer" "${retroarch_arguments[@]}" &
+launcher_pid=$!
+trap 'signal_status=130; exit 130' INT
+trap 'signal_status=143; exit 143' TERM
+trap 'signal_status=129; exit 129' HUP
+(( signal_status == 0 )) || exit "$signal_status"
+set +e
+wait "$launcher_pid"
+launcher_status=$?
+set -e
+exit "$launcher_status"

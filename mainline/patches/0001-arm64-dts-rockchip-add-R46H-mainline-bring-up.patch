@@ -1,0 +1,722 @@
+From 8f839d022a4e71f8661ffd39928f6373965d823b Mon Sep 17 00:00:00 2001
+From: Codex <codex@local.invalid>
+Date: Thu, 30 Jul 2026 21:43:08 +0800
+Subject: [PATCH] arm64: dts: rockchip: add R46H mainline bring-up
+
+Add a first-pass RK3326 R46H board description and a dedicated
+provisional panel driver.
+
+The panel command table is a byte-exact translation of the downstream 4.4
+sequence. Controller identification and hardware validation remain
+follow-up work.
+---
+ arch/arm64/boot/dts/rockchip/Makefile        |   1 +
+ arch/arm64/boot/dts/rockchip/rk3326-r46h.dts | 335 +++++++++++++++++++
+ drivers/gpu/drm/panel/Kconfig                |  11 +
+ drivers/gpu/drm/panel/Makefile               |   1 +
+ drivers/gpu/drm/panel/panel-r46h.c           | 314 ++++++++++++++++++
+ 5 files changed, 662 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
+ create mode 100644 drivers/gpu/drm/panel/panel-r46h.c
+
+diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
+index 0942307..65f55bc 100644
+--- a/arch/arm64/boot/dts/rockchip/Makefile
++++ b/arch/arm64/boot/dts/rockchip/Makefile
+@@ -16,6 +16,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3326-gameforce-chi.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3326-odroid-go2.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3326-odroid-go2-v11.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3326-odroid-go3.dtb
++dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3326-r46h.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-a1.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-evb.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-nanopi-r2c.dtb
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts b/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
+new file mode 100644
+index 0000000..1984af3
+--- /dev/null
++++ b/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
+@@ -0,0 +1,335 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * First-pass mainline device tree for the unbranded R46H handheld.
++ *
++ * The board is electrically close to the ODROID-GO Super, so reuse the
++ * upstream common board description and override only verified R46H wiring.
++ */
++
++/dts-v1/;
++#include "rk3326-odroid-go.dtsi"
++
++/delete-node/ &btn_f1;
++/delete-node/ &btn_f2;
++/delete-node/ &btn_f6;
++/delete-node/ &gpio_led;
++/delete-node/ &pwm_led;
++/delete-node/ &vcc_host;
++
++/ {
++	model = "GameConsole R46H";
++	compatible = "rockchip,rk3326-r46h-linux", "rockchip,rk3326";
++	chassis-type = "handset";
++
++	aliases {
++		mmc0 = &sdmmc;
++		mmc1 = &sdio;
++	};
++
++	battery: battery {
++		compatible = "simple-battery";
++		charge-full-design-microamp-hours = <3380000>;
++		charge-term-current-microamp = <52000>;
++		constant-charge-current-max-microamp = <2000000>;
++		constant-charge-voltage-max-microvolt = <4200000>;
++		factory-internal-resistance-micro-ohms = <100000>;
++		voltage-max-design-microvolt = <4200000>;
++		voltage-min-design-microvolt = <3300000>;
++
++		/* Converted from the downstream 4.4 R46H battery table. */
++		ocv-capacity-celsius = <20>;
++		ocv-capacity-table-0 =
++			<4046000 100>, <4001000 95>, <3967000 90>,
++			<3940000 85>, <3910000 80>, <3870000 75>,
++			<3830000 70>, <3790000 65>, <3750000 60>,
++			<3720000 55>, <3690000 50>, <3650000 45>,
++			<3610000 40>, <3570000 35>, <3540000 30>,
++			<3500000 25>, <3460000 20>, <3420000 15>,
++			<3380000 10>, <3340000 5>, <3300000 0>;
++	};
++
++	joystick_mux_controller: mux-controller {
++		compatible = "gpio-mux";
++		pinctrl-names = "default";
++		pinctrl-0 = <&mux_en_pins>;
++		#mux-control-cells = <0>;
++
++		mux-gpios = <&gpio3 RK_PB3 GPIO_ACTIVE_LOW>,
++			    <&gpio3 RK_PB0 GPIO_ACTIVE_LOW>;
++	};
++
++	joystick_mux: adc-mux {
++		compatible = "io-channel-mux";
++		io-channels = <&saradc 1>;
++		io-channel-names = "parent";
++		#io-channel-cells = <1>;
++
++		mux-controls = <&joystick_mux_controller>;
++		channels = "0", "1", "2", "3";
++	};
++
++	analog_sticks: adc-joystick {
++		compatible = "adc-joystick";
++		io-channels = <&joystick_mux 0>,
++			      <&joystick_mux 1>,
++			      <&joystick_mux 2>,
++			      <&joystick_mux 3>;
++		poll-interval = <10>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		/*
++		 * The raw limits follow the upstream ODROID-GO Super circuit.
++		 * X and Y are reversed to preserve the downstream R46H polarity.
++		 * These limits must be calibrated on the physical test unit.
++		 */
++		axis@0 {
++			reg = <0>;
++			abs-flat = <10>;
++			abs-fuzz = <10>;
++			abs-range = <800 180>;
++			linux,code = <ABS_X>;
++		};
++
++		axis@1 {
++			reg = <1>;
++			abs-flat = <10>;
++			abs-fuzz = <10>;
++			abs-range = <180 800>;
++			linux,code = <ABS_RX>;
++		};
++
++		axis@2 {
++			reg = <2>;
++			abs-flat = <10>;
++			abs-fuzz = <10>;
++			abs-range = <800 180>;
++			linux,code = <ABS_Y>;
++		};
++
++		axis@3 {
++			reg = <3>;
++			abs-flat = <10>;
++			abs-fuzz = <10>;
++			abs-range = <180 800>;
++			linux,code = <ABS_RY>;
++		};
++	};
++
++	gpio-keys-vol {
++		compatible = "gpio-keys";
++		autorepeat;
++		pinctrl-0 = <&btn_pins_vol>;
++		pinctrl-names = "default";
++
++		button-vol-down {
++			gpios = <&gpio2 RK_PA1 GPIO_ACTIVE_LOW>;
++			label = "VOLUMEDOWN";
++			linux,code = <KEY_VOLUMEDOWN>;
++		};
++
++		button-volume-up {
++			gpios = <&gpio2 RK_PA0 GPIO_ACTIVE_LOW>;
++			label = "VOLUMEUP";
++			linux,code = <KEY_VOLUMEUP>;
++		};
++	};
++
++	gpio_leds: gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&status_led_pin>;
++
++		/*
++		 * This two-colour LED is driven by one GPIO. High is red and low
++		 * is blue; gpio-leds exposes the red state for initial bring-up.
++		 */
++		status_led: led-0 {
++			color = <LED_COLOR_ID_RED>;
++			function = LED_FUNCTION_STATUS;
++			gpios = <&gpio2 RK_PB5 GPIO_ACTIVE_HIGH>;
++			default-state = "keep";
++		};
++	};
++
++	rumble: pwm-vibrator {
++		compatible = "pwm-vibrator";
++		pwm-names = "enable";
++		pwms = <&pwm0 0 200000000 0>;
++	};
++
++	/* The R46H jack detect signal is active-low on GPIO2_C6. */
++	rk817-sound {
++		simple-audio-card,hp-det-gpio = <&gpio2 RK_PC6 GPIO_ACTIVE_LOW>;
++	};
++};
++
++&backlight {
++	brightness-levels = <0 160>;
++	default-brightness-level = <80>;
++	num-interpolated-steps = <159>;
++	power-supply = <&vcc_bl>;
++	pwms = <&pwm1 0 40000 0>;
++};
++
++&builtin_gamepad {
++	button-sw11 {
++		label = "THUMBR";
++	};
++
++	button-sw12 {
++		label = "THUMBL";
++	};
++
++	button-sw13 {
++		label = "F5";
++	};
++
++	button-sw19 {
++		gpios = <&gpio3 RK_PB1 GPIO_ACTIVE_LOW>;
++		label = "SELECT";
++		linux,code = <BTN_SELECT>;
++	};
++
++	button-sw20 {
++		gpios = <&gpio3 RK_PB7 GPIO_ACTIVE_LOW>;
++		label = "TOP-RIGHT 2";
++		linux,code = <BTN_TR2>;
++	};
++
++	button-sw21 {
++		gpios = <&gpio3 RK_PB2 GPIO_ACTIVE_LOW>;
++		label = "TOP-LEFT 2";
++		linux,code = <BTN_TL2>;
++	};
++
++	button-sw22 {
++		gpios = <&gpio3 RK_PB4 GPIO_ACTIVE_LOW>;
++		label = "START";
++		linux,code = <BTN_START>;
++	};
++};
++
++&internal_display {
++	compatible = "gameconsole,r46h-panel";
++	power-supply = <&vcc_lcd>;
++	reset-gpios = <&gpio3 RK_PC0 GPIO_ACTIVE_LOW>;
++	/delete-property/ rotation;
++};
++
++&io_domains {
++	vccio1-supply = <&vccio_sd>;
++};
++
++&pwm0 {
++	status = "okay";
++};
++
++&pwm3 {
++	status = "disabled";
++};
++
++&rk817 {
++	system-power-controller;
++	vcc9-supply = <&usb_midu>;
++
++	regulators {
++		vcc_wifi: LDO_REG9 {
++			regulator-name = "vcc_wifi";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++				regulator-suspend-microvolt = <3300000>;
++			};
++		};
++
++		otg_switch: OTG_SWITCH {
++			regulator-name = "otg_switch";
++			regulator-boot-on;
++		};
++	};
++};
++
++&rk817_charger {
++	monitored-battery = <&battery>;
++};
++
++&sdio {
++	bus-width = <4>;
++	cap-mmc-highspeed;
++	cap-sd-highspeed;
++	card-detect-delay = <800>;
++	cd-gpios = <&gpio3 RK_PB6 GPIO_ACTIVE_LOW>;
++	disable-wp;
++	no-mmc;
++	no-sdio;
++	sd-uhs-sdr12;
++	sd-uhs-sdr25;
++	sd-uhs-sdr50;
++	sd-uhs-sdr104;
++	vmmc-supply = <&vcc_sd>;
++	vqmmc-supply = <&vccio_sd>;
++	status = "okay";
++};
++
++&sfc {
++	status = "disabled";
++};
++
++/* The running 4.4 system enumerates the internal USB hub on this DWC2. */
++&u2phy_otg {
++	status = "okay";
++};
++
++&usb20_otg {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&pinctrl {
++	btns {
++		btn_pins: btn-pins {
++			rockchip,pins =
++				<1 RK_PA2 RK_FUNC_GPIO &pcfg_pull_up>,
++				<1 RK_PA5 RK_FUNC_GPIO &pcfg_pull_up>,
++				<1 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>,
++				<1 RK_PA7 RK_FUNC_GPIO &pcfg_pull_up>,
++				<1 RK_PB4 RK_FUNC_GPIO &pcfg_pull_up>,
++				<1 RK_PB5 RK_FUNC_GPIO &pcfg_pull_up>,
++				<1 RK_PB6 RK_FUNC_GPIO &pcfg_pull_up>,
++				<1 RK_PB7 RK_FUNC_GPIO &pcfg_pull_up>,
++				<2 RK_PA2 RK_FUNC_GPIO &pcfg_pull_up>,
++				<2 RK_PA3 RK_FUNC_GPIO &pcfg_pull_up>,
++				<2 RK_PA4 RK_FUNC_GPIO &pcfg_pull_up>,
++				<2 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>,
++				<2 RK_PA7 RK_FUNC_GPIO &pcfg_pull_up>,
++				<3 RK_PB1 RK_FUNC_GPIO &pcfg_pull_up>,
++				<3 RK_PB2 RK_FUNC_GPIO &pcfg_pull_up>,
++				<3 RK_PB4 RK_FUNC_GPIO &pcfg_pull_up>,
++				<3 RK_PB7 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++
++		btn_pins_vol: btn-pins-vol {
++			rockchip,pins =
++				<2 RK_PA0 RK_FUNC_GPIO &pcfg_pull_up>,
++				<2 RK_PA1 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
++
++	joystick {
++		mux_en_pins: mux-pins {
++			rockchip,pins =
++				<3 RK_PB5 RK_FUNC_GPIO &pcfg_output_low>;
++		};
++	};
++
++	leds {
++		status_led_pin: status-led-pin {
++			rockchip,pins =
++				<2 RK_PB5 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++};
+diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+index d3a9a9f..a513aa7 100644
+--- a/drivers/gpu/drm/panel/Kconfig
++++ b/drivers/gpu/drm/panel/Kconfig
+@@ -607,0 +608,11 @@ config DRM_PANEL_RAYDIUM_RM69380
++config DRM_PANEL_R46H
++	tristate "R46H 1024x768 DSI panel"
++	depends on OF
++	depends on DRM_MIPI_DSI
++	depends on BACKLIGHT_CLASS_DEVICE
++	help
++	  Say Y or M here to enable the provisional panel driver for the
++	  1024x768 MIPI-DSI panel fitted to the R46H handheld. The controller
++	  identity is not yet known, so this driver is intended for board
++	  bring-up until the panel can be identified and described upstream.
++
+diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
+index 987a087..0dda51e 100644
+--- a/drivers/gpu/drm/panel/Makefile
++++ b/drivers/gpu/drm/panel/Makefile
+@@ -61,6 +61,7 @@ obj-$(CONFIG_DRM_PANEL_RAYDIUM_RM67191) += panel-raydium-rm67191.o
+ obj-$(CONFIG_DRM_PANEL_RAYDIUM_RM68200) += panel-raydium-rm68200.o
+ obj-$(CONFIG_DRM_PANEL_RAYDIUM_RM692E5) += panel-raydium-rm692e5.o
+ obj-$(CONFIG_DRM_PANEL_RAYDIUM_RM69380) += panel-raydium-rm69380.o
++obj-$(CONFIG_DRM_PANEL_R46H) += panel-r46h.o
+ obj-$(CONFIG_DRM_PANEL_RONBO_RB070D30) += panel-ronbo-rb070d30.o
+ obj-$(CONFIG_DRM_PANEL_SAMSUNG_ATNA33XC20) += panel-samsung-atna33xc20.o
+ obj-$(CONFIG_DRM_PANEL_SAMSUNG_DB7430) += panel-samsung-db7430.o
+diff --git a/drivers/gpu/drm/panel/panel-r46h.c b/drivers/gpu/drm/panel/panel-r46h.c
+new file mode 100644
+index 0000000..9b44ab4
+--- /dev/null
++++ b/drivers/gpu/drm/panel/panel-r46h.c
+@@ -0,0 +1,314 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * MIPI-DSI panel driver for the 1024x768 panel in the R46H handheld.
++ *
++ * The panel controller marking is not yet known.  The initialization table
++ * below is a lossless decoding of the downstream Rockchip 4.4
++ * panel-init-sequence: 167 DCS short writes followed by EXIT_SLEEP_MODE and
++ * SET_DISPLAY_ON with their original delays.
++ */
++
++#include <linux/delay.h>
++#include <linux/gpio/consumer.h>
++#include <linux/media-bus-format.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/regulator/consumer.h>
++
++#include <drm/drm_connector.h>
++#include <drm/drm_mipi_dsi.h>
++#include <drm/drm_modes.h>
++#include <drm/drm_panel.h>
++
++#include <video/mipi_display.h>
++
++struct r46h_panel {
++	struct drm_panel panel;
++	struct mipi_dsi_device *dsi;
++	struct gpio_desc *reset_gpio;
++	struct regulator *supply;
++};
++
++struct r46h_panel_command {
++	u8 command;
++	u8 value;
++};
++
++static const struct r46h_panel_command r46h_panel_init_commands[] = {
++	{ 0xee, 0x01 }, { 0xea, 0x07 }, { 0xeb, 0x12 }, { 0x0a, 0x8b },
++	{ 0x17, 0x35 }, { 0x1d, 0x33 }, { 0x21, 0x01 }, { 0x28, 0x1c },
++	{ 0x29, 0x27 }, { 0x2a, 0x63 }, { 0x2b, 0xb5 }, { 0x2c, 0x00 },
++	{ 0x2d, 0x33 }, { 0x2f, 0xf3 }, { 0xee, 0x02 }, { 0x39, 0x78 },
++	{ 0x39, 0x78 }, { 0x00, 0x00 }, { 0x01, 0x18 }, { 0x02, 0x15 },
++	{ 0x03, 0x10 }, { 0x04, 0x18 }, { 0x05, 0x3f }, { 0x06, 0x11 },
++	{ 0x07, 0x11 }, { 0x08, 0x11 }, { 0x09, 0x0f }, { 0x0a, 0x10 },
++	{ 0x0b, 0x54 }, { 0x0c, 0x14 }, { 0x0d, 0x17 }, { 0x0e, 0x35 },
++	{ 0x0f, 0x37 }, { 0x10, 0x3f }, { 0x20, 0x00 }, { 0x21, 0x18 },
++	{ 0x22, 0x15 }, { 0x23, 0x10 }, { 0x24, 0x12 }, { 0x25, 0x37 },
++	{ 0x26, 0x0b }, { 0x27, 0x0d }, { 0x28, 0x0d }, { 0x29, 0x0b },
++	{ 0x2a, 0x10 }, { 0x2b, 0x54 }, { 0x2c, 0x14 }, { 0x2d, 0x17 },
++	{ 0x2e, 0x35 }, { 0x2f, 0x37 }, { 0x30, 0x3f }, { 0xee, 0x04 },
++	{ 0x00, 0x04 }, { 0x01, 0x01 }, { 0x02, 0x80 }, { 0x03, 0x04 },
++	{ 0x04, 0x00 }, { 0x06, 0x16 }, { 0x07, 0x03 }, { 0x08, 0x13 },
++	{ 0x09, 0x0a }, { 0x0a, 0x0f }, { 0x0b, 0x10 }, { 0x22, 0x80 },
++	{ 0x24, 0x08 }, { 0x2a, 0x00 }, { 0xee, 0x05 }, { 0x00, 0x04 },
++	{ 0x01, 0x08 }, { 0x02, 0x55 }, { 0x03, 0x05 }, { 0x04, 0x00 },
++	{ 0x05, 0x04 }, { 0x06, 0x00 }, { 0x07, 0x13 }, { 0x08, 0x1e },
++	{ 0x09, 0x66 }, { 0x0d, 0x22 }, { 0x10, 0x08 }, { 0x11, 0x0c },
++	{ 0x12, 0x55 }, { 0x13, 0x05 }, { 0x19, 0x14 }, { 0x1a, 0x76 },
++	{ 0x23, 0x00 }, { 0x43, 0x13 }, { 0x40, 0x44 }, { 0x41, 0x00 },
++	{ 0x30, 0x01 }, { 0x31, 0x01 }, { 0x32, 0x00 }, { 0x33, 0x14 },
++	{ 0x34, 0x14 }, { 0x35, 0xb4 }, { 0x36, 0x01 }, { 0x37, 0x01 },
++	{ 0x38, 0x00 }, { 0x39, 0x14 }, { 0x3a, 0x14 }, { 0x44, 0x01 },
++	{ 0x45, 0x81 }, { 0x46, 0x05 }, { 0xee, 0x06 }, { 0x00, 0x23 },
++	{ 0x01, 0x01 }, { 0x02, 0x04 }, { 0x06, 0xcd }, { 0x08, 0x67 },
++	{ 0x09, 0x45 }, { 0x0a, 0x23 }, { 0x0b, 0x01 }, { 0xee, 0x07 },
++	{ 0x00, 0x3c }, { 0x01, 0x20 }, { 0x02, 0x20 }, { 0x03, 0x21 },
++	{ 0x04, 0x21 }, { 0x05, 0x3c }, { 0x06, 0x3c }, { 0x07, 0x04 },
++	{ 0x08, 0x04 }, { 0x09, 0x0c }, { 0x0a, 0x0c }, { 0x0b, 0x01 },
++	{ 0x0c, 0x15 }, { 0x0d, 0x15 }, { 0x0e, 0x17 }, { 0x0f, 0x17 },
++	{ 0x10, 0x11 }, { 0x11, 0x11 }, { 0x12, 0x13 }, { 0x13, 0x13 },
++	{ 0x14, 0x0d }, { 0x15, 0x0d }, { 0x20, 0x3c }, { 0x21, 0x20 },
++	{ 0x22, 0x20 }, { 0x23, 0x21 }, { 0x24, 0x21 }, { 0x25, 0x3c },
++	{ 0x26, 0x3c }, { 0x27, 0x04 }, { 0x28, 0x04 }, { 0x29, 0x0c },
++	{ 0x2a, 0x0c }, { 0x2b, 0x00 }, { 0x2c, 0x14 }, { 0x2d, 0x14 },
++	{ 0x2e, 0x16 }, { 0x2f, 0x16 }, { 0x30, 0x10 }, { 0x31, 0x10 },
++	{ 0x32, 0x12 }, { 0x33, 0x12 }, { 0x34, 0x0d }, { 0x35, 0x0d },
++	{ 0xee, 0x08 }, { 0x10, 0x00 }, { 0x12, 0xda }, { 0x14, 0x10 },
++	{ 0x22, 0x69 }, { 0xee, 0x0f }, { 0x00, 0x01 }, { 0x01, 0x10 },
++	{ 0xee, 0x00 }, { 0xea, 0x00 }, { 0xeb, 0x00 },
++};
++
++static inline struct r46h_panel *to_r46h_panel(struct drm_panel *panel)
++{
++	return container_of(panel, struct r46h_panel, panel);
++}
++
++static int r46h_panel_write_init_sequence(struct r46h_panel *ctx)
++{
++	unsigned int i;
++	ssize_t ret;
++
++	for (i = 0; i < ARRAY_SIZE(r46h_panel_init_commands); i++) {
++		const struct r46h_panel_command *command =
++			&r46h_panel_init_commands[i];
++
++		ret = mipi_dsi_dcs_write(ctx->dsi, command->command,
++					 &command->value, 1);
++		if (ret < 0) {
++			dev_err(&ctx->dsi->dev,
++				"failed to write init command %u (0x%02x): %zd\n",
++				i, command->command, ret);
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++static int r46h_panel_prepare(struct drm_panel *panel)
++{
++	struct r46h_panel *ctx = to_r46h_panel(panel);
++	int ret;
++
++	ret = regulator_enable(ctx->supply);
++	if (ret) {
++		dev_err(panel->dev, "failed to enable panel supply: %d\n", ret);
++		return ret;
++	}
++
++	msleep(20);
++	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++	msleep(150);
++	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
++	msleep(20);
++
++	ret = r46h_panel_write_init_sequence(ctx);
++	if (ret)
++		goto disable_supply;
++
++	ret = mipi_dsi_dcs_exit_sleep_mode(ctx->dsi);
++	if (ret < 0) {
++		dev_err(panel->dev, "failed to exit sleep mode: %d\n", ret);
++		goto disable_supply;
++	}
++
++	msleep(200);
++
++	ret = mipi_dsi_dcs_set_display_on(ctx->dsi);
++	if (ret < 0) {
++		dev_err(panel->dev, "failed to turn display on: %d\n", ret);
++		goto disable_supply;
++	}
++
++	msleep(20);
++
++	return 0;
++
++disable_supply:
++	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++	regulator_disable(ctx->supply);
++	msleep(20);
++	return ret;
++}
++
++static int r46h_panel_enable(struct drm_panel *panel)
++{
++	/* Preserve the downstream delay between display-on and backlight-on. */
++	msleep(120);
++	return 0;
++}
++
++static int r46h_panel_disable(struct drm_panel *panel)
++{
++	/* drm_panel_disable() has already disabled the external backlight. */
++	msleep(50);
++	return 0;
++}
++
++static int r46h_panel_unprepare(struct drm_panel *panel)
++{
++	struct r46h_panel *ctx = to_r46h_panel(panel);
++	int ret;
++
++	ret = mipi_dsi_dcs_set_display_off(ctx->dsi);
++	if (ret < 0)
++		dev_err(panel->dev, "failed to turn display off: %d\n", ret);
++
++	msleep(20);
++
++	ret = mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
++	if (ret < 0)
++		dev_err(panel->dev, "failed to enter sleep mode: %d\n", ret);
++
++	usleep_range(10000, 15000);
++	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++	regulator_disable(ctx->supply);
++	msleep(20);
++
++	/* The panel is powered off even if a best-effort DCS command failed. */
++	return 0;
++}
++
++static const struct drm_display_mode r46h_panel_mode = {
++	.clock = 60000,
++	.hdisplay = 1024,
++	.hsync_start = 1024 + 80,
++	.hsync_end = 1024 + 80 + 60,
++	.htotal = 1024 + 80 + 60 + 86,
++	.vdisplay = 768,
++	.vsync_start = 768 + 16,
++	.vsync_end = 768 + 16 + 8,
++	.vtotal = 768 + 16 + 8 + 8,
++	.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
++	.type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
++};
++
++static int r46h_panel_get_modes(struct drm_panel *panel,
++				struct drm_connector *connector)
++{
++	struct drm_display_mode *mode;
++
++	mode = drm_mode_duplicate(connector->dev, &r46h_panel_mode);
++	if (!mode)
++		return -ENOMEM;
++
++	drm_mode_set_name(mode);
++	drm_mode_probed_add(connector, mode);
++
++	connector->display_info.bpc = 8;
++	connector->display_info.width_mm = 52;
++	connector->display_info.height_mm = 70;
++	connector->display_info.bus_flags =
++		DRM_BUS_FLAG_DE_LOW | DRM_BUS_FLAG_PIXDATA_DRIVE_NEGEDGE;
++
++	return 1;
++}
++
++static const struct drm_panel_funcs r46h_panel_funcs = {
++	.prepare = r46h_panel_prepare,
++	.enable = r46h_panel_enable,
++	.disable = r46h_panel_disable,
++	.unprepare = r46h_panel_unprepare,
++	.get_modes = r46h_panel_get_modes,
++};
++
++static int r46h_panel_probe(struct mipi_dsi_device *dsi)
++{
++	struct device *dev = &dsi->dev;
++	struct r46h_panel *ctx;
++	int ret;
++
++	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
++	if (!ctx)
++		return -ENOMEM;
++
++	ctx->dsi = dsi;
++	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
++	if (IS_ERR(ctx->reset_gpio))
++		return dev_err_probe(dev, PTR_ERR(ctx->reset_gpio),
++				     "failed to get reset GPIO\n");
++
++	ctx->supply = devm_regulator_get(dev, "power");
++	if (IS_ERR(ctx->supply))
++		return dev_err_probe(dev, PTR_ERR(ctx->supply),
++				     "failed to get panel supply\n");
++
++	dsi->lanes = 4;
++	dsi->format = MIPI_DSI_FMT_RGB888;
++	/* Preserve downstream dsi,flags BIT(9): disable EoT packets in HS mode. */
++	dsi->mode_flags = MIPI_DSI_MODE_VIDEO |
++			  MIPI_DSI_MODE_VIDEO_BURST |
++			  MIPI_DSI_MODE_NO_EOT_PACKET |
++			  MIPI_DSI_MODE_LPM;
++
++	mipi_dsi_set_drvdata(dsi, ctx);
++	drm_panel_init(&ctx->panel, dev, &r46h_panel_funcs,
++		       DRM_MODE_CONNECTOR_DSI);
++
++	ret = drm_panel_of_backlight(&ctx->panel);
++	if (ret)
++		return dev_err_probe(dev, ret, "failed to get backlight\n");
++
++	drm_panel_add(&ctx->panel);
++
++	ret = mipi_dsi_attach(dsi);
++	if (ret) {
++		drm_panel_remove(&ctx->panel);
++		return dev_err_probe(dev, ret, "failed to attach to DSI host\n");
++	}
++
++	return 0;
++}
++
++static void r46h_panel_remove(struct mipi_dsi_device *dsi)
++{
++	struct r46h_panel *ctx = mipi_dsi_get_drvdata(dsi);
++	int ret;
++
++	ret = mipi_dsi_detach(dsi);
++	if (ret)
++		dev_err(&dsi->dev, "failed to detach from DSI host: %d\n", ret);
++
++	drm_panel_remove(&ctx->panel);
++}
++
++static const struct of_device_id r46h_panel_of_match[] = {
++	{ .compatible = "gameconsole,r46h-panel" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, r46h_panel_of_match);
++
++static struct mipi_dsi_driver r46h_panel_driver = {
++	.probe = r46h_panel_probe,
++	.remove = r46h_panel_remove,
++	.driver = {
++		.name = "panel-r46h",
++		.of_match_table = r46h_panel_of_match,
++	},
++};
++module_mipi_dsi_driver(r46h_panel_driver);
++
++MODULE_AUTHOR("OpenAI Codex");
++MODULE_DESCRIPTION("R46H 1024x768 MIPI-DSI panel driver");
++MODULE_LICENSE("GPL");

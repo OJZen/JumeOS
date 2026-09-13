@@ -1,0 +1,743 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+LANG=C
+export PATH LC_ALL LANG
+
+readonly GATE_ID=r46h-media-usb-preflight-v0.1
+readonly EXPECTED_RELEASE=6.12.99-r46h-mainline-v0.8-bootloader-handoff
+readonly EXPECTED_ROOT_SOURCE=/dev/mmcblk0p2
+readonly EXPECTED_ROOT_PARTUUID=c9f931c9-02
+readonly EXPECTED_ROOT_UUID=d3130001-46a4-4d56-9001-000000000001
+readonly EXPECTED_WIFI_SERIAL=00E04C8188FF
+readonly EXPECTED_WIFI_VENDOR=0bda
+readonly EXPECTED_WIFI_PRODUCT=8179
+readonly EXT4_ERRORS=/sys/fs/ext4/mmcblk0p2/errors_count
+readonly REQUIRED_SCRIPT_PATH=/run/r46h-media-usb-preflight
+readonly LOCK_PATH=/run/r46h-media-usb-preflight.lock
+readonly COMMAND_TIMEOUT_SECONDS=12
+readonly WORKER_TIMEOUT_SECONDS=90
+readonly OUTPUT_TIMEOUT_SECONDS=15
+
+runtime_dir=""
+failures=0
+skips=0
+media_state=FAIL
+usb_state=FAIL
+post_state=FAIL
+worker_complete=0
+worker_reason=unexpected-exit
+dmesg_before_bytes=0
+ext4_before=""
+
+fault_pattern='(^|[^[:alnum:]_])BUG(:|[[:space:]])|Oops:|kernel panic|Call trace:|cut here'
+fault_pattern+='|synchronous( external)? abort|SError'
+fault_pattern+='|mmc.*(I/O error|error[[:space:]]+-[0-9]+|timed out|timeout|CRC|fail(ed|ure)?)'
+fault_pattern+='|I/O error.*mmc|(blk_update_request|end_request|blk_print_req_error).*(error|failure)'
+fault_pattern+='|Buffer I/O error|JBD2.*(error([ :]|$)|warning|abort|fail(ed|ure)?)'
+fault_pattern+='|EXT4-fs.*(error([ :]|$)|warning|abort|fail(ed|ure)?)'
+fault_pattern+='|(regulator|clk|clock|iommu).*(^|[^[:alnum:]_])(fault|abort|fatal|error|failed|timeout|timed out)([^[:alnum:]_]|$)'
+fault_pattern+='|(^|[^[:alnum:]_])(fault|abort|fatal|error|failed|timeout|timed out)([^[:alnum:]_]|$).*(regulator|clk|clock|iommu)'
+fault_pattern+='|(hantro|vpu|video-codec|usb|xhci|ehci|ohci).*(fault|fatal|error|failed|timeout|timed out|stall)'
+fault_pattern+='|(watchdog.*lockup|soft lockup|hard LOCKUP|rcu.*stall|hung task|task .*blocked for more than)'
+
+usage() {
+  cat <<'EOF'
+usage: r46h-media-usb-preflight [--query-only]
+
+Run the bounded R46H Hantro/USB active-test preflight. It only queries exact
+dynamic media nodes and records a USB inventory baseline. It does not stream,
+decode, encode, hotplug, mount, write a device, load a module or change USB
+authorization. Missing V4L2/FFmpeg/GStreamer tooling is reported explicitly as
+media=SKIP_TOOLING; it is not evidence that Hantro data paths work.
+EOF
+}
+
+inode_id() {
+  stat -c '%d:%i' -- "$1"
+}
+
+remove_session() {
+  local path=$1
+  local expected_inode=${2:-}
+  [[ "$path" == /run/r46h-media-usb-preflight-supervisor.* &&
+     ! -L "$path" && -d "$path" &&
+     "$(stat -c '%u:%a' -- "$path" 2>/dev/null || true)" == 0:700 ]] || return 1
+  if [[ -n "$expected_inode" ]]; then
+    [[ "$(inode_id "$path" 2>/dev/null || true)" == "$expected_inode" ]] || return 1
+  fi
+  rm -rf -- "$path"
+  [[ ! -e "$path" && ! -L "$path" ]]
+}
+
+remove_lock() {
+  local expected_inode=${1:-}
+  [[ "$LOCK_PATH" == /run/r46h-media-usb-preflight.lock &&
+     ! -L "$LOCK_PATH" && -d "$LOCK_PATH" &&
+     "$(stat -c '%u:%a' -- "$LOCK_PATH" 2>/dev/null || true)" == 0:700 ]] || return 1
+  if [[ -n "$expected_inode" ]]; then
+    [[ "$(inode_id "$LOCK_PATH" 2>/dev/null || true)" == "$expected_inode" ]] || return 1
+  fi
+  rmdir -- "$LOCK_PATH"
+  [[ ! -e "$LOCK_PATH" && ! -L "$LOCK_PATH" ]]
+}
+
+forward_worker_signal() {
+  local signal_name=$1
+  local worker_process=$2
+  (( worker_process > 0 )) || return 0
+  kill -"$signal_name" -- "-$worker_process" 2>/dev/null ||
+    kill -"$signal_name" -- "$worker_process" 2>/dev/null
+}
+
+supervisor_session_is_empty() {
+  local session_id=$1
+  local session_ids=""
+  session_ids=$(timeout --foreground -s TERM -k 2 "$COMMAND_TIMEOUT_SECONDS" \
+    ps -eo sid= 2>/dev/null) || return 1
+  ! awk -v wanted="$session_id" \
+    '$1 == wanted { found=1 } END { exit found ? 0 : 1 }' <<< "$session_ids"
+}
+
+run_supervisor() {
+  local script_path=""
+  local session_dir=""
+  local session_inode=""
+  local lock_inode=""
+  local worker_log=""
+  local worker_pid=0
+  local worker_status=1
+  local replay_status=0
+  local signal_status=0
+  local cleanup=pass
+  local worker_line=""
+  local worker_count=0
+  local final_result=fail
+  local final_media=FAIL
+  local final_usb=FAIL
+  local final_post=FAIL
+  local final_reason=supervisor-preflight
+  local final_status=1
+  local worker_group_gone=1
+  local poll=0
+
+  if [[ "$(id -u)" != 0 ]]; then
+    printf 'R46H_MEDIA_USB_GATE id=%s mode=query-only result=fail media=FAIL usb=FAIL post=FAIL cleanup=pass reason=not-root worker_status=1\n' \
+      "$GATE_ID" >&2
+    return 1
+  fi
+  if [[ "$(findmnt -rn -T /run -o FSTYPE 2>/dev/null || true)" != tmpfs ||
+        -L /run || ! -d /run ||
+        "$(stat -c '%u:%a' -- /run 2>/dev/null || true)" != 0:755 ]]; then
+    printf 'R46H_MEDIA_USB_GATE id=%s mode=query-only result=fail media=FAIL usb=FAIL post=FAIL cleanup=pass reason=unsafe-run worker_status=1\n' \
+      "$GATE_ID" >&2
+    return 1
+  fi
+  script_path=$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || true)
+  if [[ "$script_path" != "$REQUIRED_SCRIPT_PATH" ||
+        "${BASH_SOURCE[0]}" != "$REQUIRED_SCRIPT_PATH" ||
+        -L "$REQUIRED_SCRIPT_PATH" || ! -f "$REQUIRED_SCRIPT_PATH" ||
+        "$(stat -c '%u:%a:%h' -- "$REQUIRED_SCRIPT_PATH" 2>/dev/null || true)" != 0:700:1 ]]; then
+    printf 'R46H_MEDIA_USB_GATE id=%s mode=query-only result=fail media=FAIL usb=FAIL post=FAIL cleanup=pass reason=unsafe-script-identity worker_status=1\n' \
+      "$GATE_ID" >&2
+    return 1
+  fi
+  for command_name in awk cat chmod env findmnt grep kill mkdir mktemp ps readlink rm \
+    rmdir sed setsid sleep stat timeout; do
+    if ! command -v "$command_name" >/dev/null; then
+      printf 'R46H_MEDIA_USB_GATE id=%s mode=query-only result=fail media=FAIL usb=FAIL post=FAIL cleanup=pass reason=missing-supervisor-command worker_status=1\n' \
+        "$GATE_ID" >&2
+      return 1
+    fi
+  done
+
+  trap 'signal_status=130' INT
+  trap 'signal_status=143' TERM
+  trap 'signal_status=129' HUP
+  if ! session_dir=$(mktemp -d /run/r46h-media-usb-preflight-supervisor.XXXXXX) ||
+     ! chmod 0700 "$session_dir" ||
+     ! session_inode=$(inode_id "$session_dir") || [[ -z "$session_inode" ]]; then
+    [[ -z "$session_dir" ]] || remove_session "$session_dir" || cleanup=fail
+    printf 'R46H_MEDIA_USB_GATE id=%s mode=query-only result=fail media=FAIL usb=FAIL post=FAIL cleanup=%s reason=session-create-failed worker_status=1\n' \
+      "$GATE_ID" "$cleanup" >&2
+    return 1
+  fi
+  worker_log="$session_dir/worker.log"
+  if ! : > "$worker_log" || ! chmod 0600 "$worker_log"; then
+    remove_session "$session_dir" "$session_inode" || cleanup=fail
+    printf 'R46H_MEDIA_USB_GATE id=%s mode=query-only result=fail media=FAIL usb=FAIL post=FAIL cleanup=%s reason=log-create-failed worker_status=1\n' \
+      "$GATE_ID" "$cleanup" >&2
+    return 1
+  fi
+  if ! mkdir -m 0700 -- "$LOCK_PATH"; then
+    remove_session "$session_dir" "$session_inode" || cleanup=fail
+    printf 'R46H_MEDIA_USB_GATE id=%s mode=query-only result=fail media=FAIL usb=FAIL post=FAIL cleanup=%s reason=already-running worker_status=1\n' \
+      "$GATE_ID" "$cleanup" >&2
+    return 1
+  fi
+  if ! lock_inode=$(inode_id "$LOCK_PATH") || [[ -z "$lock_inode" ]]; then
+    remove_lock || cleanup=fail
+    remove_session "$session_dir" "$session_inode" || cleanup=fail
+    printf 'R46H_MEDIA_USB_GATE id=%s mode=query-only result=fail media=FAIL usb=FAIL post=FAIL cleanup=%s reason=lock-identity-failed worker_status=1\n' \
+      "$GATE_ID" "$cleanup" >&2
+    return 1
+  fi
+
+  if (( signal_status != 0 )); then
+    remove_lock "$lock_inode" || cleanup=fail
+    remove_session "$session_dir" "$session_inode" || cleanup=fail
+    printf 'R46H_MEDIA_USB_GATE id=%s mode=query-only result=fail media=FAIL usb=FAIL post=FAIL cleanup=%s reason=supervisor-signal worker_status=%d\n' \
+      "$GATE_ID" "$cleanup" "$signal_status" >&2
+    return "$signal_status"
+  fi
+
+  trap 'signal_status=130; forward_worker_signal INT "$worker_pid" || true' INT
+  trap 'signal_status=143; forward_worker_signal TERM "$worker_pid" || true' TERM
+  trap 'signal_status=129; forward_worker_signal HUP "$worker_pid" || true' HUP
+  setsid timeout -s TERM -k 5 "$WORKER_TIMEOUT_SECONDS" \
+    env -i PATH="$PATH" LC_ALL=C LANG=C R46H_MEDIA_USB_SUPERVISED=1 \
+      R46H_MEDIA_USB_SESSION_DIR="$session_dir" \
+      R46H_MEDIA_USB_SESSION_INODE="$session_inode" \
+      /bin/bash "$script_path" --query-only > "$worker_log" 2>&1 &
+  worker_pid=$!
+  case $signal_status in
+    129) forward_worker_signal HUP "$worker_pid" || true ;;
+    130) forward_worker_signal INT "$worker_pid" || true ;;
+    143) forward_worker_signal TERM "$worker_pid" || true ;;
+  esac
+  set +e
+  wait "$worker_pid"
+  worker_status=$?
+  set -e
+  trap '' INT TERM HUP
+  if (( signal_status != 0 )); then
+    forward_worker_signal TERM "$worker_pid" || true
+    for ((poll=0; poll<50; poll++)); do
+      kill -0 -- "$worker_pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    if kill -0 -- "$worker_pid" 2>/dev/null; then
+      forward_worker_signal KILL "$worker_pid" || true
+    fi
+    set +e
+    wait "$worker_pid"
+    set -e
+  fi
+  if ! supervisor_session_is_empty "$worker_pid"; then
+    forward_worker_signal KILL "$worker_pid" || true
+    sleep 0.2
+    if ! supervisor_session_is_empty "$worker_pid"; then
+      worker_group_gone=0
+    fi
+  fi
+
+  timeout --foreground -s TERM -k 2 "$OUTPUT_TIMEOUT_SECONDS" cat "$worker_log" ||
+    replay_status=$?
+  worker_line=$(grep -E '^R46H_MEDIA_USB_WORKER_RESULT ' "$worker_log" || true)
+  worker_count=$(grep -Ec '^R46H_MEDIA_USB_WORKER_RESULT ' "$worker_log" || true)
+  if (( worker_count == 1 )) &&
+     [[ "$worker_line" =~ result=(pass|skip|fail) ]] &&
+     [[ "$worker_line" =~ media=(PASS|SKIP_TOOLING|FAIL) ]] &&
+     [[ "$worker_line" =~ usb=(PASS|FAIL) ]] &&
+     [[ "$worker_line" =~ post=(PASS|FAIL) ]] &&
+     [[ "$worker_line" =~ reason=([a-z0-9-]+) ]]; then
+    final_result=$(sed -nE 's/.* result=(pass|skip|fail) .*/\1/p' <<< "$worker_line")
+    final_media=$(sed -nE 's/.* media=(PASS|SKIP_TOOLING|FAIL) .*/\1/p' <<< "$worker_line")
+    final_usb=$(sed -nE 's/.* usb=(PASS|FAIL) .*/\1/p' <<< "$worker_line")
+    final_post=$(sed -nE 's/.* post=(PASS|FAIL) .*/\1/p' <<< "$worker_line")
+    final_reason=$(sed -nE 's/.* reason=([a-z0-9-]+) .*/\1/p' <<< "$worker_line")
+  else
+    final_result=fail
+    final_reason=invalid-worker-marker
+  fi
+  if (( worker_group_gone == 0 )); then
+    final_result=fail
+    final_reason=worker-process-leak
+  elif (( replay_status != 0 )); then
+    final_result=fail
+    final_reason=output-replay-failed
+  elif (( signal_status != 0 )); then
+    final_result=fail
+    final_reason=supervisor-signal
+    worker_status=$signal_status
+  elif (( worker_status == 124 || worker_status == 137 )); then
+    final_result=fail
+    final_reason=worker-timeout
+  elif (( worker_status != 0 )); then
+    final_result=fail
+  fi
+
+  remove_lock "$lock_inode" || cleanup=fail
+  if (( worker_group_gone == 1 )); then
+    remove_session "$session_dir" "$session_inode" || cleanup=fail
+  else
+    cleanup=fail
+  fi
+  if [[ "$cleanup" != pass ]]; then
+    final_result=fail
+    final_reason=supervisor-cleanup-failed
+  fi
+  if [[ "$final_result" == pass ]]; then
+    final_status=0
+  elif [[ "$final_result" == skip ]]; then
+    final_status=77
+  fi
+  printf 'R46H_MEDIA_USB_GATE id=%s mode=query-only result=%s media=%s usb=%s post=%s cleanup=%s reason=%s worker_status=%d\n' \
+    "$GATE_ID" "$final_result" "$final_media" "$final_usb" "$final_post" \
+    "$cleanup" "$final_reason" "$worker_status"
+  return "$final_status"
+}
+
+pass() {
+  printf 'R46H_MEDIA_USB_CHECK group=%s name=%s result=pass\n' "$1" "$2"
+}
+
+fail() {
+  failures=$((failures + 1))
+  printf 'R46H_MEDIA_USB_CHECK group=%s name=%s result=fail\n' "$1" "$2" >&2
+}
+
+skip() {
+  skips=$((skips + 1))
+  printf 'R46H_MEDIA_USB_CHECK group=%s name=%s result=skip reason=%s\n' "$1" "$2" "$3"
+}
+
+check() {
+  local group=$1
+  local name=$2
+  shift 2
+  if timeout --foreground -s TERM -k 2 "$COMMAND_TIMEOUT_SECONDS" "$@"; then
+    pass "$group" "$name"
+  else
+    fail "$group" "$name"
+  fi
+}
+
+capture() {
+  local destination=$1
+  shift
+  timeout --foreground -s TERM -k 2 "$COMMAND_TIMEOUT_SECONDS" "$@" \
+    > "$destination" 2>&1
+}
+
+read_text() {
+  timeout --foreground -s TERM -k 2 "$COMMAND_TIMEOUT_SECONDS" cat -- "$1" 2>/dev/null
+}
+
+source_unmounted_anywhere() {
+  local source=$1
+  local major_hex=""
+  local minor_hex=""
+  local device_number=""
+  local mounted_devices=""
+
+  [[ -b "$source" && ! -L "$source" ]] || return 1
+  major_hex=$(stat -c '%t' -- "$source" 2>/dev/null) || return 1
+  minor_hex=$(stat -c '%T' -- "$source" 2>/dev/null) || return 1
+  [[ "$major_hex" =~ ^[0-9a-f]+$ && "$minor_hex" =~ ^[0-9a-f]+$ ]] || return 1
+  device_number="$((16#$major_hex)):$((16#$minor_hex))"
+  [[ -e "/sys/dev/block/$device_number" ]] || return 1
+  mounted_devices=$(timeout --foreground -s TERM -k 2 "$COMMAND_TIMEOUT_SECONDS" \
+    findmnt -rn -o MAJ:MIN 2>/dev/null) || return 1
+  ! grep -Fqx -- "$device_number" <<< "$mounted_devices"
+}
+
+no_failed_units() {
+  local output=""
+  output=$(timeout --foreground -s TERM -k 2 "$COMMAND_TIMEOUT_SECONDS" \
+    systemctl --failed --no-legend --plain 2>/dev/null) || return 1
+  [[ -z "$output" ]]
+}
+
+record_usb_inventory() {
+  local destination=$1
+  local vendor_file=""
+  local usb_path=""
+  local node=""
+  local vendor=""
+  local product=""
+  local busnum=""
+  local devnum=""
+  local speed=""
+  local serial=""
+  local driver=""
+  local driver_path=""
+  local count=0
+
+  : > "$destination"
+  shopt -s nullglob
+  local vendor_files=(/sys/bus/usb/devices/*/idVendor)
+  shopt -u nullglob
+  for vendor_file in "${vendor_files[@]}"; do
+    usb_path=${vendor_file%/idVendor}
+    node=${usb_path##*/}
+    vendor=$(read_text "$vendor_file" || true)
+    product=$(read_text "$usb_path/idProduct" || true)
+    busnum=$(read_text "$usb_path/busnum" || true)
+    devnum=$(read_text "$usb_path/devnum" || true)
+    speed=$(read_text "$usb_path/speed" || true)
+    serial=$(read_text "$usb_path/serial" || true)
+    driver_path=$(timeout --foreground -s TERM -k 2 "$COMMAND_TIMEOUT_SECONDS" \
+      readlink -f -- "$usb_path/driver" 2>/dev/null || true)
+    driver=${driver_path##*/}
+    printf 'node=%s bus=%s dev=%s id=%s:%s speed=%s serial=%s driver=%s\n' \
+      "$node" "$busnum" "$devnum" "${vendor,,}" "${product,,}" "$speed" \
+      "${serial//[[:space:]]/_}" "${driver//[[:space:]]/_}" >> "$destination"
+    count=$((count + 1))
+  done
+  (( count > 0 ))
+}
+
+worker_finalize() {
+  local status=$?
+  local result=fail
+  trap - EXIT
+  trap '' INT TERM HUP
+  set +e
+  if (( worker_complete == 1 && failures == 0 && status == 0 )); then
+    if [[ "$media_state" == SKIP_TOOLING ]]; then
+      result=skip
+      worker_reason=media-tooling-unavailable
+    else
+      result=pass
+      worker_reason=checks-complete
+    fi
+  elif (( status == 0 )); then
+    status=1
+  fi
+  printf 'R46H_MEDIA_USB_WORKER_RESULT result=%s media=%s usb=%s post=%s failures=%d skips=%d reason=%s exit_status=%d\n' \
+    "$result" "$media_state" "$usb_state" "$post_state" "$failures" "$skips" \
+    "$worker_reason" "$status"
+  exit "$status"
+}
+
+case ${1:---query-only} in
+  --query-only) ;;
+  -h|--help) usage; exit 0 ;;
+  *) usage >&2; exit 2 ;;
+esac
+[[ $# -le 1 ]] || { usage >&2; exit 2; }
+
+if [[ ${R46H_MEDIA_USB_SUPERVISED:-0} != 1 ]]; then
+  run_supervisor
+  exit $?
+fi
+
+trap worker_finalize EXIT
+trap 'worker_reason=signal-int; exit 130' INT
+trap 'worker_reason=signal-term; exit 143' TERM
+trap 'worker_reason=signal-hup; exit 129' HUP
+
+[[ "$(id -u)" == 0 ]] || {
+  worker_reason=not-root
+  exit 1
+}
+[[ "$(findmnt -rn -T /run -o FSTYPE 2>/dev/null || true)" == tmpfs &&
+   ! -L /run && -d /run &&
+   "$(stat -c '%u:%a' -- /run 2>/dev/null || true)" == 0:755 ]] || {
+  worker_reason=unsafe-run
+  exit 1
+}
+[[ -n ${R46H_MEDIA_USB_SESSION_DIR:-} && -n ${R46H_MEDIA_USB_SESSION_INODE:-} &&
+   "$R46H_MEDIA_USB_SESSION_DIR" == /run/r46h-media-usb-preflight-supervisor.* &&
+   ! -L "$R46H_MEDIA_USB_SESSION_DIR" && -d "$R46H_MEDIA_USB_SESSION_DIR" &&
+   "$(stat -c '%u:%a' -- "$R46H_MEDIA_USB_SESSION_DIR" 2>/dev/null || true)" == 0:700 &&
+   "$(inode_id "$R46H_MEDIA_USB_SESSION_DIR" 2>/dev/null || true)" == \
+     "$R46H_MEDIA_USB_SESSION_INODE" ]] || {
+  worker_reason=unsafe-supervisor-session
+  exit 1
+}
+
+runtime_dir="$R46H_MEDIA_USB_SESSION_DIR/worker"
+mkdir -m 0700 -- "$runtime_dir"
+for evidence_name in dmesg-before.txt dmesg-after.txt dmesg-delta.txt device-tree.txt \
+  encoder.txt decoder.txt media-nodes.txt media-tooling.txt v4l2-encoder.txt \
+  v4l2-decoder.txt usb-before.txt usb-after.txt lsusb.txt mounts-before.txt \
+  mounts-after.txt; do
+  : > "$runtime_dir/$evidence_name"
+done
+
+printf 'R46H_MEDIA_USB_WORKER id=%s mode=query-only stage=start kernel=%s\n' \
+  "$GATE_ID" "$(uname -r)"
+
+required_commands=(
+  awk basename cat chmod cmp dmesg findmnt grep head id lsusb mkdir readlink
+  sed sha256sum stat systemctl tail test timeout tr uname wc
+)
+for command_name in "${required_commands[@]}"; do
+  if command -v "$command_name" >/dev/null 2>&1; then
+    pass preflight "command-$command_name"
+  else
+    fail preflight "command-$command_name"
+  fi
+done
+if (( failures != 0 )); then
+  worker_complete=1
+  worker_reason=missing-command
+  exit 1
+fi
+
+check identity debian13 grep -Fqx 'VERSION_ID="13"' /etc/os-release
+check identity kernel test "$(uname -r)" = "$EXPECTED_RELEASE"
+check identity pid1 test "$(read_text /proc/1/comm || true)" = systemd
+check identity firstboot-file test ! -L /var/lib/r46h/firstboot-complete
+check identity firstboot-owner test \
+  "$(stat -c '%u:%a:%h' -- /var/lib/r46h/firstboot-complete 2>/dev/null || true)" = 0:600:1
+check identity firstboot-marker grep -Fqx \
+  'release=debian13-p2-mvp-v0.1' /var/lib/r46h/firstboot-complete
+board_model=""
+if [[ -r /proc/device-tree/model ]]; then
+  board_model=$(tr -d '\000' < /proc/device-tree/model)
+fi
+if [[ -r /proc/device-tree/compatible ]]; then
+  tr '\000' '\n' < /proc/device-tree/compatible > "$runtime_dir/device-tree.txt"
+fi
+check identity board-model test "$board_model" = 'GameConsole R46H'
+check identity compatible-r46h grep -Fqx rockchip,rk3326-r46h-linux \
+  "$runtime_dir/device-tree.txt"
+check identity compatible-rk3326 grep -Fqx rockchip,rk3326 "$runtime_dir/device-tree.txt"
+
+root_source=$(timeout --foreground -s TERM -k 2 5 findmnt -rn -o SOURCE / 2>/dev/null || true)
+root_partuuid=$(timeout --foreground -s TERM -k 2 5 findmnt -rn -o PARTUUID / 2>/dev/null || true)
+root_uuid=$(timeout --foreground -s TERM -k 2 5 findmnt -rn -o UUID / 2>/dev/null || true)
+root_fstype=$(timeout --foreground -s TERM -k 2 5 findmnt -rn -o FSTYPE / 2>/dev/null || true)
+check identity root-source test "$root_source" = "$EXPECTED_ROOT_SOURCE"
+check identity root-partuuid test "$root_partuuid" = "$EXPECTED_ROOT_PARTUUID"
+check identity root-uuid test "$root_uuid" = "$EXPECTED_ROOT_UUID"
+check identity root-fstype test "$root_fstype" = ext4
+if source_unmounted_anywhere /dev/mmcblk0p1; then
+  pass identity p1-unmounted
+else
+  fail identity p1-unmounted
+fi
+if source_unmounted_anywhere /dev/mmcblk0p3; then
+  pass identity p3-unmounted
+else
+  fail identity p3-unmounted
+fi
+if no_failed_units; then
+  pass identity failed-units-before
+else
+  fail identity failed-units-before
+fi
+
+ext4_before=$(read_text "$EXT4_ERRORS" || true)
+if [[ "$ext4_before" =~ ^[0-9]+$ && "$ext4_before" -eq 0 ]]; then
+  pass post ext4-errors-before
+else
+  fail post ext4-errors-before
+fi
+if capture "$runtime_dir/dmesg-before.txt" dmesg; then
+  dmesg_before_bytes=$(wc -c < "$runtime_dir/dmesg-before.txt" | tr -d ' ')
+fi
+if [[ "$dmesg_before_bytes" =~ ^[1-9][0-9]*$ ]]; then
+  pass post dmesg-before
+else
+  fail post dmesg-before
+  dmesg_before_bytes=0
+fi
+encoder_nodes=()
+decoder_nodes=()
+media_nodes=()
+media_failures_before=$failures
+shopt -s nullglob
+video_class_nodes=(/sys/class/video4linux/video*)
+media_device_nodes=(/dev/media*)
+shopt -u nullglob
+for class_node in "${video_class_nodes[@]}"; do
+  [[ -r "$class_node/name" ]] || continue
+  video_name=$(read_text "$class_node/name" || true)
+  video_node="/dev/${class_node##*/}"
+  video_real=$(timeout --foreground -s TERM -k 2 "$COMMAND_TIMEOUT_SECONDS" \
+    readlink -f -- "$class_node" 2>/dev/null || true)
+  case "$video_name" in
+    *px30*vpu*enc*)
+      encoder_nodes+=("$video_node")
+      printf 'node=%s name=%s sysfs=%s\n' "$video_node" "$video_name" "$video_real" \
+        >> "$runtime_dir/encoder.txt"
+      ;;
+    *px30*vpu*dec*)
+      decoder_nodes+=("$video_node")
+      printf 'node=%s name=%s sysfs=%s\n' "$video_node" "$video_name" "$video_real" \
+        >> "$runtime_dir/decoder.txt"
+      ;;
+  esac
+done
+for media_node in "${media_device_nodes[@]}"; do
+  [[ -c "$media_node" && ! -L "$media_node" ]] || continue
+  media_major_hex=$(stat -c '%t' -- "$media_node" 2>/dev/null || true)
+  media_minor_hex=$(stat -c '%T' -- "$media_node" 2>/dev/null || true)
+  [[ "$media_major_hex" =~ ^[0-9a-f]+$ && "$media_minor_hex" =~ ^[0-9a-f]+$ ]] || continue
+  media_dev="$((16#$media_major_hex)):$((16#$media_minor_hex))"
+  media_real=$(timeout --foreground -s TERM -k 2 "$COMMAND_TIMEOUT_SECONDS" \
+    readlink -f -- "/sys/dev/char/$media_dev" 2>/dev/null || true)
+  case "$media_real" in
+    /sys/devices/platform/*.video-codec/media*)
+      media_nodes+=("$media_node")
+      printf 'node=%s dev=%s sysfs=%s\n' "$media_node" "$media_dev" "$media_real" \
+        >> "$runtime_dir/media-nodes.txt"
+      ;;
+  esac
+done
+if (( ${#encoder_nodes[@]} == 1 )) && [[ -c ${encoder_nodes[0]} ]]; then
+  pass media exact-encoder-node
+else
+  fail media exact-encoder-node
+fi
+if (( ${#decoder_nodes[@]} == 1 )) && [[ -c ${decoder_nodes[0]} ]]; then
+  pass media exact-decoder-node
+else
+  fail media exact-decoder-node
+fi
+if (( ${#media_nodes[@]} == 1 )); then
+  pass media exact-media-node
+else
+  fail media exact-media-node
+fi
+cat "$runtime_dir/encoder.txt" "$runtime_dir/decoder.txt" "$runtime_dir/media-nodes.txt"
+
+v4l2_ctl=missing
+ffmpeg_tool=missing
+gstreamer_tool=missing
+if command -v v4l2-ctl >/dev/null; then
+  v4l2_ctl=present
+fi
+if command -v ffmpeg >/dev/null; then
+  ffmpeg_tool=present
+fi
+if command -v gst-launch-1.0 >/dev/null && command -v gst-inspect-1.0 >/dev/null; then
+  gstreamer_tool=present
+fi
+printf 'v4l2-ctl=%s ffmpeg=%s gstreamer=%s\n' \
+  "$v4l2_ctl" "$ffmpeg_tool" "$gstreamer_tool" > "$runtime_dir/media-tooling.txt"
+cat "$runtime_dir/media-tooling.txt"
+if [[ "$v4l2_ctl" == present && ${#encoder_nodes[@]} == 1 && ${#decoder_nodes[@]} == 1 ]]; then
+  if capture "$runtime_dir/v4l2-encoder.txt" v4l2-ctl \
+      --device "${encoder_nodes[0]}" --all --list-formats-ext; then
+    pass media encoder-query
+  else
+    fail media encoder-query
+  fi
+  if capture "$runtime_dir/v4l2-decoder.txt" v4l2-ctl \
+      --device "${decoder_nodes[0]}" --all --list-formats-ext; then
+    pass media decoder-query
+  else
+    fail media decoder-query
+  fi
+else
+  skip media v4l2-capability-query SKIP_TOOLING
+fi
+if (( failures != media_failures_before )); then
+  media_state=FAIL
+elif [[ "$v4l2_ctl" == present && "$ffmpeg_tool" == present &&
+      "$gstreamer_tool" == present ]]; then
+  media_state=PASS
+else
+  media_state=SKIP_TOOLING
+  skip media active-streaming-preflight SKIP_TOOLING
+fi
+
+usb_failures_before=$failures
+if capture "$runtime_dir/mounts-before.txt" findmnt -rn -o SOURCE,TARGET,FSTYPE,OPTIONS; then
+  pass usb mount-baseline
+else
+  fail usb mount-baseline
+fi
+if record_usb_inventory "$runtime_dir/usb-before.txt"; then
+  pass usb sysfs-inventory
+else
+  fail usb sysfs-inventory
+fi
+if capture "$runtime_dir/lsusb.txt" lsusb; then
+  pass usb lsusb-query
+else
+  fail usb lsusb-query
+fi
+wifi_usb_matches=()
+shopt -s nullglob
+usb_vendor_files=(/sys/bus/usb/devices/*/idVendor)
+shopt -u nullglob
+for vendor_file in "${usb_vendor_files[@]}"; do
+  usb_path=${vendor_file%/idVendor}
+  vendor=$(read_text "$vendor_file" || true)
+  product=$(read_text "$usb_path/idProduct" || true)
+  serial=$(read_text "$usb_path/serial" || true)
+  if [[ "${vendor,,}" == "$EXPECTED_WIFI_VENDOR" &&
+        "${product,,}" == "$EXPECTED_WIFI_PRODUCT" &&
+        "$serial" == "$EXPECTED_WIFI_SERIAL" ]]; then
+    wifi_usb_matches+=("$usb_path")
+  fi
+done
+if (( ${#wifi_usb_matches[@]} == 1 )); then
+  pass usb builtin-wifi-identity
+else
+  fail usb builtin-wifi-identity
+fi
+usb_baseline_sha=$(sha256sum "$runtime_dir/usb-before.txt" | awk '{print $1}')
+printf 'R46H_USB_BASELINE sha256=%s devices=%d\n' "$usb_baseline_sha" \
+  "$(wc -l < "$runtime_dir/usb-before.txt" | tr -d ' ')"
+cat "$runtime_dir/usb-before.txt"
+
+if record_usb_inventory "$runtime_dir/usb-after.txt" &&
+   cmp -s "$runtime_dir/usb-before.txt" "$runtime_dir/usb-after.txt"; then
+  pass usb inventory-stable
+else
+  fail usb inventory-stable
+fi
+if capture "$runtime_dir/mounts-after.txt" findmnt -rn -o SOURCE,TARGET,FSTYPE,OPTIONS &&
+   cmp -s "$runtime_dir/mounts-before.txt" "$runtime_dir/mounts-after.txt"; then
+  pass usb mounts-unchanged
+else
+  fail usb mounts-unchanged
+fi
+if (( failures == usb_failures_before )); then
+  usb_state=PASS
+fi
+
+ext4_after=$(read_text "$EXT4_ERRORS" || true)
+ext4_changed=1
+if [[ "$ext4_before" =~ ^[0-9]+$ && "$ext4_after" =~ ^[0-9]+$ &&
+      "$ext4_before" == "$ext4_after" ]]; then
+  ext4_changed=0
+fi
+dmesg_ring_wrapped=1
+fault_detected=1
+if (( dmesg_before_bytes > 0 )) && capture "$runtime_dir/dmesg-after.txt" dmesg; then
+  dmesg_after_bytes=$(wc -c < "$runtime_dir/dmesg-after.txt" | tr -d ' ')
+  if [[ "$dmesg_after_bytes" =~ ^[0-9]+$ ]] &&
+     (( dmesg_after_bytes >= dmesg_before_bytes )) &&
+     head -c "$dmesg_before_bytes" "$runtime_dir/dmesg-after.txt" |
+       cmp -s "$runtime_dir/dmesg-before.txt" -; then
+    dmesg_ring_wrapped=0
+    tail -c "+$((dmesg_before_bytes + 1))" "$runtime_dir/dmesg-after.txt" \
+      > "$runtime_dir/dmesg-delta.txt"
+    if grep -Eiq "$fault_pattern" "$runtime_dir/dmesg-delta.txt"; then
+      fault_detected=1
+    else
+      fault_detected=0
+    fi
+  fi
+fi
+printf 'R46H_MEDIA_USB_POST ext4_errors_before=%s ext4_errors_after=%s ext4_changed=%s dmesg_ring_wrapped=%s fault_detected=%s\n' \
+  "${ext4_before:-missing}" "${ext4_after:-missing}" "$ext4_changed" \
+  "$dmesg_ring_wrapped" "$fault_detected"
+if (( ext4_changed == 0 && dmesg_ring_wrapped == 0 && fault_detected == 0 )); then
+  pass post kernel-storage
+  post_state=PASS
+else
+  fail post kernel-storage
+fi
+if no_failed_units; then
+  pass identity failed-units-after
+else
+  fail identity failed-units-after
+fi
+
+worker_complete=1
+if (( failures == 0 )); then
+  exit 0
+fi
+worker_reason=checks-failed
+exit 1

@@ -1,0 +1,9 @@
+    <system>
+        <name>psp</name>
+        <fullname>Sony PlayStation Portable</fullname>
+        <path>%ROMPATH%/psp</path>
+        <extension>.cso .CSO .iso .ISO .pbp .PBP</extension>
+        <command label="PPSSPP">/usr/bin/retroarch --config /etc/r46h/retroarch.cfg --appendconfig /etc/r46h/es-de-retroarch.cfg -L /usr/local/libexec/ppsspp_libretro.so %ROM%</command>
+        <platform>psp</platform>
+        <theme>psp</theme>
+    </system>

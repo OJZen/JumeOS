@@ -1,0 +1,998 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+LANG=C
+export PATH LC_ALL LANG
+
+readonly AUDIT_ID=r46h-adaptation-readonly-v0.2
+readonly EXPECTED_RELEASE=6.12.99-r46h-mainline-v0.8-bootloader-handoff
+readonly EXPECTED_ROOT_SOURCE=/dev/mmcblk0p2
+readonly EXPECTED_ROOT_PARTUUID=c9f931c9-02
+readonly EXPECTED_ROOT_UUID=d3130001-46a4-4d56-9001-000000000001
+readonly EXPECTED_WIFI_SERIAL=00E04C8188FF
+readonly EXPECTED_WIFI_MAC=00:e0:4c:81:88:ff
+readonly EXT4_ERRORS=/sys/fs/ext4/mmcblk0p2/errors_count
+readonly LOCK_PATH=/run/r46h-adaptation-readonly.lock
+readonly COMMAND_TIMEOUT_SECONDS=15
+readonly WORKER_TIMEOUT_SECONDS=160
+readonly OUTPUT_TIMEOUT_SECONDS=15
+readonly REQUIRED_SCRIPT_PATH=/run/r46h-adaptation-readonly
+
+runtime_dir=""
+failures=0
+skips=0
+skip_names=()
+dmesg_before_bytes=0
+ext4_before=""
+worker_complete=0
+worker_reason=unexpected-exit
+
+fault_pattern='panfrost.*(^|[^[:alnum:]_])(fault|error|timeout|reset|hang|warning|bug|oops|panic|drm_sched)([^[:alnum:]_]|$)'
+fault_pattern+='|(^|[^[:alnum:]_])(warning|bug|oops|panic)([^[:alnum:]_]|$).*(panfrost|gpu|drm|mmu)'
+fault_pattern+='|(^|[^[:alnum:]_])BUG(:|[[:space:]])|Oops:|kernel panic|Call trace:|cut here'
+fault_pattern+='|drm_sched_job_timedout|drm_sched.*(^|[^[:alnum:]_])(timedout|timeout|hang|fault|error)([^[:alnum:]_]|$)'
+fault_pattern+='|(^|[^[:alnum:]_])(mmu|gpu).*(^|[^[:alnum:]_])(fault|timeout|hang|reset|error)([^[:alnum:]_]|$)'
+fault_pattern+='|mmc.*(I/O error|error[[:space:]]+-[0-9]+|timed out|timeout|CRC|fail(ed|ure)?)'
+fault_pattern+='|I/O error.*mmc'
+fault_pattern+='|(blk_update_request|end_request|blk_print_req_error).*(error|failure)'
+fault_pattern+='|Buffer I/O error'
+fault_pattern+='|JBD2.*(error([ :]|$)|warning|abort|fail(ed|ure)?)'
+fault_pattern+='|EXT4-fs.*(error([ :]|$)|warning|abort|fail(ed|ure)?)'
+fault_pattern+='|synchronous( external)? abort|SError'
+fault_pattern+='|(regulator|clk|clock|iommu).*(^|[^[:alnum:]_])(fault|abort|fatal|error|failed|timeout|timed out)([^[:alnum:]_]|$)'
+fault_pattern+='|(^|[^[:alnum:]_])(fault|abort|fatal|error|failed|timeout|timed out)([^[:alnum:]_]|$).*(regulator|clk|clock|iommu)'
+fault_pattern+='|(drm|vop|dsi|mipi).*(^|[^[:alnum:]_])(fault|fatal|error|failed|timeout|timed out|hang)([^[:alnum:]_]|$)'
+fault_pattern+='|(watchdog.*lockup|soft lockup|hard LOCKUP|rcu.*stall|hung task|task .*blocked for more than)'
+
+usage() {
+  cat <<'EOF'
+usage: r46h-adaptation-readonly [--readonly]
+
+Run the non-mutating R46H Debian 13 adaptation audit. The audit enumerates
+storage, DRM, input, ALSA, power, thermal, USB/Wi-Fi and kernel-module state.
+It does not modeset, page-flip, play/capture audio, sample input events, scan
+Wi-Fi, change controls, load/unload modules, suspend, reboot or power off.
+EOF
+}
+
+inode_id() {
+  stat -c '%d:%i' -- "$1"
+}
+
+remove_supervisor_session() {
+  local path=$1
+  local expected_inode=${2:-}
+  [[ "$path" == /run/r46h-adaptation-supervisor.* &&
+     ! -L "$path" && -d "$path" &&
+     "$(stat -c '%u:%a' -- "$path" 2>/dev/null || true)" == 0:700 ]] || return 1
+  if [[ -n "$expected_inode" ]]; then
+    [[ "$(inode_id "$path" 2>/dev/null || true)" == "$expected_inode" ]] || return 1
+  fi
+  rm -rf -- "$path"
+  [[ ! -e "$path" && ! -L "$path" ]]
+}
+
+remove_supervisor_lock() {
+  local expected_inode=${1:-}
+  [[ "$LOCK_PATH" == /run/r46h-adaptation-readonly.lock &&
+     ! -L "$LOCK_PATH" && -d "$LOCK_PATH" &&
+     "$(stat -c '%u:%a' -- "$LOCK_PATH" 2>/dev/null || true)" == 0:700 ]] || return 1
+  if [[ -n "$expected_inode" ]]; then
+    [[ "$(inode_id "$LOCK_PATH" 2>/dev/null || true)" == "$expected_inode" ]] || return 1
+  fi
+  rmdir -- "$LOCK_PATH"
+  [[ ! -e "$LOCK_PATH" && ! -L "$LOCK_PATH" ]]
+}
+
+supervisor_session_is_empty() {
+  local session_id=$1
+  local session_ids=""
+  session_ids=$(timeout --foreground -s TERM -k 2 5 ps -eo sid= 2>/dev/null) || return 1
+  ! awk -v wanted="$session_id" '$1 == wanted { found=1 } END { exit found ? 0 : 1 }' \
+    <<< "$session_ids"
+}
+
+forward_worker_signal() {
+  local signal_name=$1
+  local worker_process=$2
+  (( worker_process > 0 )) || return 0
+  if kill -"$signal_name" -- "-$worker_process" 2>/dev/null; then
+    return 0
+  fi
+  kill -"$signal_name" -- "$worker_process" 2>/dev/null
+}
+
+# Invoked by the worker EXIT trap; other marked helpers are dispatched through check().
+# shellcheck disable=SC2317
+worker_finalize() {
+  local status=$?
+  local result=fail
+  local skip_summary=none
+  local skip_set_allowed=0
+  trap - EXIT
+  trap '' INT TERM HUP
+  set +e
+  if (( ${#skip_names[@]} > 0 )); then
+    local IFS=,
+    skip_summary=${skip_names[*]}
+  fi
+  case $skip_summary in
+    none|audio:capture-enumeration|modules:exfat-loaded|audio:capture-enumeration,modules:exfat-loaded)
+      skip_set_allowed=1
+      ;;
+  esac
+  if (( worker_complete == 1 && failures == 0 && status == 0 && skip_set_allowed == 1 )); then
+    result=pass
+    worker_reason=checks-complete
+  else
+    if (( skip_set_allowed == 0 )); then
+      worker_reason=unexpected-skip
+    fi
+    if (( status == 0 )); then
+      status=1
+    fi
+  fi
+  printf 'R46H_ADAPT_WORKER_RESULT result=%s failures=%d skips=%d skip_names=%s reason=%s exit_status=%d\n' \
+    "$result" "$failures" "$skips" "$skip_summary" "$worker_reason" "$status"
+  exit "$status"
+}
+
+run_supervisor() {
+  local script_path=""
+  local session_dir=""
+  local session_inode=""
+  local supervisor_log=""
+  local lock_inode=""
+  local lock_created=0
+  local worker_pid=0
+  local signal_status=0
+  local timeout_status=1
+  local replay_status=0
+  local worker_group_gone=1
+  local setup_cleanup=pass
+  local worker_line=""
+  local worker_line_count=0
+  local worker_result=fail
+  local worker_failures=0
+  local worker_skips=0
+  local worker_skip_names=none
+  local worker_reason=worker-no-terminal
+  local worker_exit=1
+  local final_result=fail
+  local final_cleanup=pass
+  local final_reason=supervisor-preflight
+  local final_status=1
+
+  if [[ "$(id -u)" != 0 ]]; then
+    printf 'R46H_ADAPT_AUDIT id=%s mode=readonly result=fail failures=0 skips=0 skip_names=none cleanup=pass reason=not-root worker_timeout=%ss output_timeout=%ss\n' \
+      "$AUDIT_ID" "$WORKER_TIMEOUT_SECONDS" "$OUTPUT_TIMEOUT_SECONDS" >&2
+    return 1
+  fi
+  if [[ "$(findmnt -rn -T /run -o FSTYPE 2>/dev/null || true)" != tmpfs ||
+        -L /run || ! -d /run || "$(stat -c '%u:%a' -- /run 2>/dev/null || true)" != 0:755 ]]; then
+    printf 'R46H_ADAPT_AUDIT id=%s mode=readonly result=fail failures=0 skips=0 skip_names=none cleanup=pass reason=unsafe-run worker_timeout=%ss output_timeout=%ss\n' \
+      "$AUDIT_ID" "$WORKER_TIMEOUT_SECONDS" "$OUTPUT_TIMEOUT_SECONDS" >&2
+    return 1
+  fi
+  script_path=$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || true)
+  if [[ "$script_path" != "$REQUIRED_SCRIPT_PATH" || "${BASH_SOURCE[0]}" != "$REQUIRED_SCRIPT_PATH" ||
+        -L "$REQUIRED_SCRIPT_PATH" || ! -f "$REQUIRED_SCRIPT_PATH" ||
+        "$(stat -c '%u:%a:%h' -- "$REQUIRED_SCRIPT_PATH" 2>/dev/null || true)" != 0:700:1 ]]; then
+    printf 'R46H_ADAPT_AUDIT id=%s mode=readonly result=fail failures=0 skips=0 skip_names=none cleanup=pass reason=unsafe-script-identity worker_timeout=%ss output_timeout=%ss\n' \
+      "$AUDIT_ID" "$WORKER_TIMEOUT_SECONDS" "$OUTPUT_TIMEOUT_SECONDS" >&2
+    return 1
+  fi
+  for supervisor_command in awk chmod env grep mkdir mktemp ps readlink rm rmdir sed setsid sleep stat tail timeout; do
+    if ! command -v "$supervisor_command" >/dev/null; then
+      printf 'R46H_ADAPT_AUDIT id=%s mode=readonly result=fail failures=0 skips=0 skip_names=none cleanup=pass reason=missing-supervisor-command worker_timeout=%ss output_timeout=%ss\n' \
+        "$AUDIT_ID" "$WORKER_TIMEOUT_SECONDS" "$OUTPUT_TIMEOUT_SECONDS" >&2
+      return 1
+    fi
+  done
+
+  trap 'signal_status=130' INT
+  trap 'signal_status=143' TERM
+  trap 'signal_status=129' HUP
+  if ! session_dir=$(mktemp -d /run/r46h-adaptation-supervisor.XXXXXX); then
+    printf 'R46H_ADAPT_AUDIT id=%s mode=readonly result=fail failures=0 skips=0 skip_names=none cleanup=pass reason=session-create-failed worker_timeout=%ss output_timeout=%ss\n' \
+      "$AUDIT_ID" "$WORKER_TIMEOUT_SECONDS" "$OUTPUT_TIMEOUT_SECONDS" >&2
+    return 1
+  fi
+  if ! chmod 0700 "$session_dir" ||
+     ! session_inode=$(inode_id "$session_dir") ||
+     [[ -z "$session_inode" ]]; then
+    remove_supervisor_session "$session_dir" || setup_cleanup=fail
+    printf 'R46H_ADAPT_AUDIT id=%s mode=readonly result=fail failures=0 skips=0 skip_names=none cleanup=%s reason=session-identity-failed worker_timeout=%ss output_timeout=%ss\n' \
+      "$AUDIT_ID" "$setup_cleanup" "$WORKER_TIMEOUT_SECONDS" "$OUTPUT_TIMEOUT_SECONDS" >&2
+    return 1
+  fi
+  supervisor_log="$session_dir/worker.log"
+  if ! : > "$supervisor_log" || ! chmod 0600 "$supervisor_log"; then
+    remove_supervisor_session "$session_dir" "$session_inode" || setup_cleanup=fail
+    printf 'R46H_ADAPT_AUDIT id=%s mode=readonly result=fail failures=0 skips=0 skip_names=none cleanup=%s reason=log-create-failed worker_timeout=%ss output_timeout=%ss\n' \
+      "$AUDIT_ID" "$setup_cleanup" "$WORKER_TIMEOUT_SECONDS" "$OUTPUT_TIMEOUT_SECONDS" >&2
+    return 1
+  fi
+  if ! mkdir -m 0700 -- "$LOCK_PATH"; then
+    remove_supervisor_session "$session_dir" "$session_inode" || setup_cleanup=fail
+    printf 'R46H_ADAPT_AUDIT id=%s mode=readonly result=fail failures=0 skips=0 skip_names=none cleanup=%s reason=already-running worker_timeout=%ss output_timeout=%ss\n' \
+      "$AUDIT_ID" "$setup_cleanup" "$WORKER_TIMEOUT_SECONDS" "$OUTPUT_TIMEOUT_SECONDS" >&2
+    return 1
+  fi
+  lock_created=1
+  if ! lock_inode=$(inode_id "$LOCK_PATH") || [[ -z "$lock_inode" ]]; then
+    remove_supervisor_lock || setup_cleanup=fail
+    remove_supervisor_session "$session_dir" "$session_inode" || setup_cleanup=fail
+    printf 'R46H_ADAPT_AUDIT id=%s mode=readonly result=fail failures=0 skips=0 skip_names=none cleanup=%s reason=lock-identity-failed worker_timeout=%ss output_timeout=%ss\n' \
+      "$AUDIT_ID" "$setup_cleanup" "$WORKER_TIMEOUT_SECONDS" "$OUTPUT_TIMEOUT_SECONDS" >&2
+    return 1
+  fi
+
+  if (( signal_status != 0 )); then
+    remove_supervisor_lock "$lock_inode" || setup_cleanup=fail
+    remove_supervisor_session "$session_dir" "$session_inode" || setup_cleanup=fail
+    printf 'R46H_ADAPT_AUDIT id=%s mode=readonly result=fail failures=0 skips=0 skip_names=none cleanup=%s reason=supervisor-signal worker_timeout=%ss output_timeout=%ss\n' \
+      "$AUDIT_ID" "$setup_cleanup" "$WORKER_TIMEOUT_SECONDS" "$OUTPUT_TIMEOUT_SECONDS" >&2
+    return "$signal_status"
+  fi
+
+  printf 'R46H_ADAPT_SUPERVISOR id=%s stage=running worker_timeout=%ss output_timeout=%ss\n' \
+    "$AUDIT_ID" "$WORKER_TIMEOUT_SECONDS" "$OUTPUT_TIMEOUT_SECONDS"
+  trap 'signal_status=130; forward_worker_signal INT "$worker_pid" || true' INT
+  trap 'signal_status=143; forward_worker_signal TERM "$worker_pid" || true' TERM
+  trap 'signal_status=129; forward_worker_signal HUP "$worker_pid" || true' HUP
+  setsid timeout -s TERM -k 5 "$WORKER_TIMEOUT_SECONDS" \
+    env -i PATH="$PATH" LC_ALL=C LANG=C R46H_ADAPT_SUPERVISED=1 \
+      R46H_ADAPT_SESSION_DIR="$session_dir" R46H_ADAPT_SESSION_INODE="$session_inode" \
+      /bin/bash "$script_path" --readonly > "$supervisor_log" 2>&1 &
+  worker_pid=$!
+  case $signal_status in
+    129) forward_worker_signal HUP "$worker_pid" || true ;;
+    130) forward_worker_signal INT "$worker_pid" || true ;;
+    143) forward_worker_signal TERM "$worker_pid" || true ;;
+  esac
+  set +e
+  wait "$worker_pid"
+  timeout_status=$?
+  set -e
+  trap '' INT TERM HUP
+  for ((stop_wait=0; stop_wait<50; stop_wait++)); do
+    if ! kill -0 -- "-$worker_pid" 2>/dev/null; then
+      break
+    fi
+    sleep 0.1
+  done
+  if kill -0 -- "-$worker_pid" 2>/dev/null; then
+    kill -KILL -- "-$worker_pid" 2>/dev/null || true
+    sleep 0.1
+  fi
+  wait "$worker_pid" 2>/dev/null || true
+  if kill -0 -- "-$worker_pid" 2>/dev/null ||
+     ! supervisor_session_is_empty "$worker_pid"; then
+    worker_group_gone=0
+  fi
+
+  worker_line_count=$(grep -c '^R46H_ADAPT_WORKER_RESULT ' "$supervisor_log" 2>/dev/null || true)
+  worker_line=$(grep '^R46H_ADAPT_WORKER_RESULT ' "$supervisor_log" 2>/dev/null | tail -n 1 || true)
+  if [[ "$worker_line_count" == 1 &&
+        "$worker_line" =~ ^R46H_ADAPT_WORKER_RESULT[[:space:]]result=(pass|fail)[[:space:]]failures=([0-9]+)[[:space:]]skips=([0-9]+)[[:space:]]skip_names=([a-z0-9:,-]+)[[:space:]]reason=([a-z0-9-]+)[[:space:]]exit_status=([0-9]+)$ ]]; then
+    worker_result=${BASH_REMATCH[1]}
+    worker_failures=${BASH_REMATCH[2]}
+    worker_skips=${BASH_REMATCH[3]}
+    worker_skip_names=${BASH_REMATCH[4]}
+    worker_reason=${BASH_REMATCH[5]}
+    worker_exit=${BASH_REMATCH[6]}
+  fi
+
+  if (( worker_group_gone == 0 )); then
+    final_reason=worker-stop-failed
+    final_cleanup=fail
+    final_status=1
+  elif (( signal_status != 0 )); then
+    final_reason=supervisor-signal
+    final_status=$signal_status
+  elif [[ "$timeout_status" == 124 || "$timeout_status" == 137 ]]; then
+    final_reason=session-timeout
+    final_status=124
+  elif [[ "$worker_line_count" != 1 ]]; then
+    final_reason=worker-terminal-invalid
+  elif [[ "$worker_result" == pass && "$worker_failures" == 0 &&
+          "$worker_exit" == 0 && "$timeout_status" == 0 ]]; then
+    final_result=pass
+    final_reason=checks-complete
+    final_status=0
+  else
+    final_reason=$worker_reason
+    final_status=1
+  fi
+
+  set +e
+  timeout --foreground -s TERM -k 2 "$OUTPUT_TIMEOUT_SECONDS" \
+    sed -u '/^R46H_ADAPT_WORKER_RESULT /d' "$supervisor_log"
+  replay_status=$?
+  set -e
+  if (( replay_status != 0 )); then
+    final_result=fail
+    final_reason=supervisor-output-failed
+    final_status=1
+  fi
+  if (( worker_group_gone == 1 )); then
+    if ! remove_supervisor_session "$session_dir" "$session_inode"; then
+      final_result=fail
+      final_cleanup=fail
+      final_reason=supervisor-cleanup-failed
+      final_status=1
+    fi
+    if (( lock_created != 1 )) || ! remove_supervisor_lock "$lock_inode"; then
+      final_result=fail
+      final_cleanup=fail
+      final_reason=supervisor-cleanup-failed
+      final_status=1
+    fi
+  fi
+
+  printf 'R46H_ADAPT_AUDIT id=%s mode=readonly result=%s failures=%d skips=%d skip_names=%s cleanup=%s reason=%s worker_timeout=%ss output_timeout=%ss\n' \
+    "$AUDIT_ID" "$final_result" "$worker_failures" "$worker_skips" "$worker_skip_names" \
+    "$final_cleanup" "$final_reason" "$WORKER_TIMEOUT_SECONDS" "$OUTPUT_TIMEOUT_SECONDS"
+  return "$final_status"
+}
+
+pass() {
+  printf 'R46H_ADAPT_CHECK group=%s name=%s result=pass\n' "$1" "$2"
+}
+
+fail() {
+  printf 'R46H_ADAPT_CHECK group=%s name=%s result=fail\n' "$1" "$2"
+  failures=$((failures + 1))
+}
+
+skip() {
+  printf 'R46H_ADAPT_CHECK group=%s name=%s result=skip reason=%s\n' "$1" "$2" "$3"
+  skips=$((skips + 1))
+  skip_names+=("$1:$2")
+}
+
+check() {
+  local group=$1
+  local name=$2
+  shift 2
+  if "$@"; then
+    pass "$group" "$name"
+  else
+    fail "$group" "$name"
+  fi
+}
+
+evidence() {
+  local group=$1
+  local name=$2
+  local path=$3
+  printf 'R46H_ADAPT_EVIDENCE group=%s name=%s begin\n' "$group" "$name"
+  if [[ ! -L "$path" && -f "$path" ]]; then
+    sed -n '1,240p' "$path"
+  else
+    printf 'evidence-file=missing\n'
+  fi
+  printf 'R46H_ADAPT_EVIDENCE group=%s name=%s end\n' "$group" "$name"
+}
+
+capture() {
+  local path=$1
+  shift
+  timeout --foreground -s TERM -k 2 "$COMMAND_TIMEOUT_SECONDS" "$@" > "$path" 2>&1
+}
+
+# shellcheck disable=SC2317
+not_mountpoint() {
+  ! timeout --foreground -s TERM -k 2 5 mountpoint -q -- "$1"
+}
+
+# shellcheck disable=SC2317
+source_unmounted_anywhere() {
+  local block_name=${1#/dev/}
+  local major_minor=""
+  local output=""
+  major_minor=$(timeout --foreground -s TERM -k 2 5 cat "/sys/class/block/$block_name/dev" 2>/dev/null || true)
+  [[ "$major_minor" =~ ^[0-9]+:[0-9]+$ ]] || return 1
+  output=$(timeout --foreground -s TERM -k 2 5 findmnt -rn -o MAJ:MIN,SOURCE 2>/dev/null) || return 1
+  ! grep -Eq "^${major_minor}([[:space:]]|$)" <<< "$output"
+}
+
+# shellcheck disable=SC2317
+no_failed_units() {
+  local output=""
+  if ! output=$(timeout --foreground -s TERM -k 2 5 systemctl --failed --no-legend --plain 2>/dev/null); then
+    return 1
+  fi
+  [[ -z "$output" ]]
+}
+
+# shellcheck disable=SC2317
+driver_is() {
+  local node=$1
+  local expected=$2
+  [[ -e "$node/device/driver" ]] &&
+    [[ "$(basename "$(timeout --foreground -s TERM -k 2 5 readlink -f "$node/device/driver")")" == "$expected" ]]
+}
+
+# shellcheck disable=SC2317
+input_name_present() {
+  grep -Fqx "N: Name=\"$1\"" /proc/bus/input/devices
+}
+
+# shellcheck disable=SC2317
+input_capability_nonzero() {
+  local name=$1
+  local capability=$2
+  awk -v wanted="N: Name=\"$name\"" -v prefix="B: $capability=" '
+    $0 == wanted { in_device=1; next }
+    in_device && $0 == "" { in_device=0 }
+    in_device && index($0, prefix) == 1 {
+      value=substr($0, length(prefix) + 1)
+      gsub(/[ 0]/, "", value)
+      if (value ~ /[1-9a-fA-F]/) found=1
+    }
+    END { exit found ? 0 : 1 }
+  ' /proc/bus/input/devices
+}
+
+# shellcheck disable=SC2317
+module_matches_release() {
+  local module=$1
+  local vermagic
+  vermagic=$(timeout --foreground -s TERM -k 2 5 modinfo -F vermagic "$module" 2>/dev/null || true)
+  [[ "$vermagic" == "$EXPECTED_RELEASE "* ]]
+}
+
+# shellcheck disable=SC2317
+module_is_loaded() {
+  local module=$1
+  awk -v wanted="$module" '$1 == wanted { found=1 } END { exit found ? 0 : 1 }' /proc/modules
+}
+
+# shellcheck disable=SC2317
+power_attr_is_integer() {
+  local path=$1
+  local value
+  value=$(timeout --foreground -s TERM -k 2 5 cat "$path" 2>/dev/null || true)
+  [[ "$value" =~ ^-?[0-9]+$ ]]
+}
+
+# shellcheck disable=SC2317
+integer_file_in_range() {
+  local path=$1
+  local minimum=$2
+  local maximum=$3
+  local value
+  value=$(timeout --foreground -s TERM -k 2 5 cat "$path" 2>/dev/null || true)
+  [[ "$value" =~ ^[0-9]+$ ]] && (( value >= minimum && value <= maximum ))
+}
+
+# shellcheck disable=SC2317
+frequency_set_matches() {
+  local path=$1
+  local expected=$2
+  [[ -r "$path" ]] || return 1
+  awk -v expected="$expected" '
+    BEGIN {
+      expected_count=split(expected, items, " ")
+      for (i=1; i<=expected_count; i++) wanted[items[i]]=1
+    }
+    {
+      for (i=1; i<=NF; i++) {
+        if (!wanted[$i] || seen[$i]++) bad=1
+        count++
+      }
+    }
+    END { exit bad || count != expected_count ? 1 : 0 }
+  ' "$path"
+}
+
+case ${1:---readonly} in
+  --readonly) ;;
+  -h|--help) usage; exit 0 ;;
+  *) usage >&2; exit 2 ;;
+esac
+[[ $# -le 1 ]] || { usage >&2; exit 2; }
+
+if [[ ${R46H_ADAPT_SUPERVISED:-0} != 1 ]]; then
+  if run_supervisor; then
+    exit 0
+  else
+    exit $?
+  fi
+fi
+
+trap worker_finalize EXIT
+trap 'worker_reason=signal-int; exit 130' INT
+trap 'worker_reason=signal-term; exit 143' TERM
+trap 'worker_reason=signal-hup; exit 129' HUP
+
+[[ "$(id -u)" == 0 ]] || {
+  worker_reason=not-root
+  printf 'R46H_ADAPT_WORKER stage=preflight result=fail reason=not-root\n' >&2
+  exit 1
+}
+[[ "$(findmnt -rn -T /run -o FSTYPE 2>/dev/null)" == tmpfs ]] || {
+  worker_reason=run-not-tmpfs
+  printf 'R46H_ADAPT_WORKER stage=preflight result=fail reason=run-not-tmpfs\n' >&2
+  exit 1
+}
+[[ ! -L /run && -d /run && "$(stat -c '%u:%a' -- /run)" == 0:755 ]] || {
+  worker_reason=unsafe-run-directory
+  printf 'R46H_ADAPT_WORKER stage=preflight result=fail reason=unsafe-run-directory\n' >&2
+  exit 1
+}
+[[ -n ${R46H_ADAPT_SESSION_DIR:-} && -n ${R46H_ADAPT_SESSION_INODE:-} &&
+   "$R46H_ADAPT_SESSION_DIR" == /run/r46h-adaptation-supervisor.* &&
+   ! -L "$R46H_ADAPT_SESSION_DIR" && -d "$R46H_ADAPT_SESSION_DIR" &&
+   "$(stat -c '%u:%a' -- "$R46H_ADAPT_SESSION_DIR" 2>/dev/null || true)" == 0:700 &&
+   "$(inode_id "$R46H_ADAPT_SESSION_DIR" 2>/dev/null || true)" == "$R46H_ADAPT_SESSION_INODE" ]] || {
+  worker_reason=unsafe-supervisor-session
+  printf 'R46H_ADAPT_WORKER stage=preflight result=fail reason=unsafe-supervisor-session\n' >&2
+  exit 1
+}
+
+trap '' INT TERM HUP
+runtime_dir="$R46H_ADAPT_SESSION_DIR/worker"
+if ! mkdir -m 0700 -- "$runtime_dir"; then
+  trap 'worker_reason=signal-int; exit 130' INT
+  trap 'worker_reason=signal-term; exit 143' TERM
+  trap 'worker_reason=signal-hup; exit 129' HUP
+  worker_reason=worker-runtime-create-failed
+  printf 'R46H_ADAPT_WORKER stage=preflight result=fail reason=worker-runtime-create-failed\n' >&2
+  exit 1
+fi
+trap 'worker_reason=signal-int; exit 130' INT
+trap 'worker_reason=signal-term; exit 143' TERM
+trap 'worker_reason=signal-hup; exit 129' HUP
+
+for evidence_name in \
+  aplay.txt arecord.txt amixer.txt backlight.txt dmesg-after.txt dmesg-before.txt \
+  dmesg-delta.txt device-tree.txt gpu-devfreq.txt input.txt iw.txt lsblk.txt lsusb.txt \
+  media.txt modetest.txt performance.txt power.txt rfkill.txt thermal.txt udev-input.txt; do
+  : > "$runtime_dir/$evidence_name"
+done
+
+printf 'R46H_ADAPT_WORKER id=%s mode=readonly stage=start kernel=%s\n' \
+  "$AUDIT_ID" "$(uname -r)"
+
+required_commands=(
+  amixer aplay arecord awk basename cat chmod cmp dmesg findmnt grep head
+  iw lsblk lsusb mktemp modetest modinfo mountpoint readlink rfkill rm sed sleep
+  stat systemctl tail timeout tr udevadm wc mkdir rmdir
+)
+for command_name in "${required_commands[@]}"; do
+  check preflight "command-$command_name" command -v "$command_name"
+done
+if (( failures != 0 )); then
+  worker_complete=1
+  worker_reason=missing-command
+  exit 1
+fi
+
+check system debian13 grep -Fqx 'VERSION_ID="13"' /etc/os-release
+check system kernel test "$(uname -r)" = "$EXPECTED_RELEASE"
+check system pid1 test "$(cat /proc/1/comm)" = systemd
+check system failed-units no_failed_units
+check system firstboot-marker grep -Fqx \
+  'release=debian13-p2-mvp-v0.1' /var/lib/r46h/firstboot-complete
+board_model=""
+if [[ -r /proc/device-tree/model ]]; then
+  board_model=$(tr -d '\000' < /proc/device-tree/model)
+fi
+if [[ -r /proc/device-tree/compatible ]]; then
+  tr '\000' '\n' < /proc/device-tree/compatible > "$runtime_dir/device-tree.txt"
+fi
+check system board-model test "$board_model" = 'GameConsole R46H'
+check system compatible-r46h grep -Fqx rockchip,rk3326-r46h-linux "$runtime_dir/device-tree.txt"
+check system compatible-rk3326 grep -Fqx rockchip,rk3326 "$runtime_dir/device-tree.txt"
+cpu_count=$(grep -Ec '^processor[[:space:]]*:' /proc/cpuinfo 2>/dev/null || true)
+check system four-cpus test "$cpu_count" = 4
+evidence system device-tree "$runtime_dir/device-tree.txt"
+
+root_source=$(timeout --foreground -s TERM -k 2 5 findmnt -rn -o SOURCE / 2>/dev/null || true)
+root_partuuid=$(timeout --foreground -s TERM -k 2 5 findmnt -rn -o PARTUUID / 2>/dev/null || true)
+root_uuid=$(timeout --foreground -s TERM -k 2 5 findmnt -rn -o UUID / 2>/dev/null || true)
+root_fstype=$(timeout --foreground -s TERM -k 2 5 findmnt -rn -o FSTYPE / 2>/dev/null || true)
+check storage root-source test "$root_source" = "$EXPECTED_ROOT_SOURCE"
+check storage root-partuuid test "$root_partuuid" = "$EXPECTED_ROOT_PARTUUID"
+check storage root-uuid test "$root_uuid" = "$EXPECTED_ROOT_UUID"
+check storage root-fstype test "$root_fstype" = ext4
+check storage boot-unmounted not_mountpoint /boot
+check storage roms-unmounted not_mountpoint /roms
+check storage p1-unmounted-anywhere source_unmounted_anywhere /dev/mmcblk0p1
+check storage p3-unmounted-anywhere source_unmounted_anywhere /dev/mmcblk0p3
+
+if capture "$runtime_dir/lsblk.txt" lsblk -b -o NAME,MAJ:MIN,SIZE,RO,TYPE,FSTYPE,UUID,PARTUUID,MOUNTPOINTS /dev/mmcblk0; then
+  pass storage lsblk
+else
+  fail storage lsblk
+fi
+evidence storage lsblk "$runtime_dir/lsblk.txt"
+
+ext4_before=$(cat "$EXT4_ERRORS" 2>/dev/null || true)
+if [[ "$ext4_before" =~ ^[0-9]+$ && "$ext4_before" -eq 0 ]]; then
+  pass storage ext4-errors-before
+else
+  fail storage ext4-errors-before
+fi
+
+if capture "$runtime_dir/dmesg-before.txt" dmesg; then
+  dmesg_before_bytes=$(wc -c < "$runtime_dir/dmesg-before.txt" | tr -d ' ')
+fi
+if [[ "$dmesg_before_bytes" =~ ^[1-9][0-9]*$ ]]; then
+  pass kernel dmesg-before
+else
+  fail kernel dmesg-before
+  dmesg_before_bytes=0
+fi
+
+cpu_policy=/sys/devices/system/cpu/cpufreq/policy0
+check performance cpu-policy test -d "$cpu_policy"
+check performance cpu-driver grep -Fqx cpufreq-dt "$cpu_policy/scaling_driver"
+check performance cpu-related-cpus grep -Eq '^0[[:space:]]+1[[:space:]]+2[[:space:]]+3$' \
+  "$cpu_policy/related_cpus"
+check performance cpu-upstream-opps frequency_set_matches \
+  "$cpu_policy/scaling_available_frequencies" '600000 816000 1008000 1200000 1296000'
+check performance cpu-current-frequency integer_file_in_range \
+  "$cpu_policy/scaling_cur_freq" 600000 1296000
+for cpu_attr in scaling_driver scaling_governor scaling_available_frequencies \
+  scaling_cur_freq scaling_min_freq scaling_max_freq cpuinfo_min_freq cpuinfo_max_freq \
+  related_cpus; do
+  if [[ -r "$cpu_policy/$cpu_attr" ]]; then
+    printf '%s=%s\n' "$cpu_attr" "$(cat "$cpu_policy/$cpu_attr")" \
+      >> "$runtime_dir/performance.txt"
+  fi
+done
+evidence performance cpu "$runtime_dir/performance.txt"
+
+gpu_devfreqs=()
+shopt -s nullglob
+devfreq_nodes=(/sys/class/devfreq/*)
+shopt -u nullglob
+for devfreq_node in "${devfreq_nodes[@]}"; do
+  if driver_is "$devfreq_node" panfrost; then
+    gpu_devfreqs+=("$devfreq_node")
+  fi
+done
+if (( ${#gpu_devfreqs[@]} == 1 )); then
+  pass performance gpu-devfreq
+  gpu_devfreq=${gpu_devfreqs[0]}
+else
+  fail performance gpu-devfreq
+  gpu_devfreq=/sys/class/devfreq/r46h-missing-gpu
+fi
+check performance gpu-upstream-opps frequency_set_matches \
+  "$gpu_devfreq/available_frequencies" '200000000 300000000 400000000 480000000'
+check performance gpu-current-frequency integer_file_in_range \
+  "$gpu_devfreq/cur_freq" 200000000 480000000
+for gpu_attr in available_frequencies cur_freq min_freq max_freq governor; do
+  if [[ -r "$gpu_devfreq/$gpu_attr" ]]; then
+    printf '%s=%s\n' "$gpu_attr" "$(cat "$gpu_devfreq/$gpu_attr")" \
+      >> "$runtime_dir/gpu-devfreq.txt"
+  fi
+done
+evidence performance gpu "$runtime_dir/gpu-devfreq.txt"
+
+check drm card0-node test -c /dev/dri/card0
+check drm card1-node test -c /dev/dri/card1
+check drm render-node test -c /dev/dri/renderD128
+check drm rockchip-driver driver_is /sys/class/drm/card0 rockchip-drm
+check drm panfrost-card-driver driver_is /sys/class/drm/card1 panfrost
+check drm panfrost-render-driver driver_is /sys/class/drm/renderD128 panfrost
+check drm dsi-connected grep -Fqx connected /sys/class/drm/card0-DSI-1/status
+check drm dsi-enabled grep -Fqx enabled /sys/class/drm/card0-DSI-1/enabled
+check drm dsi-mode grep -Fqx 1024x768 /sys/class/drm/card0-DSI-1/modes
+check drm fb-size grep -Fqx 1024,768 /sys/class/graphics/fb0/virtual_size
+check drm fb-depth grep -Fqx 32 /sys/class/graphics/fb0/bits_per_pixel
+if capture "$runtime_dir/modetest.txt" modetest -M rockchip -c -e -p; then
+  pass drm modetest-query
+else
+  fail drm modetest-query
+fi
+check drm modetest-connected grep -Eqi 'DSI-1.*connected|connected.*DSI-1' "$runtime_dir/modetest.txt"
+check drm modetest-mode grep -Fq 1024x768 "$runtime_dir/modetest.txt"
+evidence drm modetest "$runtime_dir/modetest.txt"
+
+if grep -E '^(N: Name=|H: Handlers=|B: (EV|KEY|ABS)=)' /proc/bus/input/devices \
+    > "$runtime_dir/input.txt"; then
+  pass input inventory
+else
+  fail input inventory
+fi
+evidence input inventory "$runtime_dir/input.txt"
+for input_name in pwm-vibrator 'rk805 pwrkey' adc-joystick gpio-keys gpio-keys-vol 'rk817_int Headphones'; do
+  check input "device-${input_name// /-}" input_name_present "$input_name"
+done
+check input joystick-abs input_capability_nonzero adc-joystick ABS
+check input gamepad-keys input_capability_nonzero gpio-keys KEY
+event_count=0
+shopt -s nullglob
+event_nodes=(/dev/input/event*)
+shopt -u nullglob
+for event_node in "${event_nodes[@]}"; do
+  if [[ -c "$event_node" ]] && timeout --foreground -s TERM -k 2 5 \
+      udevadm info --query=property --name="$event_node" \
+      >> "$runtime_dir/udev-input.txt" 2>&1; then
+    event_count=$((event_count + 1))
+  fi
+done
+if (( event_count >= 6 )); then
+  pass input event-nodes
+else
+  fail input event-nodes
+fi
+evidence input udev "$runtime_dir/udev-input.txt"
+
+check media media-node test -c /dev/media0
+check media encoder-node test -c /dev/video0
+check media decoder-node test -c /dev/video1
+for video_node in video0 video1; do
+  if [[ -r "/sys/class/video4linux/$video_node/name" ]]; then
+    printf '%s=%s\n' "$video_node" "$(cat "/sys/class/video4linux/$video_node/name")" \
+      >> "$runtime_dir/media.txt"
+  fi
+done
+check media encoder-name grep -Eqi '^video0=.*px30.*vpu.*enc' "$runtime_dir/media.txt"
+check media decoder-name grep -Eqi '^video1=.*px30.*vpu.*dec' "$runtime_dir/media.txt"
+evidence media hantro "$runtime_dir/media.txt"
+
+alsa_ready=0
+for ((alsa_wait=0; alsa_wait<15; alsa_wait++)); do
+  if grep -Fq rk817int /proc/asound/cards 2>/dev/null; then
+    alsa_ready=1
+    break
+  fi
+  sleep 1
+done
+if (( alsa_ready == 1 )); then
+  pass audio card-ready
+else
+  fail audio card-ready
+fi
+alsa_card=$(awk '/\[rk817int[[:space:]]*\]/{print $1; exit}' /proc/asound/cards 2>/dev/null || true)
+if [[ "$alsa_card" =~ ^[0-9]+$ ]]; then
+  pass audio card-index
+else
+  fail audio card-index
+  alsa_card=0
+fi
+if capture "$runtime_dir/aplay.txt" aplay -l; then
+  pass audio playback-enumeration
+else
+  fail audio playback-enumeration
+fi
+check audio playback-rk817 grep -Fq rk817_int "$runtime_dir/aplay.txt"
+evidence audio playback "$runtime_dir/aplay.txt"
+if capture "$runtime_dir/arecord.txt" arecord -l && grep -Fq rk817_int "$runtime_dir/arecord.txt"; then
+  pass audio capture-enumeration
+else
+  skip audio capture-enumeration not-release-gate
+fi
+evidence audio capture "$runtime_dir/arecord.txt"
+if capture "$runtime_dir/amixer.txt" amixer -c "$alsa_card" scontrols; then
+  pass audio mixer-enumeration
+else
+  fail audio mixer-enumeration
+fi
+check audio mixer-master grep -Fq "Simple mixer control 'Master',0" "$runtime_dir/amixer.txt"
+check audio mixer-playback-mux grep -Fq "Simple mixer control 'Playback Mux',0" "$runtime_dir/amixer.txt"
+evidence audio mixer "$runtime_dir/amixer.txt"
+check audio alsa-restore-masked test \
+  "$(timeout --foreground -s TERM -k 2 5 systemctl is-enabled alsa-restore.service 2>/dev/null || true)" = masked
+check audio alsa-state-masked test \
+  "$(timeout --foreground -s TERM -k 2 5 systemctl is-enabled alsa-state.service 2>/dev/null || true)" = masked
+
+battery=/sys/class/power_supply/rk817-battery
+charger=/sys/class/power_supply/rk817-charger
+check power battery-present test -d "$battery"
+check power charger-present test -d "$charger"
+check power battery-type grep -Fqx Battery "$battery/type"
+check power charger-type grep -Fqx USB "$charger/type"
+check power battery-online power_attr_is_integer "$battery/present"
+check power charger-online power_attr_is_integer "$charger/online"
+battery_voltage=$(cat "$battery/voltage_avg" 2>/dev/null || true)
+if [[ "$battery_voltage" =~ ^[0-9]+$ ]] &&
+   (( battery_voltage >= 3300000 && battery_voltage <= 4500000 )); then
+  pass power battery-voltage-plausible
+else
+  fail power battery-voltage-plausible
+fi
+for supply in "$battery" "$charger"; do
+  if [[ -r "$supply/uevent" ]]; then
+    printf 'FILE=%s\n' "$supply/uevent" >> "$runtime_dir/power.txt"
+    cat "$supply/uevent" >> "$runtime_dir/power.txt"
+  fi
+done
+evidence power supplies "$runtime_dir/power.txt"
+
+thermal_count=0
+shopt -s nullglob
+thermal_zones=(/sys/class/thermal/thermal_zone*)
+shopt -u nullglob
+for zone in "${thermal_zones[@]}"; do
+  zone_type=$(cat "$zone/type" 2>/dev/null || true)
+  zone_temp=$(cat "$zone/temp" 2>/dev/null || true)
+  printf '%s type=%s temp=%s\n' "$(basename "$zone")" "$zone_type" "$zone_temp" \
+    >> "$runtime_dir/thermal.txt"
+  if [[ "$zone_temp" =~ ^-?[0-9]+$ ]] && (( zone_temp >= 0 && zone_temp <= 120000 )); then
+    thermal_count=$((thermal_count + 1))
+  fi
+done
+if (( thermal_count > 0 )); then
+  pass thermal plausible-zones
+else
+  fail thermal plausible-zones
+fi
+check thermal soc-zone grep -Eq 'type=soc-thermal([[:space:]]|$)' "$runtime_dir/thermal.txt"
+check thermal gpu-zone grep -Eq 'type=gpu-thermal([[:space:]]|$)' "$runtime_dir/thermal.txt"
+evidence thermal zones "$runtime_dir/thermal.txt"
+
+backlight_count=0
+shopt -s nullglob
+backlights=(/sys/class/backlight/*)
+shopt -u nullglob
+for backlight in "${backlights[@]}"; do
+  brightness=$(cat "$backlight/brightness" 2>/dev/null || true)
+  max_brightness=$(cat "$backlight/max_brightness" 2>/dev/null || true)
+  printf '%s brightness=%s max_brightness=%s\n' "$(basename "$backlight")" \
+    "$brightness" "$max_brightness" >> "$runtime_dir/backlight.txt"
+  if [[ "$brightness" =~ ^[0-9]+$ && "$max_brightness" =~ ^[1-9][0-9]*$ ]] &&
+     (( brightness <= max_brightness )); then
+    backlight_count=$((backlight_count + 1))
+  fi
+done
+if (( backlight_count == 1 )); then
+  pass drm backlight-state
+else
+  fail drm backlight-state
+fi
+evidence drm backlight "$runtime_dir/backlight.txt"
+
+usb_matches=()
+shopt -s nullglob
+usb_vendor_files=(/sys/bus/usb/devices/*/idVendor)
+shopt -u nullglob
+for vendor_file in "${usb_vendor_files[@]}"; do
+  usb_path=${vendor_file%/idVendor}
+  vendor=$(cat "$vendor_file" 2>/dev/null || true)
+  product=$(cat "$usb_path/idProduct" 2>/dev/null || true)
+  if [[ "${vendor,,}" == 0bda && "${product,,}" == 8179 ]]; then
+    usb_matches+=("$usb_path")
+  fi
+done
+if (( ${#usb_matches[@]} == 1 )); then
+  pass wireless usb-device
+  wifi_usb=${usb_matches[0]}
+else
+  fail wireless usb-device
+  wifi_usb=""
+fi
+wifi_serial=""
+if [[ -n "$wifi_usb" ]]; then
+  wifi_serial=$(cat "$wifi_usb/serial" 2>/dev/null || true)
+fi
+check wireless usb-serial test "$wifi_serial" = "$EXPECTED_WIFI_SERIAL"
+if capture "$runtime_dir/lsusb.txt" lsusb; then
+  pass wireless lsusb
+else
+  fail wireless lsusb
+fi
+check wireless lsusb-realtek grep -Eqi '0bda:8179.*802\.11n' "$runtime_dir/lsusb.txt"
+evidence wireless usb "$runtime_dir/lsusb.txt"
+
+wifi_ifaces=()
+shopt -s nullglob
+wlan_paths=(/sys/class/net/wlan*)
+shopt -u nullglob
+wifi_usb_real=""
+if [[ -n "$wifi_usb" ]]; then
+  wifi_usb_real=$(readlink -f "$wifi_usb" 2>/dev/null || true)
+fi
+for wlan_path in "${wlan_paths[@]}"; do
+  wlan_device=$(readlink -f "$wlan_path/device" 2>/dev/null || true)
+  if [[ -n "$wifi_usb_real" && "$wlan_device" == "$wifi_usb_real/"* ]]; then
+    wifi_ifaces+=("$(basename "$wlan_path")")
+  fi
+done
+if (( ${#wifi_ifaces[@]} == 1 )); then
+  pass wireless interface
+  wifi_iface=${wifi_ifaces[0]}
+else
+  fail wireless interface
+  wifi_iface=""
+fi
+wifi_mac=$(cat "/sys/class/net/$wifi_iface/address" 2>/dev/null || true)
+check wireless stable-mac test "${wifi_mac,,}" = "$EXPECTED_WIFI_MAC"
+check wireless driver driver_is "/sys/class/net/$wifi_iface" rtl8xxxu
+if capture "$runtime_dir/iw.txt" iw dev; then
+  pass wireless iw-query
+else
+  fail wireless iw-query
+fi
+check wireless iw-interface grep -Eq "^[[:space:]]*Interface[[:space:]]+$wifi_iface$" "$runtime_dir/iw.txt"
+evidence wireless iw "$runtime_dir/iw.txt"
+rfkill_query_ok=0
+if capture "$runtime_dir/rfkill.txt" rfkill list; then
+  pass wireless rfkill-query
+  rfkill_query_ok=1
+else
+  fail wireless rfkill-query
+fi
+if (( rfkill_query_ok == 0 )); then
+  fail wireless rfkill-unblocked
+elif grep -Eqi '(Soft|Hard) blocked:[[:space:]]+yes' "$runtime_dir/rfkill.txt"; then
+  fail wireless rfkill-unblocked
+else
+  pass wireless rfkill-unblocked
+fi
+evidence wireless rfkill "$runtime_dir/rfkill.txt"
+
+for module in rtl8xxxu rk817_charger hantro_vpu; do
+  check modules "$module-vermagic" module_matches_release "$module"
+  check modules "$module-loaded" module_is_loaded "$module"
+done
+check modules exfat-vermagic module_matches_release exfat
+if module_is_loaded exfat; then
+  pass modules exfat-loaded
+else
+  skip modules exfat-loaded p3-unmounted
+fi
+check modules realtek-firmware test -f /lib/firmware/rtlwifi/rtl8188eufw.bin
+
+sleep 3
+ext4_after=$(cat "$EXT4_ERRORS" 2>/dev/null || true)
+ext4_changed=1
+if [[ "$ext4_before" =~ ^[0-9]+$ && "$ext4_after" =~ ^[0-9]+$ &&
+      "$ext4_before" == "$ext4_after" ]]; then
+  ext4_changed=0
+fi
+
+dmesg_ring_wrapped=1
+fault_detected=1
+if (( dmesg_before_bytes > 0 )) && capture "$runtime_dir/dmesg-after.txt" dmesg; then
+  dmesg_after_bytes=$(wc -c < "$runtime_dir/dmesg-after.txt" | tr -d ' ')
+  if [[ "$dmesg_after_bytes" =~ ^[0-9]+$ ]] &&
+     (( dmesg_after_bytes >= dmesg_before_bytes )) &&
+     head -c "$dmesg_before_bytes" "$runtime_dir/dmesg-after.txt" |
+       cmp -s "$runtime_dir/dmesg-before.txt" -; then
+    dmesg_ring_wrapped=0
+    tail -c "+$((dmesg_before_bytes + 1))" "$runtime_dir/dmesg-after.txt" \
+      > "$runtime_dir/dmesg-delta.txt"
+    if grep -Eiq "$fault_pattern" "$runtime_dir/dmesg-delta.txt"; then
+      fault_detected=1
+    else
+      fault_detected=0
+    fi
+  fi
+fi
+printf 'R46H_ADAPT_POST_AUDIT ext4_errors_before=%s ext4_errors_after=%s ext4_changed=%s dmesg_ring_wrapped=%s fault_detected=%s\n' \
+  "${ext4_before:-missing}" "${ext4_after:-missing}" "$ext4_changed" \
+  "$dmesg_ring_wrapped" "$fault_detected"
+if [[ -s "$runtime_dir/dmesg-delta.txt" ]]; then
+  evidence kernel dmesg-delta "$runtime_dir/dmesg-delta.txt"
+fi
+if (( ext4_changed == 0 && dmesg_ring_wrapped == 0 && fault_detected == 0 )); then
+  pass kernel post-audit
+else
+  fail kernel post-audit
+fi
+if [[ ! -s "$runtime_dir/dmesg-after.txt" ]]; then
+  fail kernel full-boot-faults
+elif grep -Eiq "$fault_pattern" "$runtime_dir/dmesg-after.txt"; then
+  fail kernel full-boot-faults
+  grep -Ein "$fault_pattern" "$runtime_dir/dmesg-after.txt" | tail -n 80 || true
+else
+  pass kernel full-boot-faults
+fi
+
+worker_complete=1
+if (( failures == 0 )); then
+  worker_reason=checks-complete
+  exit 0
+fi
+worker_reason=checks-failed
+exit 1

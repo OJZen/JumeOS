@@ -1,0 +1,41 @@
+{
+  "format_version": 1,
+  "baseline_id": "v0.7-host-timers",
+  "release": "6.12.99-r46h-mainline-v0.7-host-timers",
+  "payload_name": "r46h-v0.7-host-timers",
+  "source_git_commit": "ac6f60aded3cba0f275f01d6182fdb5f1cb51ce8",
+  "boot": {
+    "active_path": "boot.ini",
+    "candidate_path": "boot.ini.v0.7-host-timers",
+    "candidate_size": 1364,
+    "candidate_sha256": "09f813d4bf5b9c2cd869a2f5cf391b3714670d2ba4b5a1364c60ef49f25e78c9",
+    "image_path": "Image.mainline-v0.7-host-timers.gz",
+    "image_size": 14920505,
+    "image_sha256": "b36467f924fb490e91add94179869a530916838bac42366aafc82d3e82219ae0",
+    "dtb_path": "rk3326-r46h-mainline-v0.7-host-timers.dtb",
+    "dtb_size": 49481,
+    "dtb_sha256": "7259bac7bdd063fbaed987a0d5d2bf7066e02beaacc4440849b93d5f048e3dbc"
+  },
+  "payload_anchors": [
+    {
+      "path": ".r46h-stage-owner",
+      "size": 411,
+      "sha256": "3c49a3078a5ae804057eacd362e381c76d77698db99fab06793794835eab1eb0"
+    },
+    {
+      "path": "DEPLOY-MANIFEST",
+      "size": 4953,
+      "sha256": "69114a1540000c7de1cb0053b14373eeb103dc8378c7bfa65efa6d4310309a04"
+    },
+    {
+      "path": "STAGE-COMPLETE",
+      "size": 536,
+      "sha256": "4dc22c7e3dccfd4edf681e07b45c99180bc280fbe82c04c0035a9cb51ddf194a"
+    },
+    {
+      "path": "r46h-mainline-test-v0.7-host-timers.tar.gz",
+      "size": 33256954,
+      "sha256": "76d5eea063ce93533fe590adde4419f8f9ba11d7581cc79fb9ec334c66d5923b"
+    }
+  ]
+}

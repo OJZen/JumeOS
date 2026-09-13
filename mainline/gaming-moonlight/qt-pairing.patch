@@ -1,0 +1,35 @@
+--- a/app/gui/CliPair.qml
++++ b/app/gui/CliPair.qml
+@@ -14,14 +14,12 @@
+     }
+ 
+     function onFailed(message) {
+-        stageIndicator.visible = false
+-        errorDialog.text = message
+-        errorDialog.open()
++        // CLI callers need a result without acknowledging a hidden dialog.
++        Qt.exit(1)
+     }
+ 
+     function onSuccess(appName) {
+-        stageIndicator.visible = false
+-        pairCompleteDialog.open()
++        Qt.exit(0)
+     }
+ 
+     // Allow user to back out of pairing
+--- a/app/cli/pair.cpp
++++ b/app/cli/pair.cpp
+@@ -76,9 +76,9 @@
+         case Event::ComputerFound:
+             if (m_State == StateSeekComputer) {
+                 if (event.computer->pairState == NvComputer::PS_PAIRED) {
+-                    m_State = StateFailure;
+-                    QString msg = QObject::tr("%1 is already paired").arg(event.computer->name);
+-                    emit q->failed(msg);
++                    // Re-pairing an authenticated host is an idempotent success.
++                    m_State = StateComplete;
++                    emit q->success();
+                 }
+                 else {
+                     Q_ASSERT(!m_PredefinedPin.isEmpty());

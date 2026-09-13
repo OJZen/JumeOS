@@ -1,0 +1,12 @@
+[Unit]
+Description=R46H RTL8188EU stable MAC preparation
+After=systemd-udev-trigger.service
+Before=NetworkManager.service network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/r46h-wifi-mac
+RemainAfterExit=yes
+
+[Install]
+WantedBy=network-pre.target

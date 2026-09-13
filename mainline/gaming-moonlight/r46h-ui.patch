@@ -1,0 +1,234 @@
+diff --git a/docs/README.pod b/docs/README.pod
+index 8e08756..1f0fa34 100644
+--- a/docs/README.pod
++++ b/docs/README.pod
+@@ -196,7 +196,7 @@ A documented example configuration file can be found at /etc/moonlight/moonlight
+ 
+ =head1 COMMENTS
+ 
+-Use Ctrl+Alt+Shift+Q or Play+Back+LeftShoulder+RightShoulder to quit the streaming session.
++Use Ctrl+Alt+Shift+Q or L1+R1 (LeftShoulder+RightShoulder) to quit the streaming session.
+ 
+ =head1 AUTHOR
+ 
+diff --git a/src/input/evdev.c b/src/input/evdev.c
+index e938a8f..99625f8 100644
+--- a/src/input/evdev.c
++++ b/src/input/evdev.c
+@@ -136,7 +136,7 @@ int evdev_gamepads = 0;
+ 
+ #define ACTION_MODIFIERS (MODIFIER_SHIFT|MODIFIER_ALT|MODIFIER_CTRL)
+ #define QUIT_KEY KEY_Q
+-#define QUIT_BUTTONS (PLAY_FLAG|BACK_FLAG|LB_FLAG|RB_FLAG)
++#define QUIT_BUTTONS (LB_FLAG|RB_FLAG)
+ 
+ static bool (*handler) (struct input_event*, struct input_device*);
+ 
+diff --git a/src/input/sdl.c b/src/input/sdl.c
+index 72a2a3e..119daae 100644
+--- a/src/input/sdl.c
++++ b/src/input/sdl.c
+@@ -24,7 +24,7 @@
+ 
+ #define ACTION_MODIFIERS (MODIFIER_SHIFT|MODIFIER_ALT|MODIFIER_CTRL)
+ #define QUIT_KEY SDLK_q
+-#define QUIT_BUTTONS (PLAY_FLAG|BACK_FLAG|LB_FLAG|RB_FLAG)
++#define QUIT_BUTTONS (LB_FLAG|RB_FLAG)
+ #define FULLSCREEN_KEY SDLK_f
+ #define UNGRAB_KEY SDLK_z
+ 
+diff --git a/src/main.c b/src/main.c
+index 8e9570d..28e685f 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -224,7 +224,7 @@ static void help() {
+   printf("\t-input <device>\t\tUse <device> as input. Can be used multiple times\n");
+   printf("\t-audio <device>\t\tUse <device> as audio output device\n");
+   #endif
+-  printf("\nUse Ctrl+Alt+Shift+Q or Play+Back+LeftShoulder+RightShoulder to exit streaming session\n\n");
++  printf("\nUse Ctrl+Alt+Shift+Q or L1+R1 (LeftShoulder+RightShoulder) to exit streaming session\n\n");
+   exit(0);
+ }
+ 
+diff --git a/src/sdl.c b/src/sdl.c
+index 25567de..340d487 100644
+--- a/src/sdl.c
++++ b/src/sdl.c
+@@ -105,6 +105,7 @@ void sdl_loop() {
+             SDL_UnlockMutex(mutex);
+             SDL_RenderClear(renderer);
+             SDL_RenderCopy(renderer, bmp, NULL, NULL);
++            sdl_hud_draw(renderer);
+             SDL_RenderPresent(renderer);
+           } else
+             fprintf(stderr, "Couldn't lock mutex\n");
+@@ -113,6 +114,7 @@ void sdl_loop() {
+     }
+   }
+ 
++  sdl_hud_close();
+   SDL_DestroyWindow(window);
+   SDL_Quit();
+ }
+diff --git a/src/sdl.h b/src/sdl.h
+index 65345ba..c610375 100644
+--- a/src/sdl.h
++++ b/src/sdl.h
+@@ -35,6 +35,8 @@
+ 
+ void sdl_init(int width, int height, bool fullscreen);
+ void sdl_loop();
++void sdl_hud_draw(SDL_Renderer *renderer);
++void sdl_hud_close(void);
+ 
+ extern SDL_mutex *mutex;
+ extern int sdlCurrentFrame, sdlNextFrame;
+diff --git a/src/sdl_hud.c b/src/sdl_hud.c
+new file mode 100644
+--- /dev/null
++++ b/src/sdl_hud.c
+@@ -0,0 +1,96 @@
++/* R46H client presentation/CPU overlay. SPDX-License-Identifier: GPL-3.0-or-later */
++#ifdef HAVE_SDL
++#include "sdl.h"
++#include <stdio.h>
++#include <string.h>
++#include <time.h>
++
++static SDL_Texture *hud;
++static Uint32 start_ms;
++static clock_t start_cpu;
++static unsigned frames;
++static bool initialized;
++
++/* Count submitted presentations, not received packets or unique host frames. */
++static bool hud_sample(Uint32 now, clock_t cpu, char *text, size_t size) {
++  if (!initialized) {
++    initialized = true;
++    start_ms = now;
++    start_cpu = cpu;
++    snprintf(text, size, "FPS - CPU -%%");
++    return true;
++  }
++  Uint32 elapsed = now - start_ms; /* SDL's 32-bit tick wrap is intentional. */
++  if (elapsed < 1000)
++    return false;
++  double fps = frames * 1000.0 / elapsed;
++  if (cpu == (clock_t)-1 || start_cpu == (clock_t)-1 || cpu < start_cpu)
++    snprintf(text, size, "FPS %.0f CPU -%%", fps);
++  else
++    snprintf(text, size, "FPS %.0f CPU %.0f%%", fps,
++             100000.0 * (cpu - start_cpu) / CLOCKS_PER_SEC / elapsed);
++  start_ms = now;
++  start_cpu = cpu;
++  frames = 0;
++  return true;
++}
++
++static SDL_Texture *hud_texture(SDL_Renderer *renderer, const char *text) {
++  /* Only these glyphs are needed. Rasterize once per second, then one GPU copy. */
++  static const char alphabet[] = "0123456789FPSC U%-";
++  static const Uint8 rows[][5] = {
++    {7,5,5,5,7}, {2,6,2,2,7}, {7,1,7,4,7}, {7,1,7,1,7}, {5,5,7,1,1},
++    {7,4,7,1,7}, {7,4,7,5,7}, {7,1,1,1,1}, {7,5,7,5,7}, {7,5,7,1,7},
++    {7,4,6,4,4}, {6,5,6,4,4}, {7,4,7,1,7}, {7,4,4,4,7}, {0,0,0,0,0},
++    {5,5,5,5,7}, {5,1,2,4,5}, {0,0,7,0,0}
++  };
++  SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(
++      0, (int)strlen(text) * 4 + 4, 9, 32, SDL_PIXELFORMAT_RGBA32);
++  if (!surface)
++    return NULL;
++  SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, 12, 18, 24));
++  Uint32 ink = SDL_MapRGB(surface->format, 100, 255, 180);
++  for (size_t i = 0; text[i]; ++i) {
++    const char *glyph = strchr(alphabet, text[i]);
++    if (!glyph)
++      continue;
++    for (int y = 0; y < 5; ++y)
++      for (int x = 0; x < 3; ++x)
++        if (rows[glyph - alphabet][y] & (4 >> x)) {
++          SDL_Rect pixel = {2 + (int)i * 4 + x, 2 + y, 1, 1};
++          SDL_FillRect(surface, &pixel, ink);
++        }
++  }
++  SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
++  SDL_FreeSurface(surface);
++  return texture;
++}
++
++void sdl_hud_draw(SDL_Renderer *renderer) {
++  char text[64];
++  if (hud_sample(SDL_GetTicks(), clock(), text, sizeof(text))) {
++    SDL_Texture *next = hud_texture(renderer, text);
++    if (next) {
++      SDL_DestroyTexture(hud);
++      hud = next;
++    } else
++      fprintf(stderr, "R46H HUD: %s\n", SDL_GetError());
++    printf("R46H_HUD %s\n", text);
++  }
++  ++frames; /* Caller immediately submits this frame through SDL_RenderPresent. */
++  if (hud) {
++    SDL_Rect dest = {8, 8, 0, 0};
++    SDL_QueryTexture(hud, NULL, NULL, &dest.w, &dest.h);
++    dest.w *= 3;
++    dest.h *= 3;
++    SDL_RenderCopy(renderer, hud, NULL, &dest);
++  }
++}
++
++void sdl_hud_close(void) {
++  SDL_DestroyTexture(hud);
++  hud = NULL;
++  initialized = false;
++  frames = 0;
++}
++#endif
+diff --git a/tests/r46h-hud.c b/tests/r46h-hud.c
+new file mode 100644
+--- /dev/null
++++ b/tests/r46h-hud.c
+@@ -0,0 +1,43 @@
++/* Deterministic sampling plus a real headless SDL texture/render check. */
++#include <assert.h>
++#include "../src/sdl_hud.c"
++
++int main(void) {
++  char text[64];
++  assert(hud_sample(100, 0, text, sizeof(text)));
++  assert(!strcmp(text, "FPS - CPU -%"));
++  frames = 60;
++  assert(!hud_sample(1099, CLOCKS_PER_SEC, text, sizeof(text)));
++  assert(frames == 60);
++  assert(hud_sample(1100, CLOCKS_PER_SEC, text, sizeof(text)));
++  assert(!strcmp(text, "FPS 60 CPU 100%"));
++  assert(frames == 0);
++  frames = 30;
++  assert(hud_sample(3100, 5 * CLOCKS_PER_SEC, text, sizeof(text)));
++  assert(!strcmp(text, "FPS 15 CPU 200%"));
++  start_ms = UINT32_MAX - 499;
++  frames = 60;
++  assert(hud_sample(500, (clock_t)-1, text, sizeof(text)));
++  assert(!strcmp(text, "FPS 60 CPU -%"));
++
++  assert(SDL_Init(SDL_INIT_VIDEO) == 0);
++  SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(
++      0, 320, 80, 32, SDL_PIXELFORMAT_RGBA32);
++  assert(surface);
++  SDL_Renderer *renderer = SDL_CreateSoftwareRenderer(surface);
++  assert(renderer);
++  hud = hud_texture(renderer, "FPS 60 CPU 100%");
++  assert(hud);
++  SDL_Rect dest = {8, 8, 180, 27};
++  assert(SDL_RenderCopy(renderer, hud, NULL, &dest) == 0);
++  SDL_RenderPresent(renderer);
++  Uint32 *pixels = surface->pixels;
++  assert(pixels[8 * surface->pitch / 4 + 8] == SDL_MapRGB(surface->format, 12, 18, 24));
++  assert(pixels[14 * surface->pitch / 4 + 14] == SDL_MapRGB(surface->format, 100, 255, 180));
++  sdl_hud_close();
++  assert(!initialized && !hud && frames == 0);
++  SDL_DestroyRenderer(renderer);
++  SDL_FreeSurface(surface);
++  SDL_Quit();
++  puts("R46H_HUD_TEST PASS");
++}

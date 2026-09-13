@@ -1,0 +1,430 @@
+# Original ports and PortMaster integration
+
+Status 2026-09-13: **R42 SOURCE GTA TARGET AUTOMATION PASS / STARDEW FAIL / DRI HOST CHECK PASS**.
+The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
+executed the fixed-hash GTA III engine, never the original launcher script; original
+game data stayed read-only and the managed save directory stayed empty.
+
+## Original-card data
+
+The retained source is `mainline/out/.cache/r46h-original-card-import-20260826/easyroms`.
+A read-only SHA-256 inventory of every regular file in the four game directories,
+plus launchers, Mono runtime and Metal Slug ROM/BIOS is in
+`mainline/out/.cache/r46h-ports-source-20260910/inventory.json`.
+It proves this source snapshot, not vendor authenticity/version or target equality.
+
+| Original directory under ports/ | Files / MiB | Relevant inputs |
+| --- | --- | --- |
+| stardewvalley1615 | 3631 / 570.3 | Managed Stardew Valley.exe, SVLoader.exe, patches, gamedata/Content and savedata/Saves |
+| gta3 | 439 / 439.3 | AArch64 re3/re3_gl, classic game data, configuration; userfiles currently empty |
+| gtavc | 2384 / 2678.1 | AArch64 reVC/reVC_gl, classic game data, Chinese/mod files and an existing userfiles save |
+| gtasa_zh | 458 / 2551.8 | AArch64 gtasa and libGTASA.so, assets, translation/archive files and loose save files |
+
+The Mono squashfs exists under `tools/PortMaster/libs/`. The Metal Slug ROM and
+Neo Geo BIOS hashes match the [accepted FBNeo inputs](../gaming-ozone-fbneo/README.md).
+These directories were within the earlier [p3 import](../../docs/P3-CONTENT-MIGRATION.md)
+scope, but full target readback was skipped. Verify the matching target paths
+before copying; avoid a second full copy of roughly 6 GiB when assets are already there.
+Original save files must survive import, failed launch, update and removal.
+
+The Stardew metadata names stardewvalley/StardewValley.sh while the original
+folder/launcher are named with 1615; its saved status says Broken. This is a
+metadata/path discrepancy, not proof that the game itself fails. Metadata inspection now reports assembly `1.6.15.24356` and `.NETFramework 4 Client`;
+this identifies the local compatibility assembly, not vendor authenticity.
+
+## Upstream findings
+
+The official [compatibility port](https://github.com/PortsMaster/PortMaster-New/blob/main/ports/stardewvalley/port.json)
+requires the Steam/GOG compatibility data and Mono 6.12.0.122 AArch64. Prefer this
+route for the found data. The separate [mainline port](https://github.com/PortsMaster/PortMaster-New/blob/main/ports/stardewvalleymainline/port.json)
+requires regular Windows Steam data and is marked experimental; its loader/mod
+and memory behavior need a separate comparison, not a blind replacement.
+[Stardew's compatibility guide](https://www.stardewvalley.net/compatibility/).
+
+The checked default PortMaster-New ports tree contains both Stardew variants but
+no gta3/gtavc/gtasa entries. The local GTA manifests identify classic PC assets for
+III/VC and include an additional-source record. Do not assume a current default
+catalog download exists; preserve the found packages while checking provenance,
+engine/library closure and available upstream maintenance. SA is a separate package.
+
+[HarbourMaster](https://portmaster.games/harbourmaster.html) already owns catalog,
+install/remove and runtime management. Reuse that backend behind a small Qt
+adapter after one local game works. PortMaster's [repository policy](https://github.com/PortsMaster/PortMaster-New)
+keeps port-specific libraries separate from OS libraries; retain that boundary.
+Do not put commercial assets, private pairing data or user saves in Git.
+
+## Runtime audit and management
+
+The separate [Qt tool page](../gaming-shell/TOOLS.md) keeps the four original games
+and their save-copy/backup operations. The current working tree also adds a real
+HarbourMaster catalog, search/installed filter, package install/update/rollback/
+uninstall and dependency runtimes. These additions are packaged in the host-checked R19 candidate. Installed catalog packages do not execute their legacy launch scripts;
+actual game launching still requires an adapted profile.
+
+Read-only ELF inspection is retained in
+`mainline/out/.cache/r46h-ports-source-20260910/elf-dependencies.json`:
+
+| Binary | Required runtime boundary |
+| --- | --- |
+| re3 / reVC | SDL2, OpenAL, libOpenGL, mpg123; maximum referenced GLIBC 2.29 / GLIBCXX 3.4.22 |
+| re3_gl / reVC_gl | GLFW and X11 in addition to audio/C++ libraries; not an assumed EGLFS path |
+| gtasa | SDL2, OpenAL, EGL/GLESv2, zlib and libbsd; custom Android loader and direct evdev input |
+| libGTASA.so | Android-named libraries including libandroid, liblog, OpenSLES and libSCAnd; requires the package's compatibility loader |
+
+No original script was run. Match these dependencies on the R46H first;
+do not replace Mesa/Panfrost with vendor libraries or assume an existing filename
+proves a working dependency closure. The original Mono archive was subsequently extracted only inside an isolated
+container: it reports Mono 6.12.0.122, arm64. It was not installed on the device. Original GTASA loose saves and Vice City userfiles are included in
+the managed-copy path; source SHA inventory remains unchanged.
+
+The 2026-09-11 SA follow-up is retained in
+`mainline/out/.cache/r46h-ports-source-20260910/gtasa-audit/receipt.json` with focused
+ELF/disassembly evidence. All 458 original files still match the earlier inventory.
+The loader and Android libraries are ELF64/AArch64; the Linux loader's highest
+referenced GLIBC version is 2.29. Its `sdl_gamepad_sample` actually calls `evdev_poll`
+and reads the wrapper's button/axis state. `patch_game` opens input event nodes
+and attempts EVIOCGRAB. SDL controller mappings/ignore lists therefore do not
+establish this game's input isolation or layout. A future adapter must restrict
+visible inputs to the routed controller and verify the loader's own button table.
+
+The translation archive differs from its original backup in `Text/japanese.gxt`
+and two Japanese font files; all three match the current `assets/` files. This
+proves patch placement, not the selected language or rendered Chinese. The loader's
+configuration, loose saves, `savegames/`, auxiliary state and logs need private
+writable paths; retain originals. Existing `gtasa.log`/`log.txt` are original-card
+history, not current R46H runtime proof. The legacy launcher also writes governors,
+forces graphics settings and invokes distro helpers; it was not executed.
+
+The exact upstream source/revision for this binary remains unidentified. A
+[related patch author's report](https://github.com/erfan2255/gtasa-portmaster-dpad)
+also describes direct evdev, but does not identify this binary. The separate
+[Switch wrapper](https://github.com/NaGaa95/gtasa_nx/blob/main/README.md) expects
+2.11.311 `libGame.so`; it is not an established replacement for the found package.
+SA launch stays disabled until loader, writable paths and routed-input adaptation
+have their own bounded runtime checks.
+
+## Private HarbourMaster backend
+
+`backend-lock.json` pins upstream commit `0009bb08d33252d9e0b1813c3c481a3017fc7a01`
+and the required Python wheels by SHA-256. The adapter reuses upstream catalog,
+package inspection/installation and runtime download APIs. It suppresses bulk
+image downloads, distro hooks, global permission changes and original-ROM scans.
+Requests uses a private session with `trust_env=False`: host `.netrc`, proxy
+credentials and environment authentication are not consulted. The backend also
+binds `HOME` to its private state before importing HarbourMaster, so upstream
+platform probes cannot read the launching account's home. Python 3.10+ is required.
+R31 bundles Debian's [Python 3.13 interpreter and standard library](https://packages.debian.org/trixie/python3.13-minimal),
+pinned in `prepare-native.py` with official package-index sizes/SHA-256. They
+live at `usr/bin/python3.13` and `usr/lib/python3.13`, without a system install.
+Both catalog and native-port workers use this interpreter with `-I -B`; a missing
+packaged interpreter fails closed. Unpackaged development retains system Python.
+`test-port-python.py` verifies imports, TLS validation and paths inside the bundle;
+the packaged catalog check removes system Python from PATH. Target preflight also
+imports the required extensions as `ark`. R36's direct refresh and Qt catalog passed
+on R46H; native-port launch remains a separate gate.
+
+Installation distinguishes an unpublished index failure from a failure to sync
+its directory after replacement. The latter reports uncertain durable storage
+and retains the published generation, its runtimes and the prior version; it
+must not delete files referenced by the visible index. A verified runtime download
+replaces a corrupt cached file or link; intact verified caches are reused.
+
+```sh
+python3 -B mainline/gaming-ports/prepare-backend.py "$PWD/mainline/out/.cache/r46h-portmaster"
+python3 -B mainline/gaming-ports/manager.py \
+  --runtime "$PWD/mainline/out/.cache/r46h-portmaster/runtime" \
+  --state "$PWD/mainline/out/.cache/r46h-portmaster-test" refresh
+```
+
+The Qt builder accepts `R46H_PORTMASTER_BUNDLE` for a separately named prepared
+archive; the neighboring SHA receipt and source lock must match. The packaged
+adapter/runtime live under `usr/share/r46h/`. Native development can point
+`--portmaster-backend` and `--portmaster-runtime` at those private files.
+
+In the local PortMaster page, X opens the catalog. In the catalog, X searches,
+Y switches installed/all, START refreshes and L1/R1 page through 50 entries.
+A opens details; install/update, rollback and uninstall use the shared confirmation
+popup with Cancel selected first. B cancels work or returns. Installation
+instructions use a scrollable, plain-text popup. Metadata compatibility is a
+filter against the known target profile, not proof that a game runs.
+
+Downloads and extraction use fresh transactions, with 512 MiB compressed,
+2 GiB expanded, 50,000-file and 64 MiB free-space reserve limits. Traversal,
+links/device entries and duplicate paths are rejected. Only after successful
+installation/runtime checks does an atomic index select the new generation;
+one previous version remains available. Saves stay outside package generations.
+Runtime downloads are verified again after the upstream result, reused by content
+hash and removed when neither current nor previous packages reference them.
+Only the fixed official catalog is loaded; self-updating PortMaster, themes and
+arbitrary custom repositories are outside this adapter.
+
+The live official catalog returned 1,396 entries; Wordle SDL downloaded and
+installed successfully in a disposable host state. Its launcher was never run.
+R36 also refreshed the same 1,396 records on R46H and displayed them with the four
+local projects; no target package mutation or launcher execution occurred.
+`test-portmaster-manager.py` covers updates/rollback, bad ZIPs, cancellation,
+failed index writes, failed/mismatched runtime downloads, reuse/cleanup and save
+preservation. `test-portmaster-ui.py` drives the actual Qt/backend pair, including
+120% fonts, modal isolation, installed filtering, instructions and private-editor
+refusal. Evidence is under `mainline/out/.cache/r46h-ports-backend-20260910/`.
+
+The frozen R19 package/source/receipt are in that evidence directory; the newer
+R20 native-launch package/source/receipt are separately retained in its `r20/`
+subdirectory. R20 also includes the v4 Moonlight combined package; it has no
+device acceptance. The
+assembled backend archive is byte-identical across two cached repacks; this does
+not claim a reproducible Qt ELF build. Temporary Mono extraction is retained at
+`mono-audit/runtime` only for ongoing Stardew adapter work; remove it after the
+adapter's replacement runtime/test evidence is verified.
+
+## Stardew adapter input
+
+`mono-audit/metadata/` contains metadata-only inspection of the local assembly
+and `SVLoader.exe` IL. The loader accepts `<assembly> [appBasePath] [-- appArgs...]`,
+sets its working directory/AppDomain base to that optional path, and redirects
+XNA assembly names to MonoGame. The original `gamedata` already lacks the obsolete
+System/MonoGame duplicates removed by the legacy script. The adapter uses a
+private working directory and existing `MONO_PATH`/patch inputs without moving
+or deleting original DLLs. It reaches the title/menu and writes `startup_preferences` through
+that private save path. Original files remain read-only. The original Mono exports
+LLVM 6 symbols which collide with Mesa 25/LLVM 19 when graphics providers load;
+the private `mono-compat.c` shim deep-binds Mesa GLX/EGL/GBM and `*_dri.so`
+provider groups. Baseline native crash and corrected host-menu evidence are
+retained. No system graphics library was replaced.
+
+The game's own `GameRunner` exit handler calls `Process.Kill` after notifying game
+instances. The shim reports that deliberate self-exit separately from a supervisor
+kill; the host check observed the marker, no forced kill and private settings
+readback. `test-mono-compat.py` additionally checks real ELF symbol resolution,
+unrelated-library behavior, and intentional versus external SIGKILL. This does not
+prove a farm save/load cycle or physical speaker/controller behavior.
+
+The dedicated host Xvfb had no window manager and left the initial SDL window at
+1280×720. The host harness records that geometry, resizes only that test window to
+1024×768 and captures the complete menu. This is a test-environment correction,
+not a guessed permanent game setting. `probe-host.py` uses init and an outer
+container deadline; putting `xvfb-run` at PID 1 previously stalled its startup handshake.
+
+## GTA SDL2 profile preparation
+
+`local_port.py` verifies the exact original re3/reVC engines and uses a disposable
+working directory with read-only resource links, managed configuration and a
+separate `userfiles` save directory. The referenced SDL2 source implements that
+relative save location; source references and engine hashes remain in the host
+record. The old GL dispatch libraries and Windows launchers are not loaded.
+
+Both original engines reached `GS_FRONTEND`, initialized OpenGL ES 3.2 on Mesa
+25.0.7 software rendering and exited 0 on the 20-second bounded stop in an
+AArch64 container. The missing SDL2 dynamic library was supplied by Debian's
+2.32.4 runtime; the builder's static SDK alone was insufficient. This proves
+frontend startup and controlled exit, not gameplay, physical input/audio,
+Panfrost performance or save/load. Original content was mounted read-only.
+The helper's `--host-test` requires that isolated container/read-only mount;
+its prepared-directory function is now connected to the guarded ports supervisor.
+R36's first target launch exposed one missing inherited path: the private process
+found the port audio libraries but not the package's existing `libOpenGL.so.0`.
+R37 explicitly admits both verified package-library directories. The target then
+reached SDL context creation but stopped at `gladLoadGLLoader`: its profile loop
+treated a Wayland window as proof that an unavailable desktop GL context worked.
+R38's process-local adapter loaded, but SDL did not read back the pending profile
+before context creation. R39 records the application's `SDL_GL_SetAttribute`
+request directly and rejects only core-profile window attempts. It again passed
+the actual-engine AArch64 host check on software GLES 3.2, but the R46H target's
+Panfrost GLES 3.1 path still ended at the same `gladLoadGLLoader` error before a
+fresh frame. This narrows the blocker to the engine/target GL capability boundary;
+do not add another profile shim or repeat the shared session without a new hypothesis.
+The initial managed INI copy is published only after a flushed complete write,
+without replacing an existing copy. This later working-tree fix has an interrupted
+copy/retry check; it is newer than the frozen R20 package.
+
+## Migration gates
+
+1. Inspect executable architecture, ELF dependencies, loader/data versions and
+   required runtimes without executing the original scripts. Keep hashed originals.
+2. Build a per-game launcher using the current combined controller and accepted
+   audio route. The old scripts change HOME, chmod device nodes globally, restart
+   oga_events, kill all gptokeyb processes, change governors or delete/move data.
+   Those actions do not belong in the new launcher.
+3. Keep assets read-only and allocate separate writable saves/config/logs. Only
+   games that require resource patching get a working copy; back up existing saves
+   before import. Old uppercase paths and Windows-only mods need explicit review.
+4. Validate dependency loading and a bounded start/exit/restart on the selected
+   display path. Add a desktop/library entry with stable ID, cover and last-played
+   state. Uninstall removes managed code without silently removing user data.
+5. Attended gates per title: Chinese/text, sticks/buttons, picture/audio, save/load
+   and returning to the desktop. Metadata discovery and host parsing do not prove playability.
+
+Metal Slug is the first local game integration: reuse the accepted core/options
+and data, but use a current lifecycle wrapper. Do not replay the historical
+p2-v0.7-bound Ozone installer on the current p2-v0.17 card. Save-state menu/core-info
+issues remain separately tracked until verified with this core.
+
+## Shared-display host integration
+
+`local_port.py --host-test --shared-display` uses Wayland and keeps the engine in
+the desktop's foreground process group. It requires the routed-controller identity
+and refuses the X11-only input helper. TERM/INT request a bounded graceful stop,
+then finalize logs and remove the disposable working directory. Shared children
+get a one-second inner grace period before the desktop's 1.5-second group ceiling;
+direct-display children retain their separate process group and five-second grace.
+This is process cleanup, not a promise that a game saves progress automatically.
+
+`gaming-wayland/check-ports.sh` runs the real retained re3/reVC and Mono/Stardew
+engines with the Qt desktop, headless Mesa GL and read-only original assets.
+`mainline/out/.cache/r46h-compositor-20260910/ports/` holds the captured frontends,
+routed-only input descriptors, global panels and completion records. GTA III/VC
+menus move from Start Game to Options; Stardew's title screen accepts controller
+input and selects Load. All three return to the same desktop session and remove
+their working directories. Stardew still uses the identified deliberate self-exit
+marker; no forced-timeout success is inferred.
+
+The check exposed an input gap hidden by the old synthetic game: SDL rejects
+background controller events by default. The common launcher now sets that hint
+for routed sessions, and the test game no longer supplies its own workaround.
+Broker ownership/neutral gating still controls delivery. These results establish
+host menu input and lifecycle only; gameplay, real audio, saves and target timing
+remain open. The target session candidate below supplies persistent state and
+the guarded Mono lease; its physical mount/launch/retention gate remains open.
+
+## Shared target session candidate
+
+For the newer complete handheld package, opt into the same fixed persistent
+directory already used by the direct-display preview:
+
+```sh
+R46H_SHELL_STATE_DIR=/home/ark/.local/share/r46h-preview \
+  /run/r46h-wayland-probe/probe-r46h.sh --check MANIFEST_SHA256 handheld
+R46H_SHELL_STATE_DIR=/home/ark/.local/share/r46h-preview \
+  /run/r46h-wayland-probe/probe-r46h.sh --run MANIFEST_SHA256 handheld
+```
+
+Use the exact new manifest after the existing identity/space/serial preparation.
+Other persistent paths and ordinary two-window mode are refused. The private
+directory is checked as `ark`; `/run` session output remains disposable. When
+the package includes the native port helper, the supervisor acquires Mono before
+starting the compositor and supplies `R46H_SHARED_PORTS=1`. Without that capability
+or persistent storage, the shared UI leaves port launch disabled.
+
+The same fixed-image lease accepts the shell or Wayland unit and selects that
+unit's fixed staging directory. Unit and mount-ID checks prevent releasing
+another session's mount. Cgroup stop precedes release and ES-DE recovery; failed
+release keeps the frontend stopped. The native worker retains device/UID/cgroup,
+read-only original content and hash checks, then passes the shared profile to
+the existing Python runner. Completion refreshes the port page's save counts.
+
+`install-runtime.sh` assembles the common PortMaster backend, native helper,
+private audio libraries and Mono shim for both package builders. It runs only
+inside the isolated SDK staging area. No game assets or Mono image are embedded;
+the original verified Mono image is mounted read-only on the target. Packaged
+unprivileged session checks cover the explicit state location surviving compositor
+failure. Fake-mount checks cover both unit families and release refusal; actual
+mounting, persistent gameplay saves and power-cycle retention remain unverified.
+
+Use the accepted [R36 shared candidate](../gaming-wayland/HANDHELD.md#resume-and-rebuild)
+for its proved status/Neo/catalog behavior.
+It retains private Python for the v0.17 base and binds HarbourMaster's HOME to
+private state. Direct refresh and the 1,396-entry Qt catalog passed on R46H;
+package mutation, gameplay and save/load remain open. R39 is a retained diagnostic,
+not a promoted shared candidate: GTA III's guarded runtime path ran on-device but
+failed at the target GL loader before gameplay. The C++
+Neo worker's result does not validate those paths. R29 and earlier archives
+remain historical evidence, not the next deployment recommendation.
+
+R24 is frozen at `mainline/out/.cache/r46h-compositor-20260910/r24/receipt.json`,
+source `091b796cb28c6d046cf0bd3076e667847e78fe1c` on
+`codex/r46h-shared-ports-r24-candidate`. Its 33,647,407-byte archive expands to
+92,864,150 regular-file bytes. Full readback, packaged unprivileged sessions,
+explicit state retention, the common backend/shim checks and all three frozen-source
+Wayland frontend checks passed. Device mounting, native worker and gameplay remain open.
+
+## Native ports session candidate
+
+The shell's `--ports` / `--remote-ports` probe modes open the local PortMaster page
+with native handoff enabled. They require the opt-in persistent state directory;
+GTA III, Vice City and Stardew start through fixed hash-bound profiles. The UI exits
+before KMS use and a fresh process restores the correct tool/game selection after
+normal, failed or bounded exit. San Andreas remains disabled pending adaptation.
+
+R40 freezes this existing direct path at
+`mainline/out/.cache/r46h-direct-gta-20260913/r40/receipt.json`, using the same
+R39 source and target libraries. Its ARM64 package tests, direct supervisor recovery
+check and independent 1,629-file host/target readbacks passed. The fixed R46H then
+ran GTA III through `--remote-ports`; it exited -11 after 1.46 seconds at the same
+`gladLoadGLLoader` boundary as shared Wayland, before `GS_FRONTEND` or a game frame.
+The direct-path hypothesis is rejected. Evidence is
+`mainline/out/.cache/r46h-r40-direct-device-20260913.mAey9k/session.json`; do not
+add another shim or rerun this binary.
+
+R41 reused those exact 1,629 verified files for the two independent targets in one
+device session. Stardew's fixed Mono squashfs mounted read-only and execution reached
+`StardewValley.Program.Main`, but Mono's native stack failed through
+`SDL_CreateWindow` and `gbm_create_device` after 10.44 seconds (supervisor exit -6).
+Vice City's fixed reVC failed after 1.12 seconds at the same librw
+`gladLoadGLLoader` source line as GTA III (exit -11). Neither reached a game frame.
+The UI recovered after each failure; source saves remained 3/1 files and both managed
+save trees remained empty. Evidence is
+`mainline/out/.cache/r46h-r40-ports-batch-device-20260913.XEe7qy/session.json`.
+
+`runtime-lease.sh` mounts only the hash-verified original gzip Mono squashfs read-only
+at the temporary payload's `mono` directory. Root-only records bind it to the
+current unit and mount ID; release refuses another unit or a replaced mount. The
+supervisor stops the entire process group before release and frontend restoration.
+R41 passed actual read-only squashfs acquisition, guarded release and loop detach on
+the accepted kernel; this proves lifecycle only, not Stardew graphics or gameplay.
+`prepare-native.py` supplies only pinned Debian OpenAL/mpg123 libraries in a private
+port library directory; it does not replace Mesa, libc or the system SDL2.
+
+## R42 source-built GTA candidate
+
+R42 retires the fixed original GTA executables from execution while retaining their
+hashes as source-card identity checks. `prepare-gta-source.py` pins re3
+`ead2747`, reVC `b9f0b23`, shared librw `81c9426` and two Debian ARM64 build-header
+packages. `librw-context-fallback.patch` creates and loads GL inside the existing
+profile loop, so a failed context/GLAD attempt releases its window and advances to
+the next GLES profile. `build-gta-source.sh INPUT_CACHE NEW_OUTPUT` runs offline,
+uses `LIBRW_FORCE_GLES`, and produced byte-identical re3/reVC pairs in independent
+builds. The old `LD_PRELOAD` GTA profile shim is no longer packaged.
+
+The package source is `e6c830904cd4087b440fa68b108cf2771de5cd2d`; the verified
+fresh-download/path follow-up is `3b12c775d0b83f9d0da931afa6612d9f0653cf86`.
+Receipt-bound output is `mainline/out/.cache/r46h-source-gta-20260913/r42/`. Its source-built GTA III
+and Vice City each reached a captured real menu, accepted one host input and exited
+at 20 seconds on ARM64 software GLES 3.2 with original assets read-only. The full
+1,630-file shell package and lifecycle checks passed.
+
+The same candidate adds `libgbm.so.1` to Stardew's existing Mono/Mesa deep-binding
+set because R41's direct KMSDRM stack entered GBM without the earlier GLX/EGL marker.
+The focused ELF collision test passed, but the R42 target run rejected the diagnosis:
+Stardew still crashed after 10.46 seconds through `SDL_CreateWindow` and
+`gbm_create_device`. Do not repeat it without a new source-level hypothesis.
+
+The fixed R46H repeated all 1,630 package hashes. Source GTA III/re3 and Vice
+City/reVC then used Panfrost OpenGL ES 3.1, reached `GS_FRONTEND`, ran for their
+full 120-second bounds and returned to fresh PortMaster UIs. Original content
+and source saves stayed read-only; source saves remained 3/0/1 files and all
+managed save trees remained empty. The logs warn that `gamecontrollerdb.txt` is
+absent, but the fixed SDL mapping has not yet had its attended check. Gameplay,
+LCD motion, audible output, physical controls, save/exit/relaunch and a fresh
+game-frame capture remain open. Evidence is
+`mainline/out/.cache/r46h-r42-ports-device-20260913.GdcAbV/session.json`.
+
+Post-R42 ELF inspection found 9,534 LLVM 6.1 symbols in the 2022 Mono executable's
+dynamic exports while Debian 13 Mesa loads LLVM 19. R42 logged no GBM isolation
+marker before the crash, so wrapping `libgbm.so.1` did not reach the actual provider
+load. The minimal follow-up also matches `*_dri.so`; its ARM64 collision fixture now
+covers GLX, EGL, GBM and Panfrost DRI and passes. This is not a packaged or target
+candidate yet.
+
+The R36-R39 target record is
+`mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
+manifests and fixed identities passed. The final run peaked at 78.461 C under the
+85 C guard, returned to ES-DE, restored 1296/480 MHz maxima, left failed units empty
+and powered off through serial. R40 then reproduced the same loader failure under
+direct KMSDRM; R41 added the matching Vice City failure and independent Stardew
+SDL/GBM crash. R42 retires the old GTA binaries and closes target frontend
+readiness; attended gameplay is next.
+
+`test-port-runtime-lease.py` exercises identity/ownership/mount-ID checks and failed
+acquisition cleanup with fake mounts. `test-local-port.py` checks actual retained
+inputs and isolated writable paths without launching games. These and the native
+supervisor tests cannot substitute for actual LCD/audio/input/save acceptance.

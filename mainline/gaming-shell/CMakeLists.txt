@@ -1,0 +1,57 @@
+cmake_minimum_required(VERSION 3.21)
+project(R46HShell LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Qt 6.8 injects obsolete AGL linkage on current macOS SDKs (QTBUG-137687).
+# Use the native OpenGL target; Qt upstream removed AGL in change 652022.
+if(APPLE)
+    find_package(OpenGL REQUIRED)
+    add_library(WrapOpenGL::WrapOpenGL INTERFACE IMPORTED)
+    target_link_libraries(WrapOpenGL::WrapOpenGL INTERFACE OpenGL::GL)
+endif()
+find_package(Qt6 6.8 REQUIRED COMPONENTS Quick Test Network DBus)
+find_package(SDL2 REQUIRED)
+qt_standard_project_setup(REQUIRES 6.8)
+set_source_files_properties(controls/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+qt_add_executable(r46h-shell main.cpp input.cpp input.h handheld.cpp handheld.h preferences.cpp preferences.h telemetry.cpp telemetry.h control.cpp control.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
+qt_add_qml_module(r46h-shell URI R46H.Shell VERSION 1.0
+    QML_FILES ShellView.qml GameCard.qml SettingRow.qml SettingsView.qml PerformancePanel.qml ControlHints.qml StreamingView.qml ToolPage.qml PortCatalog.qml
+        controls/Theme.qml controls/PageHeader.qml controls/Motion.qml controls/Label.qml controls/Icon.qml controls/FocusFrame.qml
+        controls/Button.qml controls/Switch.qml controls/ProgressBar.qml controls/ScrollBar.qml controls/TextField.qml controls/Slider.qml
+        controls/ListView.qml controls/TableView.qml controls/Page.qml controls/NavigationBar.qml controls/ChoicePopup.qml
+    RESOURCES controls/qmldir)
+target_link_libraries(r46h-shell PRIVATE Qt6::Quick Qt6::Network Qt6::DBus SDL2::SDL2)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    enable_language(C)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(WaylandCapture REQUIRED IMPORTED_TARGET wayland-client libdrm)
+    find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
+    set(CAPTURE_XML "${CMAKE_CURRENT_SOURCE_DIR}/../gaming-wayland/protocol/weston-output-capture.xml")
+    set(CAPTURE_HEADER "${CMAKE_CURRENT_BINARY_DIR}/weston-output-capture-client-protocol.h")
+    set(CAPTURE_CODE "${CMAKE_CURRENT_BINARY_DIR}/capture-protocol.c")
+    add_custom_command(OUTPUT ${CAPTURE_HEADER} ${CAPTURE_CODE}
+        COMMAND ${WAYLAND_SCANNER} client-header ${CAPTURE_XML} ${CAPTURE_HEADER}
+        COMMAND ${WAYLAND_SCANNER} private-code ${CAPTURE_XML} ${CAPTURE_CODE}
+        DEPENDS ${CAPTURE_XML} VERBATIM)
+    target_sources(r46h-shell PRIVATE ../gaming-wayland/capture.cpp ${CAPTURE_CODE} ${CAPTURE_HEADER})
+    target_include_directories(r46h-shell PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+    target_link_libraries(r46h-shell PRIVATE PkgConfig::WaylandCapture)
+endif()
+qt_add_resources(r46h-shell keyboard PREFIX "/qt/qml/R46H/Shell" FILES KeyboardPanel.qml)
+set_target_properties(r46h-shell PROPERTIES MACOSX_BUNDLE FALSE)
+include(CTest)
+if(BUILD_TESTING)
+    qt_add_executable(shell-check tests/check.cpp preferences.cpp preferences.h input.cpp input.h telemetry.cpp telemetry.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
+    target_include_directories(shell-check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(shell-check PRIVATE Qt6::Quick Qt6::Test Qt6::Network Qt6::DBus SDL2::SDL2)
+    target_compile_definitions(shell-check PRIVATE SHELL_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    add_test(NAME shell-check COMMAND shell-check)
+    qt_add_executable(network-check tests/network-check.cpp network.cpp network.h)
+    target_include_directories(network-check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(network-check PRIVATE Qt6::Test Qt6::DBus)
+    add_test(NAME network-check COMMAND network-check)
+    qt_add_executable(tools-check tests/tools-check.cpp tools.cpp tools.h device.cpp device.h usbgamepad.cpp usbgamepad.h)
+    target_include_directories(tools-check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(tools-check PRIVATE Qt6::Test Qt6::Network)
+    add_test(NAME tools-check COMMAND tools-check)
+endif()

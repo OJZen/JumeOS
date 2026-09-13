@@ -1,0 +1,244 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+readonly EXPECTED_MANIFEST_SHA256="@DEPLOY_MANIFEST_SHA256@"
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+readonly SCRIPT_DIR
+readonly R46H_MANIFEST="${SCRIPT_DIR}/DEPLOY-MANIFEST"
+readonly TRUSTED_PAYLOAD=${R46H_DEPLOY_TRUSTED_PAYLOAD:-}
+readonly EXTERNAL_RECEIPT=${R46H_DEPLOY_EXTERNAL_RECEIPT:-}
+readonly EXTERNAL_RECEIPT_SHA256=${R46H_DEPLOY_EXTERNAL_RECEIPT_SHA256:-}
+readonly SECURE_ROMS_MOUNT=${R46H_DEPLOY_SECURE_ROMS_MOUNT:-}
+
+bootstrap_fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+bootstrap_value() {
+  local key=$1 count value
+  count=$(grep -c "^${key}=" "$R46H_MANIFEST" 2>/dev/null || true)
+  [[ "$count" -eq 1 ]] || bootstrap_fail "manifest key ${key} must appear exactly once"
+  value=$(sed -n "s/^${key}=//p" "$R46H_MANIFEST")
+  [[ "$value" != *$'\n'* ]] || bootstrap_fail "manifest key ${key} is multiline"
+  printf '%s' "$value"
+}
+
+[[ "$(id -u)" -eq 0 ]] || bootstrap_fail "run through the verified root-owned bootstrap"
+[[ "$TRUSTED_PAYLOAD" == "$SCRIPT_DIR" && -d "$SCRIPT_DIR" && ! -L "$SCRIPT_DIR" ]] ||
+  bootstrap_fail "installer is not running from the bootstrap trusted copy"
+[[ "$(stat -c '%u:%a' -- "$SCRIPT_DIR")" == 0:700 ]] ||
+  bootstrap_fail "trusted payload directory must be root-owned 0700"
+[[ "$EXTERNAL_RECEIPT" == "$SCRIPT_DIR/EXTERNAL-STAGE-RECEIPT" &&
+   "$EXTERNAL_RECEIPT_SHA256" =~ ^[0-9a-f]{64}$ &&
+   -f "$EXTERNAL_RECEIPT" && ! -L "$EXTERNAL_RECEIPT" ]] ||
+  bootstrap_fail "missing trusted external stage receipt"
+[[ "$(stat -c '%u:%a' -- "$EXTERNAL_RECEIPT")" == 0:600 &&
+   "$(sha256sum "$EXTERNAL_RECEIPT" | awk '{print $1}')" == "$EXTERNAL_RECEIPT_SHA256" ]] ||
+  bootstrap_fail "trusted external stage receipt mismatch"
+[[ -f "$R46H_MANIFEST" && ! -L "$R46H_MANIFEST" ]] || bootstrap_fail "unsafe deployment manifest"
+[[ "$(sha256sum "$R46H_MANIFEST" | awk '{print $1}')" == "$EXPECTED_MANIFEST_SHA256" ]] ||
+  bootstrap_fail "deployment manifest SHA-256 mismatch"
+common_name=$(bootstrap_value target_common)
+[[ "$common_name" == target-common.sh ]] || bootstrap_fail "unexpected target common path"
+common_path="${SCRIPT_DIR}/${common_name}"
+[[ -f "$common_path" && ! -L "$common_path" ]] || bootstrap_fail "unsafe target common"
+[[ "$(stat -c '%s' "$common_path")" == "$(bootstrap_value target_common_size)" ]] ||
+  bootstrap_fail "target common size mismatch"
+[[ "$(sha256sum "$common_path" | awk '{print $1}')" == "$(bootstrap_value target_common_sha256)" ]] ||
+  bootstrap_fail "target common SHA-256 mismatch"
+# shellcheck source=/dev/null
+source "$common_path"
+
+R46H_ROOT=$(r46h_test_root)
+readonly R46H_ROOT
+readonly roms_mount="$SECURE_ROMS_MOUNT"
+readonly modules_parent="${R46H_ROOT}/lib/modules"
+readonly lock_parent="${R46H_ROOT}/run/r46h-deploy"
+
+payload_name=$(r46h_manifest_value payload_name)
+old_release=$(r46h_manifest_value current_release)
+new_release=$(r46h_manifest_value kernel_release)
+package_name=$(r46h_manifest_value package_name)
+tar_name=$(r46h_manifest_value canonical_tar)
+expected_tree=$(r46h_manifest_value module_tree_sha256)
+expected_modules=$(r46h_manifest_value module_count)
+expected_files=$(r46h_manifest_value module_tree_file_count)
+source_commit=$(r46h_manifest_value source_git_commit)
+source_snapshot=$(r46h_manifest_value source_snapshot_sha256)
+tar_sha=$(r46h_manifest_value canonical_tar_sha256)
+tar_size=$(r46h_manifest_value canonical_tar_size)
+extraction_bytes=$(r46h_manifest_value extraction_bytes)
+extraction_inodes=$(r46h_manifest_value extraction_inodes)
+readonly payload_name old_release new_release package_name tar_name
+readonly expected_tree expected_modules expected_files source_commit source_snapshot
+readonly tar_sha tar_size extraction_bytes extraction_inodes
+readonly payload_tar="${SCRIPT_DIR}/${tar_name}"
+readonly final_modules="${modules_parent}/${new_release}"
+readonly receipt_payload="${roms_mount}/${payload_name}"
+readonly module_receipt="${receipt_payload}/MODULES-INSTALLED"
+readonly module_receipt_stage="${receipt_payload}/.MODULES-INSTALLED.stage"
+
+stage_dir=""
+stage_identity=""
+receipt_tmp=""
+install_complete=0
+
+cleanup() {
+  local status=$? identity
+  trap - EXIT
+  trap '' INT TERM HUP
+  if [[ -n "$receipt_tmp" && "$receipt_tmp" == "$module_receipt_stage" &&
+        -f "$receipt_tmp" && ! -L "$receipt_tmp" ]]; then
+    rm -f -- "$receipt_tmp"
+  fi
+  if [[ -n "$stage_dir" && -n "$stage_identity" &&
+        "$stage_dir" == "${modules_parent}/.r46h-${payload_name}-modules."* &&
+        -d "$stage_dir" && ! -L "$stage_dir" ]]; then
+    identity=$(r46h_identity "$stage_dir" 2>/dev/null || true)
+    [[ "$identity" != "$stage_identity" ]] || rm -rf -- "$stage_dir"
+  fi
+  if [[ "$install_complete" -ne 1 && ( -e "$final_modules" || -L "$final_modules" ) ]]; then
+    printf 'WARNING: target module directory exists without complete proof: %s\n' "$final_modules" >&2
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+publish_receipt() {
+  r46h_verify_rootfs_health_at install-before-module-receipt
+  [[ ! -e "$module_receipt" && ! -L "$module_receipt" ]] || r46h_fail "module receipt already exists"
+  [[ ! -e "$module_receipt_stage" && ! -L "$module_receipt_stage" ]] ||
+    r46h_fail "module receipt stage appeared concurrently"
+  receipt_tmp=$module_receipt_stage
+  (
+    set -o noclobber
+    printf '%s\n' \
+      'format_version=1' \
+      'status=complete' \
+      "installed_from=${old_release}" \
+      "installed_release=${new_release}" \
+      "source_git_commit=${source_commit}" \
+      "source_snapshot_sha256=${source_snapshot}" \
+      "payload_tar_sha256=${tar_sha}" \
+      "module_tree_sha256=${expected_tree}" \
+      "module_count=${expected_modules}" \
+      "module_tree_file_count=${expected_files}" > "$receipt_tmp"
+  ) || r46h_fail "cannot stage module receipt"
+  r46h_validate_receipt "$receipt_tmp" "$old_release" "$new_release" "$expected_tree" "$expected_modules" "$expected_files"
+  sync || r46h_fail "cannot sync staged module receipt"
+  [[ ! -e "$module_receipt" && ! -L "$module_receipt" ]] || r46h_fail "module receipt appeared concurrently"
+  mv -T -- "$receipt_tmp" "$module_receipt"
+  receipt_tmp=""
+  sync || r46h_fail "cannot sync published module receipt"
+  r46h_validate_receipt "$module_receipt" "$old_release" "$new_release" "$expected_tree" "$expected_modules" "$expected_files"
+}
+
+recover_interrupted_module_receipt_stage() {
+  local size
+  [[ -e "$module_receipt_stage" || -L "$module_receipt_stage" ]] || return 0
+  [[ -f "$module_receipt_stage" && ! -L "$module_receipt_stage" ]] ||
+    r46h_fail "unsafe interrupted module receipt stage"
+  size=$(r46h_size "$module_receipt_stage")
+  [[ "$size" =~ ^[0-9]+$ && "$size" -le 4096 ]] ||
+    r46h_fail "interrupted module receipt stage is unexpectedly large"
+  rm -- "$module_receipt_stage"
+  sync || r46h_fail "cannot sync interrupted module receipt recovery"
+  [[ ! -e "$module_receipt_stage" && ! -L "$module_receipt_stage" ]] ||
+    r46h_fail "interrupted module receipt stage remains after recovery"
+}
+
+[[ "$payload_name" =~ ^r46h-[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || r46h_fail "unsafe payload name"
+[[ "$new_release" =~ ^6\.12\.99-r46h-mainline-[A-Za-z0-9._-]+$ ]] || r46h_fail "unsafe new release"
+[[ "$old_release" =~ ^6\.12\.99-r46h-mainline-[A-Za-z0-9._-]+$ ]] || r46h_fail "unsafe old release"
+[[ "$package_name" =~ ^r46h-mainline-test-[A-Za-z0-9._-]+$ ]] || r46h_fail "unsafe package name"
+[[ "$tar_name" == "${package_name}.tar.gz" ]] || r46h_fail "unexpected canonical tar name"
+[[ "$roms_mount" == "$SCRIPT_DIR/card-roms" && -d "$roms_mount" && ! -L "$roms_mount" ]] ||
+  r46h_fail "missing private root-only EASYROMS mount"
+[[ "$SCRIPT_DIR" == "${lock_parent}/${payload_name}.trusted."* ]] ||
+  r46h_fail "trusted payload directory path mismatch"
+r46h_acquire_deploy_lock "$lock_parent"
+r46h_verify_card_mounts
+r46h_verify_modules_parent "$modules_parent"
+r46h_verify_rootfs_health_at install-initial
+[[ -d "$receipt_payload" && ! -L "$receipt_payload" &&
+   "$(stat -c '%u:%g:%a' -- "$receipt_payload")" == 0:0:700 ]] ||
+  r46h_fail "EASYROMS receipt payload is not root-only after secure remount"
+r46h_check_file "$receipt_payload/.r46h-stage-owner" \
+  "$(r46h_manifest_value stage_owner_size)" "$(r46h_manifest_value stage_owner_sha256)" "card stage owner"
+r46h_check_file "$receipt_payload/STAGE-COMPLETE" \
+  "$(r46h_manifest_value stage_complete_size)" "$(r46h_manifest_value stage_complete_sha256)" "card stage completion marker"
+r46h_check_file "$SCRIPT_DIR/.r46h-stage-owner" \
+  "$(r46h_manifest_value stage_owner_size)" "$(r46h_manifest_value stage_owner_sha256)" "stage owner"
+r46h_check_file "$SCRIPT_DIR/STAGE-COMPLETE" \
+  "$(r46h_manifest_value stage_complete_size)" "$(r46h_manifest_value stage_complete_sha256)" "stage completion marker"
+r46h_check_file "$payload_tar" "$tar_size" "$tar_sha" "canonical payload tar"
+recover_interrupted_module_receipt_stage
+
+running_release=$(r46h_running_release)
+final_present=0
+receipt_present=0
+[[ -e "$final_modules" || -L "$final_modules" ]] && final_present=1
+[[ -e "$module_receipt" || -L "$module_receipt" ]] && receipt_present=1
+
+if [[ "$final_present" -eq 1 && "$receipt_present" -eq 1 ]]; then
+  r46h_verify_module_tree "$modules_parent" "$new_release" "$expected_tree" "$expected_modules" "$expected_files" "installed"
+  r46h_validate_receipt "$module_receipt" "$old_release" "$new_release" "$expected_tree" "$expected_modules" "$expected_files"
+  install_complete=1
+  printf 'PASS: %s modules and receipt are already verified\n' "$new_release"
+  exit 0
+fi
+[[ "$running_release" == "$old_release" ]] || r46h_fail "fresh installation must run from ${old_release}"
+if [[ "$final_present" -eq 1 ]]; then
+  r46h_verify_module_tree "$modules_parent" "$new_release" "$expected_tree" "$expected_modules" "$expected_files" "receipt recovery"
+  publish_receipt
+  install_complete=1
+  printf 'PASS: recovered missing module receipt for %s\n' "$new_release"
+  exit 0
+fi
+[[ "$receipt_present" -eq 0 ]] || r46h_fail "module receipt exists without target module tree"
+
+available_kib=$(df -Pk "$modules_parent" | awk 'END {print $4}')
+available_inodes=$(df -Pi "$modules_parent" | awk 'END {print $4}')
+[[ "$available_kib" =~ ^[0-9]+$ && "$available_inodes" =~ ^[0-9]+$ &&
+   "$extraction_bytes" =~ ^[1-9][0-9]*$ && "$extraction_inodes" =~ ^[1-9][0-9]*$ ]] ||
+  r46h_fail "cannot read or validate rootfs capacity projection"
+required_kib=$(( (extraction_bytes + 1023) / 1024 + 65536 ))
+required_inodes=$(( extraction_inodes + 256 ))
+(( available_kib >= required_kib )) || r46h_fail "rootfs free space is below the package projection plus 64 MiB"
+(( available_inodes >= required_inodes )) || r46h_fail "rootfs free inodes are below the package projection plus 256"
+
+tar -tzf "$payload_tar" | while IFS= read -r entry; do
+  [[ -n "$entry" && "$entry" != /* && "$entry" != *$'\n'* && "$entry" != *'/../'* && "$entry" != ../* ]] ||
+    r46h_fail "unsafe tar path"
+done
+if tar -tvzf "$payload_tar" | awk 'substr($1,1,1)!="-" && substr($1,1,1)!="d" {bad=1} END{exit bad?1:0}'; then :; else
+  r46h_fail "payload tar contains links or special files"
+fi
+
+r46h_verify_rootfs_health_at install-before-extract
+stage_dir=$(mktemp -d "${modules_parent}/.r46h-${payload_name}-modules.XXXXXX") || r46h_fail "cannot create module staging directory"
+stage_identity=$(r46h_identity "$stage_dir")
+chmod 0700 "$stage_dir"
+tar --no-same-owner -xzf "$payload_tar" -C "$stage_dir"
+package_dir="${stage_dir}/${package_name}"
+staged_modules="${package_dir}/rootfs/lib/modules/${new_release}"
+[[ -d "$package_dir" && ! -L "$package_dir" ]] || r46h_fail "unexpected package root"
+[[ -d "$staged_modules" && ! -L "$staged_modules" ]] || r46h_fail "missing staged module tree"
+(
+  cd "$package_dir"
+  sha256sum -c SHA256SUMS >/dev/null
+) || r46h_fail "package SHA256SUMS verification failed"
+r46h_verify_module_tree "${package_dir}/rootfs/lib/modules" "$new_release" "$expected_tree" "$expected_modules" "$expected_files" "staged"
+r46h_verify_rootfs_health_at install-before-publish-modules
+[[ ! -e "$final_modules" && ! -L "$final_modules" ]] || r46h_fail "target module tree appeared concurrently"
+mv -T -- "$staged_modules" "$final_modules"
+sync || r46h_fail "cannot sync published module tree"
+r46h_verify_module_tree "$modules_parent" "$new_release" "$expected_tree" "$expected_modules" "$expected_files" "post-install"
+r46h_check_same_identity "$stage_dir" "$stage_identity" "package staging directory"
+/bin/rm -rf -- "$stage_dir"
+stage_dir=""
+stage_identity=""
+publish_receipt
+install_complete=1
+printf 'PASS: installed %s without modifying BOOT or older modules\n' "$new_release"

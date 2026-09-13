@@ -1,0 +1,9 @@
+    <system>
+        <name>arcade</name>
+        <fullname>Arcade</fullname>
+        <path>%ROMPATH%/arcade</path>
+        <extension>.7z .7Z .zip .ZIP</extension>
+        <command label="FinalBurn Neo">/usr/bin/retroarch --config /etc/r46h/retroarch.cfg --appendconfig /etc/r46h/es-de-retroarch.cfg -L /usr/local/libexec/fbneo_libretro.so %ROM%</command>
+        <platform>arcade</platform>
+        <theme>arcade</theme>
+    </system>

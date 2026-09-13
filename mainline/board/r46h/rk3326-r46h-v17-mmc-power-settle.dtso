@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/dts-v1/;
+/plugin/;
+
+/*
+ * Changed cold-MMC hypothesis after persistent v0.16 still reproduced -84.
+ *
+ * Linux 6.12 otherwise gives the system card only the generic 10 ms power
+ * settle default.  Use the factory R46H system-slot delay value for the
+ * standard initial-power property, while retaining v0.16's secondary-host
+ * isolation.  System-card speed capabilities and supplies remain unchanged.
+ */
+/ {
+	compatible = "rockchip,rk3326-r46h-linux", "rockchip,rk3326";
+
+	fragment@0 {
+		target-path = "/mmc@ff370000";
+
+		__overlay__ {
+			post-power-on-delay-ms = <800>;
+		};
+	};
+
+	fragment@1 {
+		target-path = "/mmc@ff380000";
+
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+};

@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "items": [
+    {
+      "path": "/roms/neogeo/mslug.zip",
+      "label": "Metal Slug",
+      "core_path": "/usr/local/libexec/fbneo_neogeo_libretro.so",
+      "core_name": "FinalBurn Neo (neogeo subset)",
+      "crc32": "DETECT",
+      "db_name": "FBNeo - Arcade Games.lpl"
+    }
+  ]
+}

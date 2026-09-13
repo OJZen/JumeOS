@@ -1,0 +1,12 @@
+diff --git a/src/audio/sdl.c b/src/audio/sdl.c
+--- a/src/audio/sdl.c
++++ b/src/audio/sdl.c
+@@ -48,7 +48,7 @@ static int sdl_renderer_init(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION
+   want.freq = opusConfig->sampleRate;
+   want.format = AUDIO_S16LSB;
+   want.channels = opusConfig->channelCount;
+-  want.samples = 4096;
++  want.samples = 0; /* Let SDL_AUDIO_SAMPLES select the device period. */
+ 
+   dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+   if (dev == 0) {

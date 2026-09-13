@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<!-- R46H v0.1 exposes only cores already present in and bounded by the accepted p2. -->
+<systemList>
+    <system>
+        <name>nes</name>
+        <fullname>Nintendo Entertainment System</fullname>
+        <path>%ROMPATH%/nes</path>
+        <extension>.3dsen .3DSEN .fds .FDS .nes .NES .unf .UNF .unif .UNIF .7z .7Z .zip .ZIP</extension>
+        <command label="Nestopia UE">/usr/bin/retroarch --config /etc/r46h/retroarch.cfg --appendconfig /etc/r46h/es-de-retroarch.cfg -L /usr/lib/aarch64-linux-gnu/libretro/nestopia_libretro.so %ROM%</command>
+        <platform>nes</platform>
+        <theme>nes</theme>
+    </system>
+    <system>
+        <name>famicom</name>
+        <fullname>Nintendo Family Computer</fullname>
+        <path>%ROMPATH%/famicom</path>
+        <extension>.3dsen .3DSEN .fds .FDS .nes .NES .unf .UNF .unif .UNIF .7z .7Z .zip .ZIP</extension>
+        <command label="Nestopia UE">/usr/bin/retroarch --config /etc/r46h/retroarch.cfg --appendconfig /etc/r46h/es-de-retroarch.cfg -L /usr/lib/aarch64-linux-gnu/libretro/nestopia_libretro.so %ROM%</command>
+        <platform>famicom</platform>
+        <theme>famicom</theme>
+    </system>
+    <system>
+        <name>gb</name>
+        <fullname>Nintendo Game Boy</fullname>
+        <path>%ROMPATH%/gb</path>
+        <extension>.bs .BS .cgb .CGB .dmg .DMG .gb .GB .gbc .GBC .gbx .GBX .sgb .SGB .sfc .SFC .smc .SMC .7z .7Z .zip .ZIP</extension>
+        <command label="Gambatte">/usr/bin/retroarch --config /etc/r46h/retroarch.cfg --appendconfig /etc/r46h/es-de-retroarch.cfg -L /usr/lib/aarch64-linux-gnu/libretro/gambatte_libretro.so %ROM%</command>
+        <platform>gb</platform>
+        <theme>gb</theme>
+    </system>
+    <system>
+        <name>gbc</name>
+        <fullname>Nintendo Game Boy Color</fullname>
+        <path>%ROMPATH%/gbc</path>
+        <extension>.bs .BS .cgb .CGB .dmg .DMG .gb .GB .gbc .GBC .gbx .GBX .sgb .SGB .sfc .SFC .smc .SMC .7z .7Z .zip .ZIP</extension>
+        <command label="Gambatte">/usr/bin/retroarch --config /etc/r46h/retroarch.cfg --appendconfig /etc/r46h/es-de-retroarch.cfg -L /usr/lib/aarch64-linux-gnu/libretro/gambatte_libretro.so %ROM%</command>
+        <platform>gbc</platform>
+        <theme>gbc</theme>
+    </system>
+    <system>
+        <name>gba</name>
+        <fullname>Nintendo Game Boy Advance</fullname>
+        <path>%ROMPATH%/gba</path>
+        <extension>.agb .AGB .bin .BIN .cgb .CGB .dmg .DMG .gb .GB .gba .GBA .gbc .GBC .gbx .GBX .sgb .SGB .7z .7Z .zip .ZIP</extension>
+        <command label="mGBA">/usr/bin/retroarch --config /etc/r46h/retroarch.cfg --appendconfig /etc/r46h/es-de-retroarch.cfg -L /usr/lib/aarch64-linux-gnu/libretro/mgba_libretro.so %ROM%</command>
+        <platform>gba</platform>
+        <theme>gba</theme>
+    </system>
+    <system>
+        <name>nds</name>
+        <fullname>Nintendo DS</fullname>
+        <path>%ROMPATH%/nds</path>
+        <extension>.app .APP .bin .BIN .nds .NDS .7z .7Z .zip .ZIP</extension>
+        <command label="DeSmuME">/usr/bin/retroarch --config /etc/r46h/retroarch.cfg --appendconfig /etc/r46h/es-de-retroarch.cfg -L /usr/lib/aarch64-linux-gnu/libretro/desmume_libretro.so %ROM%</command>
+        <platform>nds</platform>
+        <theme>nds</theme>
+    </system>
+    <system>
+        <name>neogeo</name>
+        <fullname>SNK Neo Geo</fullname>
+        <path>%ROMPATH%/neogeo</path>
+        <extension>.neo .NEO .7z .7Z .zip .ZIP</extension>
+        <command label="FinalBurn Neo (accepted subset)">/usr/bin/retroarch --config /etc/r46h/retroarch.cfg --appendconfig /etc/r46h/es-de-retroarch.cfg -L /usr/local/libexec/fbneo_neogeo_libretro.so %ROM%</command>
+        <platform>neogeo</platform>
+        <theme>neogeo</theme>
+    </system>
+</systemList>

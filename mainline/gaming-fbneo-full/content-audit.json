@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-04",
+  "boundary": "RetroArch null-I/O startup through FBNeo Driver successfully started",
+  "core_sha256": "d63bc891a85599949b99748aa5dcd79aed86c29dc859739a9bfe4e1361c02956",
+  "container_id": "sha256:bd09bf6db6f1fb8f882621e98d70f01f976fd8dfba1bc897766afebd64cf51b9",
+  "retroarch_package": "retroarch_1.20.0+dfsg-2+b1_arm64.deb",
+  "directories": {
+    "cps1": {
+      "archives": 48,
+      "loaded": 48,
+      "fixture_manifest_sha256": "569df5e4166a326845817d48c6b2ebfb8293fa7a08bad72773a3d047d04cb5c5",
+      "failed": {}
+    },
+    "cps2": {
+      "archives": 62,
+      "loaded": 57,
+      "fixture_manifest_sha256": "17f0477d696e79da62b0e727488689e9601dd6383cdc87fcd4bd1d3c667c5c5b",
+      "failed": {
+        "1944.zip": "c654a6b850d594c6c22913b8d884123f7f4c9dce31e7de1ee98c7cf703b90818",
+        "19xx.zip": "4f2e56e0bfb38b5255ae4155d511987245b61eacf68aadc14c6f5dc5b8f1ecae",
+        "avsp.zip": "b427b63e7878522ce065a0b5b44ad9ca72ae6e39fa803e96ddda28ed305651ea",
+        "avspj.zip": "e85e942616f45b4e093fc88e28920b6d99eb397baab7d1899061651519cad38e",
+        "progear.zip": "0f4e8fb2591bb15994ace853a1fd093007a378d6d7e8b11527b7901d95081b6b"
+      }
+    },
+    "cps3": {
+      "archives": 12,
+      "loaded": 9,
+      "fixture_manifest_sha256": "cda39ccd711f019a0aa654415ab85a053a151413afd705deac7b900397a22fb1",
+      "failed": {
+        "jojo.zip": "4edb64dd5c3c0a1503a9ad9077ddb8a8a04a378f5f92bb615172a2fa7194f396",
+        "jojoba.zip": "62057a171c71c5c5f4d7d1572074983c533ac2a0a31da6032ea6d127cf4e12bc",
+        "jojobane.zip": "7a2e07d516840d00ba7db919a5071c068aefc8e2b4e5659cc885582dd60e79fb"
+      }
+    }
+  }
+}

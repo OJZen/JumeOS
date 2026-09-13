@@ -1,0 +1,13 @@
+[Unit]
+Description=R46H Debian 13 first-boot identity setup
+After=local-fs.target
+Before=sshd-keygen.service ssh.service NetworkManager.service
+ConditionPathExists=!/var/lib/r46h/firstboot-complete
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/r46h-firstboot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

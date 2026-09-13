@@ -1,0 +1,72 @@
+From 8d7368520241509f5265605023ef7d9455f26f07 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Tue, 11 Aug 2026 10:30:00 +0800
+Subject: [PATCH] arm64: dts: rockchip: use the R46H ADC full range
+
+The R46H joystick mux feeds an unsigned 10-bit SARADC. Hardware testing
+with the inversion fix produced values from 31 through 946, outside the
+ODROID-GO-derived 180 through 800 limits currently advertised by the
+input device.
+
+Use the complete 0 through 1023 converter domain for all four axes so a
+valid raw sample cannot escape the input contract across device variation.
+Keep the existing X and Y polarity and the existing fuzz and flat values.
+
+Signed-off-by: Codex <codex@openai.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3326-r46h.dts | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts b/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
+index 6e812c657b9f..e9cab2c80d2b 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
+@@ -79,15 +79,15 @@ analog_sticks: adc-joystick {
+ 		#size-cells = <0>;
+ 
+ 		/*
+-		 * The raw limits follow the upstream ODROID-GO Super circuit.
+-		 * X and Y are reversed to preserve the downstream R46H polarity.
+-		 * These limits must be calibrated on the physical test unit.
++		 * The mux feeds the unsigned 10-bit RK3326 SARADC. Hardware sweeps
++		 * exceeded the borrowed ODROID-GO Super limits, so advertise the
++		 * complete converter domain. X and Y preserve the R46H polarity.
+ 		 */
+ 		axis@0 {
+ 			reg = <0>;
+ 			abs-flat = <10>;
+ 			abs-fuzz = <10>;
+-			abs-range = <800 180>;
++			abs-range = <1023 0>;
+ 			linux,code = <ABS_X>;
+ 		};
+ 
+@@ -95,7 +96,7 @@ axis@1 {
+ 			reg = <1>;
+ 			abs-flat = <10>;
+ 			abs-fuzz = <10>;
+-			abs-range = <180 800>;
++			abs-range = <0 1023>;
+ 			linux,code = <ABS_RX>;
+ 		};
+ 
+@@ -103,7 +104,7 @@ axis@2 {
+ 			reg = <2>;
+ 			abs-flat = <10>;
+ 			abs-fuzz = <10>;
+-			abs-range = <800 180>;
++			abs-range = <1023 0>;
+ 			linux,code = <ABS_Y>;
+ 		};
+ 
+@@ -111,7 +112,7 @@ axis@3 {
+ 			reg = <3>;
+ 			abs-flat = <10>;
+ 			abs-fuzz = <10>;
+-			abs-range = <180 800>;
++			abs-range = <0 1023>;
+ 			linux,code = <ABS_RY>;
+ 		};
+ 	};
+-- 
+2.39.5

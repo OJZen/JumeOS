@@ -1,0 +1,41 @@
+{
+  "format_version": 1,
+  "baseline_id": "v0.8-bootloader-handoff",
+  "release": "6.12.99-r46h-mainline-v0.8-bootloader-handoff",
+  "payload_name": "r46h-v0.8-bootloader-handoff",
+  "source_git_commit": "6bc39c6a0d33a385d2e10cf910b16616c33491b3",
+  "boot": {
+    "active_path": "boot.ini",
+    "candidate_path": "boot.ini.v0.8-bootloader-handoff",
+    "candidate_size": 1427,
+    "candidate_sha256": "cead3fbee0d5c42fddcd6f6d83839b82af791e1abf1dd0252d9850fb47dd33fb",
+    "image_path": "Image.mainline-v0.8-bootloader-handoff.gz",
+    "image_size": 14920864,
+    "image_sha256": "d7c7796c097fbe692412fb63d19c1f97c4b21f55ae2c3b1e8df324a739f166fa",
+    "dtb_path": "rk3326-r46h-mainline-v0.8-bootloader-handoff.dtb",
+    "dtb_size": 49481,
+    "dtb_sha256": "7259bac7bdd063fbaed987a0d5d2bf7066e02beaacc4440849b93d5f048e3dbc"
+  },
+  "payload_anchors": [
+    {
+      "path": ".r46h-stage-owner",
+      "size": 432,
+      "sha256": "9803bd40d2575fe3357acdb233b27842679b5acfdb747cc6fe9e4d9ca4d18687"
+    },
+    {
+      "path": "DEPLOY-MANIFEST",
+      "size": 5066,
+      "sha256": "7f824b5cabc1a1d6bee540fe56a95e4b32128ec5d603784f8a0a363117152bb5"
+    },
+    {
+      "path": "STAGE-COMPLETE",
+      "size": 564,
+      "sha256": "7de695c19cd6a475143d9e78271877e1adce358584d9ac81e7b1b3276141d2e9"
+    },
+    {
+      "path": "r46h-mainline-test-v0.8-bootloader-handoff.tar.gz",
+      "size": 33259526,
+      "sha256": "8c7282a07bdec52b753a8af27d15c6bbc8b71b34d017c3d78a2273fba6cfd09e"
+    }
+  ]
+}

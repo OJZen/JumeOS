@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+      - name: Documentation
+        run: python3 -B mainline/tests/test-project-docs.py
+      - name: Rust format
+        working-directory: mainline/tools/r46h-card-toolchain
+        run: cargo fmt --all -- --check
+      - name: Rust lint
+        working-directory: mainline/tools/r46h-card-toolchain
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Rust core tests
+        working-directory: mainline/tools/r46h-card-toolchain
+        run: cargo test --locked -p r46h-card-core

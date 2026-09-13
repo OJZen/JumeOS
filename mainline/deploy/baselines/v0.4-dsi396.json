@@ -1,0 +1,41 @@
+{
+  "format_version": 1,
+  "baseline_id": "v0.4-dsi396",
+  "release": "6.12.99-r46h-mainline-v0.4-dsi396",
+  "payload_name": "r46h-v0.4-dsi396",
+  "source_git_commit": "7b3c5d0366e7a550c561e2f4d9e9b5604e356562",
+  "boot": {
+    "active_path": "boot.ini",
+    "candidate_path": "boot.ini.v0.4-dsi396",
+    "candidate_size": 1333,
+    "candidate_sha256": "7f896fa80bbf0d69cf74a2b5b6b48479140381dfc46febd870456a480358465a",
+    "image_path": "Image.mainline-v0.4-dsi396.gz",
+    "image_size": 14919895,
+    "image_sha256": "088694bf0770c5c84a035f7827f4d985773e56535a0ada47cbceb4aba069dfad",
+    "dtb_path": "rk3326-r46h-mainline-v0.4-dsi396.dtb",
+    "dtb_size": 49448,
+    "dtb_sha256": "074bb3121fafe5df96872628ab22db03ffd63adf53c990e779e5a0e2f54b7a2b"
+  },
+  "payload_anchors": [
+    {
+      "path": ".codex-stage-owner",
+      "size": 308,
+      "sha256": "08e1a2ecf02e6ce9c4355a865d46224ff3f141662b5bcc8381a3f287ecfb183e"
+    },
+    {
+      "path": "DEPLOY-MANIFEST",
+      "size": 2099,
+      "sha256": "e41e3d996cc88cbbe633c9cd6baaba29cf41db3ab084f3a92439bde674d0fa5a"
+    },
+    {
+      "path": "STAGE-COMPLETE",
+      "size": 428,
+      "sha256": "1ae75836b9b035f2cbb3c0666968f0bd533739e94733c3a2b344cf8b0307910d"
+    },
+    {
+      "path": "r46h-mainline-test-v0.4-dsi396.tar.gz",
+      "size": 33256622,
+      "sha256": "311252094935213513ef4001c72a4476d41be1e73e37d0c1a529d94616923f3d"
+    }
+  ]
+}

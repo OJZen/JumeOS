@@ -1,0 +1,16 @@
+alsa-utils
+dosfstools
+ethtool
+evtest
+exfatprogs
+firmware-realtek
+i2c-tools
+iproute2
+iputils-ping
+iw
+lm-sensors
+network-manager
+rfkill
+usbutils
+wireless-regdb
+wpasupplicant

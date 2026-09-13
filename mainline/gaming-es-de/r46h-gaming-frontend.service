@@ -1,0 +1,21 @@
+[Unit]
+Description=R46H ES-DE gaming frontend candidate
+Documentation=file:/var/lib/r46h-gaming-es-de/v0.1/README.md
+Wants=getty@tty1.service r46h-volume-keys.service
+Requires=r46h-gaming-input.service
+RequiresMountsFor=/roms
+After=systemd-user-sessions.service getty@tty1.service r46h-gaming-input.service r46h-volume-keys.service
+Conflicts=getty@tty2.service
+
+[Service]
+Type=simple
+ExecCondition=/usr/local/libexec/r46h-gaming-frontend-condition
+ExecStart=/usr/local/sbin/r46h-es-de-ui
+KillMode=mixed
+TimeoutStopSec=15s
+Restart=no
+SuccessExitStatus=129 130 143
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "source": {
+    "repository": "https://gitlab.com/es-de/emulationstation-de.git",
+    "tag": "v3.4.1",
+    "commit": "5db4e2a32bd5852cc7a3dbeb298d85de86a536d7",
+    "tree": "fc0bb596d66ddcc26548edb6a31c075da68e5cd6",
+    "archive_url": "https://gitlab.com/es-de/emulationstation-de/-/archive/v3.4.1/emulationstation-de-v3.4.1.tar.gz",
+    "archive_name": "emulationstation-de-v3.4.1.tar.gz",
+    "archive_size": 77253914,
+    "archive_sha256": "58a45eb3f400a3b02d5b994407ba8c5f71807de3c2df571b7abdc21bc6e83be8",
+    "source_date_epoch": 1775822834
+  },
+  "build": {
+    "platform": "linux/arm64",
+    "base_image": "arkos4clone/r46h-debian13-p2-mvp:v0.1@sha256:bd09bf6db6f1fb8f882621e98d70f01f976fd8dfba1bc897766afebd64cf51b9",
+    "base_image_id": "sha256:bd09bf6db6f1fb8f882621e98d70f01f976fd8dfba1bc897766afebd64cf51b9",
+    "accepted_target_packages": {
+      "kbd": "2.7.1-2",
+      "libretro-desmume": "0.9.11+git20160819+dfsg1-2+b2",
+      "libretro-gambatte": "0.5.0+git20160522+dfsg1-3",
+      "libretro-mgba": "0.10.5+dfsg-1",
+      "libretro-nestopia": "1.53.0+20250119.git5b56b6b-1",
+      "retroarch": "1.20.0+dfsg-2+b1"
+    },
+    "cmake_options": [
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DCMAKE_INSTALL_PREFIX=/opt/r46h/es-de",
+      "-DGL=OFF",
+      "-DGLES=ON",
+      "-DDEINIT_ON_LAUNCH=ON",
+      "-DAPPLICATION_UPDATER=OFF",
+      "-DVIDEO_HW_DECODING=OFF"
+    ]
+  },
+  "artifact": {
+    "name": "r46h-es-de-runtime-v3.4.1.tar.gz",
+    "size": 81738580,
+    "sha256": "d5de91eb79fa229336d3f0f9c5e0e0d34b0096950cc67928914603209003aa70",
+    "version_output": "ES-DE 3.4.1 (r51)"
+  }
+}

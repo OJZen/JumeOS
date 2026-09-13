@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arkos4clone.invalid/schemas/r46h-card-profile-v2.json",
+  "$comment": "Structural authoring aid only. The r46h-card CLI schema-check or schema-check-readonly command is the authoritative semantic validator; this schema does not authorize execution or writes.",
+  "title": "R46H card profile v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format_version", "profile_id", "target", "whole_size", "sector_size", "partition_scheme", "prefix", "partitions"],
+  "properties": {
+    "format_version": { "const": 2 },
+    "profile_id": { "$ref": "#/$defs/id" },
+    "target": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "whole_size": { "type": "integer", "minimum": 1, "maximum": 18446744073709551615 },
+    "sector_size": { "type": "integer", "minimum": 512, "maximum": 4294967295 },
+    "partition_scheme": { "enum": ["mbr", "gpt"] },
+    "prefix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["size", "sha256"],
+      "properties": {
+        "size": { "type": "integer", "minimum": 1, "maximum": 18446744073709551615 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "partitions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/partition" }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "partition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "number", "offset", "size"],
+      "properties": {
+        "role": { "enum": ["boot", "root", "easyroms"] },
+        "number": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "offset": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+        "size": { "type": "integer", "minimum": 1, "maximum": 18446744073709551615 },
+        "mbr": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["bootable", "type_code"],
+              "properties": {
+                "bootable": { "type": "boolean" },
+                "type_code": { "type": "integer", "minimum": 1, "maximum": 255 }
+              }
+            }
+          ]
+        },
+        "filesystem": { "type": ["string", "null"] },
+        "identifiers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    }
+  }
+}

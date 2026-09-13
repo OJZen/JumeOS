@@ -1,0 +1,161 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+LANG=C
+export PATH LC_ALL LANG
+
+readonly DEVICE=/dev/input/by-path/platform-gpio-keys-vol-event
+readonly EXPECTED_NAME=gpio-keys-vol
+readonly CARD=0
+readonly CONTROL=2
+readonly STEP=16
+readonly SAFE_MAX=201
+
+resolved_device=""
+
+usage() {
+  printf 'usage: r46h-volume-keys [--check]\n'
+}
+
+wait_for_device() {
+  local attempt
+
+  for ((attempt=0; attempt<100; attempt++)); do
+    resolved_device=$(/usr/bin/readlink -f "$DEVICE" 2>/dev/null || true)
+    if [[ -n "$resolved_device" && -c "$resolved_device" && -r "$resolved_device" ]]; then
+      return 0
+    fi
+    /usr/bin/sleep 0.1
+  done
+  printf 'R46H_VOLUME_KEYS result=fail reason=device-unavailable path=%s\n' \
+    "$DEVICE" >&2
+  return 1
+}
+
+parse_level() {
+  /usr/bin/awk -F= '
+    /^[[:space:]]*: values=/ {
+      split($2, value, ",")
+      if (value[1] ~ /^[0-9]+$/ && value[2] == value[1]) {
+        print value[1]
+        found=1
+      }
+    }
+    END { exit found ? 0 : 1 }
+  '
+}
+
+read_level() {
+  /usr/bin/amixer -c "$CARD" cget "numid=$CONTROL" 2>/dev/null | parse_level
+}
+
+wait_for_mixer() {
+  local attempt level mixer
+
+  for ((attempt=0; attempt<150; attempt++)); do
+    mixer=$(/usr/bin/amixer -c "$CARD" cget "numid=$CONTROL" 2>/dev/null || true)
+    if [[ "$mixer" == *'values=2,min=0,max=255'* ]]; then
+      level=$(printf '%s\n' "$mixer" | parse_level) || true
+      if [[ "$level" =~ ^[0-9]+$ ]]; then
+        printf '%s\n' "$level"
+        return 0
+      fi
+    fi
+    /usr/bin/sleep 0.1
+  done
+  return 1
+}
+
+check_environment() {
+  local event_name level
+
+  for tool in /usr/bin/amixer /usr/bin/awk /usr/bin/evtest /usr/bin/readlink \
+    /usr/bin/sleep /usr/bin/stdbuf; do
+    [[ -x "$tool" ]] || {
+      printf 'R46H_VOLUME_KEYS_CHECK result=fail reason=missing-runtime path=%s\n' \
+        "$tool" >&2
+      return 1
+    }
+  done
+  wait_for_device
+  event_name=$(<"/sys/class/input/${resolved_device##*/}/device/name")
+  [[ "$event_name" == "$EXPECTED_NAME" ]] || {
+    printf 'R46H_VOLUME_KEYS_CHECK result=fail reason=unexpected-device name=%s\n' \
+      "$event_name" >&2
+    return 1
+  }
+  level=$(wait_for_mixer) || {
+    printf 'R46H_VOLUME_KEYS_CHECK result=fail reason=mixer-unavailable\n' >&2
+    return 1
+  }
+  (( level >= 0 && level <= 255 )) || {
+    printf 'R46H_VOLUME_KEYS_CHECK result=fail reason=invalid-level level=%s\n' \
+      "$level" >&2
+    return 1
+  }
+  printf 'R46H_VOLUME_KEYS_CHECK result=pass device=%s level=%d safe_max=%d\n' \
+    "$resolved_device" "$level" "$SAFE_MAX"
+}
+
+set_level() {
+  local level=$1
+
+  /usr/bin/amixer -q -c "$CARD" cset "numid=$CONTROL" "$level,$level"
+}
+
+adjust_level() {
+  local current next
+
+  current=$(read_level) || {
+    printf 'R46H_VOLUME_KEYS result=fail reason=unreadable-level\n' >&2
+    return 1
+  }
+  next=$((current + $1))
+  (( next < 0 )) && next=0
+  (( next > SAFE_MAX )) && next=$SAFE_MAX
+  if (( next != current )); then
+    set_level "$next"
+  fi
+  printf 'R46H_VOLUME_KEYS result=pass old=%d new=%d\n' "$current" "$next"
+}
+
+case ${1:-} in
+  '') ;;
+  --check)
+    check_environment
+    exit 0
+    ;;
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
+
+check_environment
+initial_level=$(read_level)
+if (( initial_level > SAFE_MAX )); then
+  set_level "$SAFE_MAX"
+  initial_level=$SAFE_MAX
+fi
+printf 'R46H_VOLUME_KEYS state=listening device=%s level=%d step=%d safe_max=%d\n' \
+  "$resolved_device" "$initial_level" "$STEP" "$SAFE_MAX"
+
+set +e
+/usr/bin/stdbuf -oL -eL /usr/bin/evtest "$DEVICE" 2>&1 |
+  while IFS= read -r line; do
+    case "$line" in
+      *'(KEY_VOLUMEUP), value 1'*) adjust_level "$STEP" ;;
+      *'(KEY_VOLUMEDOWN), value 1'*) adjust_level "-$STEP" ;;
+    esac
+  done
+evtest_status=${PIPESTATUS[0]}
+set -e
+printf 'R46H_VOLUME_KEYS result=fail reason=listener-exited status=%d\n' \
+  "$evtest_status" >&2
+exit 1

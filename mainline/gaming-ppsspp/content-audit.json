@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-09-04",
+  "core_sha256": "f39819580dc5a867bd8674eef37b13c2eef328824b1aabe7ed4dc98af61bf3a7",
+  "runtime": {
+    "retroarch_version": "1.20.0",
+    "video_driver": "null",
+    "audio_driver": "null",
+    "input_driver": "null",
+    "backend": "none",
+    "software_rendering": "enabled",
+    "pass_markers": [
+      "[libretro INFO] [SCEKERNEL] Kernel initialized.",
+      "[libretro INFO] [LOADER] Starting graphics..."
+    ]
+  },
+  "original_gamelist": {
+    "path": "psp/gamelist.xml.old",
+    "entries": 27,
+    "present": 6,
+    "missing": 21
+  },
+  "content": [
+    {
+      "path": "psp/融合方块汉化版.iso",
+      "size": 28577792,
+      "sha256": "3574bfe74d5a6a80e5c64125866f4f995b98e96371843d35c842463ccedbf9be",
+      "disc_id": "NPUH10042",
+      "title": "KURULIN FUSION",
+      "result": "pass"
+    },
+    {
+      "path": "psp/脱逃大师1汉化版.cso",
+      "size": 46483226,
+      "sha256": "88da589ca146d18ddbc945fef3121d5720ccace4b53a378db864cef7d64b6aef",
+      "disc_id": "ULJM05062",
+      "title": "EXIT",
+      "result": "pass"
+    },
+    {
+      "path": "psp/我的出租车汉化版.cso",
+      "size": 42739254,
+      "sha256": "8011824045a68a59ce27f0f5d590d892d634869b7bbb7d0492ddae4284a75ab0",
+      "disc_id": "ULJS00096",
+      "title": "SIMPLE2500シリーズPortable!! Vol.9       THE マイ・タクシー",
+      "result": "pass"
+    },
+    {
+      "path": "psp/泡泡龙口袋版汉化版.cso",
+      "size": 9616937,
+      "sha256": "636d5e35a8fe2a7e48a113b1b1d7422cfc972531c5f62cced388757de8bcd123",
+      "disc_id": "ULJM05011",
+      "title": "PUZZLEBOBBLE POCKET",
+      "result": "pass"
+    },
+    {
+      "path": "psp/我的世界PSP/我的世界PSP.PBP",
+      "size": 3910347,
+      "sha256": "84fe293739239eb09b5ac2596229fef4b75e84265e1304a182a6fdb62b5c9d47",
+      "disc_id": null,
+      "title": "Minecraft",
+      "result": "pass"
+    },
+    {
+      "path": "psp/水晶守卫汉化版.iso",
+      "size": 12382208,
+      "sha256": "1e861212a707456e3b34e19ca292c059ff2b2b0969a89d3627fff0ed61dac2d5",
+      "disc_id": "NPEH00017",
+      "title": "CRYSTAL DEFENDERS",
+      "result": "pass"
+    }
+  ],
+  "known_boundaries": [
+    "Null I/O startup does not prove GLES, LCD, audio, controls, pacing or gameplay.",
+    "Only upstream replacement fonts are packaged; proprietary PSP fonts are not copied.",
+    "The loose Minecraft PBP probes its read-only content directory, logs a failed temporary write and continues into graphics startup."
+  ]
+}

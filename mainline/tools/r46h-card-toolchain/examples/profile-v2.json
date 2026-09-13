@@ -1,0 +1,41 @@
+{
+  "format_version": 2,
+  "profile_id": "r46h-simulator-v2",
+  "target": "R46H-TEST",
+  "whole_size": 4096,
+  "sector_size": 512,
+  "partition_scheme": "mbr",
+  "prefix": {
+    "size": 512,
+    "sha256": "076a27c79e5ace2a3d47f9dd2e6d871f28c96a459a76b043808922c8c5a0c73e"
+  },
+  "partitions": [
+    {
+      "role": "boot",
+      "number": 1,
+      "offset": 512,
+      "size": 1024,
+      "mbr": { "bootable": false, "type_code": 12 },
+      "filesystem": null,
+      "identifiers": {}
+    },
+    {
+      "role": "root",
+      "number": 2,
+      "offset": 1536,
+      "size": 1024,
+      "mbr": { "bootable": false, "type_code": 131 },
+      "filesystem": null,
+      "identifiers": {}
+    },
+    {
+      "role": "easyroms",
+      "number": 3,
+      "offset": 2560,
+      "size": 1024,
+      "mbr": { "bootable": false, "type_code": 7 },
+      "filesystem": null,
+      "identifiers": {}
+    }
+  ]
+}

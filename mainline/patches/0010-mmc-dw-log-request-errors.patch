@@ -1,0 +1,50 @@
+From 7aa25ea25908512541c80d515eac09bead199a7c Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Mon, 17 Aug 2026 12:00:00 +0800
+Subject: [PATCH] mmc: dw_mmc: log failed request details
+
+The MMC core's final card-initialization error does not identify which
+request failed or distinguish response and data errors. Emit an error-only
+record at the DesignWare completion points with the request opcode,
+argument, raw interrupt status and resulting errno.
+
+The diagnostics do not alter retries, clocks, signal voltage, timing or
+request completion.  Successful requests remain silent.
+
+Signed-off-by: Codex <codex@openai.com>
+---
+ drivers/mmc/host/dw_mmc.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 55158540c28c..4ef5a8409fd1 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1954,6 +1954,12 @@ static int dw_mci_command_complete(struct dw_mci *host, struct mmc_command *cmd)
+ 	else
+ 		cmd->error = 0;
+ 
++	if (cmd->error)
++		dev_err(host->dev,
++			"R46H_MMC_CMD_ERROR host=%s op=%u arg=%#x stat=%#x err=%d\n",
++			mmc_hostname(host->slot->mmc), cmd->opcode, cmd->arg,
++			status, cmd->error);
++
+ 	return cmd->error;
+ }
+ 
+@@ -1988,6 +1994,12 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
+ 			data->error = -EILSEQ;
+ 		}
+ 
++		dev_err(host->dev,
++			"R46H_MMC_DATA_ERROR host=%s op=%u arg=%#x stat=%#x err=%d\n",
++			mmc_hostname(host->slot->mmc),
++			data->mrq->cmd->opcode, data->mrq->cmd->arg,
++			status, data->error);
++
+ 		dev_dbg(host->dev, "data error, status 0x%08x\n", status);
+ 
+ 		/*
+-- 
+2.50.1

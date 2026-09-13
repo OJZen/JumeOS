@@ -1,0 +1,34 @@
+--- a/app/streaming/video/ffmpeg.cpp
++++ b/app/streaming/video/ffmpeg.cpp
+@@ -2,0 +3 @@
++#include "streamstats.h"
+@@ -231,0 +233 @@
++    m_ReportStats = !testOnly && qEnvironmentVariable("R46H_STREAM_STATS") == "1" && StreamStats::preparePipe();
+@@ -652,0 +655,16 @@
++static QJsonObject r46hVideoStats(const VIDEO_STATS& stats, int audioNetworkQueueMs)
++{
++    auto average = [](double total, uint32_t count) { return count ? total / count : -1.; };
++    auto rate = [](float value) { return std::isfinite(value) && value >= 0 ? double(value) : -1.; };
++    return {{"version", 1}, {"receivedFps", rate(stats.receivedFps)},
++        {"decodedFps", rate(stats.decodedFps)}, {"renderedFps", rate(stats.renderedFps)},
++        {"networkDropPercent", average(double(stats.networkDroppedFrames) * 100, stats.totalFrames)},
++        {"pacingDropPercent", average(double(stats.pacerDroppedFrames) * 100, stats.decodedFrames)},
++        {"decodeMs", average(stats.totalDecodeTime, stats.decodedFrames)},
++        {"queueMs", average(stats.totalPacerTime, stats.renderedFrames)},
++        {"renderCallMs", average(stats.totalRenderTime, stats.renderedFrames)},
++        {"rttMs", stats.lastRtt ? double(stats.lastRtt) : -1.},
++        {"hostProcessingMs", average(double(stats.totalHostProcessingLatency) / 10, stats.framesWithHostProcessingLatency)},
++        {"audioNetworkQueueMs", audioNetworkQueueMs}};
++}
++
+@@ -1757,0 +1776,6 @@
++        if (m_ReportStats) {
++            VIDEO_STATS currentStats = {};
++            addVideoStats(m_ActiveWndVideoStats, currentStats);
++            StreamStats::send(StreamStats::encode(r46hVideoStats(currentStats, LiGetPendingAudioDuration())));
++        }
++
+--- a/app/streaming/video/ffmpeg.h
++++ b/app/streaming/video/ffmpeg.h
+@@ -110,0 +111 @@
++    bool m_ReportStats = false;

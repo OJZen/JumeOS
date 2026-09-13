@@ -1,0 +1,38 @@
+[Unit]
+Description=R46H hardware volume keys with persistent level
+Documentation=file:/usr/share/doc/r46h-gaming-mvp/GAMING-PRODUCT.md
+Wants=sound.target
+After=systemd-udev-trigger.service sound.target alsa-restore.service
+Before=r46h-gaming-frontend.service
+StartLimitIntervalSec=30s
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=ark
+Group=ark
+SupplementaryGroups=audio input
+StateDirectory=r46h-volume
+StateDirectoryMode=0700
+ExecStartPre=/usr/local/libexec/r46h-volume-keys --check
+ExecStart=/usr/local/libexec/r46h-volume-keys
+Restart=on-failure
+RestartSec=1s
+TimeoutStartSec=20s
+TimeoutStopSec=5s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_UNIX
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

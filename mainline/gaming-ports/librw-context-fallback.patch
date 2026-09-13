@@ -1,0 +1,31 @@
+diff --git a/src/gl/gl3device.cpp b/src/gl/gl3device.cpp
+index 569dfad..6d6c599 100644
+--- a/src/gl/gl3device.cpp
++++ b/src/gl/gl3device.cpp
+@@ -1547,2 +1547,2 @@ startSDL2(void)
+-	SDL_Window *win;
+-	SDL_GLContext ctx;
++	SDL_Window *win = nil;
++	SDL_GLContext ctx = nil;
+@@ -1573 +1573,10 @@ startSDL2(void)
+-			break;
++			ctx = SDL_GL_CreateContext(win);
++			if(ctx){
++				if((gl3Caps.gles ? gladLoadGLES2Loader : gladLoadGLLoader)((GLADloadproc)SDL_GL_GetProcAddress, gl3Caps.glversion))
++					break;
++				SDL_GL_DeleteContext(ctx);
++				SDL_SetError("gladLoadGLLoader failed");
++			}
++			SDL_DestroyWindow(win);
++			win = nil;
++			ctx = nil;
+@@ -1580,9 +1588,0 @@ startSDL2(void)
+-	ctx = SDL_GL_CreateContext(win);
+-
+-	if (!((gl3Caps.gles ? gladLoadGLES2Loader : gladLoadGLLoader) ((GLADloadproc) SDL_GL_GetProcAddress, gl3Caps.glversion)) ) {
+-		RWERROR((ERR_GENERAL, "gladLoadGLLoader failed"));
+-		SDL_GL_DeleteContext(ctx);
+-		SDL_DestroyWindow(win);
+-		return 0;
+-	}
+-

@@ -1,0 +1,21 @@
+[Unit]
+Description=R46H RetroArch gaming frontend
+Documentation=file:/usr/share/doc/r46h-gaming-mvp/GAMING-PRODUCT.md
+Wants=getty@tty1.service r46h-volume-keys.service
+Requires=r46h-gaming-input.service
+RequiresMountsFor=/roms
+After=systemd-user-sessions.service getty@tty1.service r46h-gaming-input.service r46h-volume-keys.service
+Conflicts=getty@tty2.service
+
+[Service]
+Type=simple
+ExecCondition=/usr/local/libexec/r46h-gaming-frontend-condition
+ExecStart=/usr/local/sbin/r46h-game-ui menu
+KillMode=mixed
+TimeoutStopSec=10s
+Restart=no
+SuccessExitStatus=129 130 143
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

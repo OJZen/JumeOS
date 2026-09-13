@@ -1,0 +1,339 @@
+From 30a3e9a59fd9601b6896c0d9628236264368f4ad Mon Sep 17 00:00:00 2001
+From: Codex <codex@local.invalid>
+Date: Thu, 6 Aug 2026 20:20:00 +0800
+Subject: [PATCH] drm: panel: preserve the R46H bootloader handoff once
+
+The R46H bootloader establishes a visible panel state before Linux, but
+the mainline test driver currently requests the active-low reset GPIO as
+asserted during probe.  That destroys the only known-good first-screen
+state before the panel prepare callback runs.
+
+Request the GPIO without changing its direction or value.  Adopt the
+bootloader state only when reset is already an output at physical high
+and both panel rails report enabled at their exact configured voltages.
+Acquire balanced consumer references for both rails and revalidate the
+full signature before accepting the handoff.
+
+On the first prepare, preserve that state by skipping the rail cycle,
+reset sequence, and DCS initialization.  Consume the handoff at the
+first enable, and use the complete existing initialization path after
+the first unprepare.  Any mismatch or drift asserts reset and falls back
+to the normal sequence; reference and attach failures unwind in reverse
+order.
+
+This is deliberately a panel-only experiment.  The Rockchip DSI host,
+PHY, VOP, framebuffer, clocks, and backlight PWM remain managed by their
+mainline drivers.
+
+Signed-off-by: Codex <codex@local.invalid>
+---
+ drivers/gpu/drm/panel/panel-r46h.c | 196 ++++++++++++++++++++++++++++-
+ 1 file changed, 192 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/panel/panel-r46h.c b/drivers/gpu/drm/panel/panel-r46h.c
+index f3fbb8a..30a3e9a 100644
+--- a/drivers/gpu/drm/panel/panel-r46h.c
++++ b/drivers/gpu/drm/panel/panel-r46h.c
+@@ -22,6 +22,9 @@
+ 
+ #include <video/mipi_display.h>
+ 
++#define R46H_PANEL_POWER_UV		2800000
++#define R46H_PANEL_BACKLIGHT_UV	3300000
++
+ enum r46h_panel_supply {
+ 	R46H_PANEL_SUPPLY_POWER,
+ 	R46H_PANEL_SUPPLY_BACKLIGHT,
+@@ -34,9 +37,21 @@ struct r46h_panel {
+ 	struct gpio_desc *reset_gpio;
+ 	struct regulator_bulk_data supplies[R46H_PANEL_NUM_SUPPLIES];
+ 	bool supply_enabled[R46H_PANEL_NUM_SUPPLIES];
++	bool handoff_pending;
++	bool handoff_active;
++	bool handoff_used;
+ 	bool initialized;
+ };
+ 
++struct r46h_panel_handoff_state {
++	int reset_direction;
++	int reset_raw;
++	int power_enabled;
++	int backlight_enabled;
++	int power_uv;
++	int backlight_uv;
++};
++
+ struct r46h_panel_command {
+ 	u8 command;
+ 	u8 value;
+@@ -114,6 +129,32 @@ static int r46h_panel_write_init_sequence(struct r46h_panel *ctx)
+ 	return 0;
+ }
+ 
++static void
++r46h_panel_read_handoff_state(struct r46h_panel *ctx,
++			      struct r46h_panel_handoff_state *state)
++{
++	struct regulator *backlight =
++		ctx->supplies[R46H_PANEL_SUPPLY_BACKLIGHT].consumer;
++	struct regulator *power =
++		ctx->supplies[R46H_PANEL_SUPPLY_POWER].consumer;
++
++	state->reset_direction = gpiod_get_direction(ctx->reset_gpio);
++	state->reset_raw = gpiod_get_raw_value_cansleep(ctx->reset_gpio);
++	state->power_enabled = regulator_is_enabled(power);
++	state->backlight_enabled = regulator_is_enabled(backlight);
++	state->power_uv = regulator_get_voltage(power);
++	state->backlight_uv = regulator_get_voltage(backlight);
++}
++
++static bool
++r46h_panel_handoff_state_ready(const struct r46h_panel_handoff_state *state)
++{
++	return state->reset_direction == 0 && state->reset_raw == 1 &&
++	       state->power_enabled > 0 && state->backlight_enabled > 0 &&
++	       state->power_uv == R46H_PANEL_POWER_UV &&
++	       state->backlight_uv == R46H_PANEL_BACKLIGHT_UV;
++}
++
+ static int r46h_panel_disable_supplies(struct r46h_panel *ctx)
+ {
+ 	struct regulator *backlight =
+@@ -127,6 +168,7 @@ static int r46h_panel_disable_supplies(struct r46h_panel *ctx)
+ 		if (ret) {
+ 			dev_err(ctx->panel.dev,
+ 				"failed to disable backlight supply: %d\n", ret);
++			/* Keep panel power on while the dependent rail is owned. */
+ 			return ret;
+ 		}
+ 
+@@ -147,6 +189,94 @@ static int r46h_panel_disable_supplies(struct r46h_panel *ctx)
+ 	return 0;
+ }
+ 
++static int r46h_panel_assert_reset(struct r46h_panel *ctx)
++{
++	int ret;
++
++	ret = gpiod_direction_output(ctx->reset_gpio, 1);
++	if (ret)
++		dev_err(ctx->panel.dev, "failed to assert reset: %d\n", ret);
++
++	return ret;
++}
++
++static int r46h_panel_arm_bootloader_handoff(struct r46h_panel *ctx)
++{
++	struct regulator *backlight =
++		ctx->supplies[R46H_PANEL_SUPPLY_BACKLIGHT].consumer;
++	struct regulator *power =
++		ctx->supplies[R46H_PANEL_SUPPLY_POWER].consumer;
++	struct r46h_panel_handoff_state state;
++	int cleanup_ret, reset_ret, ret;
++
++	r46h_panel_read_handoff_state(ctx, &state);
++	if (!r46h_panel_handoff_state_ready(&state)) {
++		dev_info(ctx->panel.dev,
++			 "R46H_PANEL_HANDOFF stage=probe decision=fallback reason=state reset_dir=%d reset_raw=%d power=%d backlight=%d power_uv=%d backlight_uv=%d\n",
++			 state.reset_direction, state.reset_raw,
++			 state.power_enabled, state.backlight_enabled,
++			 state.power_uv, state.backlight_uv);
++		return r46h_panel_assert_reset(ctx);
++	}
++
++	ret = regulator_enable(power);
++	if (ret) {
++		dev_err(ctx->panel.dev,
++			"R46H_PANEL_HANDOFF stage=probe decision=error reason=power-ref error=%d\n",
++			ret);
++		reset_ret = r46h_panel_assert_reset(ctx);
++		if (reset_ret)
++			dev_err(ctx->panel.dev,
++				"handoff reset rollback failed after power-ref error %d: %d\n",
++				ret, reset_ret);
++		return ret;
++	}
++	ctx->supply_enabled[R46H_PANEL_SUPPLY_POWER] = true;
++
++	ret = regulator_enable(backlight);
++	if (ret) {
++		dev_err(ctx->panel.dev,
++			"R46H_PANEL_HANDOFF stage=probe decision=error reason=backlight-ref error=%d\n",
++			ret);
++		reset_ret = r46h_panel_assert_reset(ctx);
++		cleanup_ret = r46h_panel_disable_supplies(ctx);
++		if (reset_ret || cleanup_ret)
++			dev_err(ctx->panel.dev,
++				"handoff rollback failed after error %d: reset=%d supplies=%d\n",
++				ret, reset_ret, cleanup_ret);
++		return ret;
++	}
++	ctx->supply_enabled[R46H_PANEL_SUPPLY_BACKLIGHT] = true;
++
++	/* Revalidate after both consumer references have been acquired. */
++	r46h_panel_read_handoff_state(ctx, &state);
++	if (!r46h_panel_handoff_state_ready(&state)) {
++		dev_warn(ctx->panel.dev,
++			 "R46H_PANEL_HANDOFF stage=probe decision=fallback reason=state-drift reset_dir=%d reset_raw=%d power=%d backlight=%d power_uv=%d backlight_uv=%d refs=2\n",
++			 state.reset_direction, state.reset_raw,
++			 state.power_enabled, state.backlight_enabled,
++			 state.power_uv, state.backlight_uv);
++		reset_ret = r46h_panel_assert_reset(ctx);
++		cleanup_ret = r46h_panel_disable_supplies(ctx);
++		if (reset_ret || cleanup_ret) {
++			dev_err(ctx->panel.dev,
++				"handoff fallback rollback failed: reset=%d supplies=%d\n",
++				reset_ret, cleanup_ret);
++			return reset_ret ? reset_ret : cleanup_ret;
++		}
++		msleep(20);
++		return 0;
++	}
++
++	ctx->handoff_pending = true;
++
++	dev_info(ctx->panel.dev,
++		 "R46H_PANEL_HANDOFF stage=probe decision=adopt reset_dir=%d reset_raw=%d power=%d backlight=%d power_uv=%d backlight_uv=%d refs=2\n",
++		 state.reset_direction, state.reset_raw, state.power_enabled,
++		 state.backlight_enabled, state.power_uv, state.backlight_uv);
++	return 0;
++}
++
+ static int r46h_panel_prepare(struct drm_panel *panel)
+ {
+ 	struct r46h_panel *ctx = to_r46h_panel(panel);
+@@ -154,8 +284,35 @@ static int r46h_panel_prepare(struct drm_panel *panel)
+ 		ctx->supplies[R46H_PANEL_SUPPLY_BACKLIGHT].consumer;
+ 	struct regulator *power =
+ 		ctx->supplies[R46H_PANEL_SUPPLY_POWER].consumer;
++	struct r46h_panel_handoff_state state;
+ 	int cleanup_ret, ret;
+ 
++	if (ctx->handoff_pending) {
++		r46h_panel_read_handoff_state(ctx, &state);
++		ctx->handoff_pending = false;
++		if (r46h_panel_handoff_state_ready(&state)) {
++			ctx->handoff_active = true;
++			ctx->handoff_used = true;
++			ctx->initialized = true;
++			dev_info(panel->dev,
++				 "R46H_PANEL_HANDOFF stage=prepare action=preserve reset_raw=%d power=%d backlight=%d\n",
++				 state.reset_raw, state.power_enabled,
++				 state.backlight_enabled);
++			return 0;
++		}
++
++		dev_warn(panel->dev,
++			 "R46H_PANEL_HANDOFF stage=prepare action=fallback-full-init reason=state-drift reset_dir=%d reset_raw=%d power=%d backlight=%d power_uv=%d backlight_uv=%d\n",
++			 state.reset_direction, state.reset_raw,
++			 state.power_enabled, state.backlight_enabled,
++			 state.power_uv, state.backlight_uv);
++		ret = r46h_panel_assert_reset(ctx);
++		cleanup_ret = r46h_panel_disable_supplies(ctx);
++		if (ret || cleanup_ret)
++			return ret ? ret : cleanup_ret;
++		msleep(20);
++	}
++
+ 	if (ctx->supply_enabled[R46H_PANEL_SUPPLY_BACKLIGHT] ||
+ 	    ctx->supply_enabled[R46H_PANEL_SUPPLY_POWER]) {
+ 		ret = r46h_panel_disable_supplies(ctx);
+@@ -168,6 +325,10 @@ static int r46h_panel_prepare(struct drm_panel *panel)
+ 		msleep(20);
+ 	}
+ 
++	ret = r46h_panel_assert_reset(ctx);
++	if (ret)
++		return ret;
++
+ 	ret = regulator_enable(power);
+ 	if (ret) {
+ 		dev_err(panel->dev, "failed to enable power supply: %d\n", ret);
+@@ -213,7 +374,7 @@ static int r46h_panel_prepare(struct drm_panel *panel)
+ 	return 0;
+ 
+ disable_supplies:
+-	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++	r46h_panel_assert_reset(ctx);
+ 	cleanup_ret = r46h_panel_disable_supplies(ctx);
+ 	if (cleanup_ret)
+ 		dev_err(panel->dev,
+@@ -232,6 +393,12 @@ static int r46h_panel_enable(struct drm_panel *panel)
+ 		dev_err(panel->dev, "refusing to enable uninitialized panel\n");
+ 		return -EIO;
+ 	}
++	if (ctx->handoff_active) {
++		ctx->handoff_active = false;
++		dev_info(panel->dev,
++			 "R46H_PANEL_HANDOFF stage=enable action=consume-first-enable\n");
++		return 0;
++	}
+ 
+ 	/* Preserve the downstream delay between display-on and backlight-on. */
+ 	msleep(120);
+@@ -267,12 +434,19 @@ static int r46h_panel_unprepare(struct drm_panel *panel)
+ 		ctx->initialized = false;
+ 	}
+ 
+-	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++	r46h_panel_assert_reset(ctx);
+ 	disable_ret = r46h_panel_disable_supplies(ctx);
+ 	if (disable_ret)
+ 		dev_err(panel->dev, "failed to disable panel supplies: %d\n",
+ 			disable_ret);
+ 	msleep(20);
++	ctx->handoff_pending = false;
++	ctx->handoff_active = false;
++	if (ctx->handoff_used) {
++		ctx->handoff_used = false;
++		dev_info(panel->dev,
++			 "R46H_PANEL_HANDOFF stage=unprepare next=full-init\n");
++	}
+ 
+ 	/*
+ 	 * The Rockchip panel bridge does not recover from an unprepare error.
+@@ -336,7 +510,7 @@ static int r46h_panel_probe(struct mipi_dsi_device *dsi)
+ 		return -ENOMEM;
+ 
+ 	ctx->dsi = dsi;
+-	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
++	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_ASIS);
+ 	if (IS_ERR(ctx->reset_gpio))
+ 		return dev_err_probe(dev, PTR_ERR(ctx->reset_gpio),
+ 				     "failed to get reset GPIO\n");
+@@ -367,10 +541,24 @@ static int r46h_panel_probe(struct mipi_dsi_device *dsi)
+ 	if (ret)
+ 		return dev_err_probe(dev, ret, "failed to get backlight\n");
+ 
++	ret = r46h_panel_arm_bootloader_handoff(ctx);
++	if (ret)
++		return ret;
++
+ 	drm_panel_add(&ctx->panel);
+ 
+ 	ret = mipi_dsi_attach(dsi);
+ 	if (ret) {
++		int cleanup_ret;
++		int reset_ret;
++
++		ctx->handoff_pending = false;
++		reset_ret = r46h_panel_assert_reset(ctx);
++		cleanup_ret = r46h_panel_disable_supplies(ctx);
++		if (reset_ret || cleanup_ret)
++			dev_err(dev,
++				"failed to rollback panel after attach error %d: reset=%d supplies=%d\n",
++				ret, reset_ret, cleanup_ret);
+ 		drm_panel_remove(&ctx->panel);
+ 		return dev_err_probe(dev, ret, "failed to attach to DSI host\n");
+ 	}
+@@ -387,7 +575,7 @@ static void r46h_panel_remove(struct mipi_dsi_device *dsi)
+ 	if (!ctx->panel.prepared &&
+ 	    (ctx->supply_enabled[R46H_PANEL_SUPPLY_BACKLIGHT] ||
+ 	     ctx->supply_enabled[R46H_PANEL_SUPPLY_POWER])) {
+-		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++		r46h_panel_assert_reset(ctx);
+ 		ret = r46h_panel_disable_supplies(ctx);
+ 		if (ret)
+ 			dev_err(&dsi->dev,
+-- 
+2.50.1

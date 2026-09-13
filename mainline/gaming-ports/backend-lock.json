@@ -1,0 +1,119 @@
+{
+  "upstream_commit": "0009bb08d33252d9e0b1813c3c481a3017fc7a01",
+  "files": [
+    {
+      "name": "LICENSE",
+      "url": "https://raw.githubusercontent.com/PortsMaster/PortMaster-GUI/0009bb08d33252d9e0b1813c3c481a3017fc7a01/LICENSE",
+      "bytes": 1067,
+      "sha256": "ad472b77840ebffc06dae38a37ae6f65aea14401920cc9e168782bfd11d4f62b"
+    },
+    {
+      "name": "PortMaster/pylibs/harbourmaster/__init__.py",
+      "url": "https://raw.githubusercontent.com/PortsMaster/PortMaster-GUI/0009bb08d33252d9e0b1813c3c481a3017fc7a01/PortMaster/pylibs/harbourmaster/__init__.py",
+      "bytes": 1439,
+      "sha256": "9b742baf90e0027a52d2d19757bd4ad8b3f99e508a0c5dbf41e62d56d1d9eb48"
+    },
+    {
+      "name": "PortMaster/pylibs/harbourmaster/captain.py",
+      "url": "https://raw.githubusercontent.com/PortsMaster/PortMaster-GUI/0009bb08d33252d9e0b1813c3c481a3017fc7a01/PortMaster/pylibs/harbourmaster/captain.py",
+      "bytes": 5312,
+      "sha256": "372eab5088d046d5920c9f4e8f40137b5e21d2831c678af0ac81ca56165c9181"
+    },
+    {
+      "name": "PortMaster/pylibs/harbourmaster/config.py",
+      "url": "https://raw.githubusercontent.com/PortsMaster/PortMaster-GUI/0009bb08d33252d9e0b1813c3c481a3017fc7a01/PortMaster/pylibs/harbourmaster/config.py",
+      "bytes": 10257,
+      "sha256": "cfc567d39c5bae4e9ed007b78cfba8e9f44e2cd77284b08eb923ff14a6bd6719"
+    },
+    {
+      "name": "PortMaster/pylibs/harbourmaster/harbour.py",
+      "url": "https://raw.githubusercontent.com/PortsMaster/PortMaster-GUI/0009bb08d33252d9e0b1813c3c481a3017fc7a01/PortMaster/pylibs/harbourmaster/harbour.py",
+      "bytes": 92774,
+      "sha256": "f30ec0bfa03b1b1dd4284482a336b33cc018615b609400853c52e452d1c7d975"
+    },
+    {
+      "name": "PortMaster/pylibs/harbourmaster/hardware.py",
+      "url": "https://raw.githubusercontent.com/PortsMaster/PortMaster-GUI/0009bb08d33252d9e0b1813c3c481a3017fc7a01/PortMaster/pylibs/harbourmaster/hardware.py",
+      "bytes": 32382,
+      "sha256": "c5179dbee241e7271937c7a54e0a63088f1f4c7d393cd3639e7cb0943affedd6"
+    },
+    {
+      "name": "PortMaster/pylibs/harbourmaster/info.py",
+      "url": "https://raw.githubusercontent.com/PortsMaster/PortMaster-GUI/0009bb08d33252d9e0b1813c3c481a3017fc7a01/PortMaster/pylibs/harbourmaster/info.py",
+      "bytes": 9770,
+      "sha256": "0ef2b86c908fedf8ec79b8ef012fd95b1da2870d5322b17a9998570a14f91603"
+    },
+    {
+      "name": "PortMaster/pylibs/harbourmaster/platform.py",
+      "url": "https://raw.githubusercontent.com/PortsMaster/PortMaster-GUI/0009bb08d33252d9e0b1813c3c481a3017fc7a01/PortMaster/pylibs/harbourmaster/platform.py",
+      "bytes": 44885,
+      "sha256": "81fb93cddef2f0501ef964d68837cde1646bc2eae2573aa344e5366baf9201ff"
+    },
+    {
+      "name": "PortMaster/pylibs/harbourmaster/source.py",
+      "url": "https://raw.githubusercontent.com/PortsMaster/PortMaster-GUI/0009bb08d33252d9e0b1813c3c481a3017fc7a01/PortMaster/pylibs/harbourmaster/source.py",
+      "bytes": 41092,
+      "sha256": "9428e59806186eff5ce57c12266b4484c7e4139ccbe0e179e3603a139542b984"
+    },
+    {
+      "name": "PortMaster/pylibs/harbourmaster/util.py",
+      "url": "https://raw.githubusercontent.com/PortsMaster/PortMaster-GUI/0009bb08d33252d9e0b1813c3c481a3017fc7a01/PortMaster/pylibs/harbourmaster/util.py",
+      "bytes": 20087,
+      "sha256": "26379e8472605f86afd00fbcd083f2a07ec7070194cc3eb1797324ee06a24a9b"
+    },
+    {
+      "name": "PortMaster/pylibs/utility.py",
+      "url": "https://raw.githubusercontent.com/PortsMaster/PortMaster-GUI/0009bb08d33252d9e0b1813c3c481a3017fc7a01/PortMaster/pylibs/utility.py",
+      "bytes": 1638,
+      "sha256": "ad7f4b120113185b36d608fa8d77ea7a393de3a8ad6b20c3c1fa85934ce9bd90"
+    },
+    {
+      "name": "wheels/loguru-0.7.3-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/0c/29/0348de65b8cc732daa3e33e67806420b2ae89bdce2b04af740289c5c6c8c/loguru-0.7.3-py3-none-any.whl",
+      "bytes": 61595,
+      "sha256": "31a33c10c8e1e10422bfd431aeb5d351c7cf7fa671e3c4df004162264b28220c"
+    },
+    {
+      "name": "wheels/colorama-0.4.6-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl",
+      "bytes": 25335,
+      "sha256": "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"
+    },
+    {
+      "name": "wheels/ansimarkup-2.2.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/39/d2/39a95e2597947972d5d9e102c250a9fab27b10844223de87a47e4fc8064e/ansimarkup-2.2.0-py3-none-any.whl",
+      "bytes": 10801,
+      "sha256": "a5f9bc7c8da88feaf3902745977baf9271319892703e9eb5d37b2c7e70aba7ec"
+    },
+    {
+      "name": "wheels/requests-2.34.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl",
+      "bytes": 73075,
+      "sha256": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0"
+    },
+    {
+      "name": "wheels/urllib3-2.7.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl",
+      "bytes": 131087,
+      "sha256": "9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897"
+    },
+    {
+      "name": "wheels/charset_normalizer-3.5.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/cc/61/d01fc49b8dea277640b55a9e15960dbca9fdc8c9fde18e572d39c59f4019/charset_normalizer-3.5.1-py3-none-any.whl",
+      "bytes": 68658,
+      "sha256": "6df0ec430f9a831772c23ca5a224cba36517a58a84bb32c32bb59a9fa67c47f6"
+    },
+    {
+      "name": "wheels/idna-3.19-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/57/b0/0e52c878c53f245edd3a11020f20979b3f490f245af532c7cae3027754b5/idna-3.19-py3-none-any.whl",
+      "bytes": 68550,
+      "sha256": "815e7be7a7806d54abb586dc943addc79e8b2ee16915059658cbeff4b1b43bf4"
+    },
+    {
+      "name": "wheels/certifi-2026.7.22-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl",
+      "bytes": 136983,
+      "sha256": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "source": {
+    "repository": "https://github.com/libretro/FBNeo.git",
+    "commit": "26f11fa9e43227a04953e20e8c7e4bf322cd53cb",
+    "tree": "b39288c23cadb273a1f02a558687ce5cc6952241",
+    "archive_url": "https://github.com/libretro/FBNeo/archive/26f11fa9e43227a04953e20e8c7e4bf322cd53cb.tar.gz",
+    "archive_name": "fbneo-26f11fa9e43227a04953e20e8c7e4bf322cd53cb.tar.gz",
+    "archive_size": 27119884,
+    "archive_sha256": "f8050abc47cd99b46e828aabdbbdba568a4a4122d9c0ce4e0469d1596263d7f1",
+    "source_date_epoch": 1787855716,
+    "git_version": "26f11fa",
+    "git_date": "260827"
+  },
+  "build": {
+    "container_image": "arkos4clone/r46h-kernel-builder:trixie-arm64",
+    "container_image_id": "sha256:3686fd20408cf746c1171e9345fd6c842a71f87e589f691b2455435b3bdd141a",
+    "platform": "linux/arm64",
+    "make_directory": "src/burner/libretro",
+    "make_arguments": [
+      "SUBSET=neogeo",
+      "REGEN_HEADERS=1"
+    ],
+    "source_output": "src/burner/libretro/fbneo_neogeo_libretro.so",
+    "strip": "aarch64-linux-gnu-strip"
+  },
+  "artifact": {
+    "name": "fbneo_neogeo_libretro.so",
+    "size": 9007520,
+    "sha256": "8bb17a551f3eeeb384ab00a5c5375d30eb63807afe5b6c1ba1d3f78220732bdb",
+    "machine": "AArch64",
+    "required_symbols": [
+      "retro_api_version",
+      "retro_init",
+      "retro_load_game",
+      "retro_run"
+    ],
+    "needed_libraries": [
+      "libstdc++.so.6",
+      "libm.so.6",
+      "libmvec.so.1",
+      "libgcc_s.so.1",
+      "libc.so.6"
+    ]
+  }
+}

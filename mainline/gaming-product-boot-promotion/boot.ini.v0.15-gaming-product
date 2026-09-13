@@ -1,0 +1,36 @@
+odroidgoa-uboot-config
+
+# R46H v0.15-gaming-product persistent product boot.
+# Keep the exact v0.10 and v0.8 versioned scripts as serial fallbacks.
+setenv bootargs "root=PARTUUID=c9f931c9-02 rootwait rw fsck.repair=yes net.ifnames=0 console=ttyS2,115200n8 earlycon loglevel=7 ignore_loglevel plymouth.enable=0 clk_ignore_unused pd_ignore_unused"
+
+setenv loadaddr "0x02000000"
+setenv initrd_loadaddr "0x0a000000"
+setenv dtb_loadaddr "0x01f00000"
+
+setenv kernel_comp_addr "0x10000000"
+if load mmc 1:1 ${kernel_comp_addr} Image.mainline-v0.15-gaming-product.gz; then
+  if itest ${filesize} -eq 0xe3bde2; then
+    if unzip ${kernel_comp_addr} ${loadaddr} 0x03000000; then
+      if itest ${filesize} -eq 0x27a5200; then
+        if load mmc 1:1 ${dtb_loadaddr} rk3326-r46h-mainline-v0.15-gaming-product.dtb; then
+          if itest ${filesize} -eq 0xc16e; then
+            booti ${loadaddr} - ${dtb_loadaddr}
+          else
+            echo "R46H v0.15-gaming-product: DTB size mismatch"
+          fi
+        else
+          echo "R46H v0.15-gaming-product: DTB load failed"
+        fi
+      else
+        echo "R46H v0.15-gaming-product: decompressed Image size mismatch"
+      fi
+    else
+      echo "R46H v0.15-gaming-product: Image unzip failed"
+    fi
+  else
+    echo "R46H v0.15-gaming-product: compressed Image size mismatch"
+  fi
+else
+  echo "R46H v0.15-gaming-product: compressed Image load failed"
+fi

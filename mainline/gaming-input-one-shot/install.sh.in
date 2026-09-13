@@ -1,0 +1,193 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+LANG=C
+export PATH LC_ALL LANG
+
+readonly PAYLOAD_ID=@PAYLOAD_ID@
+readonly EXPECTED_RUNNING_RELEASE=@RUNNING_RELEASE@
+readonly CANDIDATE_RELEASE=@CANDIDATE_RELEASE@
+readonly ROOT_PARTUUID=@ROOT_PARTUUID@
+readonly BOOT_PARTUUID=@BOOT_PARTUUID@
+readonly PAYLOAD_DIR=/run/@PAYLOAD_DIRECTORY@
+readonly SOURCE_MODULE_DIR="$PAYLOAD_DIR/modules/$CANDIDATE_RELEASE"
+readonly MODULE_PARENT=/usr/lib/modules
+readonly MODULE_DIR="$MODULE_PARENT/$CANDIDATE_RELEASE"
+readonly TARGET_PARENT=@TARGET_PARENT@
+readonly TARGET_DIR=@TARGET_DIRECTORY@
+readonly MODULE_FILE_COUNT=@MODULE_FILE_COUNT@
+readonly MODULE_DIRECTORY_COUNT=@MODULE_DIRECTORY_COUNT@
+readonly MIN_AVAILABLE_KIB=131072
+readonly EXT4_ERRORS=/sys/fs/ext4/mmcblk0p2/errors_count
+
+module_stage=""
+target_stage=""
+module_stage_id=""
+target_stage_id=""
+module_published=0
+target_published=0
+target_parent_created=0
+install_complete=0
+
+die() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+boot_partition_must_not_be_writable() {
+  local partuuid options
+  while read -r partuuid options; do
+    if [[ "$partuuid" == "$BOOT_PARTUUID" && ",$options," == *,rw,* ]]; then
+      die 'BOOT partition is mounted writable'
+    fi
+  done < <(findmnt -rn -o PARTUUID,OPTIONS)
+}
+
+validate_module_tree() {
+  local directory=$1 manifest=$2 file_count directory_count
+  [[ -d "$directory" && ! -L "$directory" ]] || return 1
+  [[ -f "$manifest" && ! -L "$manifest" ]] || return 1
+  [[ -z "$(find "$directory" -xdev -type l -print -quit)" ]] || return 1
+  [[ -z "$(find "$directory" -xdev ! -type d ! -type f -print -quit)" ]] || return 1
+  file_count=$(find "$directory" -xdev -type f -print | wc -l | tr -d '[:space:]')
+  directory_count=$(find "$directory" -xdev -type d -print | wc -l | tr -d '[:space:]')
+  [[ "$file_count" == "$MODULE_FILE_COUNT" ]] || return 1
+  [[ "$directory_count" == "$MODULE_DIRECTORY_COUNT" ]] || return 1
+  (cd "$directory" && sha256sum -c "$manifest" >/dev/null)
+}
+
+delete_exact_module_tree() {
+  local directory=$1 manifest=$2
+  validate_module_tree "$directory" "$manifest" || return 1
+  find "$directory" -xdev -depth -delete
+}
+
+delete_owned_stage() {
+  local directory=$1 identity=$2
+  [[ -n "$identity" && -d "$directory" && ! -L "$directory" ]] || return 1
+  [[ "$(stat -c '%d:%i' "$directory")" == "$identity" ]] || return 1
+  find "$directory" -xdev -depth -delete
+}
+
+remove_exact_target_tree() {
+  local directory=$1
+  [[ -d "$directory" && ! -L "$directory" ]] || return 1
+  rm -f -- \
+    "$directory/IMAGE.GZ" \
+    "$directory/MODULE-SHA256SUMS" \
+    "$directory/R46H.DTB" \
+    "$directory/RECEIPT" \
+    "$directory/REMOVE.sh" \
+    "$directory/SHA256SUMS" \
+    "$directory/UBOOT-CMDS.txt"
+  rmdir -- "$directory"
+}
+
+cleanup_install() {
+  local status=$?
+  trap - EXIT INT TERM HUP
+  set +e
+  if (( install_complete == 0 )); then
+    if (( target_published == 1 )); then
+      remove_exact_target_tree "$TARGET_DIR" || \
+        printf 'ERROR: guarded cleanup left %s for manual review\n' "$TARGET_DIR" >&2
+    elif [[ -n "$target_stage" && ( -e "$target_stage" || -L "$target_stage" ) ]]; then
+      delete_owned_stage "$target_stage" "$target_stage_id" || \
+        printf 'ERROR: guarded cleanup left %s for manual review\n' "$target_stage" >&2
+    fi
+    if (( module_published == 1 )); then
+      delete_exact_module_tree "$MODULE_DIR" "$PAYLOAD_DIR/MODULE-SHA256SUMS" || \
+        printf 'ERROR: guarded cleanup left %s for manual review\n' "$MODULE_DIR" >&2
+    elif [[ -n "$module_stage" && ( -e "$module_stage" || -L "$module_stage" ) ]]; then
+      delete_owned_stage "$module_stage" "$module_stage_id" || \
+        printf 'ERROR: guarded cleanup left %s for manual review\n' "$module_stage" >&2
+    fi
+    if (( target_parent_created == 1 )); then
+      rmdir -- "$TARGET_PARENT" 2>/dev/null || true
+    fi
+  fi
+  exit "$status"
+}
+
+(( EUID == 0 )) || die 'root is required'
+[[ $# == 0 ]] || die 'this installer accepts no arguments'
+[[ "${BASH_SOURCE[0]}" == "$PAYLOAD_DIR/install.sh" ]] || die "bind payload at $PAYLOAD_DIR"
+[[ -d "$PAYLOAD_DIR" && ! -L "$PAYLOAD_DIR" ]] || die 'unsafe payload directory'
+[[ "$(stat -c '%u:%g:%a' "$PAYLOAD_DIR")" == 0:0:700 ]] || die 'unsafe payload directory identity'
+[[ "$(uname -r)" == "$EXPECTED_RUNNING_RELEASE" ]] || die 'stage from exact persistent v0.10'
+[[ "$(findmnt -rn -o PARTUUID /)" == "$ROOT_PARTUUID" ]] || die 'unexpected root partition'
+[[ "$(findmnt -rn -o FSTYPE /)" == ext4 ]] || die 'root is not ext4'
+[[ ",$(findmnt -rn -o OPTIONS /)," == *,rw,* ]] || die 'root is not writable'
+[[ "$(cat "$EXT4_ERRORS")" == 0 ]] || die 'root filesystem already reports errors'
+[[ -z "$(systemctl --failed --no-legend --plain)" ]] || die 'systemd has failed units'
+boot_partition_must_not_be_writable
+[[ "$(readlink -f -- /lib/modules)" == "$MODULE_PARENT" ]] || die 'unexpected merged-usr module path'
+[[ -d "$MODULE_PARENT" && ! -L "$MODULE_PARENT" ]] || die 'unsafe module parent'
+[[ "$(stat -c '%u:%g' "$MODULE_PARENT")" == 0:0 ]] || die 'unsafe module parent ownership'
+[[ ! -e "$MODULE_DIR" && ! -L "$MODULE_DIR" ]] || die 'candidate module tree already exists'
+[[ ! -e "$TARGET_DIR" && ! -L "$TARGET_DIR" ]] || die 'candidate target already exists'
+
+top_members=$(find "$PAYLOAD_DIR" -mindepth 1 -maxdepth 1 -printf '%f\n' | LC_ALL=C sort)
+[[ "$top_members" == $'IMAGE.GZ\nMODULE-SHA256SUMS\nPAYLOAD-INFO.json\nPAYLOAD.COMPLETE\nR46H.DTB\nRECEIPT\nSHA256SUMS\nSTATE-SHA256SUMS\nUBOOT-CMDS.txt\ninstall.sh\nmodules\nremove.sh' ]] || die 'unexpected payload member set'
+[[ -z "$(find "$PAYLOAD_DIR" -xdev -type l -print -quit)" ]] || die 'payload contains a symbolic link'
+[[ -z "$(find "$PAYLOAD_DIR" -xdev ! -type d ! -type f -print -quit)" ]] || die 'payload contains a special file'
+[[ -z "$(find "$PAYLOAD_DIR" -xdev -type f ! -links 1 -print -quit)" ]] || die 'payload contains a hard-linked file'
+cd "$PAYLOAD_DIR"
+sha256sum -c --quiet SHA256SUMS
+[[ "$(<PAYLOAD.COMPLETE)" == "sha256sums_sha256=$(sha256sum SHA256SUMS | awk '{print $1}')" ]] || die 'payload completion marker mismatch'
+validate_module_tree "$SOURCE_MODULE_DIR" "$PAYLOAD_DIR/MODULE-SHA256SUMS" || die 'source module tree mismatch'
+available_kib=$(df -Pk "$MODULE_PARENT" | awk 'NR == 2 {print $4}')
+[[ "$available_kib" =~ ^[0-9]+$ && "$available_kib" -ge "$MIN_AVAILABLE_KIB" ]] || die 'insufficient p2 space for guarded staging'
+
+trap cleanup_install EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+if [[ -e "$TARGET_PARENT" || -L "$TARGET_PARENT" ]]; then
+  [[ -d "$TARGET_PARENT" && ! -L "$TARGET_PARENT" ]] || die 'unsafe target parent'
+  [[ "$(stat -c '%u:%g:%a' "$TARGET_PARENT")" == 0:0:700 ]] || die 'unsafe target parent identity'
+else
+  install -d -o root -g root -m 0700 "$TARGET_PARENT"
+  target_parent_created=1
+fi
+
+module_stage=$MODULE_PARENT/.r46h-v14-stage.$$
+target_stage=$TARGET_PARENT/.stage-v0.14.$$
+[[ ! -e "$module_stage" && ! -L "$module_stage" ]] || die 'module stage already exists'
+[[ ! -e "$target_stage" && ! -L "$target_stage" ]] || die 'target stage already exists'
+install -d -o root -g root -m 0755 "$module_stage"
+module_stage_id=$(stat -c '%d:%i' "$module_stage")
+install -d -o root -g root -m 0700 "$target_stage"
+target_stage_id=$(stat -c '%d:%i' "$target_stage")
+
+cp -a --no-preserve=ownership -- "$SOURCE_MODULE_DIR/." "$module_stage/"
+find "$module_stage" -xdev -type d -exec chmod 0755 {} +
+find "$module_stage" -xdev -type f -exec chmod 0644 {} +
+validate_module_tree "$module_stage" "$PAYLOAD_DIR/MODULE-SHA256SUMS" || die 'staged module tree mismatch'
+
+install -o root -g root -m 0600 IMAGE.GZ "$target_stage/IMAGE.GZ"
+install -o root -g root -m 0600 MODULE-SHA256SUMS "$target_stage/MODULE-SHA256SUMS"
+install -o root -g root -m 0600 R46H.DTB "$target_stage/R46H.DTB"
+install -o root -g root -m 0600 RECEIPT "$target_stage/RECEIPT"
+install -o root -g root -m 0700 remove.sh "$target_stage/REMOVE.sh"
+install -o root -g root -m 0600 STATE-SHA256SUMS "$target_stage/SHA256SUMS"
+install -o root -g root -m 0600 UBOOT-CMDS.txt "$target_stage/UBOOT-CMDS.txt"
+(cd "$target_stage" && sha256sum -c --quiet SHA256SUMS)
+
+boot_partition_must_not_be_writable
+[[ "$(cat "$EXT4_ERRORS")" == 0 ]] || die 'root filesystem reported an error during staging'
+mv -T --no-clobber -- "$module_stage" "$MODULE_DIR"
+module_stage=""
+module_published=1
+mv -T --no-clobber -- "$target_stage" "$TARGET_DIR"
+target_stage=""
+target_published=1
+sync
+install_complete=1
+trap - EXIT INT TERM HUP
+
+printf 'PASS: inactive %s staged on p2; active BOOT and environment are unchanged.\n' "$PAYLOAD_ID"
+printf 'NEXT=defer-power-on-and-use-%s/UBOOT-CMDS.txt-in-attended-batch\n' "$TARGET_DIR"

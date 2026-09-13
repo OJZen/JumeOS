@@ -1,0 +1,298 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+LANG=C
+export PATH LC_ALL LANG
+umask 077
+
+readonly EXPECTED_RELEASE=6.12.99-r46h-mainline-v0.15-gaming-product
+readonly EXPECTED_ROOT_PARTUUID=c9f931c9-02
+readonly EXPECTED_ROOT_UUID=d3130007-46a4-4d56-9001-000000000007
+readonly EXPECTED_CONFIG_SHA256=0694b9f41220983bdf9d60789b97b2fe115f68474f22f4869a2764513bcf1835
+readonly EXPECTED_RUNNER_SHA256=b0a44a7184cef97e2b9597f0d84adacb66617073f9422ef719d98e3465cc77c8
+readonly EXPECTED_CAPTURE_SHA256=77f22181289edd701001fd6570a49afbfde277417e3769a693d1dd335cad324e
+readonly EXPECTED_ES_DE_RUNNER_SHA256=5b9edd8705d26ac2b58285baee9d2025354a0343936b5360313e664edd5bafa1
+readonly EXPECTED_ES_DE_SHA256=9c6e50433b9bca5ac1c01030bc4d7b143f05c2cd27c52e6f5f765b0acf01be98
+readonly CONFIG=/etc/r46h/retroarch.cfg
+readonly OZONE_RUNNER=/usr/local/sbin/r46h-game-ui
+readonly ES_DE_RUNNER=/usr/local/sbin/r46h-es-de-ui
+readonly ES_DE=/opt/r46h/es-de/bin/es-de
+readonly CAPTURE_BINARY=/usr/local/libexec/r46h-drm-capture
+readonly SUDOERS=/etc/sudoers.d/r46h-remote-screen
+readonly RUNTIME_DIR=/run/user/1000
+readonly LOCK_DIR=$RUNTIME_DIR/r46h-screenshot.lock
+readonly SCREENSHOT_ROOT=/home/ark/.cache/r46h/screenshots
+readonly CAPTURE_DIR=$SCREENSHOT_ROOT/capture
+readonly EXPORT_DIR=$SCREENSHOT_ROOT/exports
+readonly MAX_PNG_BYTES=16777216
+readonly MAX_PENDING_EXPORTS=8
+
+lock_held=0
+capture_stage=""
+
+die() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  printf 'usage: r46h-screenshot | r46h-screenshot --read NAME BYTES SHA256 | r46h-screenshot --remove NAME BYTES SHA256\n'
+}
+
+release_lock() {
+  local status=$?
+  trap - EXIT INT TERM HUP
+  if [[ -n "$capture_stage" ]]; then
+    if [[ -f "$capture_stage" && ! -L "$capture_stage" &&
+          "$(stat -c '%u:%g:%a:%h' "$capture_stage")" == 1000:1000:600:1 ]]; then
+      rm -f -- "$capture_stage" || status=1
+    elif [[ -e "$capture_stage" || -L "$capture_stage" ]]; then
+      status=1
+    fi
+  fi
+  if (( lock_held == 1 )); then
+    rmdir -- "$LOCK_DIR" 2>/dev/null || status=1
+  fi
+  exit "$status"
+}
+
+require_ark_directory() {
+  local directory=$1
+  [[ -d "$directory" && ! -L "$directory" ]] || die "unsafe directory: $directory"
+  [[ "$(stat -c '%u:%g:%a' "$directory")" == 1000:1000:700 ]] || \
+    die "unexpected directory identity: $directory"
+}
+
+require_regular_png_container() {
+  local path=$1
+  local bytes
+  local group
+  local identity
+  local links
+  local mode
+  local owner
+
+  [[ -f "$path" && ! -L "$path" ]] || die "unsafe screenshot file: $path"
+  identity=$(stat -c '%u:%g:%a:%h:%s' "$path")
+  IFS=: read -r owner group mode links bytes <<< "$identity"
+  [[ "$owner:$group" == 1000:1000 && "$links" == 1 ]] || \
+    die "unexpected screenshot owner or link count: $path"
+  [[ "$mode" == 600 || "$mode" == 644 ]] || die "unexpected screenshot mode: $path"
+  [[ "$bytes" =~ ^[0-9]+$ && "$bytes" -le "$MAX_PNG_BYTES" ]] || \
+    die "screenshot size is outside the bound: $path"
+  [[ "${path##*/}" == *.png ]] || die "unexpected screenshot filename: $path"
+}
+
+require_regular_png_identity() {
+  local path=$1
+
+  require_regular_png_container "$path"
+  [[ "$(stat -c '%s' "$path")" -gt 0 ]] || die "screenshot is empty: $path"
+}
+
+png_is_complete() {
+  local path=$1
+  local first
+  local last
+
+  first=$(od -An -tx1 -N8 -- "$path" 2>/dev/null | tr -d '[:space:]') || return 1
+  last=$(tail -c 12 -- "$path" 2>/dev/null | od -An -tx1 | tr -d '[:space:]') || return 1
+  [[ "$first" == 89504e470d0a1a0a && "$last" == 0000000049454e44ae426082 ]]
+}
+
+require_base_identity() {
+  (( EUID == 1000 )) || die 'run as the ark user'
+  [[ "$(id -g)" == 1000 ]] || die 'unexpected ark group identity'
+  [[ "$(uname -r)" == "$EXPECTED_RELEASE" ]] || die 'unexpected running kernel'
+  [[ "$(findmnt -rn -o PARTUUID /)" == "$EXPECTED_ROOT_PARTUUID" ]] || \
+    die 'unexpected root partition'
+  [[ "$(findmnt -rn -o UUID /)" == "$EXPECTED_ROOT_UUID" ]] || die 'unexpected p2 image UUID'
+  [[ -f "$CONFIG" && ! -L "$CONFIG" ]] || die 'RetroArch config is unavailable'
+  [[ "$(stat -c '%u:%g:%a:%h' "$CONFIG")" == 0:0:644:1 ]] || \
+    die 'RetroArch config identity is unsafe'
+  [[ "$(sha256sum "$CONFIG" | awk '{print $1}')" == "$EXPECTED_CONFIG_SHA256" ]] || \
+    die 'RetroArch config mismatch'
+  [[ -f "$OZONE_RUNNER" && ! -L "$OZONE_RUNNER" ]] || die 'Ozone launcher is unavailable'
+  [[ "$(stat -c '%u:%g:%a:%h' "$OZONE_RUNNER")" == 0:0:755:1 ]] || \
+    die 'Ozone launcher identity is unsafe'
+  [[ "$(sha256sum "$OZONE_RUNNER" | awk '{print $1}')" == "$EXPECTED_RUNNER_SHA256" ]] || \
+    die 'Ozone launcher mismatch'
+  [[ -x "$CAPTURE_BINARY" && ! -L "$CAPTURE_BINARY" ]] || \
+    die 'DRM capture helper is unavailable'
+  [[ "$(stat -c '%u:%g:%a:%h' "$CAPTURE_BINARY")" == 0:0:755:1 ]] || \
+    die 'DRM capture helper identity is unsafe'
+  [[ "$(sha256sum "$CAPTURE_BINARY" | awk '{print $1}')" == \
+     "$EXPECTED_CAPTURE_SHA256" ]] || die 'DRM capture helper mismatch'
+  [[ -f "$SUDOERS" && ! -L "$SUDOERS" ]] || die 'capture sudo policy is unavailable'
+  [[ "$(stat -c '%u:%g:%a:%h' "$SUDOERS")" == 0:0:440:1 ]] || \
+    die 'capture sudo policy identity is unsafe'
+  [[ -x /usr/bin/sudo && ! -L /usr/bin/sudo ]] || die 'sudo runtime is unavailable'
+  require_ark_directory "$RUNTIME_DIR"
+  require_ark_directory /home/ark/.cache
+  require_ark_directory /home/ark/.cache/r46h
+  require_ark_directory "$SCREENSHOT_ROOT"
+  require_ark_directory "$CAPTURE_DIR"
+  require_ark_directory "$EXPORT_DIR"
+}
+
+require_active_frontend() {
+  local expected pair path pid
+  local -a es_de_pids retroarch_pids
+
+  mapfile -t retroarch_pids < <(pgrep -u 1000 -f '^/usr/bin/retroarch( |$)' || true)
+  mapfile -t es_de_pids < <(pgrep -u 1000 -f '^/opt/r46h/es-de/bin/es-de( |$)' || true)
+  (( ${#retroarch_pids[@]} <= 1 && ${#es_de_pids[@]} <= 1 &&
+     ${#retroarch_pids[@]} + ${#es_de_pids[@]} >= 1 )) || \
+    die 'expected exactly one supported gaming frontend process'
+  if (( ${#retroarch_pids[@]} == 1 )); then
+    pid=${retroarch_pids[0]}
+    [[ "$pid" =~ ^[1-9][0-9]*$ && "$(readlink "/proc/$pid/exe")" == /usr/bin/retroarch ]] || \
+      die 'unexpected RetroArch process identity'
+  fi
+  if (( ${#es_de_pids[@]} == 1 )); then
+    for pair in \
+      "$ES_DE_RUNNER:$EXPECTED_ES_DE_RUNNER_SHA256" \
+      "$ES_DE:$EXPECTED_ES_DE_SHA256"; do
+      path=${pair%%:*}
+      expected=${pair#*:}
+      [[ -f "$path" && ! -L "$path" ]] || die "ES-DE runtime is unavailable: $path"
+      [[ "$(stat -c '%u:%g:%a:%h' "$path")" == 0:0:755:1 ]] || \
+        die "ES-DE runtime identity is unsafe: $path"
+      [[ "$(sha256sum "$path" | awk '{print $1}')" == "$expected" ]] || \
+        die "ES-DE runtime mismatch: $path"
+    done
+    pid=${es_de_pids[0]}
+    [[ "$pid" =~ ^[1-9][0-9]*$ && "$(readlink "/proc/$pid/exe")" == "$ES_DE" ]] || \
+      die 'unexpected ES-DE process identity'
+  fi
+}
+
+acquire_lock() {
+  mkdir -m 0700 -- "$LOCK_DIR" 2>/dev/null || die 'another screenshot operation is active'
+  lock_held=1
+  trap release_lock EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
+  [[ "$(stat -c '%u:%g:%a' "$LOCK_DIR")" == 1000:1000:700 ]] || \
+    die 'screenshot lock identity is invalid'
+}
+
+audit_pending_exports() {
+  local count=0
+  local path
+
+  while IFS= read -r -d '' path; do
+    require_regular_png_identity "$path"
+    png_is_complete "$path" || die "incomplete pending export: $path"
+    ((count += 1))
+  done < <(find "$EXPORT_DIR" -mindepth 1 -maxdepth 1 -print0)
+  (( count < MAX_PENDING_EXPORTS )) || die 'too many pending screenshot exports'
+}
+
+clear_private_capture_cache() {
+  local path
+
+  while IFS= read -r -d '' path; do
+    require_regular_png_container "$path"
+    rm -f -- "$path"
+  done < <(find "$CAPTURE_DIR" -mindepth 1 -maxdepth 1 -print0)
+  [[ -z "$(find "$CAPTURE_DIR" -mindepth 1 -maxdepth 1 -print -quit)" ]] || \
+    die 'capture cache did not become empty'
+}
+
+capture_screen() {
+  local bytes
+  local candidate
+  local digest
+  local export_name
+  local export_path
+  [[ "$(systemctl is-active r46h-gaming-frontend.service || true)" == active ]] || \
+    die 'gaming frontend is not active'
+  require_active_frontend
+
+  audit_pending_exports
+  clear_private_capture_cache
+  capture_stage=$CAPTURE_DIR/.r46h-kms-capture-$$.png
+  [[ ! -e "$capture_stage" && ! -L "$capture_stage" ]] || die 'capture stage exists'
+  if ! (umask 077; /usr/bin/sudo -n -- "$CAPTURE_BINARY" > "$capture_stage"); then
+    die 'bounded DRM capture failed'
+  fi
+  candidate=$capture_stage
+  require_regular_png_identity "$candidate"
+  png_is_complete "$candidate" || die 'DRM screenshot is incomplete'
+
+  export_name="r46h-screen-$(date -u +%Y%m%dT%H%M%SZ)-$$.png"
+  [[ "$export_name" =~ ^r46h-screen-[0-9]{8}T[0-9]{6}Z-[1-9][0-9]*\.png$ ]] || \
+    die 'generated export name is invalid'
+  export_path=$EXPORT_DIR/$export_name
+  [[ ! -e "$export_path" && ! -L "$export_path" ]] || die 'screenshot export already exists'
+  mv -T -- "$candidate" "$export_path"
+  capture_stage=""
+  chmod 0600 "$export_path"
+  require_regular_png_identity "$export_path"
+  png_is_complete "$export_path" || die 'published screenshot is incomplete'
+  bytes=$(stat -c '%s' "$export_path")
+  digest=$(sha256sum "$export_path" | awk '{print $1}')
+  [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || die 'cannot hash screenshot export'
+  printf 'R46H_SCREENSHOT result=pass name=%s bytes=%s sha256=%s\n' \
+    "$export_name" "$bytes" "$digest"
+}
+
+remove_export() {
+  local name=$1
+  local expected_bytes=$2
+  local expected_sha256=$3
+  local path
+
+  [[ "$name" =~ ^r46h-screen-[0-9]{8}T[0-9]{6}Z-[1-9][0-9]*\.png$ ]] || \
+    die 'invalid export name'
+  [[ "$expected_bytes" =~ ^[1-9][0-9]*$ && "$expected_bytes" -le "$MAX_PNG_BYTES" ]] || \
+    die 'invalid expected byte count'
+  [[ "$expected_sha256" =~ ^[0-9a-f]{64}$ ]] || die 'invalid expected SHA-256'
+  path=$EXPORT_DIR/$name
+  require_regular_png_identity "$path"
+  png_is_complete "$path" || die 'pending export is incomplete'
+  [[ "$(stat -c '%s' "$path")" == "$expected_bytes" ]] || die 'pending export size mismatch'
+  [[ "$(sha256sum "$path" | awk '{print $1}')" == "$expected_sha256" ]] || \
+    die 'pending export SHA-256 mismatch'
+  rm -f -- "$path"
+  [[ ! -e "$path" && ! -L "$path" ]] || die 'pending export removal failed'
+  printf 'R46H_SCREENSHOT_REMOVE result=pass name=%s\n' "$name"
+}
+
+read_export() {
+  local name=$1
+  local expected_bytes=$2
+  local expected_sha256=$3
+  local path
+
+  [[ "$name" =~ ^r46h-screen-[0-9]{8}T[0-9]{6}Z-[1-9][0-9]*\.png$ ]] || \
+    die 'invalid export name'
+  [[ "$expected_bytes" =~ ^[1-9][0-9]*$ && "$expected_bytes" -le "$MAX_PNG_BYTES" ]] || \
+    die 'invalid expected byte count'
+  [[ "$expected_sha256" =~ ^[0-9a-f]{64}$ ]] || die 'invalid expected SHA-256'
+  path=$EXPORT_DIR/$name
+  require_regular_png_identity "$path"
+  png_is_complete "$path" || die 'pending export is incomplete'
+  [[ "$(stat -c '%s' "$path")" == "$expected_bytes" ]] || die 'pending export size mismatch'
+  [[ "$(sha256sum "$path" | awk '{print $1}')" == "$expected_sha256" ]] || \
+    die 'pending export SHA-256 mismatch'
+  cat -- "$path"
+}
+
+require_base_identity
+acquire_lock
+case $# in
+  0) capture_screen ;;
+  4)
+    case $1 in
+      --read) read_export "$2" "$3" "$4" ;;
+      --remove) remove_export "$2" "$3" "$4" ;;
+      *) usage >&2; exit 2 ;;
+    esac
+    ;;
+  *) usage >&2; exit 2 ;;
+esac

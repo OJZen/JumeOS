@@ -1,0 +1,1000 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+LANG=C
+export PATH LC_ALL LANG
+
+readonly GATE_ID=r46h-input-wifi-active-v0.1
+readonly EXPECTED_RELEASE=6.12.99-r46h-mainline-v0.8-bootloader-handoff
+readonly EXPECTED_ROOT_SOURCE=/dev/mmcblk0p2
+readonly EXPECTED_ROOT_PARTUUID=c9f931c9-02
+readonly EXPECTED_ROOT_UUID=d3130001-46a4-4d56-9001-000000000001
+readonly EXPECTED_FIRSTBOOT='release=debian13-p2-mvp-v0.1'
+readonly EXPECTED_WIFI_SERIAL=00E04C8188FF
+readonly EXPECTED_WIFI_MAC=00:e0:4c:81:88:ff
+readonly REQUIRED_SCRIPT_PATH=/run/r46h-input-wifi-active
+readonly LOCK_PATH=/run/r46h-input-wifi-active.lock
+readonly EXT4_ERRORS=/sys/fs/ext4/mmcblk0p2/errors_count
+readonly COMMAND_TIMEOUT_SECONDS=8
+readonly WIFI_SCAN_TIMEOUT_SECONDS=25
+readonly INPUT_WINDOW_SECONDS=60
+readonly WIFI_WORKER_TIMEOUT_SECONDS=55
+readonly INPUT_WORKER_TIMEOUT_SECONDS=90
+readonly OUTPUT_TIMEOUT_SECONDS=12
+
+readonly REQUIRED_KEYS=(
+  BTN_DPAD_UP BTN_DPAD_DOWN BTN_DPAD_LEFT BTN_DPAD_RIGHT
+  BTN_EAST BTN_SOUTH BTN_WEST BTN_NORTH
+  BTN_TRIGGER_HAPPY3 BTN_TRIGGER_HAPPY4 BTN_TRIGGER_HAPPY5
+  BTN_TL BTN_TR BTN_SELECT BTN_TR2 BTN_TL2 BTN_START
+  KEY_VOLUMEDOWN KEY_VOLUMEUP
+)
+readonly REQUIRED_AXES=(ABS_X ABS_Y ABS_RX ABS_RY)
+
+# Kept as data so the host-side unit test executes the exact parsers used here.
+AXIS_AWK='
+/^[[:space:]]*Event code [0-9]+ \(/ {
+  wanted_header = index($0, "(" wanted ")") > 0
+  next
+}
+wanted_header && /^[[:space:]]*Min[[:space:]]/ {
+  advertised_min = $NF
+  have_min = 1
+  next
+}
+wanted_header && /^[[:space:]]*Value[[:space:]]/ {
+  initial = $NF
+  have_initial = 1
+  next
+}
+wanted_header && /^[[:space:]]*Max[[:space:]]/ {
+  advertised_max = $NF
+  have_max = 1
+  next
+}
+index($0, "Event: time") && index($0, "(" wanted ")") {
+  value = $NF
+  if (value !~ /^-?[0-9]+$/) next
+  if (count == 0 || value < observed_min) observed_min = value
+  if (count == 0 || value > observed_max) observed_max = value
+  last = value
+  count++
+}
+END {
+  if (!have_min || !have_max || !have_initial || count == 0) exit 1
+  printf "%d %d %d %d %d %d %d\n", \
+    advertised_min, advertised_max, initial, observed_min, observed_max, last, count
+}'
+readonly AXIS_AWK
+
+KEY_AWK='
+index($0, "Event: time") && index($0, "(" wanted ")") {
+  value = $NF
+  if (value == 1) {
+    presses++
+    last = 1
+    have_last = 1
+  } else if (value == 0) {
+    releases++
+    last = 0
+    have_last = 1
+  }
+}
+END {
+  if (!have_last) last = -1
+  printf "%d %d %d\n", presses, releases, last
+}'
+readonly KEY_AWK
+
+SYN_AWK='
+index($0, "Event: time") && index($0, "SYN_DROPPED") { count++ }
+END { print count + 0 }
+'
+readonly SYN_AWK
+
+fault_pattern='(^|[^[:alnum:]_])(BUG(:|[[:space:]])|Oops:|kernel panic|Call trace:|cut here)'
+fault_pattern+='|watchdog.*lockup|soft lockup|hard LOCKUP|rcu.*stall|hung task|task .*blocked for more than'
+fault_pattern+='|mmc.*(I/O error|error[[:space:]]+-[0-9]+|timed out|timeout|CRC|fail(ed|ure)?)'
+fault_pattern+='|I/O error.*mmc|(blk_update_request|end_request|blk_print_req_error).*(error|failure)'
+fault_pattern+='|Buffer I/O error|JBD2.*(error([ :]|$)|warning|abort|fail(ed|ure)?)'
+fault_pattern+='|EXT4-fs.*(error([ :]|$)|warning|abort|fail(ed|ure)?)'
+fault_pattern+='|(rtl8xxxu|wlan[0-9]+|cfg80211|mac80211|usb).*(firmware.*fail|I/O error|error[[:space:]]+-[0-9]+|timed out|timeout|disconnect|reset|fault|fail(ed|ure)?)'
+
+mode=""
+runtime_dir=""
+failures=0
+worker_complete=0
+worker_reason=unexpected-exit
+wifi_iface=none
+bss_count=0
+key_count=0
+key_pairs=0
+axis_count=0
+centered_count=0
+syn_dropped=0
+ext4_before=""
+dmesg_before_bytes=0
+capture_pids=()
+
+usage() {
+  cat <<'EOF'
+usage: r46h-input-wifi-active --wifi-scan
+       r46h-input-wifi-active --input-capture
+
+Run exactly one bounded, active R46H Debian 13 hardware gate. --wifi-scan
+performs a temporary passive scan without credentials or saved configuration.
+--input-capture samples only adc-joystick, gpio-keys and gpio-keys-vol without
+grabbing them; press and release every control, move both sticks through their
+full ranges, then release all controls and let both sticks return to center.
+
+Install the reviewed script as root:root mode 0700 at
+/run/r46h-input-wifi-active and run it from an interactive TTY as root.
+All temporary evidence is removed from /run before the final marker.
+EOF
+}
+
+inode_id() {
+  stat -c '%d:%i' -- "$1"
+}
+
+safe_remove_session() {
+  local path=$1
+  local expected_inode=${2:-}
+  [[ "$path" == /run/r46h-input-wifi-active.* &&
+     "$path" != "$LOCK_PATH" &&
+     ! -L "$path" && -d "$path" &&
+     "$(stat -c '%u:%a' -- "$path" 2>/dev/null || true)" == 0:700 ]] || return 1
+  if [[ -n "$expected_inode" ]]; then
+    [[ "$(inode_id "$path" 2>/dev/null || true)" == "$expected_inode" ]] || return 1
+  fi
+  rm -rf -- "$path"
+  [[ ! -e "$path" && ! -L "$path" ]]
+}
+
+safe_remove_lock() {
+  local expected_inode=${1:-}
+  [[ "$LOCK_PATH" == /run/r46h-input-wifi-active.lock &&
+     ! -L "$LOCK_PATH" && -d "$LOCK_PATH" &&
+     "$(stat -c '%u:%a' -- "$LOCK_PATH" 2>/dev/null || true)" == 0:700 ]] || return 1
+  if [[ -n "$expected_inode" ]]; then
+    [[ "$(inode_id "$LOCK_PATH" 2>/dev/null || true)" == "$expected_inode" ]] || return 1
+  fi
+  rmdir -- "$LOCK_PATH"
+  [[ ! -e "$LOCK_PATH" && ! -L "$LOCK_PATH" ]]
+}
+
+forward_signal() {
+  local signal_name=$1
+  local process_id=$2
+  (( process_id > 0 )) || return 0
+  kill -"$signal_name" -- "-$process_id" 2>/dev/null ||
+    kill -"$signal_name" -- "$process_id" 2>/dev/null
+}
+
+supervisor_session_is_empty() {
+  local session_id=$1
+  local session_ids=""
+  session_ids=$(timeout --foreground -s TERM -k 2 "$COMMAND_TIMEOUT_SECONDS" \
+    ps -eo sid= 2>/dev/null) || return 1
+  ! awk -v wanted="$session_id" \
+    '$1 == wanted { found=1 } END { exit found ? 0 : 1 }' <<< "$session_ids"
+}
+
+emit_direct_failure() {
+  local selected_mode=$1
+  local reason=$2
+  local cleanup=${3:-pass}
+  printf 'R46H_INPUT_WIFI_ACTIVE id=%s mode=%s result=fail failures=0 cleanup=%s reason=%s wifi_iface=none bss=0 keys=0 pairs=0 axes=0 centered=0 syn_dropped=0 worker_timeout=0s scan_timeout=%ss input_window=%ss\n' \
+    "$GATE_ID" "$selected_mode" "$cleanup" "$reason" \
+    "$WIFI_SCAN_TIMEOUT_SECONDS" "$INPUT_WINDOW_SECONDS"
+}
+
+worker_finalize() {
+  local status=$?
+  local result=fail
+  trap - EXIT
+  trap '' INT TERM HUP
+  set +e
+  for child_pid in "${capture_pids[@]}"; do
+    kill -TERM -- "$child_pid" 2>/dev/null || true
+  done
+  for child_pid in "${capture_pids[@]}"; do
+    wait "$child_pid" 2>/dev/null || true
+  done
+  capture_pids=()
+  if (( worker_complete == 1 && failures == 0 && status == 0 )); then
+    result=pass
+    worker_reason=checks-complete
+  elif (( status == 0 )); then
+    status=1
+  fi
+  printf 'R46H_ACTIVE_WORKER id=%s mode=%s result=%s failures=%d reason=%s wifi_iface=%s bss=%d keys=%d pairs=%d axes=%d centered=%d syn_dropped=%d exit_status=%d\n' \
+    "$GATE_ID" "$mode" "$result" "$failures" "$worker_reason" "$wifi_iface" \
+    "$bss_count" "$key_count" "$key_pairs" "$axis_count" "$centered_count" \
+    "$syn_dropped" "$status"
+  exit "$status"
+}
+
+pass() {
+  printf 'R46H_ACTIVE_CHECK group=%s name=%s result=pass\n' "$1" "$2"
+}
+
+fail() {
+  printf 'R46H_ACTIVE_CHECK group=%s name=%s result=fail reason=%s\n' "$1" "$2" "$3"
+  failures=$((failures + 1))
+}
+
+check() {
+  local group=$1
+  local name=$2
+  shift 2
+  if "$@"; then
+    pass "$group" "$name"
+  else
+    fail "$group" "$name" check-failed
+  fi
+}
+
+timed() {
+  timeout --foreground -s TERM -k 2 "$COMMAND_TIMEOUT_SECONDS" "$@"
+}
+
+no_failed_units() {
+  local output=""
+  output=$(timed systemctl --failed --no-legend --plain 2>/dev/null) || return 1
+  [[ -z "$output" ]]
+}
+
+run_common_preflight() {
+  local board_model=""
+  local root_source=""
+  local root_partuuid=""
+  local root_uuid=""
+  local root_fstype=""
+
+  for required_command in \
+    awk basename cat cmp dmesg findmnt grep head mkdir rm rmdir stat systemctl \
+    tail timeout tr uname wc; do
+    if command -v "$required_command" >/dev/null; then
+      pass preflight "command-$required_command"
+    else
+      fail preflight "command-$required_command" missing-command
+    fi
+  done
+  if [[ "$mode" == wifi-scan ]]; then
+    for required_command in dirname ip iw readlink rfkill; do
+      if command -v "$required_command" >/dev/null; then
+        pass preflight "command-$required_command"
+      else
+        fail preflight "command-$required_command" missing-command
+      fi
+    done
+  else
+    if command -v evtest >/dev/null; then
+      pass preflight command-evtest
+    else
+      fail preflight command-evtest missing-command
+    fi
+  fi
+  (( failures == 0 )) || {
+    worker_reason=missing-command
+    return 1
+  }
+
+  check identity debian13 grep -Fqx 'VERSION_ID="13"' /etc/os-release
+  check identity kernel test "$(uname -r)" = "$EXPECTED_RELEASE"
+  check identity pid1 test "$(cat /proc/1/comm 2>/dev/null || true)" = systemd
+  if [[ -r /proc/device-tree/model ]]; then
+    board_model=$(tr -d '\000' < /proc/device-tree/model)
+  fi
+  check identity board-model test "$board_model" = 'GameConsole R46H'
+  check identity firstboot-file test ! -L /var/lib/r46h/firstboot-complete
+  check identity firstboot-owner test \
+    "$(stat -c '%u:%a:%h' -- /var/lib/r46h/firstboot-complete 2>/dev/null || true)" = 0:600:1
+  check identity firstboot-marker grep -Fqx "$EXPECTED_FIRSTBOOT" /var/lib/r46h/firstboot-complete
+
+  root_source=$(timed findmnt -rn -o SOURCE / 2>/dev/null || true)
+  root_partuuid=$(timed findmnt -rn -o PARTUUID / 2>/dev/null || true)
+  root_uuid=$(timed findmnt -rn -o UUID / 2>/dev/null || true)
+  root_fstype=$(timed findmnt -rn -o FSTYPE / 2>/dev/null || true)
+  check identity root-source test "$root_source" = "$EXPECTED_ROOT_SOURCE"
+  check identity root-partuuid test "$root_partuuid" = "$EXPECTED_ROOT_PARTUUID"
+  check identity root-uuid test "$root_uuid" = "$EXPECTED_ROOT_UUID"
+  check identity root-fstype test "$root_fstype" = ext4
+  check identity failed-units-before no_failed_units
+
+  ext4_before=$(cat "$EXT4_ERRORS" 2>/dev/null || true)
+  if [[ "$ext4_before" =~ ^[0-9]+$ && "$ext4_before" -eq 0 ]]; then
+    pass storage ext4-errors-before
+  else
+    fail storage ext4-errors-before "value-${ext4_before:-missing}"
+  fi
+  if dmesg > "$runtime_dir/dmesg-before.txt"; then
+    dmesg_before_bytes=$(wc -c < "$runtime_dir/dmesg-before.txt" | tr -d ' ')
+  fi
+  if [[ "$dmesg_before_bytes" =~ ^[1-9][0-9]*$ ]]; then
+    pass kernel dmesg-before
+  else
+    dmesg_before_bytes=0
+    fail kernel dmesg-before capture-failed
+  fi
+  (( failures == 0 ))
+}
+
+find_usb_ancestor() {
+  local path=$1
+  local parent=""
+  local iteration=0
+  for ((iteration=0; iteration<10; iteration++)); do
+    [[ "$path" != / && -n "$path" ]] || break
+    if [[ -r "$path/idVendor" && -r "$path/idProduct" ]] &&
+       [[ "$(tr '[:upper:]' '[:lower:]' < "$path/idVendor")" == 0bda ]] &&
+       [[ "$(tr '[:upper:]' '[:lower:]' < "$path/idProduct")" == 8179 ]]; then
+      printf '%s\n' "$path"
+      return 0
+    fi
+    parent=$(dirname -- "$path")
+    [[ "$parent" != "$path" ]] || break
+    path=$parent
+  done
+  return 1
+}
+
+run_wifi_scan() {
+  local status_line=""
+  local status_pattern='^R46H_WIFI_MAC result=pass interface=(wlan[0-9]+) source=usb-serial mac=00:e0:4c:81:88:ff$'
+  local live_mac=""
+  local driver=""
+  local device_path=""
+  local usb_path=""
+  local usb_serial=""
+  local scan_status=0
+
+  if [[ ! -f /run/r46h-wifi-mac.status || -L /run/r46h-wifi-mac.status ||
+        "$(stat -c '%u:%a:%h' -- /run/r46h-wifi-mac.status 2>/dev/null || true)" != 0:600:1 ]]; then
+    fail wireless stable-status-file unsafe-status-file
+    return 1
+  fi
+  status_line=$(cat /run/r46h-wifi-mac.status 2>/dev/null || true)
+  if [[ "$status_line" =~ $status_pattern ]]; then
+    wifi_iface=${BASH_REMATCH[1]}
+    pass wireless stable-source
+  else
+    fail wireless stable-source invalid-status
+    return 1
+  fi
+  live_mac=$(cat "/sys/class/net/$wifi_iface/address" 2>/dev/null || true)
+  if [[ "${live_mac,,}" == "$EXPECTED_WIFI_MAC" ]]; then
+    pass wireless stable-mac
+  else
+    fail wireless stable-mac live-mismatch
+  fi
+  if [[ -L "/sys/class/net/$wifi_iface/device/driver" ]]; then
+    driver=$(basename "$(readlink -f "/sys/class/net/$wifi_iface/device/driver")")
+  fi
+  if [[ "$driver" == rtl8xxxu ]]; then
+    pass wireless driver
+  else
+    fail wireless driver "observed-${driver:-missing}"
+  fi
+  device_path=$(readlink -f "/sys/class/net/$wifi_iface/device" 2>/dev/null || true)
+  usb_path=$(find_usb_ancestor "$device_path" 2>/dev/null || true)
+  if [[ -n "$usb_path" ]]; then
+    pass wireless usb-identity
+  else
+    fail wireless usb-identity no-0bda-8179-ancestor
+  fi
+  if [[ -r "$usb_path/serial" ]]; then
+    usb_serial=$(tr -d '\r\n' < "$usb_path/serial")
+  fi
+  if [[ "$usb_serial" == "$EXPECTED_WIFI_SERIAL" ]]; then
+    pass wireless usb-serial
+  else
+    fail wireless usb-serial "observed-${usb_serial:-missing}"
+  fi
+  if timed iw dev | grep -Eq "^[[:space:]]*Interface[[:space:]]+$wifi_iface$"; then
+    pass wireless iw-interface
+  else
+    fail wireless iw-interface missing-interface
+  fi
+  if timed rfkill list > "$runtime_dir/rfkill.txt" 2>&1 &&
+     ! grep -Eqi '(Soft|Hard) blocked:[[:space:]]+yes' "$runtime_dir/rfkill.txt"; then
+    pass wireless rfkill-unblocked
+  else
+    fail wireless rfkill-unblocked blocked-or-query-failed
+  fi
+  if timed iw dev "$wifi_iface" link > "$runtime_dir/association-before.txt" 2>&1 &&
+     grep -Fqx 'Not connected.' "$runtime_dir/association-before.txt"; then
+    pass wireless initially-unassociated
+  else
+    fail wireless initially-unassociated connected-or-query-failed
+  fi
+  (( failures == 0 )) || return 1
+
+  if ip -o link show dev "$wifi_iface" > "$runtime_dir/link-before.txt"; then
+    pass wireless link-state-before
+  else
+    fail wireless link-state-before query-failed
+    return 1
+  fi
+  set +e
+  timeout --foreground -s TERM -k 5 "$WIFI_SCAN_TIMEOUT_SECONDS" \
+    iw dev "$wifi_iface" scan passive \
+    > "$runtime_dir/wifi-scan.txt" 2> "$runtime_dir/wifi-scan.err"
+  scan_status=$?
+  set -e
+  if (( scan_status == 0 )); then
+    pass wireless passive-scan-command
+  else
+    fail wireless passive-scan-command "status-$scan_status"
+  fi
+  bss_count=$(awk '$1 == "BSS" && $2 ~ /^[0-9A-Fa-f][0-9A-Fa-f]:/ { count++ } END { print count + 0 }' \
+    "$runtime_dir/wifi-scan.txt")
+  if [[ "$bss_count" =~ ^[1-9][0-9]*$ ]]; then
+    pass wireless bss-observed
+  else
+    bss_count=0
+    fail wireless bss-observed none
+  fi
+  if [[ "$(cat "/sys/class/net/$wifi_iface/address" 2>/dev/null || true)" == "$EXPECTED_WIFI_MAC" ]]; then
+    pass wireless mac-after
+  else
+    fail wireless mac-after changed
+  fi
+  if ip -o link show dev "$wifi_iface" > "$runtime_dir/link-after.txt"; then
+    pass wireless link-state-after
+  else
+    fail wireless link-state-after query-failed
+  fi
+  if [[ -s "$runtime_dir/link-after.txt" ]] &&
+     cmp -s "$runtime_dir/link-before.txt" "$runtime_dir/link-after.txt"; then
+    pass wireless link-state-unchanged
+  else
+    fail wireless link-state-unchanged changed
+  fi
+  if timed iw dev "$wifi_iface" link > "$runtime_dir/association-after.txt" 2>&1 &&
+     cmp -s "$runtime_dir/association-before.txt" "$runtime_dir/association-after.txt"; then
+    pass wireless association-unchanged
+  else
+    fail wireless association-unchanged changed-or-query-failed
+  fi
+}
+
+discover_input_node() {
+  local wanted_name=$1
+  local output_variable=$2
+  local name_file=""
+  local event_name=""
+  local matches=()
+  shopt -s nullglob
+  for name_file in /sys/class/input/event*/device/name; do
+    if [[ "$(cat "$name_file" 2>/dev/null || true)" == "$wanted_name" ]]; then
+      event_name=$(basename "${name_file%/device/name}")
+      [[ "$event_name" =~ ^event[0-9]+$ ]] || continue
+      matches+=("/dev/input/$event_name")
+    fi
+  done
+  shopt -u nullglob
+  (( ${#matches[@]} == 1 )) || return 1
+  [[ -c "${matches[0]}" ]] || return 1
+  printf -v "$output_variable" '%s' "${matches[0]}"
+}
+
+run_input_capture() {
+  local joystick_node=""
+  local keys_node=""
+  local volume_node=""
+  local joystick_status=0
+  local keys_status=0
+  local volume_status=0
+  local all_keys_log="$runtime_dir/all-keys.txt"
+  local key=""
+  local presses=0
+  local releases=0
+  local last=0
+  local complete_pairs=0
+  local axis=""
+  local advertised_min=0
+  local advertised_max=0
+  local initial_value=0
+  local observed_min=0
+  local observed_max=0
+  local last_value=0
+  local sample_count=0
+  local advertised_span=0
+  local observed_span=0
+  local center_twice=0
+  local initial_twice=0
+  local last_twice=0
+  local center_delta=0
+  local return_delta=0
+  local axis_result=pass
+
+  if discover_input_node adc-joystick joystick_node; then
+    pass input device-adc-joystick
+  else
+    fail input device-adc-joystick not-exactly-one
+  fi
+  if discover_input_node gpio-keys keys_node; then
+    pass input device-gpio-keys
+  else
+    fail input device-gpio-keys not-exactly-one
+  fi
+  if discover_input_node gpio-keys-vol volume_node; then
+    pass input device-gpio-keys-vol
+  else
+    fail input device-gpio-keys-vol not-exactly-one
+  fi
+  (( failures == 0 )) || return 1
+
+  printf 'R46H_ACTIVE_INPUT_CAPTURE stage=start seconds=%d devices=adc-joystick,gpio-keys,gpio-keys-vol grab=no\n' \
+    "$INPUT_WINDOW_SECONDS"
+  timeout --foreground -s TERM -k 3 "$INPUT_WINDOW_SECONDS" \
+    evtest "$joystick_node" > "$runtime_dir/joystick.txt" 2>&1 &
+  capture_pids+=("$!")
+  timeout --foreground -s TERM -k 3 "$INPUT_WINDOW_SECONDS" \
+    evtest "$keys_node" > "$runtime_dir/keys.txt" 2>&1 &
+  capture_pids+=("$!")
+  timeout --foreground -s TERM -k 3 "$INPUT_WINDOW_SECONDS" \
+    evtest "$volume_node" > "$runtime_dir/volume.txt" 2>&1 &
+  capture_pids+=("$!")
+
+  set +e
+  wait "${capture_pids[0]}"; joystick_status=$?
+  wait "${capture_pids[1]}"; keys_status=$?
+  wait "${capture_pids[2]}"; volume_status=$?
+  set -e
+  capture_pids=()
+  if (( joystick_status == 124 && keys_status == 124 && volume_status == 124 )); then
+    pass input fixed-window-complete
+  else
+    fail input fixed-window-complete \
+      "statuses-$joystick_status-$keys_status-$volume_status"
+  fi
+
+  if cat "$runtime_dir/keys.txt" "$runtime_dir/volume.txt" > "$all_keys_log"; then
+    pass input key-logs-combined
+  else
+    fail input key-logs-combined read-failed
+  fi
+  syn_dropped=$(awk "$SYN_AWK" \
+    "$runtime_dir/joystick.txt" "$runtime_dir/keys.txt" "$runtime_dir/volume.txt")
+  if [[ "$syn_dropped" == 0 ]]; then
+    pass input syn-dropped
+  else
+    fail input syn-dropped "count-$syn_dropped"
+  fi
+
+  for key in "${REQUIRED_KEYS[@]}"; do
+    read -r presses releases last < <(awk -v wanted="$key" "$KEY_AWK" "$all_keys_log")
+    if (( presses >= 1 && releases >= 1 && last == 0 )); then
+      key_count=$((key_count + 1))
+      complete_pairs=$presses
+      (( releases < complete_pairs )) && complete_pairs=$releases
+      key_pairs=$((key_pairs + complete_pairs))
+      printf 'R46H_ACTIVE_INPUT_KEY code=%s result=pass presses=%d releases=%d last=%d\n' \
+        "$key" "$presses" "$releases" "$last"
+    else
+      printf 'R46H_ACTIVE_INPUT_KEY code=%s result=fail presses=%d releases=%d last=%d\n' \
+        "$key" "$presses" "$releases" "$last"
+      failures=$((failures + 1))
+    fi
+  done
+
+  for axis in "${REQUIRED_AXES[@]}"; do
+    axis_result=pass
+    if ! read -r advertised_min advertised_max initial_value observed_min observed_max last_value sample_count \
+        < <(awk -v wanted="$axis" "$AXIS_AWK" "$runtime_dir/joystick.txt"); then
+      printf 'R46H_ACTIVE_INPUT_AXIS code=%s result=fail reason=unparseable\n' "$axis"
+      failures=$((failures + 1))
+      continue
+    fi
+    advertised_span=$((advertised_max - advertised_min))
+    observed_span=$((observed_max - observed_min))
+    center_twice=$((advertised_min + advertised_max))
+    initial_twice=$((initial_value * 2))
+    last_twice=$((last_value * 2))
+    center_delta=$((initial_twice - center_twice))
+    (( center_delta < 0 )) && center_delta=$((-center_delta))
+    return_delta=$((last_value - initial_value))
+    (( return_delta < 0 )) && return_delta=$((-return_delta))
+    if (( advertised_span <= 0 || sample_count <= 0 ||
+          initial_value < advertised_min || initial_value > advertised_max ||
+          observed_min < advertised_min || observed_max > advertised_max ||
+          last_value < advertised_min || last_value > advertised_max ||
+          observed_span * 100 < advertised_span * 70 ||
+          (observed_min - advertised_min) * 100 > advertised_span * 20 ||
+          (advertised_max - observed_max) * 100 > advertised_span * 20 )); then
+      axis_result=fail
+    else
+      axis_count=$((axis_count + 1))
+    fi
+    if (( advertised_span > 0 &&
+          center_delta * 100 <= advertised_span * 70 &&
+          return_delta * 100 <= advertised_span * 10 )); then
+      centered_count=$((centered_count + 1))
+    else
+      axis_result=fail
+    fi
+    printf 'R46H_ACTIVE_INPUT_AXIS code=%s result=%s advertised_min=%d advertised_max=%d initial=%d observed_min=%d observed_max=%d last=%d samples=%d\n' \
+      "$axis" "$axis_result" "$advertised_min" "$advertised_max" \
+      "$initial_value" "$observed_min" "$observed_max" "$last_value" "$sample_count"
+    if [[ "$axis_result" == fail ]]; then
+      failures=$((failures + 1))
+    fi
+  done
+  if (( key_count == ${#REQUIRED_KEYS[@]} )); then
+    pass input all-required-keys
+  else
+    fail input all-required-keys "complete-$key_count-of-${#REQUIRED_KEYS[@]}"
+  fi
+  if (( axis_count == ${#REQUIRED_AXES[@]} && centered_count == ${#REQUIRED_AXES[@]} )); then
+    pass input all-required-axes
+  else
+    fail input all-required-axes \
+      "covered-$axis_count-centered-$centered_count-of-${#REQUIRED_AXES[@]}"
+  fi
+}
+
+run_postflight() {
+  local ext4_after=""
+  local dmesg_after_bytes=0
+  local dmesg_ring_wrapped=1
+  local fault_detected=1
+
+  ext4_after=$(cat "$EXT4_ERRORS" 2>/dev/null || true)
+  if [[ "$ext4_after" =~ ^[0-9]+$ && "$ext4_after" -eq 0 &&
+        "$ext4_after" == "$ext4_before" ]]; then
+    pass storage ext4-errors-after
+  else
+    fail storage ext4-errors-after \
+      "before-${ext4_before:-missing}-after-${ext4_after:-missing}"
+  fi
+  if dmesg > "$runtime_dir/dmesg-after.txt"; then
+    dmesg_after_bytes=$(wc -c < "$runtime_dir/dmesg-after.txt" | tr -d ' ')
+  fi
+  if [[ "$dmesg_after_bytes" =~ ^[0-9]+$ ]] &&
+     (( dmesg_before_bytes > 0 && dmesg_after_bytes >= dmesg_before_bytes )) &&
+     head -c "$dmesg_before_bytes" "$runtime_dir/dmesg-after.txt" |
+       cmp -s "$runtime_dir/dmesg-before.txt" -; then
+    dmesg_ring_wrapped=0
+    pass kernel dmesg-ring-prefix
+    if tail -c "+$((dmesg_before_bytes + 1))" "$runtime_dir/dmesg-after.txt" \
+        > "$runtime_dir/dmesg-delta.txt"; then
+      pass kernel dmesg-delta-capture
+    else
+      : > "$runtime_dir/dmesg-delta.txt"
+      fail kernel dmesg-delta-capture failed
+    fi
+  else
+    : > "$runtime_dir/dmesg-delta.txt"
+    fail kernel dmesg-ring-prefix wrapped-or-changed
+  fi
+  if ! grep -Eqi "$fault_pattern" "$runtime_dir/dmesg-delta.txt"; then
+    fault_detected=0
+    pass kernel dmesg-new-faults
+  else
+    fail kernel dmesg-new-faults detected
+  fi
+  if no_failed_units; then
+    pass identity failed-units-after
+  else
+    fail identity failed-units-after present-or-query-failed
+  fi
+  printf 'R46H_ACTIVE_POST mode=%s ext4_before=%s ext4_after=%s dmesg_ring_wrapped=%d fault_detected=%d\n' \
+    "$mode" "${ext4_before:-missing}" "${ext4_after:-missing}" \
+    "$dmesg_ring_wrapped" "$fault_detected"
+}
+
+run_worker() {
+  trap worker_finalize EXIT
+  trap 'worker_reason=signal-int; exit 130' INT
+  trap 'worker_reason=signal-term; exit 143' TERM
+  trap 'worker_reason=signal-hup; exit 129' HUP
+
+  [[ "$(id -u)" == 0 ]] || {
+    worker_reason=not-root
+    exit 1
+  }
+  [[ "$(findmnt -rn -T /run -o FSTYPE 2>/dev/null || true)" == tmpfs &&
+     ! -L /run && -d /run &&
+     "$(stat -c '%u:%a' -- /run 2>/dev/null || true)" == 0:755 ]] || {
+    worker_reason=unsafe-run
+    exit 1
+  }
+  [[ -n ${R46H_ACTIVE_SESSION_DIR:-} && -n ${R46H_ACTIVE_SESSION_INODE:-} &&
+     "$R46H_ACTIVE_SESSION_DIR" == /run/r46h-input-wifi-active.* &&
+     "$R46H_ACTIVE_SESSION_DIR" != "$LOCK_PATH" &&
+     ! -L "$R46H_ACTIVE_SESSION_DIR" && -d "$R46H_ACTIVE_SESSION_DIR" &&
+     "$(stat -c '%u:%a' -- "$R46H_ACTIVE_SESSION_DIR" 2>/dev/null || true)" == 0:700 &&
+     "$(inode_id "$R46H_ACTIVE_SESSION_DIR" 2>/dev/null || true)" == "$R46H_ACTIVE_SESSION_INODE" ]] || {
+    worker_reason=unsafe-session
+    exit 1
+  }
+  runtime_dir="$R46H_ACTIVE_SESSION_DIR/worker"
+  mkdir -m 0700 -- "$runtime_dir" || {
+    worker_reason=runtime-create-failed
+    exit 1
+  }
+  for evidence_file in \
+    dmesg-before.txt dmesg-after.txt dmesg-delta.txt rfkill.txt \
+    link-before.txt link-after.txt association-before.txt association-after.txt \
+    wifi-scan.txt wifi-scan.err \
+    joystick.txt keys.txt volume.txt all-keys.txt; do
+    : > "$runtime_dir/$evidence_file"
+  done
+  printf 'R46H_ACTIVE_WORKER id=%s mode=%s stage=start kernel=%s\n' \
+    "$GATE_ID" "$mode" "$(uname -r)"
+
+  if ! run_common_preflight; then
+    worker_reason=preflight-failed
+  elif [[ "$mode" == wifi-scan ]]; then
+    run_wifi_scan || true
+  elif [[ "$mode" == input-capture ]]; then
+    run_input_capture || true
+  else
+    fail preflight mode internal-invalid-mode
+  fi
+  run_postflight || true
+  worker_complete=1
+  if (( failures == 0 )); then
+    exit 0
+  fi
+  worker_reason=checks-failed
+  exit 1
+}
+
+run_supervisor() {
+  local script_path=""
+  local session_dir=""
+  local session_inode=""
+  local supervisor_log=""
+  local lock_inode=""
+  local setup_cleanup=pass
+  local cleanup=pass
+  local worker_pid=0
+  local signal_status=0
+  local timeout_status=1
+  local replay_status=0
+  local worker_timeout=0
+  local worker_line=""
+  local worker_line_count=0
+  local result=fail
+  local result_reason=worker-no-terminal
+  local result_failures=0
+  local result_iface=none
+  local result_bss=0
+  local result_keys=0
+  local result_pairs=0
+  local result_axes=0
+  local result_centered=0
+  local result_syn=0
+  local result_exit=1
+  local final_status=1
+  local worker_group_gone=1
+  local poll=0
+
+  [[ "$(id -u)" == 0 ]] || {
+    emit_direct_failure "$mode" not-root
+    return 1
+  }
+  [[ -t 0 && -t 1 && -t 2 ]] || {
+    emit_direct_failure "$mode" interactive-tty-required
+    return 1
+  }
+  [[ "$(findmnt -rn -T /run -o FSTYPE 2>/dev/null || true)" == tmpfs &&
+     ! -L /run && -d /run &&
+     "$(stat -c '%u:%a' -- /run 2>/dev/null || true)" == 0:755 ]] || {
+    emit_direct_failure "$mode" unsafe-run
+    return 1
+  }
+  script_path=$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null || true)
+  [[ "$script_path" == "$REQUIRED_SCRIPT_PATH" &&
+     "${BASH_SOURCE[0]}" == "$REQUIRED_SCRIPT_PATH" &&
+     ! -L "$REQUIRED_SCRIPT_PATH" && -f "$REQUIRED_SCRIPT_PATH" &&
+     "$(stat -c '%u:%a:%h' -- "$REQUIRED_SCRIPT_PATH" 2>/dev/null || true)" == 0:700:1 ]] || {
+    emit_direct_failure "$mode" unsafe-script-identity
+    return 1
+  }
+  for supervisor_command in \
+    awk cat chmod env grep kill mkdir mktemp ps readlink rm rmdir sed setsid \
+    sleep stat tail timeout; do
+    command -v "$supervisor_command" >/dev/null || {
+      emit_direct_failure "$mode" missing-supervisor-command
+      return 1
+    }
+  done
+  if [[ "$mode" == wifi-scan ]]; then
+    worker_timeout=$WIFI_WORKER_TIMEOUT_SECONDS
+  else
+    worker_timeout=$INPUT_WORKER_TIMEOUT_SECONDS
+  fi
+
+  trap 'signal_status=130' INT
+  trap 'signal_status=143' TERM
+  trap 'signal_status=129' HUP
+  session_dir=$(mktemp -d /run/r46h-input-wifi-active.XXXXXX) || {
+    emit_direct_failure "$mode" session-create-failed
+    return 1
+  }
+  chmod 0700 "$session_dir" || true
+  session_inode=$(inode_id "$session_dir" 2>/dev/null || true)
+  if [[ -z "$session_inode" || -L "$session_dir" || ! -d "$session_dir" ||
+        "$(stat -c '%u:%a' -- "$session_dir" 2>/dev/null || true)" != 0:700 ]]; then
+    safe_remove_session "$session_dir" || setup_cleanup=fail
+    emit_direct_failure "$mode" session-identity-failed "$setup_cleanup"
+    return 1
+  fi
+  supervisor_log="$session_dir/worker.log"
+  if ! : > "$supervisor_log" || ! chmod 0600 "$supervisor_log"; then
+    safe_remove_session "$session_dir" "$session_inode" || setup_cleanup=fail
+    emit_direct_failure "$mode" log-create-failed "$setup_cleanup"
+    return 1
+  fi
+  if ! mkdir -m 0700 -- "$LOCK_PATH"; then
+    safe_remove_session "$session_dir" "$session_inode" || setup_cleanup=fail
+    emit_direct_failure "$mode" already-running "$setup_cleanup"
+    return 1
+  fi
+  lock_inode=$(inode_id "$LOCK_PATH" 2>/dev/null || true)
+  if [[ -z "$lock_inode" || -L "$LOCK_PATH" || ! -d "$LOCK_PATH" ||
+        "$(stat -c '%u:%a' -- "$LOCK_PATH" 2>/dev/null || true)" != 0:700 ]]; then
+    safe_remove_lock || setup_cleanup=fail
+    safe_remove_session "$session_dir" "$session_inode" || setup_cleanup=fail
+    emit_direct_failure "$mode" lock-identity-failed "$setup_cleanup"
+    return 1
+  fi
+  if (( signal_status != 0 )); then
+    safe_remove_lock "$lock_inode" || setup_cleanup=fail
+    safe_remove_session "$session_dir" "$session_inode" || setup_cleanup=fail
+    emit_direct_failure "$mode" supervisor-signal "$setup_cleanup"
+    return "$signal_status"
+  fi
+
+  if [[ "$mode" == input-capture ]]; then
+    printf 'R46H_ACTIVE_WINDOW mode=input-capture seconds=%ss start=all-released-and-centered action=press-release-all-controls-move-both-sticks-full-range-then-center avoid=power-reset\n' \
+      "$INPUT_WINDOW_SECONDS"
+  else
+    printf 'R46H_ACTIVE_WINDOW mode=wifi-scan seconds=%ss action=passive-scan-only credentials=none saved_config=no\n' \
+      "$WIFI_SCAN_TIMEOUT_SECONDS"
+  fi
+  trap 'signal_status=130; forward_signal INT "$worker_pid" || true' INT
+  trap 'signal_status=143; forward_signal TERM "$worker_pid" || true' TERM
+  trap 'signal_status=129; forward_signal HUP "$worker_pid" || true' HUP
+  setsid timeout -s TERM -k 5 "$worker_timeout" \
+    env -i PATH="$PATH" LC_ALL=C LANG=C R46H_ACTIVE_SUPERVISED=1 \
+      R46H_ACTIVE_SESSION_DIR="$session_dir" R46H_ACTIVE_SESSION_INODE="$session_inode" \
+      /bin/bash "$script_path" --worker "$mode" > "$supervisor_log" 2>&1 &
+  worker_pid=$!
+  case $signal_status in
+    129) forward_signal HUP "$worker_pid" || true ;;
+    130) forward_signal INT "$worker_pid" || true ;;
+    143) forward_signal TERM "$worker_pid" || true ;;
+  esac
+  set +e
+  wait "$worker_pid"
+  timeout_status=$?
+  set -e
+  trap '' INT TERM HUP
+  if (( signal_status != 0 )); then
+    forward_signal TERM "$worker_pid" || true
+    for ((poll=0; poll<50; poll++)); do
+      kill -0 -- "$worker_pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    if kill -0 -- "$worker_pid" 2>/dev/null; then
+      forward_signal KILL "$worker_pid" || true
+    fi
+    set +e
+    wait "$worker_pid"
+    set -e
+  fi
+  if ! supervisor_session_is_empty "$worker_pid"; then
+    forward_signal KILL "$worker_pid" || true
+    sleep 0.2
+    if ! supervisor_session_is_empty "$worker_pid"; then
+      worker_group_gone=0
+    fi
+  fi
+
+  set +e
+  timeout --foreground -s TERM -k 2 "$OUTPUT_TIMEOUT_SECONDS" cat "$supervisor_log"
+  replay_status=$?
+  set -e
+  worker_line_count=$(grep -Ec '^R46H_ACTIVE_WORKER id=.* stage=' "$supervisor_log" || true)
+  worker_line_count=$((worker_line_count + $(grep -Ec '^R46H_ACTIVE_WORKER id=.* result=' "$supervisor_log" || true)))
+  worker_line=$(grep -E '^R46H_ACTIVE_WORKER id=.* result=' "$supervisor_log" | tail -n 1 || true)
+  if [[ "$worker_line" =~ ^R46H_ACTIVE_WORKER[[:space:]]id=$GATE_ID[[:space:]]mode=$mode[[:space:]]result=(pass|fail)[[:space:]]failures=([0-9]+)[[:space:]]reason=([a-z0-9-]+)[[:space:]]wifi_iface=(none|wlan[0-9]+)[[:space:]]bss=([0-9]+)[[:space:]]keys=([0-9]+)[[:space:]]pairs=([0-9]+)[[:space:]]axes=([0-9]+)[[:space:]]centered=([0-9]+)[[:space:]]syn_dropped=([0-9]+)[[:space:]]exit_status=([0-9]+)$ ]]; then
+    result=${BASH_REMATCH[1]}
+    result_failures=${BASH_REMATCH[2]}
+    result_reason=${BASH_REMATCH[3]}
+    result_iface=${BASH_REMATCH[4]}
+    result_bss=${BASH_REMATCH[5]}
+    result_keys=${BASH_REMATCH[6]}
+    result_pairs=${BASH_REMATCH[7]}
+    result_axes=${BASH_REMATCH[8]}
+    result_centered=${BASH_REMATCH[9]}
+    result_syn=${BASH_REMATCH[10]}
+    result_exit=${BASH_REMATCH[11]}
+  fi
+  # There must be one start marker and one terminal worker marker.
+  if (( worker_group_gone == 0 )); then
+    result=fail
+    result_reason=worker-process-leak
+  elif (( worker_line_count != 2 )); then
+    result=fail
+    result_reason=worker-marker-count
+  elif (( replay_status != 0 )); then
+    result=fail
+    result_reason=output-timeout
+  elif (( signal_status != 0 )); then
+    result=fail
+    result_reason=supervisor-signal
+  elif (( timeout_status == 124 || timeout_status == 137 )); then
+    result=fail
+    result_reason=worker-timeout
+  elif (( timeout_status != result_exit )); then
+    result=fail
+    result_reason=worker-status-mismatch
+  elif [[ "$result" == pass ]] &&
+       (( result_failures == 0 && result_exit == 0 && timeout_status == 0 )); then
+    final_status=0
+  else
+    final_status=1
+  fi
+
+  safe_remove_lock "$lock_inode" || cleanup=fail
+  if (( worker_group_gone == 1 )); then
+    safe_remove_session "$session_dir" "$session_inode" || cleanup=fail
+  else
+    cleanup=fail
+  fi
+  if [[ "$cleanup" != pass ]]; then
+    result=fail
+    result_reason=cleanup-failed
+    final_status=1
+  fi
+  printf 'R46H_INPUT_WIFI_ACTIVE id=%s mode=%s result=%s failures=%d cleanup=%s reason=%s wifi_iface=%s bss=%d keys=%d pairs=%d axes=%d centered=%d syn_dropped=%d worker_timeout=%ss scan_timeout=%ss input_window=%ss\n' \
+    "$GATE_ID" "$mode" "$result" "$result_failures" "$cleanup" "$result_reason" \
+    "$result_iface" "$result_bss" "$result_keys" "$result_pairs" "$result_axes" \
+    "$result_centered" "$result_syn" "$worker_timeout" \
+    "$WIFI_SCAN_TIMEOUT_SECONDS" "$INPUT_WINDOW_SECONDS"
+  return "$final_status"
+}
+
+case ${1:-} in
+  --help|-h)
+    (( $# == 1 )) || { usage >&2; exit 2; }
+    usage
+    exit 0
+    ;;
+  --wifi-scan)
+    (( $# == 1 )) || { usage >&2; exit 2; }
+    mode=wifi-scan
+    ;;
+  --input-capture)
+    (( $# == 1 )) || { usage >&2; exit 2; }
+    mode=input-capture
+    ;;
+  --worker)
+    [[ ${R46H_ACTIVE_SUPERVISED:-0} == 1 && $# == 2 ]] || exit 2
+    case $2 in
+      wifi-scan|input-capture) mode=$2 ;;
+      *) exit 2 ;;
+    esac
+    run_worker
+    exit $?
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
+
+if run_supervisor; then
+  exit 0
+else
+  exit $?
+fi

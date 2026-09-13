@@ -1,0 +1,32 @@
+[Unit]
+Description=R46H combined gaming input bridge candidate
+Documentation=file:/var/lib/r46h-gaming-input-bridge/v0.5/OPERATIONS.md
+After=systemd-udev-trigger.service
+Before=r46h-gaming-frontend.service
+StartLimitIntervalSec=30s
+StartLimitBurst=3
+
+[Service]
+Type=simple
+ExecStartPre=/usr/local/libexec/r46h-input-bridge --check
+ExecStart=/usr/local/libexec/r46h-input-bridge --diagnostics
+Restart=no
+TimeoutStopSec=5s
+RuntimeDirectory=r46h-input-bridge
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_UNIX
+SystemCallArchitectures=native
+UMask=0077
+
+# Deliberately not installable: this candidate is trial-only.

@@ -1,0 +1,225 @@
+From 3f24ab68df032f80cc8b36b8c3fc65543a22ae1b Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sat, 15 Aug 2026 18:05:00 +0800
+Subject: [PATCH] power: supply: rk817: support a board DC input
+
+Some RK817 boards route their dedicated DC jack presence signal to a
+GPIO instead of the PMIC plug-status input. Allow an optional
+dc-det-gpios line on the charger child and combine its logical state with
+the existing PMIC state for POWER_SUPPLY_PROP_ONLINE.
+
+Use both-edge interrupts for change notification, sample the line once
+after the IRQ is installed, and refresh it on resume. Boards without the
+property retain the existing behavior. Do not change charge voltage, charge
+current or input-limit programming.
+
+The R46H vendor DT and driver identify GPIO0_B3 as an active-high DC
+presence signal. A bounded hardware observation confirmed that it follows
+USB-DC while the PMIC plug IRQ counters remain zero, so describe that line
+for this board.
+
+Signed-off-by: Codex <codex@openai.com>
+---
+ .../bindings/mfd/rockchip,rk817.yaml          |  7 ++
+ .../boot/dts/rockchip/rk3326-r46h.dts         |  1 +
+ drivers/power/supply/rk817_charger.c          | 101 +++++++++++++++++++--
+ 3 files changed, 105 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/mfd/rockchip,rk817.yaml b/Documentation/devicetree/bindings/mfd/rockchip,rk817.yaml
+--- a/Documentation/devicetree/bindings/mfd/rockchip,rk817.yaml
++++ b/Documentation/devicetree/bindings/mfd/rockchip,rk817.yaml
+@@ -131,6 +131,13 @@ properties:
+           voltage-min-design-microvolt,
+           and a valid ocv-capacity table.
+ 
++      dc-det-gpios:
++        maxItems: 1
++        description:
++          Optional board-level DC input presence signal. The asserted state
++          is combined with the RK817 internal plug status when reporting the
++          charger online property.
++
+       rockchip,resistor-sense-micro-ohms:
+         description: |
+           Value in microohms of the battery sense resistor. This value is
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts b/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
+--- a/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
+@@ -255,6 +255,7 @@ &rk817_codec {
+ };
+ 
+ &rk817_charger {
++	dc-det-gpios = <&gpio0 RK_PB3 GPIO_ACTIVE_HIGH>;
+ 	monitored-battery = <&battery>;
+ };
+ 
+diff --git a/drivers/power/supply/rk817_charger.c b/drivers/power/supply/rk817_charger.c
+--- a/drivers/power/supply/rk817_charger.c
++++ b/drivers/power/supply/rk817_charger.c
+@@ -10,6 +10,7 @@
+ 
+ #include <linux/unaligned.h>
+ #include <linux/devm-helpers.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/mfd/rk808.h>
+ #include <linux/irq.h>
+ #include <linux/of.h>
+@@ -52,6 +53,8 @@ struct rk817_charger {
+ 	struct power_supply *bat_ps;
+ 	struct power_supply *chg_ps;
+ 	bool plugged_in;
++	struct gpio_desc *dc_det_gpio;
++	bool dc_plugged_in;
+ 	bool battery_present;
+ 
+ 	/*
+@@ -564,7 +567,8 @@ static int rk817_chg_get_prop(struct power_supply *ps,
+ 
+ 	switch (prop) {
+ 	case POWER_SUPPLY_PROP_ONLINE:
+-		val->intval = charger->plugged_in;
++		val->intval = READ_ONCE(charger->plugged_in) ||
++			      READ_ONCE(charger->dc_plugged_in);
+ 		break;
+ 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
+ 		/* max voltage from datasheet at 5.5v (default 5.0v) */
+@@ -597,7 +601,7 @@ static irqreturn_t rk817_plug_in_isr(int irq, void *cg)
+ 	struct rk817_charger *charger;
+ 
+ 	charger = (struct rk817_charger *)cg;
+-	charger->plugged_in = 1;
++	WRITE_ONCE(charger->plugged_in, true);
+ 	power_supply_changed(charger->chg_ps);
+ 	power_supply_changed(charger->bat_ps);
+ 	/* try to recalibrate capacity if we hit full charge. */
+@@ -617,7 +621,7 @@ static irqreturn_t rk817_plug_out_isr(int irq, void *cg)
+ 
+ 	charger = (struct rk817_charger *)cg;
+ 	rk808 = charger->rk808;
+-	charger->plugged_in = 0;
++	WRITE_ONCE(charger->plugged_in, false);
+ 	power_supply_changed(charger->bat_ps);
+ 	power_supply_changed(charger->chg_ps);
+ 
+@@ -648,6 +652,82 @@ static irqreturn_t rk817_plug_out_isr(int irq, void *cg)
+ 	return IRQ_HANDLED;
+ }
+ 
++static int rk817_update_dc_det(struct rk817_charger *charger, bool notify)
++{
++	bool plugged_in;
++	int value;
++
++	value = gpiod_get_value_cansleep(charger->dc_det_gpio);
++	if (value < 0)
++		return value;
++
++	plugged_in = value;
++	if (plugged_in == READ_ONCE(charger->dc_plugged_in))
++		return 0;
++
++	WRITE_ONCE(charger->dc_plugged_in, plugged_in);
++	if (notify) {
++		power_supply_changed(charger->chg_ps);
++		power_supply_changed(charger->bat_ps);
++	}
++
++	dev_dbg(charger->dev, "DC input %s\n",
++		plugged_in ? "inserted" : "removed");
++
++	return 0;
++}
++
++static irqreturn_t rk817_dc_det_isr(int irq, void *cg)
++{
++	struct rk817_charger *charger = cg;
++	int ret;
++
++	ret = rk817_update_dc_det(charger, true);
++	if (ret)
++		dev_err_ratelimited(charger->dev,
++				    "Unable to read DC input: %d\n", ret);
++
++	return IRQ_HANDLED;
++}
++
++static int rk817_dc_det_init(struct rk817_charger *charger,
++			     struct device_node *node)
++{
++	struct device *dev = charger->dev;
++	int irq, ret;
++
++	if (!of_property_present(node, "dc-det-gpios"))
++		return 0;
++
++	charger->dc_det_gpio =
++		devm_fwnode_gpiod_get_index(dev, of_fwnode_handle(node),
++					    "dc-det", 0, GPIOD_IN, "rk817-dc-det");
++	if (IS_ERR(charger->dc_det_gpio))
++		return dev_err_probe(dev, PTR_ERR(charger->dc_det_gpio),
++				     "Unable to request DC input\n");
++
++	irq = gpiod_to_irq(charger->dc_det_gpio);
++	if (irq < 0)
++		return dev_err_probe(dev, irq,
++				     "Unable to map DC input IRQ\n");
++
++	ret = devm_request_threaded_irq(dev, irq, NULL, rk817_dc_det_isr,
++					IRQF_TRIGGER_RISING |
++					IRQF_TRIGGER_FALLING |
++					IRQF_ONESHOT,
++					"rk817_dc_det", charger);
++	if (ret)
++		return dev_err_probe(dev, ret,
++				     "DC input IRQ request failed\n");
++
++	ret = rk817_update_dc_det(charger, false);
++	if (ret)
++		return dev_err_probe(dev, ret,
++				     "Unable to read initial DC input\n");
++
++	return 0;
++}
++
+ static enum power_supply_property rk817_bat_props[] = {
+ 	POWER_SUPPLY_PROP_PRESENT,
+ 	POWER_SUPPLY_PROP_STATUS,
+@@ -867,7 +947,7 @@ static int rk817_battery_init(struct rk817_charger *charger,
+ 
+ 	/* Get initial plug state */
+ 	regmap_read(rk808->regmap, RK817_SYS_STS, &tmp);
+-	charger->plugged_in = (tmp & RK817_PLUG_IN_STS);
++	WRITE_ONCE(charger->plugged_in, tmp & RK817_PLUG_IN_STS);
+ 
+ 	/*
+ 	 * Turn on all ADC functions to measure battery, USB, and sys voltage,
+@@ -1166,6 +1246,10 @@ static int rk817_charger_probe(struct platform_device *pdev)
+ 
+ 	power_supply_put_battery_info(charger->bat_ps, bat_info);
+ 
++	ret = rk817_dc_det_init(charger, node);
++	if (ret)
++		return ret;
++
+ 	plugin_irq = platform_get_irq(pdev, 0);
+ 	if (plugin_irq < 0)
+ 		return plugin_irq;
+@@ -1206,7 +1290,16 @@ static int __maybe_unused rk817_resume(struct device *dev)
+ {
+ 
+ 	struct rk817_charger *charger = dev_get_drvdata(dev);
++	int ret;
+ 
++	if (charger->dc_det_gpio) {
++		ret = rk817_update_dc_det(charger, true);
++		if (ret)
++			dev_err_ratelimited(charger->dev,
++					    "Unable to refresh DC input: %d\n",
++					    ret);
++	}
++
+ 	/* force an immediate update */
+ 	mod_delayed_work(system_wq, &charger->work, 0);
+ 
+-- 
+2.39.5

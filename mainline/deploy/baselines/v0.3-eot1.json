@@ -1,0 +1,36 @@
+{
+  "format_version": 1,
+  "baseline_id": "v0.3-eot1",
+  "release": "6.12.99-r46h-mainline-v0.3-eot1",
+  "payload_name": "r46h-v0.3-eot1",
+  "source_git_commit": "e88fde19f1d409ae15543aecf4c7f25f6f877300",
+  "boot": {
+    "active_path": "boot.ini",
+    "candidate_path": "boot.ini.v0.3-eot1",
+    "candidate_size": 1303,
+    "candidate_sha256": "8836e6e95f18e4d1256c61c8f58160795edfb9c8a553c9a2c08149e70cf1e600",
+    "image_path": "Image.mainline-v0.3-eot1.gz",
+    "image_size": 14919659,
+    "image_sha256": "c8abe8b09ad1f387d59d4c146fa66233cb76b8f799f58040c93bf8fc6350242e",
+    "dtb_path": "rk3326-r46h-mainline-v0.3-eot1.dtb",
+    "dtb_size": 49448,
+    "dtb_sha256": "074bb3121fafe5df96872628ab22db03ffd63adf53c990e779e5a0e2f54b7a2b"
+  },
+  "payload_anchors": [
+    {
+      "path": ".codex-stage-owner",
+      "size": 196,
+      "sha256": "93fcd5be7c4eb0329cf44257e338833451b213dcf17ab452c02503abc6541387"
+    },
+    {
+      "path": "DEPLOY-MANIFEST",
+      "size": 1462,
+      "sha256": "e9d0812d99b7bc350d4e3266d35668577954f3d8aef250fcc48d619cd47b182a"
+    },
+    {
+      "path": "r46h-mainline-test-v0.3-eot1.tar.gz",
+      "size": 33254098,
+      "sha256": "3bdf8c72a6a322acc8469ff149ae5bb0896c865d24014d06011d4bfe90700653"
+    }
+  ]
+}

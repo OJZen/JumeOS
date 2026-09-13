@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "source": {
+    "repository": "https://github.com/flyinghead/flycast.git",
+    "tag": "v2.6",
+    "commit": "392a429e8b040b3e5bf6696cb4f984274fc44123",
+    "tree": "712e00d5a9c99abc949bcce2bf02800492de869d",
+    "source_date_epoch": 1767792512,
+    "submodules": {
+      "core/deps/asio": "d3402006e84efb6114ff93e4f2b8508412ed80d5",
+      "core/deps/libchdr": "5f82799f2c8cad1e9cd26d39a0f8d36369a5534b"
+    }
+  },
+  "build": {
+    "platform": "linux/arm64",
+    "base_image": "arkos4clone/r46h-debian13-p2-mvp:v0.1@sha256:bd09bf6db6f1fb8f882621e98d70f01f976fd8dfba1bc897766afebd64cf51b9",
+    "base_image_id": "sha256:bd09bf6db6f1fb8f882621e98d70f01f976fd8dfba1bc897766afebd64cf51b9",
+    "builder_image": "arkos4clone/r46h-ppsspp-builder:v1.20.4",
+    "builder_image_id": "sha256:6381ff02e8a1bb5eda383ee37f45ae9312c412c7e242cc659bcd26a57d5cd548",
+    "builder_recipe": "mainline/gaming-ppsspp/Dockerfile",
+    "builder_recipe_sha256": "db5da178c75019ef9743b44e8d6a017632f6b4ff8252b0f16fed4c301fa13aaa",
+    "cmake_options": [
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DLIBRETRO=ON",
+      "-DUSE_VULKAN=OFF",
+      "-DUSE_OPENGL=ON",
+      "-DUSE_GLES2=ON",
+      "-DUSE_OPENMP=ON",
+      "-DUSE_HOST_LIBZIP=OFF",
+      "-DENABLE_CTEST=OFF",
+      "-DBUILD_TESTING=OFF"
+    ],
+    "retroarch_version": "1.20.0"
+  },
+  "core": {
+    "name": "flycast_libretro.so",
+    "size": 32646000,
+    "sha256": "1de0ebcad7de5906b2e03e3b7885254635399503969b5e1c8b21c8ef79c07eaf",
+    "machine": "AArch64",
+    "required_symbols": [
+      "retro_api_version",
+      "retro_init",
+      "retro_load_game",
+      "retro_run"
+    ],
+    "needed_libraries": [
+      "libGLESv2.so.2",
+      "libgomp.so.1",
+      "libstdc++.so.6",
+      "libm.so.6",
+      "libgcc_s.so.1",
+      "libc.so.6"
+    ]
+  },
+  "license": {
+    "name": "LICENSE",
+    "size": 18092,
+    "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+  },
+  "artifact": {
+    "name": "r46h-flycast-libretro-v2.6.tar.gz",
+    "size": 4115189,
+    "sha256": "2e526c2533cf9e9ac79e210226c1a5e96990b9f6463317d747175604b8280861"
+  }
+}

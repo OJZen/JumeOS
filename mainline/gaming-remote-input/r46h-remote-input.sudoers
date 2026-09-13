@@ -1,0 +1,17 @@
+ark ALL=(root) NOPASSWD: /usr/local/libexec/r46h-drm-capture "", \
+  /usr/local/libexec/r46h-remote-input up, \
+  /usr/local/libexec/r46h-remote-input down, \
+  /usr/local/libexec/r46h-remote-input left, \
+  /usr/local/libexec/r46h-remote-input right, \
+  /usr/local/libexec/r46h-remote-input a, \
+  /usr/local/libexec/r46h-remote-input b, \
+  /usr/local/libexec/r46h-remote-input x, \
+  /usr/local/libexec/r46h-remote-input y, \
+  /usr/local/libexec/r46h-remote-input select, \
+  /usr/local/libexec/r46h-remote-input start, \
+  /usr/local/libexec/r46h-remote-input l1, \
+  /usr/local/libexec/r46h-remote-input r1, \
+  /usr/local/libexec/r46h-remote-input l2, \
+  /usr/local/libexec/r46h-remote-input r2, \
+  /usr/local/libexec/r46h-remote-input l3, \
+  /usr/local/libexec/r46h-remote-input r3

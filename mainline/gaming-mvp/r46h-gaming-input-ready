@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+
+PATH=/usr/bin:/bin
+export PATH
+
+readonly_name='R46H Combined Gamepad'
+attempt=0
+
+while [ "$attempt" -lt 50 ]; do
+    matches=0
+    matched_event=''
+    for name_path in /sys/class/input/event*/device/name; do
+        [ -f "$name_path" ] || continue
+        [ "$(cat "$name_path")" = "$readonly_name" ] || continue
+        matches=$((matches + 1))
+        matched_event=${name_path#/sys/class/input/}
+        matched_event=${matched_event%/device/name}
+    done
+    if [ "$matches" -eq 1 ]; then
+        printf 'R46H_GAMING_INPUT_READY result=pass event=%s name=%s\n' \
+            "$matched_event" "$readonly_name"
+        exit 0
+    fi
+    [ "$matches" -eq 0 ] || {
+        printf 'ERROR: expected one combined gamepad, found %s\n' "$matches" >&2
+        exit 1
+    }
+    attempt=$((attempt + 1))
+    sleep 0.1
+done
+
+printf 'ERROR: combined gamepad did not appear\n' >&2
+exit 1

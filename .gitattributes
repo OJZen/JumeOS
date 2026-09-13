@@ -1,0 +1,50 @@
+*.sh text eol=lf
+
+*.go text eol=lf
+*.md text eol=lf
+
+*.ini text eol=lf
+*.cfg text eol=lf
+*.conf text eol=lf
+*.txt text eol=lf
+mainline/gaming-ozone-fbneo/FBNEO-LICENSE.txt -text -diff
+
+*.dts text eol=lf
+*.dtsi text eol=lf
+*.mk text eol=lf
+mainline/patches/*.patch text eol=lf -whitespace
+mainline/gaming-moonlight/*.patch text eol=lf -whitespace
+
+Makefile text eol=lf
+
+*.c text eol=lf
+*.h text eol=lf
+*.cpp text eol=lf
+
+*.bmp binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.dtb binary
+*.bin binary
+*.zip binary
+*.7z binary
+*.exe binary
+*.dll binary
+
+# The cross-platform card-toolchain build compares its live driver with the
+# committed blob and archives this exact source scope. Keep those text inputs
+# byte-stable even when a Windows checkout enables core.autocrlf.
+.gitattributes text eol=lf
+.github/workflows/ci.yml text eol=lf
+mainline/README.md text eol=lf
+mainline/scripts/r46h_card_toolchain.py text eol=lf
+mainline/scripts/r46h_card_macos_readonly.py text eol=lf
+mainline/tests/test_r46h_card_toolchain_build.py text eol=lf
+mainline/tests/test_r46h_card_macos_readonly.py text eol=lf
+mainline/tools/r46h-card-toolchain/**/.gitignore text eol=lf
+mainline/tools/r46h-card-toolchain/**/*.rs text eol=lf
+mainline/tools/r46h-card-toolchain/**/*.toml text eol=lf
+mainline/tools/r46h-card-toolchain/**/Cargo.lock text eol=lf
+mainline/tools/r46h-card-toolchain/**/*.md text eol=lf
+mainline/tools/r46h-card-toolchain/**/*.json text eol=lf

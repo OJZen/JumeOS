@@ -1,0 +1,273 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Codex <codex@local.invalid>
+Date: Sun, 2 Aug 2026 12:00:00 +0800
+Subject: [PATCH] drm: panel: r46h: enable backlight rail before init
+
+The downstream R46H panel description supplies both the LCD power rail and the backlight rail to the panel. Its panel-simple prepare path enables both rails before reset and DCS initialization. The provisional mainline driver currently enables only the LCD rail.
+
+Model both regulators as required supplies. Enable the LCD power rail first and the backlight rail second, then retain the existing reset and command sequence unchanged. Track each acquired consumer reference. This prevents failed cleanup from accumulating references on a later DRM prepare retry. Power down in reverse order, stop if the backlight rail cannot be disabled, and avoid repeating shutdown DCS when DRM retries a failed unprepare. Release residual consumer references left by a failed prepare on driver removal before devres puts the regulators.
+
+Signed-off-by: Codex <codex@local.invalid>
+---
+ arch/arm64/boot/dts/rockchip/rk3326-r46h.dts |   1 +
+ drivers/gpu/drm/panel/panel-r46h.c           | 155 ++++++++++++++++---
+ 2 files changed, 132 insertions(+), 24 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts b/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
+index 1984af3..6e812c6 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3326-r46h.dts
+@@ -212,6 +212,7 @@
+ 
+ &internal_display {
+ 	compatible = "gameconsole,r46h-panel";
++	backlight-supply = <&vcc_bl>;
+ 	power-supply = <&vcc_lcd>;
+ 	reset-gpios = <&gpio3 RK_PC0 GPIO_ACTIVE_LOW>;
+ 	/delete-property/ rotation;
+diff --git a/drivers/gpu/drm/panel/panel-r46h.c b/drivers/gpu/drm/panel/panel-r46h.c
+index 6844c0e..f3fbb8a 100644
+--- a/drivers/gpu/drm/panel/panel-r46h.c
++++ b/drivers/gpu/drm/panel/panel-r46h.c
+@@ -22,11 +22,19 @@
+ 
+ #include <video/mipi_display.h>
+ 
++enum r46h_panel_supply {
++	R46H_PANEL_SUPPLY_POWER,
++	R46H_PANEL_SUPPLY_BACKLIGHT,
++	R46H_PANEL_NUM_SUPPLIES,
++};
++
+ struct r46h_panel {
+ 	struct drm_panel panel;
+ 	struct mipi_dsi_device *dsi;
+ 	struct gpio_desc *reset_gpio;
+-	struct regulator *supply;
++	struct regulator_bulk_data supplies[R46H_PANEL_NUM_SUPPLIES];
++	bool supply_enabled[R46H_PANEL_NUM_SUPPLIES];
++	bool initialized;
+ };
+ 
+ struct r46h_panel_command {
+@@ -106,16 +114,74 @@ static int r46h_panel_write_init_sequence(struct r46h_panel *ctx)
+ 	return 0;
+ }
+ 
++static int r46h_panel_disable_supplies(struct r46h_panel *ctx)
++{
++	struct regulator *backlight =
++		ctx->supplies[R46H_PANEL_SUPPLY_BACKLIGHT].consumer;
++	struct regulator *power =
++		ctx->supplies[R46H_PANEL_SUPPLY_POWER].consumer;
++	int ret;
++
++	if (ctx->supply_enabled[R46H_PANEL_SUPPLY_BACKLIGHT]) {
++		ret = regulator_disable(backlight);
++		if (ret) {
++			dev_err(ctx->panel.dev,
++				"failed to disable backlight supply: %d\n", ret);
++			return ret;
++		}
++
++		ctx->supply_enabled[R46H_PANEL_SUPPLY_BACKLIGHT] = false;
++	}
++
++	if (ctx->supply_enabled[R46H_PANEL_SUPPLY_POWER]) {
++		ret = regulator_disable(power);
++		if (ret) {
++			dev_err(ctx->panel.dev,
++				"failed to disable power supply: %d\n", ret);
++			return ret;
++		}
++
++		ctx->supply_enabled[R46H_PANEL_SUPPLY_POWER] = false;
++	}
++
++	return 0;
++}
++
+ static int r46h_panel_prepare(struct drm_panel *panel)
+ {
+ 	struct r46h_panel *ctx = to_r46h_panel(panel);
+-	int ret;
++	struct regulator *backlight =
++		ctx->supplies[R46H_PANEL_SUPPLY_BACKLIGHT].consumer;
++	struct regulator *power =
++		ctx->supplies[R46H_PANEL_SUPPLY_POWER].consumer;
++	int cleanup_ret, ret;
++
++	if (ctx->supply_enabled[R46H_PANEL_SUPPLY_BACKLIGHT] ||
++	    ctx->supply_enabled[R46H_PANEL_SUPPLY_POWER]) {
++		ret = r46h_panel_disable_supplies(ctx);
++		if (ret) {
++			dev_err(panel->dev,
++				"failed to clear residual supply state: %d\n", ret);
++			return ret;
++		}
+ 
+-	ret = regulator_enable(ctx->supply);
++		msleep(20);
++	}
++
++	ret = regulator_enable(power);
+ 	if (ret) {
+-		dev_err(panel->dev, "failed to enable panel supply: %d\n", ret);
++		dev_err(panel->dev, "failed to enable power supply: %d\n", ret);
+ 		return ret;
+ 	}
++	ctx->supply_enabled[R46H_PANEL_SUPPLY_POWER] = true;
++
++	ret = regulator_enable(backlight);
++	if (ret) {
++		dev_err(panel->dev, "failed to enable backlight supply: %d\n",
++			ret);
++		goto disable_supplies;
++	}
++	ctx->supply_enabled[R46H_PANEL_SUPPLY_BACKLIGHT] = true;
+ 
+ 	msleep(20);
+ 	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+@@ -125,12 +191,12 @@ static int r46h_panel_prepare(struct drm_panel *panel)
+ 
+ 	ret = r46h_panel_write_init_sequence(ctx);
+ 	if (ret)
+-		goto disable_supply;
++		goto disable_supplies;
+ 
+ 	ret = mipi_dsi_dcs_exit_sleep_mode(ctx->dsi);
+ 	if (ret < 0) {
+ 		dev_err(panel->dev, "failed to exit sleep mode: %d\n", ret);
+-		goto disable_supply;
++		goto disable_supplies;
+ 	}
+ 
+ 	msleep(200);
+@@ -138,22 +204,35 @@ static int r46h_panel_prepare(struct drm_panel *panel)
+ 	ret = mipi_dsi_dcs_set_display_on(ctx->dsi);
+ 	if (ret < 0) {
+ 		dev_err(panel->dev, "failed to turn display on: %d\n", ret);
+-		goto disable_supply;
++		goto disable_supplies;
+ 	}
+ 
+ 	msleep(20);
++	ctx->initialized = true;
+ 
+ 	return 0;
+ 
+-disable_supply:
++disable_supplies:
+ 	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+-	regulator_disable(ctx->supply);
++	cleanup_ret = r46h_panel_disable_supplies(ctx);
++	if (cleanup_ret)
++		dev_err(panel->dev,
++			"failed to disable supplies while handling error %d: %d\n",
++			ret, cleanup_ret);
++
+ 	msleep(20);
+ 	return ret;
+ }
+ 
+ static int r46h_panel_enable(struct drm_panel *panel)
+ {
++	struct r46h_panel *ctx = to_r46h_panel(panel);
++
++	if (!ctx->initialized) {
++		dev_err(panel->dev, "refusing to enable uninitialized panel\n");
++		return -EIO;
++	}
++
+ 	/* Preserve the downstream delay between display-on and backlight-on. */
+ 	msleep(120);
+ 	return 0;
+@@ -169,24 +248,37 @@ static int r46h_panel_disable(struct drm_panel *panel)
+ static int r46h_panel_unprepare(struct drm_panel *panel)
+ {
+ 	struct r46h_panel *ctx = to_r46h_panel(panel);
+-	int ret;
++	int disable_ret, ret;
+ 
+-	ret = mipi_dsi_dcs_set_display_off(ctx->dsi);
+-	if (ret < 0)
+-		dev_err(panel->dev, "failed to turn display off: %d\n", ret);
++	if (ctx->initialized) {
++		ret = mipi_dsi_dcs_set_display_off(ctx->dsi);
++		if (ret < 0)
++			dev_err(panel->dev, "failed to turn display off: %d\n",
++				ret);
+ 
+-	msleep(20);
++		msleep(20);
+ 
+-	ret = mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
+-	if (ret < 0)
+-		dev_err(panel->dev, "failed to enter sleep mode: %d\n", ret);
++		ret = mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
++		if (ret < 0)
++			dev_err(panel->dev, "failed to enter sleep mode: %d\n",
++				ret);
++
++		usleep_range(10000, 15000);
++		ctx->initialized = false;
++	}
+ 
+-	usleep_range(10000, 15000);
+ 	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+-	regulator_disable(ctx->supply);
++	disable_ret = r46h_panel_disable_supplies(ctx);
++	if (disable_ret)
++		dev_err(panel->dev, "failed to disable panel supplies: %d\n",
++			disable_ret);
+ 	msleep(20);
+ 
+-	/* The panel is powered off even if a best-effort DCS command failed. */
++	/*
++	 * The Rockchip panel bridge does not recover from an unprepare error.
++	 * Keep residual consumer refs in supply_enabled[] so the next prepare
++	 * retries cleanup, but return success so DRM clears panel->prepared.
++	 */
+ 	return 0;
+ }
+ 
+@@ -249,10 +341,12 @@ static int r46h_panel_probe(struct mipi_dsi_device *dsi)
+ 		return dev_err_probe(dev, PTR_ERR(ctx->reset_gpio),
+ 				     "failed to get reset GPIO\n");
+ 
+-	ctx->supply = devm_regulator_get(dev, "power");
+-	if (IS_ERR(ctx->supply))
+-		return dev_err_probe(dev, PTR_ERR(ctx->supply),
+-				     "failed to get panel supply\n");
++	ctx->supplies[R46H_PANEL_SUPPLY_POWER].supply = "power";
++	ctx->supplies[R46H_PANEL_SUPPLY_BACKLIGHT].supply = "backlight";
++	ret = devm_regulator_bulk_get(dev, R46H_PANEL_NUM_SUPPLIES,
++				      ctx->supplies);
++	if (ret)
++		return dev_err_probe(dev, ret, "failed to get panel supplies\n");
+ 
+ 	dsi->lanes = 4;
+ 	dsi->format = MIPI_DSI_FMT_RGB888;
+@@ -289,6 +383,19 @@ static void r46h_panel_remove(struct mipi_dsi_device *dsi)
+ 	struct r46h_panel *ctx = mipi_dsi_get_drvdata(dsi);
+ 	int ret;
+ 
++	/* Only a failed prepare can leave owned refs while unprepared. */
++	if (!ctx->panel.prepared &&
++	    (ctx->supply_enabled[R46H_PANEL_SUPPLY_BACKLIGHT] ||
++	     ctx->supply_enabled[R46H_PANEL_SUPPLY_POWER])) {
++		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
++		ret = r46h_panel_disable_supplies(ctx);
++		if (ret)
++			dev_err(&dsi->dev,
++				"failed to release residual panel supplies: %d\n",
++				ret);
++		msleep(20);
++	}
++
+ 	ret = mipi_dsi_detach(dsi);
+ 	if (ret)
+ 		dev_err(&dsi->dev, "failed to detach from DSI host: %d\n", ret);
+-- 
+2.50.1 (Apple Git-155)
+

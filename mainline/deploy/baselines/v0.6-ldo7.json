@@ -1,0 +1,41 @@
+{
+  "format_version": 1,
+  "baseline_id": "v0.6-ldo7",
+  "release": "6.12.99-r46h-mainline-v0.6-ldo7",
+  "payload_name": "r46h-v0.6-ldo7",
+  "source_git_commit": "982b9b530a337c64f83ed333b12f85fdeccf241e",
+  "boot": {
+    "active_path": "boot.ini",
+    "candidate_path": "boot.ini.v0.6-ldo7",
+    "candidate_size": 1301,
+    "candidate_sha256": "2f553077ddea849c5fd736ea1bc5f75a4eb52369297476b7f1e61b81aa8dff3c",
+    "image_path": "Image.mainline-v0.6-ldo7.gz",
+    "image_size": 14919718,
+    "image_sha256": "69f97f4a0f37e31ca37899cca29b2a9047f0a0ea80307f07b5636528a650cbfd",
+    "dtb_path": "rk3326-r46h-mainline-v0.6-ldo7.dtb",
+    "dtb_size": 49481,
+    "dtb_sha256": "7259bac7bdd063fbaed987a0d5d2bf7066e02beaacc4440849b93d5f048e3dbc"
+  },
+  "payload_anchors": [
+    {
+      "path": ".r46h-stage-owner",
+      "size": 390,
+      "sha256": "5045a7ef3668ab082cd23fca85f6c19e6a117f3da34c17d837fb924d948f170e"
+    },
+    {
+      "path": "DEPLOY-MANIFEST",
+      "size": 4912,
+      "sha256": "e28e9930d8127e4c4cec9ec6a1cf29487ed4ab7773353cedee57f94390200717"
+    },
+    {
+      "path": "STAGE-COMPLETE",
+      "size": 517,
+      "sha256": "af096c37d95c1d7833f490909994cfc33c5872bf7feba7b0ae9260558d4bf94f"
+    },
+    {
+      "path": "r46h-mainline-test-v0.6-ldo7.tar.gz",
+      "size": 33253555,
+      "sha256": "db3dbd68129e7508c94c51a6f9e45947958ec9056558ed38c5e516cb03bf70c3"
+    }
+  ]
+}

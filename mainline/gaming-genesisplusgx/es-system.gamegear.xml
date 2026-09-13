@@ -1,0 +1,9 @@
+    <system>
+        <name>gamegear</name>
+        <fullname>Sega Game Gear</fullname>
+        <path>%ROMPATH%/gamegear</path>
+        <extension>.gg .GG .zip .ZIP</extension>
+        <command label="Genesis Plus GX">/usr/bin/retroarch --config /etc/r46h/retroarch.cfg --appendconfig /etc/r46h/es-de-retroarch.cfg -L /usr/local/libexec/genesis_plus_gx_libretro.so %ROM%</command>
+        <platform>gamegear</platform>
+        <theme>gamegear</theme>
+    </system>

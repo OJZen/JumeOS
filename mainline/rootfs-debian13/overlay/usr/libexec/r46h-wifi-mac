@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+readonly STATUS=/run/r46h-wifi-mac.status
+
+emit() {
+  local result=$1
+  local detail=$2
+  printf 'R46H_WIFI_MAC result=%s %s\n' "$result" "$detail" | tee "$STATUS"
+}
+
+valid_mac() {
+  local value=${1,,}
+  [[ "$value" =~ ^([0-9a-f]{2}:){5}[0-9a-f]{2}$ ]] || return 1
+  [[ "$value" != 00:00:00:00:00:00 && "$value" != ff:ff:ff:ff:ff:ff ]] || return 1
+  local first=${value%%:*}
+  (( (16#$first & 1) == 0 ))
+}
+
+serial_to_mac() {
+  local serial=${1//[^0-9A-Fa-f]/}
+  [[ "$serial" =~ ^[0-9A-Fa-f]{12}$ ]] || return 1
+  printf '%s:%s:%s:%s:%s:%s\n' \
+    "${serial:0:2}" "${serial:2:2}" "${serial:4:2}" \
+    "${serial:6:2}" "${serial:8:2}" "${serial:10:2}" | tr '[:upper:]' '[:lower:]'
+}
+
+find_usb_device() {
+  local path=$1
+  local parent
+  for _ in 1 2 3 4 5 6 7 8; do
+    [[ "$path" != / && -n "$path" ]] || break
+    if [[ -r "$path/idVendor" && -r "$path/idProduct" ]] &&
+       [[ "$(tr '[:upper:]' '[:lower:]' < "$path/idVendor")" == 0bda ]] &&
+       [[ "$(tr '[:upper:]' '[:lower:]' < "$path/idProduct")" == 8179 ]]; then
+      printf '%s\n' "$path"
+      return 0
+    fi
+    parent=$(dirname -- "$path")
+    [[ "$parent" != "$path" ]] || break
+    path=$parent
+  done
+  return 1
+}
+
+modprobe rtl8xxxu || true
+iface=""
+usb_device=""
+for _ in $(seq 1 100); do
+  for candidate in /sys/class/net/wlan*; do
+    [[ -e "$candidate" ]] || continue
+    candidate_device=$(readlink -f "$candidate/device" 2>/dev/null || true)
+    candidate_usb=$(find_usb_device "$candidate_device" 2>/dev/null || true)
+    [[ -n "$candidate_usb" ]] || continue
+    iface=$(basename -- "$candidate")
+    usb_device=$candidate_usb
+    break 2
+  done
+  sleep 0.1
+done
+
+if [[ -z "$iface" ]]; then
+  emit blocked 'reason=no-matching-realtek-interface'
+  exit 0
+fi
+
+current=$(cat "/sys/class/net/$iface/address" 2>/dev/null || true)
+serial=""
+if [[ -r "$usb_device/serial" ]]; then
+  serial=$(tr -d '\r\n' < "$usb_device/serial")
+fi
+derived=$(serial_to_mac "$serial" 2>/dev/null || true)
+if ! valid_mac "$derived"; then
+  if valid_mac "$current"; then
+    emit pass "interface=$iface source=driver-no-usb-serial mac=${current,,}"
+    exit 0
+  fi
+  emit blocked "reason=invalid-usb-serial interface=$iface observed_mac=${current:-missing}"
+  exit 0
+fi
+
+if [[ "${current,,}" == "$derived" ]]; then
+  emit pass "interface=$iface source=usb-serial mac=$derived"
+  exit 0
+fi
+
+ip link set dev "$iface" down || true
+if ! ip link set dev "$iface" address "$derived"; then
+  emit blocked "reason=set-mac-failed interface=$iface requested_mac=$derived"
+  exit 0
+fi
+actual=$(cat "/sys/class/net/$iface/address" 2>/dev/null || true)
+if [[ "${actual,,}" != "$derived" ]]; then
+  emit blocked "reason=mac-readback-mismatch interface=$iface requested_mac=$derived observed_mac=${actual:-missing}"
+  exit 0
+fi
+emit pass "interface=$iface source=usb-serial mac=$derived"

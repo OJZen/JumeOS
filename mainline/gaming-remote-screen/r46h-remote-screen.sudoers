@@ -1,0 +1,1 @@
+ark ALL=(root) NOPASSWD: /usr/local/libexec/r46h-drm-capture ""

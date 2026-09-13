@@ -1,0 +1,40 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+LANG=C
+export PATH LC_ALL LANG
+
+readonly EXPECTED_NAME='R46H Combined Gamepad'
+
+[[ $# == 0 || ( $# == 1 && ${1:-} == --print-node ) ]] || {
+  printf 'usage: r46h-input-bridge-wait [--print-node]\n' >&2
+  exit 2
+}
+
+for ((attempt=0; attempt<50; attempt++)); do
+  matches=()
+  for name_path in /sys/class/input/event*/device/name; do
+    [[ -f "$name_path" ]] || continue
+    [[ "$(<"$name_path")" == "$EXPECTED_NAME" ]] || continue
+    event=${name_path#/sys/class/input/}
+    event=${event%%/*}
+    [[ "$event" =~ ^event[0-9]+$ ]] || continue
+    [[ -c "/dev/input/$event" && ! -L "/dev/input/$event" ]] || continue
+    matches+=("/dev/input/$event")
+  done
+  if (( ${#matches[@]} == 1 )); then
+    if [[ ${1:-} == --print-node ]]; then
+      printf '%s\n' "${matches[0]}"
+    else
+      printf 'R46H_INPUT_BRIDGE_WAIT result=pass node=%s name=%s\n' \
+        "${matches[0]}" "$EXPECTED_NAME"
+    fi
+    exit 0
+  fi
+  /usr/bin/sleep 0.1
+done
+
+printf 'ERROR: expected exactly one ready %s event node\n' "$EXPECTED_NAME" >&2
+exit 1

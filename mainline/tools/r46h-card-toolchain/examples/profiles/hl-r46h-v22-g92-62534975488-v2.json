@@ -1,0 +1,47 @@
+{
+  "format_version": 2,
+  "profile_id": "hl-r46h-v22-g92-62534975488-v2",
+  "target": "HL-R46H-V22",
+  "whole_size": 62534975488,
+  "sector_size": 512,
+  "partition_scheme": "mbr",
+  "prefix": {
+    "size": 16777216,
+    "sha256": "3fe2feb9cc89ce5f01603199bfc8b715875708a9acc61bfc68b4821e1d8a5da3"
+  },
+  "partitions": [
+    {
+      "role": "boot",
+      "number": 1,
+      "offset": 16777216,
+      "size": 117440512,
+      "mbr": { "bootable": false, "type_code": 11 },
+      "filesystem": "fat32",
+      "identifiers": {
+        "volume_uuid": "575BC58C-96FA-3E4F-958B-7A30D5210C3D"
+      }
+    },
+    {
+      "role": "root",
+      "number": 2,
+      "offset": 134217728,
+      "size": 10716877312,
+      "mbr": { "bootable": false, "type_code": 131 },
+      "filesystem": "ext4",
+      "identifiers": {
+        "partuuid": "c9f931c9-02"
+      }
+    },
+    {
+      "role": "easyroms",
+      "number": 3,
+      "offset": 10851095040,
+      "size": 51683880448,
+      "mbr": { "bootable": false, "type_code": 7 },
+      "filesystem": "exfat",
+      "identifiers": {
+        "volume_uuid": "75495362-8048-4A4A-ACB7-625349754881"
+      }
+    }
+  ]
+}

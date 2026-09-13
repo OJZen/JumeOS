@@ -1,0 +1,23 @@
+[workspace]
+members = ["crates/r46h-card-core", "crates/r46h-card-cli"]
+resolver = "2"
+
+[workspace.package]
+version = "0.2.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.85"
+
+[workspace.dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+thiserror = "=2.0.20"
+sha2 = "=0.10.9"
+libc = "=0.2.189"
+cc = "=1.2.57"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+panic = "abort"
+strip = "symbols"

@@ -1,0 +1,120 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+LANG=C
+export PATH LC_ALL LANG
+
+readonly EXPECTED_RUNNING_RELEASE=@RUNNING_RELEASE@
+readonly CANDIDATE_RELEASE=@CANDIDATE_RELEASE@
+readonly ROOT_PARTUUID=@ROOT_PARTUUID@
+readonly BOOT_PARTUUID=@BOOT_PARTUUID@
+readonly MODULE_PARENT=/usr/lib/modules
+readonly MODULE_DIR="$MODULE_PARENT/$CANDIDATE_RELEASE"
+readonly TARGET_PARENT=@TARGET_PARENT@
+readonly TARGET_DIR=@TARGET_DIRECTORY@
+readonly MODULE_FILE_COUNT=@MODULE_FILE_COUNT@
+readonly MODULE_DIRECTORY_COUNT=@MODULE_DIRECTORY_COUNT@
+readonly EXT4_ERRORS=/sys/fs/ext4/mmcblk0p2/errors_count
+
+module_tombstone=""
+target_tombstone=""
+module_moved=0
+target_moved=0
+deletion_started=0
+
+die() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+boot_partition_must_not_be_writable() {
+  local partuuid options
+  while read -r partuuid options; do
+    if [[ "$partuuid" == "$BOOT_PARTUUID" && ",$options," == *,rw,* ]]; then
+      die 'BOOT partition is mounted writable'
+    fi
+  done < <(findmnt -rn -o PARTUUID,OPTIONS)
+}
+
+validate_module_tree() {
+  local directory=$1 manifest=$2 file_count directory_count
+  [[ -d "$directory" && ! -L "$directory" ]] || return 1
+  [[ -f "$manifest" && ! -L "$manifest" ]] || return 1
+  [[ -z "$(find "$directory" -xdev -type l -print -quit)" ]] || return 1
+  [[ -z "$(find "$directory" -xdev ! -type d ! -type f -print -quit)" ]] || return 1
+  file_count=$(find "$directory" -xdev -type f -print | wc -l | tr -d '[:space:]')
+  directory_count=$(find "$directory" -xdev -type d -print | wc -l | tr -d '[:space:]')
+  [[ "$file_count" == "$MODULE_FILE_COUNT" ]] || return 1
+  [[ "$directory_count" == "$MODULE_DIRECTORY_COUNT" ]] || return 1
+  (cd "$directory" && sha256sum -c "$manifest" >/dev/null)
+}
+
+restore_on_failure() {
+  local status=$?
+  trap - EXIT INT TERM HUP
+  set +e
+  if (( deletion_started == 0 )); then
+    if (( target_moved == 1 )); then
+      mv -T --no-clobber -- "$target_tombstone" "$TARGET_DIR" || true
+    fi
+    if (( module_moved == 1 )); then
+      mv -T --no-clobber -- "$module_tombstone" "$MODULE_DIR" || true
+    fi
+  else
+    printf 'ERROR: removal stopped after deletion began; inspect the two tombstones before retrying\n' >&2
+  fi
+  exit "$status"
+}
+
+(( EUID == 0 )) || die 'root is required'
+[[ $# == 0 ]] || die 'this remover accepts no arguments'
+[[ "${BASH_SOURCE[0]}" == "$TARGET_DIR/REMOVE.sh" ]] || die 'run the installed guarded remover'
+[[ "$(uname -r)" == "$EXPECTED_RUNNING_RELEASE" ]] || die 'remove from exact persistent v0.10'
+[[ "$(findmnt -rn -o PARTUUID /)" == "$ROOT_PARTUUID" ]] || die 'unexpected root partition'
+[[ "$(findmnt -rn -o FSTYPE /)" == ext4 ]] || die 'root is not ext4'
+[[ ",$(findmnt -rn -o OPTIONS /)," == *,rw,* ]] || die 'root is not writable'
+[[ "$(cat "$EXT4_ERRORS")" == 0 ]] || die 'root filesystem reports errors'
+boot_partition_must_not_be_writable
+[[ "$(readlink -f -- /lib/modules)" == "$MODULE_PARENT" ]] || die 'unexpected merged-usr module path'
+[[ -d "$TARGET_PARENT" && ! -L "$TARGET_PARENT" ]] || die 'unsafe target parent'
+[[ "$(stat -c '%u:%g:%a' "$TARGET_PARENT")" == 0:0:700 ]] || die 'unsafe target parent identity'
+[[ -d "$TARGET_DIR" && ! -L "$TARGET_DIR" ]] || die 'candidate target is missing or unsafe'
+target_members=$(find "$TARGET_DIR" -mindepth 1 -maxdepth 1 -printf '%f\n' | LC_ALL=C sort)
+[[ "$target_members" == $'IMAGE.GZ\nMODULE-SHA256SUMS\nR46H.DTB\nRECEIPT\nREMOVE.sh\nSHA256SUMS\nUBOOT-CMDS.txt' ]] || die 'unexpected installed target member set'
+(cd "$TARGET_DIR" && sha256sum -c --quiet SHA256SUMS)
+validate_module_tree "$MODULE_DIR" "$TARGET_DIR/MODULE-SHA256SUMS" || die 'installed module tree mismatch'
+[[ "$(systemctl is-active r46h-input-bridge.service 2>/dev/null || true)" != active ]] || die 'input bridge service is still active'
+
+module_tombstone=$MODULE_PARENT/.remove-$CANDIDATE_RELEASE.$$
+target_tombstone=$TARGET_PARENT/.remove-v0.14.$$
+[[ ! -e "$module_tombstone" && ! -L "$module_tombstone" ]] || die 'module tombstone already exists'
+[[ ! -e "$target_tombstone" && ! -L "$target_tombstone" ]] || die 'target tombstone already exists'
+trap restore_on_failure EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+mv -T --no-clobber -- "$MODULE_DIR" "$module_tombstone"
+module_moved=1
+mv -T --no-clobber -- "$TARGET_DIR" "$target_tombstone"
+target_moved=1
+deletion_started=1
+
+rm -f -- \
+  "$target_tombstone/IMAGE.GZ" \
+  "$target_tombstone/MODULE-SHA256SUMS" \
+  "$target_tombstone/R46H.DTB" \
+  "$target_tombstone/RECEIPT" \
+  "$target_tombstone/REMOVE.sh" \
+  "$target_tombstone/SHA256SUMS" \
+  "$target_tombstone/UBOOT-CMDS.txt"
+rmdir -- "$target_tombstone"
+find "$module_tombstone" -xdev -depth -delete
+rmdir -- "$TARGET_PARENT" 2>/dev/null || true
+[[ "$(cat "$EXT4_ERRORS")" == 0 ]] || die 'root filesystem reported an error during removal'
+sync
+trap - EXIT INT TERM HUP
+
+printf 'PASS: exact v0.14 one-shot staging removed; active BOOT and v0.10 modules were unchanged.\n'
