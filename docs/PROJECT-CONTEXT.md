@@ -38,9 +38,9 @@ skipped, so content equality remains unverified. See
 - R42 source-built GTA III and Vice City used Panfrost OpenGL ES 3.1, reached
   their target frontends, ran for 120 seconds, and returned to the tools UI.
   Gameplay, display, audio, controls, saves, and relaunch are not yet accepted.
-- Stardew Valley still fails during SDL/GBM window creation. The next DRI
-  packaging change has host checks only and must receive fresh package/device
-  proof before use.
+- Stardew Valley still fails during SDL/GBM window creation. R43 freezes the
+  DRI-isolation follow-up as an exact 1,630-file ARM64 package with host proof;
+  it has not run on the R46H.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -53,7 +53,7 @@ runbooks.
 
 ## Immediate next work
 
-1. Package the Stardew DRI isolation candidate and perform its first device gate.
+1. Perform R43's first Stardew DRI device gate using its exact frozen package.
 2. Run attended GTA III/Vice City gameplay, audio, controls, save, exit, and relaunch checks.
 3. Keep Moonlight paused until requested.
 4. Investigate a physically reachable USB peripheral route before writing gadget code.

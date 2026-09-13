@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-13: **R42 SOURCE GTA TARGET AUTOMATION PASS / STARDEW FAIL / DRI HOST CHECK PASS**.
+Status 2026-09-13: **R42 GTA TARGET AUTOMATION PASS / R43 STARDEW DRI HOST PACKAGE PASS / TARGET OPEN**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -412,8 +412,28 @@ Post-R42 ELF inspection found 9,534 LLVM 6.1 symbols in the 2022 Mono executable
 dynamic exports while Debian 13 Mesa loads LLVM 19. R42 logged no GBM isolation
 marker before the crash, so wrapping `libgbm.so.1` did not reach the actual provider
 load. The minimal follow-up also matches `*_dri.so`; its ARM64 collision fixture now
-covers GLX, EGL, GBM and Panfrost DRI and passes. This is not a packaged or target
-candidate yet.
+covers GLX, EGL, GBM and Panfrost DRI.
+
+## R43 Stardew DRI candidate
+
+R43 freezes that single hypothesis from clean JumeOS source
+`9ddb045d0eaa780e7258a6c0f83410a2b97e69c4`. The exact package is
+`mainline/out/.cache/r46h-stardew-dri-20260913/r43/r46h-shell-preview-arm64.tar.gz`,
+38,143,655 bytes, SHA-256
+`fd123d671f5af9a2ed653cc301cd59e6f3c7f38bfca826afd8192bdf26d9a70a`.
+Its 1,630 regular files rehashed after independent extraction. The packaged
+`libmono-compat.so` has SHA-256
+`ca7713e44936c791b4daf350f16d0ebd6272a881dd7035484c247fa459f5a018`
+and passed the ARM64 GLX/EGL/GBM/Panfrost DRI collision fixture from the frozen
+archive. Two package builds produced that same shim and file set; only the Qt
+`r46h-shell` binary differed, so the complete shell build is not byte-reproducible
+and only the exact archive above is the candidate. The adjacent receipt, source
+archive and file manifest own the full host boundary.
+
+No R43 target operation has run. The fixed R46H must repeat the 1,630 hashes,
+then show whether Stardew crosses the prior `SDL_CreateWindow` /
+`gbm_create_device` failure. A process start does not prove LCD, audio, controls,
+gameplay, saves or recovery.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
