@@ -12,10 +12,9 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **on at ES-DE** after the R45 differential Stardew probe. The
-fixed kernel, card CID, root UUID and read-only ROM mount were reconfirmed from
-a cold-boot serial capture. Temporary package staging remains only for the
-immediate clean-package follow-up.
+The device is **off** after the R45 full-package Stardew gate. Serial confirmed
+sync, filesystem unmount, loop detach and poweroff. Temporary target services,
+staging and the one-time public key were removed.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -39,12 +38,11 @@ skipped, so content equality remains unverified. See
 - R42 source-built GTA III and Vice City used Panfrost OpenGL ES 3.1, reached
   their target frontends, ran for 120 seconds, and returned to the tools UI.
   Gameplay, display, audio, controls, saves, and relaunch are not yet accepted.
-- R43 repeated all 1,630 hashes but still failed in SDL/GBM after 10.31 seconds;
-  neither its DRI match nor R44's Gallium-name match reached the real loader.
-  R45 instead preloads the exact Debian Gallium provider with local symbol
-  scope. Its differential probe ran Stardew for the full 120.7-second bound,
-  returned cleanly and kept the original saves read-only. A clean full-package
-  repeat is still required before promotion.
+- R43/R44 still failed in SDL/GBM because their wrappers missed the real loader.
+  R45 preloads the exact Debian Gallium provider with local symbol scope. Its
+  exact 1,630-file package ran Stardew for the full 120.6-second bound, returned
+  cleanly and kept the original saves read-only. LCD, audio, physical controls,
+  gameplay, save/load and relaunch remain operator-open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -57,8 +55,8 @@ runbooks.
 
 ## Immediate next work
 
-1. Build and repeat R45 as an exact clean-source package, then remove its temporary target state.
-2. Run attended GTA III/Vice City gameplay, audio, controls, save, exit, and relaunch checks.
+1. Run attended Stardew gameplay, audio, controls, save, exit, and relaunch checks.
+2. Batch the matching attended GTA III/Vice City checks where safe.
 3. Keep Moonlight paused until requested.
 4. Investigate a physically reachable USB peripheral route before writing gadget code.
 5. Batch remaining physical L3/R3, LCD, audio, and stream-control observations.

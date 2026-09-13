@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-13: **R42 GTA TARGET AUTOMATION PASS / R45 STARDEW DIFFERENTIAL TARGET PASS / CLEAN PACKAGE OPEN**.
+Status 2026-09-13: **R42 GTA TARGET AUTOMATION PASS / R45 STARDEW TARGET AUTOMATION PASS / ATTENDED OPEN**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -451,9 +451,19 @@ forced kill. Three provider-scope markers were retained, source saves stayed at
 three files on read-only `/roms`, one startup file appeared only in the managed
 save tree, and the tools UI recovered. The 85 C guard peaked at 68.846 C.
 
-This accepts the loader hypothesis only. Freeze and repeat a clean full package
-before promotion; LCD motion, audio, physical controls, gameplay and save/reload
-remain operator-open.
+The clean package from source `d45ede16f3be21cbf2f15e79d7bbbcd750440b22`
+is `mainline/out/.cache/r46h-stardew-gallium-20260913/r45/r46h-shell-preview-arm64.tar.gz`,
+38,143,915 bytes, SHA-256
+`0ff856a9df1cf0b86c5b7393b3c75750a04da014cfe13488638be66164591f08`.
+The target repeated all 1,630 hashes and the same result for 120.6 seconds. ES-DE,
+1296/480 MHz limits, services and mounts recovered; failed units, temporary
+listeners and matched kernel errors were zero. Sync, unmount, loop detach and
+poweroff were serial-confirmed. The adjacent receipt and
+`mainline/out/.cache/r46h-r43-device-20260913.YmFUAM/session.json` own the full
+boundary.
+
+Target automation accepts the loader fix. LCD motion, audio, physical controls,
+gameplay and save/reload remain operator-open.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
