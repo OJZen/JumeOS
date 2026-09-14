@@ -358,26 +358,27 @@ Item {
             anchors.fill: parent; visible: !root.editing
             Item {
             anchors.fill: parent; visible: !root.gameOverlay
-            Rectangle { x: 36; y: 30; width: 37; height: 37; radius: 11; color: Ui.Theme.accent
+            Rectangle { id: brandMark; x: 36; y: 30; width: 37; height: 37; radius: 11; color: Ui.Theme.accent
                 Ui.Label { anchors.centerIn: parent; text: "R"; font.pixelSize: 25 * root.fontScale; font.bold: true; color: "#142c30" }
             }
             Ui.Label { x: 86; y: 35; text: "R46H"; font.pixelSize: 22 * root.fontScale; font.bold: true; font.letterSpacing: 2; color: Ui.Theme.text }
-            Ui.Label { id: statusClock; anchors.right: parent.right; anchors.rightMargin: 36; y: 34; text: root.clockText; color: Ui.Theme.text; font.pixelSize: 22; visible: !root.store.monitor }
-            Rectangle { anchors.right: statusClock.left; anchors.rightMargin: 20; y: 33; width: 152; height: 30; radius: 15; color: "#253743"; visible: !root.store.monitor && !root.hardware
+            Ui.Label { id: statusClock; objectName: "statusClock"; anchors.right: parent.right; anchors.rightMargin: Ui.Theme.pageMargin; anchors.verticalCenter: statusMetrics.verticalCenter; height: Ui.Theme.bodySize; text: root.clockText; color: Ui.Theme.text; font.pixelSize: Ui.Theme.captionSize * root.fontScale; visible: !root.store.monitor }
+            Rectangle { anchors.right: statusClock.left; anchors.rightMargin: Ui.Theme.labelGap; anchors.verticalCenter: statusMetrics.verticalCenter; width: 152; height: 30; radius: 15; color: "#253743"; visible: !root.store.monitor && !root.hardware
                 Ui.Label { anchors.centerIn: parent; text: root.hardware ? (root.device.info.online === 1 ? "外部供电" : root.device.info.online === 0 ? "电池供电" : "供电状态未知") : "本地界面预览"; color: "#b1c5cf"; font.pixelSize: 13 }
             }
             Row {
-                anchors.right: statusClock.left; anchors.rightMargin: 20; y: 36; spacing: 18
+                id: statusMetrics
+                anchors.right: statusClock.left; anchors.rightMargin: Ui.Theme.labelGap; anchors.verticalCenter: brandMark.verticalCenter; spacing: Ui.Theme.labelGap
                 visible: !root.store.monitor && root.hardware
                 Row {
-                    spacing: 5
-                    Ui.Icon { width: 20; height: 20; name: "wifi"; color: root.wifiSignal >= 0 ? "#b1c5cf" : Ui.Theme.muted }
-                    Ui.Label { objectName: "statusWifi"; text: root.wifiSignal >= 0 ? root.wifiSignal + "%" : "未连接"; color: "#b1c5cf"; font.pixelSize: 14 }
+                    spacing: Ui.Theme.smallGap
+                    Ui.Icon { objectName: "statusWifiIcon"; width: Ui.Theme.bodySize; height: Ui.Theme.bodySize; name: "wifi"; color: root.wifiSignal >= 0 ? "#b1c5cf" : Ui.Theme.muted }
+                    Ui.Label { objectName: "statusWifi"; anchors.verticalCenter: parent.verticalCenter; height: Ui.Theme.bodySize; text: root.wifiSignal >= 0 ? root.wifiSignal + "%" : "未连接"; color: "#b1c5cf"; font.pixelSize: Ui.Theme.captionSize * root.fontScale }
                 }
                 Row {
-                    spacing: 5
-                    Ui.Icon { width: 20; height: 20; name: "battery"; color: root.batteryState === "charging" ? Ui.Theme.accent : "#b1c5cf" }
-                    Ui.Label { objectName: "statusBattery"; text: root.batteryText; color: "#b1c5cf"; font.pixelSize: 14 }
+                    spacing: Ui.Theme.smallGap
+                    Ui.Icon { objectName: "statusBatteryIcon"; width: Ui.Theme.bodySize; height: Ui.Theme.bodySize; name: "battery"; color: root.batteryState === "charging" ? Ui.Theme.accent : "#b1c5cf" }
+                    Ui.Label { objectName: "statusBattery"; anchors.verticalCenter: parent.verticalCenter; height: Ui.Theme.bodySize; text: root.batteryText; color: "#b1c5cf"; font.pixelSize: Ui.Theme.captionSize * root.fontScale }
                 }
             }
             Ui.NavigationBar {

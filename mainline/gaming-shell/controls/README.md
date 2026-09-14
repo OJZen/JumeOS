@@ -17,7 +17,9 @@ device writes or shell commands. State belongs to the calling
 feature; pass values in and handle native signals or the documented action.
 Labels default to plain text, vertical centering and elision. Use semantic roles,
 not page-local pixel sizes. Geometry uses the 1024×768 logical canvas; only text
-scales from 100–120%. Do not scale a whole page to implement font size.
+scales from 100–120%. Do not scale a whole page to implement font size. The
+compact header status uses caption text, 18 px icon boxes, `smallGap` within each
+metric and `labelGap` between metrics, all on one centerline.
 
 ### Required defaults for new tools
 

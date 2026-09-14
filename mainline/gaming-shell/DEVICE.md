@@ -1,7 +1,8 @@
 # Temporary R46H settings
 
-R35 status-bar correction: **HOST + DEVICE READBACK PASS**. Revision 17 device
-controls remain **HOST + DEVICE SCOPE PASS / FOCUS PACING OPEN**.
+R56 status-bar geometry: **HOST PASS / DEVICE OPEN**. R35 status values remain
+**HOST + DEVICE READBACK PASS**; revision 17 device controls remain
+**HOST + DEVICE SCOPE PASS / FOCUS PACING OPEN**.
 The [project checkpoint](../../docs/PROJECT-CONTEXT.md) owns the next session;
 the [performance/power plan](../../docs/PERFORMANCE-POWER.md) owns product scope.
 The frozen package, source and checks live in
@@ -54,6 +55,8 @@ The subsequent 510 → 360 px hardware HUD width adjustment is host-checked only
 The 2026-09-12 R35 device run matched the status display to NetworkManager's
 cached signal and battery sysfs percentage/status. This proves the shown values
 for that session, not Wi-Fi connection management or calibrated battery policy.
+R56 gives both status icons one 18 px box and shared centerline, uses theme gaps,
+and matches the clock to caption text. Its fixture capture is host proof only.
 
 The hardware HUD now shows available/total RAM, `soc-thermal` chip temperature,
 current/effective upper CPU frequency and CPU/GPU cooling-device activity. Missing

@@ -879,6 +879,11 @@ private slots:
         auto *root=view.rootObject();auto tap=[&](const char *key){QVERIFY(QMetaObject::invokeMethod(root,"dispatch",Q_ARG(QVariant,QString(key)),Q_ARG(QVariant,false)));};
         QCOMPARE(root->findChild<QObject *>("statusWifi")->property("text").toString(),QStringLiteral("79%"));
         QCOMPARE(root->findChild<QObject *>("statusBattery")->property("text").toString(),QStringLiteral("86% · 充电"));
+        auto *clock=root->findChild<QQuickItem *>("statusClock");auto *wifiIcon=root->findChild<QQuickItem *>("statusWifiIcon");auto *batteryIcon=root->findChild<QQuickItem *>("statusBatteryIcon");
+        QVERIFY(clock&&wifiIcon&&batteryIcon);QCOMPARE(wifiIcon->size(),QSizeF(18,18));QCOMPARE(batteryIcon->size(),wifiIcon->size());
+        QCOMPARE(clock->property("font").value<QFont>().pixelSize(),root->findChild<QObject *>("statusWifi")->property("font").value<QFont>().pixelSize());
+        const auto centerY=[](QQuickItem *item){return item->mapToScene(QPointF(0,item->height()/2)).y();};
+        QCOMPARE(centerY(clock),centerY(wifiIcon));QCOMPARE(centerY(clock),centerY(batteryIcon));
         if(!qEnvironmentVariable("R46H_UI_CAPTURE_DIR").isEmpty())QVERIFY(view.grabWindow().save(qEnvironmentVariable("R46H_UI_CAPTURE_DIR")+"/device-status.png"));
         QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("power"))));tap("right");tap("down");tap("down");tap("accept");
         QVERIFY(root->property("choicesOpen").toBool());tap("accept");QCOMPARE(power.size(),1); // Default is cancel.
