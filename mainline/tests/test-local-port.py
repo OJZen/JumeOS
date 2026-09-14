@@ -28,6 +28,7 @@ with tempfile.TemporaryDirectory(prefix='local-port-', dir=repo / 'mainline/out/
         state = root / game
         with port.prepared(game, args.content_root, state, host_test=True) as plan:
             work = Path(plan['directory'])
+            assert plan['environment']['PAN_MESA_DEBUG'] == 'noafbc'
             assert (work / 'userfiles').resolve() == (state / 'saves').resolve()
             assert (work / 'data').is_symlink()
             config = state / 'config' / (Path(plan['program']).name + '.ini')
@@ -52,6 +53,7 @@ with tempfile.TemporaryDirectory(prefix='local-port-', dir=repo / 'mainline/out/
         assert (state / 'config/StardewValley').resolve() == state / 'saves'
         assert (work / 'Content').is_symlink()
         assert plan['arguments'][2] == str(work)
+        assert 'PAN_MESA_DEBUG' not in plan['environment']
         assert plan['environment']['XDG_CONFIG_HOME'] == str(state / 'config')
     assert not work.exists()
     for game in ('gta3', 'stardew'):

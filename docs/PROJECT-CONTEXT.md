@@ -12,7 +12,7 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **off** after the R56 status/GTA diagnostic. Serial confirmed
+The device is **off** after the R57 GTA diagnostic. Serial confirmed
 sync, filesystem unmount, loop/MD/DM detach and `Powering off.` Temporary target
 staging, the one-time key and the host serial bridge were removed.
 
@@ -81,6 +81,9 @@ skipped, so content equality remains unverified. See
   active thermal cooling from a hot start and did not prevent two Panfrost faults;
   it is evidence for a rendering-cost bottleneck, not an accepted default. The
   original configuration was hash-restored before poweroff.
+- R58 is the next isolated fault candidate: GTA III and Vice City set Mesa's
+  Panfrost `noafbc` debug option in their private launch environment. It does not
+  alter system Mesa or Stardew; target fault and performance results remain open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -93,8 +96,8 @@ runbooks.
 
 ## Immediate next work
 
-1. Isolate the GTA/Panfrost runtime fault with one bounded hypothesis; do not treat
-   the now-proven graceful exit as a graphics fix.
+1. Run one cooled, bounded GTA III comparison with R58's application-only
+   `noafbc` candidate; do not treat host checks as a graphics fix.
 2. Recheck the 640x480 performance candidate from a cooled start and obtain physical
    LCD quality acceptance before choosing a product default.
 3. Measure natural intro/gameplay/exit behavior, then recheck shared Vice City.

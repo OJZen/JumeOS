@@ -142,7 +142,7 @@ def prepared(game, content, state, host_test=False, mono=None, mono_compat=None,
         else:
             (working / (name + '.ini')).symlink_to(config_file)
         yield {'program': str(executable), 'arguments': [], 'directory': str(working), 'saveDirectory': str(saves),
-               'environment': {'XDG_CONFIG_HOME': str(config), 'XDG_CACHE_HOME': str(cache), 'XDG_DATA_HOME': str(data)}}
+               'environment': {'PAN_MESA_DEBUG': 'noafbc', 'XDG_CONFIG_HOME': str(config), 'XDG_CACHE_HOME': str(cache), 'XDG_DATA_HOME': str(data)}}
 
 
 @contextlib.contextmanager
