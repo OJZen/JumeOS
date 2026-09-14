@@ -1,6 +1,6 @@
 # R46H product roadmap
 
-Updated 2026-09-13. This owns the feature backlog and completion criteria.
+Updated 2026-09-15. This owns the feature backlog and completion criteria.
 [Project Context](PROJECT-CONTEXT.md) owns the immediate order and current device
 state; the [ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) owns physical proof.
 P0 closes the first usable gameplay flows. P1 builds the product around them.
@@ -64,8 +64,10 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
   save import occurred. R57 later proved two graceful GTA III bounds without a
   forced kill, but also captured Panfrost faults during active gameplay. A temporary
   640x480 run more than doubled intro submissions while reaching thermal cooling;
-  it is not yet an accepted default. R58's GTA-only no-AFBC package/readback passed
-  on the host; its target comparison and attended gameplay/audio/controls/save/relaunch remain open.
+  it is not yet an accepted default. R58's GTA-only no-AFBC package then completed
+  two target runs without a forced kill or any boot-time Panfrost fault. One fresh
+  intro capture remained slow, and a later faster window lacks a matched visual
+  phase; attended gameplay/audio/controls/save/relaunch remain open.
   The separate SA Android-loader/direct-evdev findings do not establish a working
   target port.
 - **U1:** shared controls, headers, icons, font/spacing/motion rules and frame
@@ -86,9 +88,9 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
 
 ## Delivery sequence
 
-1. Run R47's guarded Stardew save import, then Stardew and source GTA III/Vice
-   City for gameplay, LCD/audio/controls and save/exit/relaunch; keep every save
-   generation isolated.
+1. Repeat a synchronized R58 GTA III scene, then test Vice City for gameplay,
+   LCD/audio/controls and save/exit/relaunch; finish Stardew acceptance separately
+   and keep every save generation isolated.
 2. Keep Moonlight paused until the user resumes it; its prepared Linux host,
    controller-test program and accepted v3 fallback remain available.
 3. Keep SA's loader/input adaptation

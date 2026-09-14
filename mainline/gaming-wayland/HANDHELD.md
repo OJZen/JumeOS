@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-14: **R58 NO-AFBC HOST PASS / R57 GTA GRACEFUL-BOUND DEVICE PASS + PANFROST FAULT / STREAMING DEFERRED**.
+Status 2026-09-15: **R58 NO-AFBC TWO-RUN R46H FAULT-FREE MACHINE PASS / PACING + ATTENDED OPEN / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -344,9 +344,8 @@ were clean before serial-confirmed poweroff. Exact evidence is
 Vice City were not run; LCD motion, audio, physical controls, saves and relaunch
 remain open.
 
-R36 remains the accepted Moonlight/status comparison. R57 is the last target-tested
-no-Moonlight GTA candidate; its device `session.json` above owns physical results
-and limitations. The next host-only R58 candidate is
+R36 remains the accepted Moonlight/status comparison. The current no-Moonlight
+GTA candidate is R58 at
 `mainline/out/.cache/r46h-gta-shared-20260914/r58/`, source
 `b5e63c1cbebe00526ca134952977f9954a8e768f`. Its full ARM64 checks and 1,727-file
 readback passed; archive SHA-256 is
@@ -355,7 +354,20 @@ manifest SHA-256 is
 `c3ddc421b11350d1fe67b21ff4cf988dd4438eccad0e0efa479ab326e4969099`
 and shell SHA-256 is
 `926f91926f4e5d32117a1ae268d28c4b68b47427793fefdb908145f21a8c3cfd`.
-Use those exact hashes for the next target preflight; R58 has no device result yet.
+
+R58's exact target package and preflight passed. Two GTA III runs ended cleanly
+at 60.68 seconds by requested stop and 120.38 seconds by diagnostic bound; both
+reported exit 0 and no forced kill. The whole cold boot logged zero Panfrost
+`DATA_INVALID`/GPU faults, unlike R57. A fresh intro capture still measured only
+3.21 submissions/s. A later 27-sample active window averaged 29.51/s with a
+33.11 ms median interval, but has no matched visual capture and cannot be treated
+as a direct pacing improvement. Temperature peaked at 78.846 C without cooling.
+State, services and 1296/480 MHz limits recovered; temporary staging and access
+were removed, and serial confirmed `Powering off.` Exact device evidence is
+`mainline/out/.cache/r46h-r58-device-20260914.nA6gGX/session.json`. This closes
+only the bounded two-run fault candidate; matched-scene repetition, LCD motion,
+audio, physical controls, saves, relaunch and Vice City remain open. Moonlight
+was not run.
 
 The retained GTA diagnostic is `mainline/out/.cache/r46h-compositor-20260910/r39/`,
 source `286fcdfcf7643c43f19b1272beefd136e09cc08f` on

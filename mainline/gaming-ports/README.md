@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-14: **R58 NO-AFBC HOST PACKAGE PASS / R46H UNTESTED**.
+Status 2026-09-15: **R58 NO-AFBC TWO-RUN R46H FAULT-FREE MACHINE PASS / PACING + ATTENDED OPEN**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -654,7 +654,23 @@ Its 1,727 files passed independent readback; archive SHA-256 is
 `218e227b9853e3ff046c0afc727c37cee973b2ef04b3b4482f5477d6642bfb76`
 and manifest SHA-256 is
 `c3ddc421b11350d1fe67b21ff4cf988dd4438eccad0e0efa479ab326e4969099`.
-R46H fault and performance results remain open.
+
+On the exact R46H at temporary 1008/400 MHz caps, a fresh composed menu frame
+measured 30.20 submissions/s, then a real intro frame fell to 3.21/s. The first
+session requested a clean stop at 60.68 seconds; a cooled second GTA III run
+reached its 120.38-second bound.
+Both exited 0 without a forced kill. Its recorder retained 27 game-active samples
+through 94.95 seconds, averaging 29.51 submissions/s with 33.11 ms median and
+37.82 ms P95 interval samples. No matching composed capture identifies that
+faster window's visual phase, so it cannot replace the slow-intro observation.
+The whole cold boot logged zero Panfrost `DATA_INVALID`/GPU faults and zero ext4
+errors. Recorded temperature stayed at 70.0--78.846 C with cooling states zero. Config,
+saves, services and 1296/480 MHz limits were unchanged or restored; staging/key
+cleanup and serial poweroff passed. Exact evidence is
+`mainline/out/.cache/r46h-r58-device-20260914.nA6gGX/session.json`. This is a
+two-run fault-suppression candidate result, not a completed fix or physical LCD
+FPS proof. Vice City, audio, physical controls, saves and relaunch remain open;
+Moonlight was not run.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

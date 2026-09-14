@@ -1,6 +1,6 @@
 # R46H project context
 
-> Current checkpoint: 2026-09-14. Read the
+> Current checkpoint: 2026-09-15. Read the
 > [experiment ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) before
 > hardware work; it owns physical evidence and limitations.
 
@@ -12,7 +12,7 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **off** after the R57 GTA diagnostic. Serial confirmed
+The device is **off** after the R58 GTA diagnostic. Serial confirmed
 sync, filesystem unmount, loop/MD/DM detach and `Powering off.` Temporary target
 staging, the one-time key and the host serial bridge were removed.
 
@@ -81,10 +81,13 @@ skipped, so content equality remains unverified. See
   active thermal cooling from a hot start and did not prevent two Panfrost faults;
   it is evidence for a rendering-cost bottleneck, not an accepted default. The
   original configuration was hash-restored before poweroff.
-- R58 is the next isolated fault candidate: GTA III and Vice City set Mesa's
-  Panfrost `noafbc` debug option in their private launch environment. Its clean
-  no-Moonlight package passed the full ARM64 host build and 1,727-file readback.
-  It does not alter system Mesa or Stardew; target fault/performance results remain open.
+- R58 sets Panfrost `noafbc` only for GTA III and Vice City. On one cold boot,
+  GTA III stopped cleanly after a 60.68-second requested run and a 120.38-second
+  bound; the boot then contained zero `DATA_INVALID`/GPU faults, versus R57's
+  active-game faults. One fresh intro capture still measured only 3.21 submissions/s.
+  A later 27-sample game-active window averaged 29.51/s, but lacks a matching
+  visual phase and is not a direct pacing comparison. This is a bounded candidate
+  pass, not a completed driver fix; Vice City and attended acceptance remain open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -97,8 +100,8 @@ runbooks.
 
 ## Immediate next work
 
-1. Run one cooled, bounded GTA III comparison with R58's application-only
-   `noafbc` candidate; do not treat host checks as a graphics fix.
+1. Repeat R58 from a cooled start with a synchronized, deterministic intro/gameplay
+   checkpoint; require both fresh frames and a fault-free kernel log before promotion.
 2. Recheck the 640x480 performance candidate from a cooled start and obtain physical
    LCD quality acceptance before choosing a product default.
 3. Measure natural intro/gameplay/exit behavior, then recheck shared Vice City.
