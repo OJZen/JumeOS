@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-14: **R58 NO-AFBC CANDIDATE / R57 GTA III PANFROST RUNTIME FAULT**.
+Status 2026-09-14: **R58 NO-AFBC HOST PACKAGE PASS / R46H UNTESTED**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -647,8 +647,14 @@ Vice City, physical LCD/audio/control/save or relaunch result is claimed.
 R58 isolates one driver hypothesis without changing the system stack: only the
 GTA III/Vice City launch plan sets `PAN_MESA_DEBUG=noafbc`; Stardew and other
 applications are unchanged. Mesa 25.0.7's Panfrost option disables AFBC for that
-process. The focused plan check owns the scope; R46H fault and performance results
-remain open.
+process. The focused plan check and complete ARM64 desktop/session/remote build
+passed. Clean source `b5e63c1cbebe00526ca134952977f9954a8e768f` produced the
+no-Moonlight package at `mainline/out/.cache/r46h-gta-shared-20260914/r58/`.
+Its 1,727 files passed independent readback; archive SHA-256 is
+`218e227b9853e3ff046c0afc727c37cee973b2ef04b3b4482f5477d6642bfb76`
+and manifest SHA-256 is
+`c3ddc421b11350d1fe67b21ff4cf988dd4438eccad0e0efa479ab326e4969099`.
+R46H fault and performance results remain open.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

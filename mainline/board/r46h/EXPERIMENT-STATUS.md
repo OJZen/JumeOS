@@ -95,8 +95,8 @@ pacing. Natural crash, physical LCD, USB, Moonlight and PSP remain open.
   R48 fixed D-pad Down. At 1008/400 MHz, R54's menu averaged 26.84/s with HUD and
   30.43/s hidden; R56's HUD-hidden intro averaged only 5.57/s. R57's two GTA III
   bounds exited 0 without forced kills, but Panfrost faults occurred while active.
-  Temporary 640x480 more than doubled a similar intro window to 12.32/s while hot;
-  it is not a default. Natural gameplay/exit, LCD FPS, audio/saves and VC are open.
+  Hot 640x480 more than doubled an intro window but is not a default; R58's
+  no-AFBC host package/readback pass. Cooled comparison, gameplay/exit, LCD FPS, audio/saves and VC are open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**

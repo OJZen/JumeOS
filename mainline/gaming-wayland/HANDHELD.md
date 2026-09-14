@@ -344,11 +344,18 @@ were clean before serial-confirmed poweroff. Exact evidence is
 Vice City were not run; LCD motion, audio, physical controls, saves and relaunch
 remain open.
 
-R36 remains the accepted Moonlight/status comparison. The current target-tested
-no-Moonlight GTA candidate is `mainline/out/.cache/r46h-gta-shared-20260914/r56/`;
-its receipt owns source, shell, engine, archive and manifest hashes. Use its shell
-hash for SSH `--expect-binary` and manifest hash for the target probe. The R56
-device `session.json` above owns physical results and limitations.
+R36 remains the accepted Moonlight/status comparison. R57 is the last target-tested
+no-Moonlight GTA candidate; its device `session.json` above owns physical results
+and limitations. The next host-only R58 candidate is
+`mainline/out/.cache/r46h-gta-shared-20260914/r58/`, source
+`b5e63c1cbebe00526ca134952977f9954a8e768f`. Its full ARM64 checks and 1,727-file
+readback passed; archive SHA-256 is
+`218e227b9853e3ff046c0afc727c37cee973b2ef04b3b4482f5477d6642bfb76`,
+manifest SHA-256 is
+`c3ddc421b11350d1fe67b21ff4cf988dd4438eccad0e0efa479ab326e4969099`
+and shell SHA-256 is
+`926f91926f4e5d32117a1ae268d28c4b68b47427793fefdb908145f21a8c3cfd`.
+Use those exact hashes for the next target preflight; R58 has no device result yet.
 
 The retained GTA diagnostic is `mainline/out/.cache/r46h-compositor-20260910/r39/`,
 source `286fcdfcf7643c43f19b1272beefd136e09cc08f` on

@@ -82,8 +82,9 @@ skipped, so content equality remains unverified. See
   it is evidence for a rendering-cost bottleneck, not an accepted default. The
   original configuration was hash-restored before poweroff.
 - R58 is the next isolated fault candidate: GTA III and Vice City set Mesa's
-  Panfrost `noafbc` debug option in their private launch environment. It does not
-  alter system Mesa or Stardew; target fault and performance results remain open.
+  Panfrost `noafbc` debug option in their private launch environment. Its clean
+  no-Moonlight package passed the full ARM64 host build and 1,727-file readback.
+  It does not alter system Mesa or Stardew; target fault/performance results remain open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
