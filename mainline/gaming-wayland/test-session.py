@@ -127,7 +127,8 @@ with tempfile.TemporaryDirectory(prefix='r46h-session-', dir='/run') as director
         os.kill(weston, signal.SIGTERM)
         assert process.wait(timeout=8) != 0
         wait_for(lambda: not paths[0].exists(), 'Routed endpoint survived session teardown')
-        assert not Path(f'/proc/{gui}').exists() and (game is None or not Path(f'/proc/{game}').exists())
+        wait_for(lambda: not Path(f'/proc/{gui}').exists() and (game is None or not Path(f'/proc/{game}').exists()),
+                 'GUI or game survived session teardown')
         assert not list(state.glob('runtime.*')), 'Private runtime survived cleanup'
         if stream_mode:
             assert (persistent / 'preview.json').is_file() and not (state / 'ui-state').exists(), 'Explicit state was ignored or removed'
