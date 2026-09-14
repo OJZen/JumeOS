@@ -17,7 +17,7 @@ portmaster=${R46H_PORTMASTER_BUNDLE:-"$workspace/mainline/out/.cache/r46h-portma
 [ "$(shasum -a 256 "$portmaster" | cut -d ' ' -f 1)" = "$(cat "$(dirname "$portmaster")/runtime.sha256")" ]
 native=${R46H_PORT_NATIVE_CACHE:-"$workspace/mainline/out/.cache/r46h-ports-native"}
 python3 -B "$workspace/mainline/gaming-ports/prepare-native.py" "$native" --check
-gta=${R46H_GTA_SOURCE_OUTPUT:-"$workspace/mainline/out/.cache/r46h-gta-source-r48-20260913"}
+gta=${R46H_GTA_SOURCE_OUTPUT:-"$workspace/mainline/out/.cache/r46h-gta-source-r52-20260914"}
 [ -f "$gta/BUILD-INFO" ] && [ -f "$gta/SHA256SUMS" ] || { echo 'Run gaming-ports/build-gta-source.sh first.' >&2; exit 1; }
 (cd "$gta" && shasum -a 256 -c SHA256SUMS)
 docker run --rm --network none --entrypoint /bin/bash \

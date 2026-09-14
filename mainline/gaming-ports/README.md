@@ -557,9 +557,20 @@ timer and Debug Menu strings. Those development paths run per-frame bookkeeping
 even when their overlay is hidden.
 
 `build-gta-source.sh` now supplies `MASTER` to both pinned engines and rejects an
-artifact retaining the two diagnostic markers. It does not change the 30 FPS
-limit, graphics settings, input, save layout or source game data. A clean ARM64
-build and R46H differential performance run are required before promotion.
+artifact retaining the two diagnostic markers. Clean source
+`b2d82f707025473ebf47b59c09f9317e10c9d5cc` produced re3 SHA-256
+`6ebf8aedffa2a43bfeac93863917da33b13ae2ce0bff672d7a02018444bc12f4`
+and reVC SHA-256
+`d19bbe5b90648e6ad0ae10b10f27fa256f84fd91381a38187ffd8c1e7814aa3c`.
+Both hashes pass readback, and the former diagnostic markers are absent. The
+stripped binaries are 204,016 and 271,152 bytes smaller than R48. This does not
+change the 30 FPS limit, graphics settings, input, save layout or source game
+data. ARM64 frontend checks and an R46H differential performance run remain
+required before promotion. The new binaries each completed a 12-second ARM64
+Wayland/software GLES 3.2 process bound without a forced kill; `MASTER` removes
+the old `GS_FRONTEND` trace, so that run proves context/lifecycle only, not a
+composed frontend. Evidence is
+`mainline/out/.cache/r46h-gta-host-r52-20260914/`.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

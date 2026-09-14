@@ -54,7 +54,7 @@ def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 manifest = ''.join(f'{digest(f)}  {f.relative_to(root)}\n' for f in sorted(root.rglob('*'))
                    if f.is_file() and not f.is_symlink() and f != root / 'SHA256SUMS')
 (root / 'SHA256SUMS').write_text(manifest)
-record = {'revision': 51, 'status': 'SHARED_GTA_OVERLAY_HOST_PASS_R46H_UNTESTED',
+record = {'revision': 53, 'status': 'MASTER_GTA_OVERLAY_HOST_PASS_R46H_UNTESTED',
           'source_commit': sys.argv[2], 'base_runtime_sha256': digest(pathlib.Path('/wayland-runtime.tar.gz')),
           'manifest_sha256': digest(root / 'SHA256SUMS'),
           'binaries': {str(f.relative_to(root)): digest(f) for f in [root / 'usr/bin/r46h-shell', root / 'usr/bin/input-router',
