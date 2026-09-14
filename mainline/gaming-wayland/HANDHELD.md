@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-14: **R55 CLIPPED HUD HOST PASS / R54 GTA HUD-OFF MENU DEVICE PASS / R55 DEVICE + INTRO OPEN / STREAMING DEFERRED**.
+Status 2026-09-14: **R56 CLIPPED HUD + STATUS BAR HOST PASS / R54 GTA HUD-OFF MENU DEVICE PASS / R56 DEVICE + INTRO OPEN / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -307,12 +307,14 @@ Evidence is `mainline/out/.cache/r46h-hud-mask-r55-host-20260914/`. This is host
 proof only; the R46H pacing, colors, controls and thermal gate remain open.
 
 The current host-built no-Moonlight candidate is
-`mainline/out/.cache/r46h-gta-shared-20260914/r55/`, source
-`32ad0bd0db42d953411010ca215a29bdcb095820`. Its 1,727 regular files passed
+`mainline/out/.cache/r46h-gta-shared-20260914/r56/`, source
+`c5514be42c346f008c8fadf0982668c1d2ad3cf9`. It retains R55's HUD mask and
+aligns the status icons, labels and clock. Mac and ARM64 Qt fixture captures
+passed. Its 1,727 regular files passed
 independent readback; archive SHA-256 is
-`01a5642a0c7f64abde7997a2991947c2f2eadf8492a664e84d420366c20e998b` and
+`d21881d20f26b3a5e5208880211ff1c0304a88fe6881f82b4bf482c738eab762` and
 manifest SHA-256 is
-`04399813bd4281b0c1e146cde0413f93f3be5a298d50ef6f72df3a8285558b0b`.
+`22cfc859f0b268524122cb456a01ffc9979207632b38bb9f0c3207e5e4d346df`.
 The receipt owns remaining binary and evidence hashes; this package is not
 target-tested.
 

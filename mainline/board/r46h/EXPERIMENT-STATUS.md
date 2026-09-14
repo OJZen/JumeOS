@@ -89,14 +89,14 @@ GTA III menu at the 30 FPS limit with HUD hidden. R54 intro/crash, USB, Moonligh
   still required after a new image write.
 - **Remote input — V0.16/V0.17 10 MS DEVICE PASS.** Self-test and exact
   screenshot-verified right/left single-step roundtrip passed; v0.15 uses 100 ms.
-- **Qt shell — R17 CONTROLS + R35 STATUS BAR DEVICE PASS / FOCUS PACING OPEN.**
+- **Qt shell — R17 CONTROLS + R35 STATUS VALUES DEVICE PASS / R56 GEOMETRY HOST PASS.**
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
   reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope; Wi-Fi/swap/suspend remain open.
 - **Wayland/ports — R54 GTA HUD-OFF MENU DEVICE PASS / HUD-ON PACING FAIL / INTRO OPEN.**
   R48 fixed D-pad Down; R51 measured 25.6 submissions/s and reached 85 C. At
   1008/400 MHz R54 averaged 26.84/s with HUD, 30.43/s hidden and peaked at 83.846 C.
-  R55 clips the HUD surface and passes host checks, but has no device result. R54
-  restored and powered off; LCD FPS, R55 pacing, intro/crash, gameplay/audio/saves, VC and Moonlight remain open.
+  R56 clips the HUD and aligns status geometry on host, but has no device result. R54
+  restored and powered off; LCD FPS, R56 pacing/status, intro/crash, gameplay/audio/saves, VC and Moonlight remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**

@@ -58,11 +58,10 @@ skipped, so content equality remains unverified. See
   it hidden; the full-screen transparent HUD is a material compositor cost.
   The hottest GPU sample was 83.846 C. All runs exited without a forced kill,
   but remote confirm did not leave the main menu, so intro/crash proof stays open.
-- R55 clips the resident HUD's transparent UI surface to its fixed top-right
-  canvas region while a game is active; opening the panel restores the full UI.
+- R56 retains R55's clipped game HUD and aligns the top-right Wi-Fi, battery and
+  clock with shared icon boxes, gaps, caption size and centerline. Mac/ARM64 Qt,
   Weston Pixman/GL, real Qt/router/SDL and the full package build passed; an
-  independent 1,727-file readback passed. R46H performance, colors, controls
-  and thermal behavior remain untested.
+  independent 1,727-file readback passed. R46H visual and performance proof is open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -75,8 +74,8 @@ runbooks.
 
 ## Immediate next work
 
-1. Deploy the R55 clipped-HUD candidate and compare HUD-on/off GTA III pacing at
-   the same caps; preserve the existing toggle and thermal guard as fallbacks.
+1. Deploy R56, visually verify its status-bar alignment, and compare HUD-on/off
+   GTA III pacing at the same caps; preserve the toggle and thermal guard.
 2. Correctly map remote GTA confirm, then measure the actual intro and crash point.
 3. Recheck shared Vice City after the GTA HUD path is bounded.
 4. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
