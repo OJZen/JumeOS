@@ -572,8 +572,15 @@ The R54 shared check then loaded the exact R52 hashes, captured both main menus,
 moved Down from Start Game to Options, overlaid the global panel and returned to
 the same desktop without a forced kill. Evidence is
 `mainline/out/.cache/r46h-gta-host-r52-20260914/` and
-`mainline/out/.cache/r46h-gta-composed-r53-20260914/`. This is ARM64 software
-rendering evidence; an R46H differential performance run remains required.
+`mainline/out/.cache/r46h-gta-composed-r54-20260914/`. The frozen R54 package is
+`mainline/out/.cache/r46h-gta-shared-20260914/r54/`: source commit
+`8923172a3f50cfc37ccce5d8bcee503c6f1b6598`, manifest SHA-256
+`9409118571dda4794b0de22c5d82dcd9894049b024710447b659a3f8aaf940d1`
+and archive SHA-256
+`1b6627947d0ecdf0853d8b48dca21f15f40e8f5e58ea99bee5ed5f83209f7d92`.
+Its 1,727-file independent readback passed and it contains no Moonlight client.
+This is ARM64 software rendering evidence; an R46H differential performance
+run remains required.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
