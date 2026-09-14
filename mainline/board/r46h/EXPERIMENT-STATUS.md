@@ -24,11 +24,9 @@ The current card's EASYROMS p3 import passed write, eject and physical use; its
 full target checksum/readback was skipped, so equality remains unverified; see
 [P3 Content Migration](../../../docs/P3-CONTENT-MIGRATION.md).
 
-P2 v0.7 is the last fully attended fallback; p2 v0.15 is the last accepted
-automated device fallback. The current card's exact p2 v0.17 passed its p2-only
-write, two full readbacks, cold/warm infrastructure and attended dual-stick smoke.
-R47-R54 passed Stardew import/bound, R48 GTA intro starts/D-pad Down and the R54
-GTA III menu at the 30 FPS limit with HUD hidden. R54 intro/crash, USB, Moonlight and PSP remain open.
+Fallbacks are p2 v0.7 attended and v0.15 automated; current v0.17 passed readbacks, cold/warm infra and stick smoke.
+R56 confirmed aligned composed status output and slow HUD-hidden GTA III intro
+pacing. Natural crash, physical LCD, USB, Moonlight and PSP remain open.
 
 ## Capability ledger
 
@@ -89,14 +87,16 @@ GTA III menu at the 30 FPS limit with HUD hidden. R54 intro/crash, USB, Moonligh
   still required after a new image write.
 - **Remote input — V0.16/V0.17 10 MS DEVICE PASS.** Self-test and exact
   screenshot-verified right/left single-step roundtrip passed; v0.15 uses 100 ms.
-- **Qt shell — R17 CONTROLS + R35 STATUS VALUES DEVICE PASS / R56 GEOMETRY HOST PASS.**
+- **Qt shell — R17 CONTROLS + R35 STATUS VALUES DEVICE PASS / R56 GEOMETRY COMPOSED PASS.**
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
-  reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope; Wi-Fi/swap/suspend remain open.
-- **Wayland/ports — R54 GTA HUD-OFF MENU DEVICE PASS / HUD-ON PACING FAIL / INTRO OPEN.**
-  R48 fixed D-pad Down; R51 measured 25.6 submissions/s and reached 85 C. At
-  1008/400 MHz R54 averaged 26.84/s with HUD, 30.43/s hidden and peaked at 83.846 C.
-  R56 clips the HUD and aligns status geometry on host, but has no device result. R54
-  restored and powered off; LCD FPS, R56 pacing/status, intro/crash, gameplay/audio/saves, VC and Moonlight remain open.
+  R56 aligned the status row in a device-composed capture; physical LCD remains open.
+  Reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope.
+- **Wayland/ports — R54 GTA HUD-OFF MENU PASS / R56 INTRO PACING FAIL / NATURAL CRASH OPEN.**
+  R48 fixed D-pad Down. At 1008/400 MHz, R54's menu averaged 26.84/s with HUD and
+  30.43/s hidden; R56's HUD-hidden intro averaged only 5.57/s. Its HUD-on samples
+  covered another phase. The 121.17-second disappearance was a forced diagnostic
+  bound, not a reproduced crash; Panfrost faults coincided with cleanup. R56 powered
+  off cleanly. LCD FPS, graceful exit, gameplay/audio/saves, VC and Moonlight are open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**

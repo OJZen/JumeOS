@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-14: **R54 GTA HUD-OFF MENU PACING DEVICE PASS / HUD-ON COST IDENTIFIED / INTRO OPEN**.
+Status 2026-09-14: **R56 STATUS/HUD COMPOSED PASS / GTA III INTRO PACING FAIL / NATURAL CRASH OPEN**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -592,6 +592,27 @@ on the main menu, so the reported intro slowdown/crash remains untested. State,
 poweroff. Exact evidence is
 `mainline/out/.cache/r46h-r54-device-20260914.goly7P/session.json`. These are
 buffer submissions, not displayed LCD FPS.
+
+R56 source `c5514be42c346f008c8fadf0982668c1d2ad3cf9` retains R55's clipped
+HUD and aligns the status row. Its 1,727-file archive SHA-256 is
+`d21881d20f26b3a5e5208880211ff1c0304a88fe6881f82b4bf482c738eab762`;
+target readback and preflight passed. Device-composed captures show the Wi-Fi,
+battery and clock aligned and the HUD confined to the top-right over a real GTA
+III intro frame. This is not physical LCD acceptance.
+
+At the same 1008/400 MHz caps, seven 20-second HUD-hidden intro samples averaged
+5.57 submissions/s (median 5.00), with 121.24--226.62 ms median and
+200.33--268.40 ms P95 intervals. Three HUD-on samples covered a different intro
+phase and do not support a matched comparison; the slowdown therefore persists
+without the HUD, but its incremental cost in the intro is unresolved. The game
+disappeared at 121.17 seconds with `boundedStop=true` and `forcedKill=true`: the
+diagnostic bound explains this exit and no natural crash was reproduced. Panfrost
+faults coincided with forced session/game cleanup, so graceful bounded termination
+is the next prerequisite before attributing a driver crash. Original content and
+the GTA configuration stayed unchanged, managed saves stayed empty, limits/state/
+services recovered, and serial confirmed poweroff. Exact evidence is
+`mainline/out/.cache/r46h-r56-device-20260914.L7Smy5/session.json`; Vice City and
+Moonlight were not run.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

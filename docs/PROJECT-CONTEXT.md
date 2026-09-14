@@ -12,9 +12,9 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **off** after the R54 GTA performance diagnostic. Serial confirmed
+The device is **off** after the R56 status/GTA diagnostic. Serial confirmed
 sync, filesystem unmount, loop/MD/DM detach and `Powering off.` Temporary target
-staging and the one-time public key were removed.
+staging, the one-time key and the host serial bridge were removed.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -59,9 +59,17 @@ skipped, so content equality remains unverified. See
   The hottest GPU sample was 83.846 C. All runs exited without a forced kill,
   but remote confirm did not leave the main menu, so intro/crash proof stays open.
 - R56 retains R55's clipped game HUD and aligns the top-right Wi-Fi, battery and
-  clock with shared icon boxes, gaps, caption size and centerline. Mac/ARM64 Qt,
-  Weston Pixman/GL, real Qt/router/SDL and the full package build passed; an
-  independent 1,727-file readback passed. R46H visual and performance proof is open.
+  clock with shared icon boxes, gaps, caption size and centerline. Its complete
+  1,727-file readback and preflight passed on R46H. A Weston capture shows the
+  status row aligned and the HUD confined to the top-right over a real GTA III
+  intro frame; physical LCD confirmation remains open.
+- GTA III intro pacing stayed abnormally low with the HUD hidden: seven samples
+  averaged 5.57 submissions/s (median 5.00), with 121.24--226.62 ms median frame
+  intervals at the same 1008/400 MHz caps. The HUD-on recorder covered only three
+  samples from a different intro phase, so it is not a matched comparison. The
+  observed disappearance at 121.17 seconds was the diagnostic bound's forced kill,
+  not a reproduced natural crash. Panfrost faults coincided with forced cleanup;
+  graceful termination must be proven before assigning a driver cause.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -74,10 +82,11 @@ runbooks.
 
 ## Immediate next work
 
-1. Deploy R56, visually verify its status-bar alignment, and compare HUD-on/off
-   GTA III pacing at the same caps; preserve the toggle and thermal guard.
-2. Correctly map remote GTA confirm, then measure the actual intro and crash point.
-3. Recheck shared Vice City after the GTA HUD path is bounded.
+1. Make the GTA diagnostic bound exit gracefully, then verify that forced cleanup
+   and its coincident Panfrost faults are gone.
+2. Repeat the same GTA III intro phase with HUD on/off at identical caps, then test
+   one render-resolution hypothesis if pacing remains low.
+3. Measure natural intro/gameplay/exit behavior, then recheck shared Vice City.
 4. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
 5. Keep Moonlight paused until requested; keep USB HID as a separate hardware-route gate.
 
