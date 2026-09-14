@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-14: **R36 STATUS/NEO/CATALOG DEVICE PASS / R50 SHARED GTA OVERLAY CANDIDATE / STREAMING DEFERRED**.
+Status 2026-09-14: **R36 STATUS/NEO/CATALOG DEVICE PASS / R51 SHARED GTA OVERLAY CANDIDATE / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -255,15 +255,18 @@ audio, physical-control, save or relaunch proof.
 
 ## Resume and rebuild
 
-R50 reuses the existing composed game layer, resident performance panel,
+R51 reuses the existing composed game layer, resident performance panel,
 frame-submission telemetry, capture authorization and routed remote gamepad for
 the repaired source-built GTA engines. `build-handheld.sh` now verifies and
 mounts the same explicit hash-bound GTA engine directory used by the direct
 package; the receipt records both engine hashes. This adds no second overlay or
 remote protocol. R49 passed its 1,726-file target readback but its preflight
 omitted the already packaged private port library from the diagnostic `ldd`
-search path. R50 fixes only that diagnostic path; its R46H composed-frame,
-input and performance gate remains open until the candidate is built and run.
+search path. R50 fixed that preflight and passed it on target, but its no-Moonlight
+fallback hid the built-in PortMaster page behind the diagnostic controller.
+R51 keeps that fallback only for sessions without shared ports; it adds no game,
+overlay or remote protocol. Its R46H composed-frame, input and performance gate
+remains open until the candidate is built and run.
 
 R36 source `e82aa3874084f3d5edb31dea7b15c38ef1450dc9` on
 `codex/r46h-porthome-r36-candidate` contains R35's battery/charge/Wi-Fi correction
@@ -415,7 +418,8 @@ rule, global device mode or service is installed. Wrong-device/read-only descrip
 are refused; the existing target cgroup and ES-DE recovery wrapper remain in use.
 
 `handheld-client.sh` defaults to a private diagnostic application list: one separate
-copy of the controller-test UI. Settings are read-only unless the root supervisor
+copy of the controller-test UI. A shared ports session instead exposes the existing
+built-in PortMaster page without requiring a packaged Moonlight client. Settings are read-only unless the root supervisor
 grants the [explicit device lease](../gaming-shell/DEVICE.md#shared-wayland-settings-candidate).
 The game child never inherits that control flag. `check-session.sh` runs these
 actual scripts as `nobody`, with `/dev/uinput` hidden after delegation. It verifies

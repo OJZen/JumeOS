@@ -11,12 +11,23 @@ from unittest.mock import patch
 
 repo = Path(__file__).resolve().parents[2]
 source = (repo / 'mainline/gaming-wayland/probe-r46h.sh').read_text()
+handheld = (repo / 'mainline/gaming-wayland/handheld-client.sh').read_text()
 
 
 
 def bash(code, **env):
     return subprocess.run(['/bin/bash', '-c', 'set -Eeuo pipefail\n' + code],
                           env={**os.environ, **env}, text=True, capture_output=True, timeout=5)
+
+
+with tempfile.TemporaryDirectory(prefix='handheld-client-', dir=repo / 'mainline/out/.cache') as directory:
+    root = Path(directory); output = root / 'output'; output.mkdir()
+    (root / 'handheld-client.sh').write_text(handheld); (root / 'handheld-client.sh').chmod(0o755)
+    (root / 'shell-client.sh').write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$CALL_RECORD"\n')
+    (root / 'shell-client.sh').chmod(0o755)
+    record = root / 'args'
+    result = bash(f'CALL_RECORD={record} R46H_ROUTED_SOURCE=/dev/input/test R46H_SHARED_PORTS=1 {root}/handheld-client.sh ui {output}')
+    assert result.returncode == 0 and '--applications' not in record.read_text().splitlines(), result
 
 
 # Execute the actual batched header/closure check without loading fixture ELFs.

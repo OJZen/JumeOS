@@ -9,6 +9,7 @@ case "$base:$output" in *[[:space:]\;=\"\\]*) exit 2;; esac
 case "$output" in /*) ;; *) exit 2;; esac
 unset R46H_SHELL_LOG
 case "${R46H_DEVICE_CONTROLS:-0}" in 0|1) ;; *) exit 2;; esac
+case "${R46H_SHARED_PORTS:-0}" in 0|1) ;; *) exit 2;; esac
 if [ "$role" = game ]; then
     unset R46H_DEVICE_CONTROLS
     export R46H_SHELL_STATE_DIR="$output/game-state"
@@ -20,7 +21,7 @@ if [ -f "$base/MOONLIGHT_SHA256" ]; then
     [ "${#client_hash}" = 64 ] && [ "$(sha256sum "$base/usr/bin/moonlight-qt" | cut -d ' ' -f 1)" = "$client_hash" ]
     export R46H_VIRTUAL_KEYBOARD=1
     set -- --scene streaming --moonlight-client "$base/usr/bin/moonlight-qt" --moonlight-sha256 "$client_hash"
-else
+elif [ "${R46H_SHARED_PORTS:-0}" != 1 ]; then
 cat > "$output/applications.json" <<JSON
 {"version":1,"applications":[{"id":"diagnostic.controller","title":"独立摇杆测试","program":"$base/handheld-client.sh","arguments":["game","$output"]}]}
 JSON
