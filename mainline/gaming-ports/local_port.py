@@ -49,6 +49,10 @@ def _packaged_engine_path(game, script=Path(__file__)):
     return script.resolve().parents[3] / 'lib/r46h-ports' / SOURCE_PROFILES[game][0]
 
 
+def frontend_reached(log):
+    return any(marker in log for marker in (b'GS_FRONTEND', b'LOAD frontend'))
+
+
 def inspect(game, content):
     if game == 'stardew':
         source = content / 'ports/stardewvalley1615'
@@ -284,7 +288,7 @@ def run_game(game, content, state, seconds, mono=None, mono_compat=None, capture
         (state / ('host-runtime.log' if host_test else 'runtime.log')).write_bytes(log)
         result = {'game': game, 'exit': proc.returncode, 'boundedStop': stop, 'requestedStop': stop_requested, 'sharedDisplay': shared_display, 'seconds': round(time.monotonic() - started, 2),
                   'engine_sha256': STARDEW['SVLoader.exe'] if game == 'stardew' else digest(Path(plan['program'])), 'sourceReadOnly': True,
-                  'frontendReached': b'GS_FRONTEND' in log, 'x11ReturnSent': input_sent, 'initialWindowGeometry': geometry, 'captured': captured, 'forcedKill': forced_kill,
+                  'frontendReached': frontend_reached(log), 'x11ReturnSent': input_sent, 'initialWindowGeometry': geometry, 'captured': captured, 'forcedKill': forced_kill,
                   'deliberateSelfExit': game == 'stardew' and b'R46H_PORT_SELF_EXIT' in log and proc.returncode == -signal.SIGKILL and not forced_kill, 'peakRssKiB': resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss,
                   'renderer': next((line for line in log.decode(errors='replace').splitlines() if line.startswith('OpenGL version:')), ''),
                   'boundary': ('AArch64 container, ' + ('Wayland' if shared_display else 'X11') + '/software Mesa, null audio') if host_test else 'R46H bounded process only; LCD/audio/controls require observation'}

@@ -52,6 +52,10 @@ skipped, so content equality remains unverified. See
   at the temporary 1008/400 MHz caps, and one remote Down sample completed.
   The first run reached the 85 C guard; both runs restored ES-DE and all leases.
   Displayed LCD FPS, GTA gameplay/audio/saves/relaunch and shared Vice City remain open.
+- R54 replaces the GTA development profile with the upstream `MASTER`/`FINAL`
+  production profile. ARM64 software-rendered shared checks loaded the exact
+  R52 engine hashes, captured both main menus, moved Down to Options, overlaid
+  the global panel and returned cleanly. Target performance is not yet measured.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -64,8 +68,8 @@ runbooks.
 
 ## Immediate next work
 
-1. Profile GTA pacing below the 85 C bound, comparing HUD off/on before changing
-   rendering or resolution; the direct stock-frequency run was also reported slow.
+1. Compare R54 against the R51 GTA III baseline under the same guarded clocks,
+   using the shared HUD/capture before changing rendering or resolution.
 2. Recheck shared Vice City only after the GTA thermal/performance hypothesis is bounded.
 3. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
 4. Keep Moonlight paused until requested; keep USB HID as a separate hardware-route gate.

@@ -565,12 +565,15 @@ and reVC SHA-256
 Both hashes pass readback, and the former diagnostic markers are absent. The
 stripped binaries are 204,016 and 271,152 bytes smaller than R48. This does not
 change the 30 FPS limit, graphics settings, input, save layout or source game
-data. ARM64 frontend checks and an R46H differential performance run remain
-required before promotion. The new binaries each completed a 12-second ARM64
-Wayland/software GLES 3.2 process bound without a forced kill; `MASTER` removes
-the old `GS_FRONTEND` trace, so that run proves context/lifecycle only, not a
-composed frontend. Evidence is
-`mainline/out/.cache/r46h-gta-host-r52-20260914/`.
+data. The new binaries each completed a 12-second ARM64 Wayland/software GLES
+3.2 process bound without a forced kill. `MASTER` removes the old `GS_FRONTEND`
+trace but retains `LOAD frontend`; the launcher now recognizes both markers.
+The R54 shared check then loaded the exact R52 hashes, captured both main menus,
+moved Down from Start Game to Options, overlaid the global panel and returned to
+the same desktop without a forced kill. Evidence is
+`mainline/out/.cache/r46h-gta-host-r52-20260914/` and
+`mainline/out/.cache/r46h-gta-composed-r53-20260914/`. This is ARM64 software
+rendering evidence; an R46H differential performance run remains required.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

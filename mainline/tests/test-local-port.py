@@ -19,6 +19,9 @@ assert port._device_libraries(Path('/payload/usr/share/r46h/ports/local_port.py'
     '/payload/usr/lib/r46h-ports:/payload/usr/lib/aarch64-linux-gnu'
 assert port._packaged_engine_path('gta3', Path('/payload/usr/share/r46h/ports/local_port.py')) == \
     Path('/payload/usr/lib/r46h-ports/re3')
+assert port.frontend_reached(b'GS_FRONTEND')
+assert port.frontend_reached(b'LOAD frontend2')
+assert not port.frontend_reached(b'OpenGL version only')
 with tempfile.TemporaryDirectory(prefix='local-port-', dir=repo / 'mainline/out/.cache') as directory:
     root = Path(directory)
     for game in ('gta3', 'gtavc'):

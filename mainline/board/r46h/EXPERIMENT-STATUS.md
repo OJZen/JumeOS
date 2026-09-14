@@ -94,9 +94,9 @@ the shared GTA III HUD/frame gate and one remote Down. Performance, thermals, US
   reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope; Wi-Fi/swap/suspend remain open.
 - **Wayland/ports — R48 GTA START/D-PAD PHYSICAL PASS; R51 SHARED HUD/INPUT
   DEVICE PASS / PERFORMANCE+THERMAL FAIL.** R47 imported the Stardew save and
-  ran 120 seconds; R48 reached both intros and fixed D-pad Down. R51 rehashed
-  1,726 files, captured GTA III at 25.6 submissions/s and completed remote Down.
-  It hit 85 C and restored services/leases; LCD FPS, gameplay/audio/saves, shared VC and Moonlight remain open.
+  ran 120 seconds; R48 fixed D-pad Down; R51 measured 25.6 submissions/s, remote
+  Down and 85 C. R54's production GTA passes both host menus only; LCD FPS,
+  gameplay/audio/saves, shared VC and Moonlight remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**
