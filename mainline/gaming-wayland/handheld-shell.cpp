@@ -102,6 +102,12 @@ static void arrange(Shell *shell)
         weston_desktop_surface_propagate_layer(item->desktop);
         weston_view_set_output(item->view, output);
         weston_view_set_position(item->view, output->pos);
+        if (isUi && hasGame && shell->overlay && !shell->panel
+            && (shell->compositor->capabilities & WESTON_CAP_VIEW_CLIP_MASK)) {
+            // The Qt game HUD occupies this canvas region; clipping avoids a full-screen transparent blend.
+            weston_view_set_mask(item->view, output->width * 624 / 1024, output->height * 16 / 768,
+                (output->width * 368 + 1023) / 1024, (output->height * 260 + 767) / 768);
+        } else if (isUi) weston_view_set_mask_infinite(item->view);
         weston_view_update_transform(item->view);
         const bool active = isUi ? (!hasGame || shell->panel) : isGame && !shell->panel;
         weston_desktop_surface_set_activated(item->desktop, active);

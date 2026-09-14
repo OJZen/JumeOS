@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-14: **R54 GTA HUD-OFF MENU PACING DEVICE PASS / FULL-SCREEN HUD COST IDENTIFIED / INTRO OPEN / STREAMING DEFERRED**.
+Status 2026-09-14: **R55 CLIPPED HUD HOST PASS / R54 GTA HUD-OFF MENU DEVICE PASS / R55 DEVICE + INTRO OPEN / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -298,6 +298,14 @@ but two completed remote A requests left identical main-menu captures, so no int
 or crash result is inferred. Exact evidence is
 `mainline/out/.cache/r46h-r54-device-20260914.goly7P/session.json`.
 
+R55 uses Weston's existing view mask to limit the transparent UI surface to the
+resident HUD's fixed top-right canvas region while a game owns the display. The
+full UI mask returns when the quick panel opens, and compositors without the mask
+capability retain the previous full-surface behavior. Pixman, software GL and the
+real Qt/router/SDL desktop checks passed, including composed HUD and panel pixels.
+Evidence is `mainline/out/.cache/r46h-hud-mask-r55-host-20260914/`. This is host
+proof only; the R46H pacing, colors, controls and thermal gate remain open.
+
 R36 remains the accepted Moonlight/status comparison. The current target-tested
 no-Moonlight GTA candidate is `mainline/out/.cache/r46h-gta-shared-20260914/r54/`;
 its receipt owns source, shell, engine, archive and manifest hashes. Use its shell
@@ -551,8 +559,9 @@ independent client `frameSwapped` and compositor counts at two requested timer
 rates and at rest. The software renderer need not
 reach the requested rate. The check covers HUD-only repaints, stale intervals,
 sampling off/on and game exit. Evidence lives in `desktop/frame-metrics.json`
-and `desktop/game-frame-hud.png` under the named candidate output. Physical
-accuracy and overlay cost on R46H remain open.
+and `desktop/game-frame-hud.png` under the named candidate output. R55 additionally
+checks that the game remains visible outside the masked HUD and opening the panel
+restores the full UI surface. Physical accuracy and R55 overlay cost on R46H remain open.
 
 R26 is frozen at `mainline/out/.cache/r46h-compositor-20260910/r26/receipt.json`,
 source `e4ed1ba3b115ce43805eb12306efac04b838dddd` on

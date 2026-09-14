@@ -180,7 +180,11 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
             '--session', prior['session'], '--sequence', str(prior['sequence']), '--application', prior['state']['activeApplication'],
             '--input-sequence', str(prior['state']['inputSequence']), '--button', 'b', '--right-y', '.8', '--duration-ms', '300'],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        wait_for(lambda: game()['buttons'][1] == 1 and game()['axes'][3] > 25000, 'CLI sample did not reach SDL')
+        def cli_reached():
+            if game()['buttons'][1] == 1 and game()['axes'][3] > 25000: return True
+            if cli.poll() is not None: raise AssertionError('CLI exited before input: ' + cli.stderr.read())
+            return False
+        wait_for(cli_reached, 'CLI sample did not reach SDL')
         stdout, stderr = cli.communicate(timeout=4)
         assert cli.returncode == 0 and json.loads(stdout)['input_status'] == 'completed', stderr
         wait_for(lambda: game()['buttons'][1] == 0 and abs(game()['axes'][3]) < 2, 'CLI sample did not release')

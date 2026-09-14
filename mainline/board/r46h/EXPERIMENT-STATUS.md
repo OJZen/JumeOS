@@ -95,8 +95,8 @@ GTA III menu at the 30 FPS limit with HUD hidden. R54 intro/crash, USB, Moonligh
 - **Wayland/ports — R54 GTA HUD-OFF MENU DEVICE PASS / HUD-ON PACING FAIL / INTRO OPEN.**
   R48 fixed D-pad Down; R51 measured 25.6 submissions/s and reached 85 C. At
   1008/400 MHz R54 averaged 26.84/s with HUD, 30.43/s hidden and peaked at 83.846 C.
-  It restored all state and powered off; LCD FPS, intro/crash, gameplay/audio/saves,
-  shared VC and Moonlight remain open.
+  R55 clips the HUD surface and passes host checks, but has no device result. R54
+  restored and powered off; LCD FPS, R55 pacing, intro/crash, gameplay/audio/saves, VC and Moonlight remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**

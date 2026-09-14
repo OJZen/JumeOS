@@ -126,8 +126,10 @@ GUI apply waits for these target checks; memory/swap/pressure readout is impleme
 1. R54 measured the GTA III menu under identical 1008 MHz CPU / 400 MHz GPU
    caps: 26.84 game submissions/s with the full-screen transparent HUD and
    30.43/s with it hidden. Median interval samples improved from 35.84 to
-   31.85 ms. Replace or narrow that overlay before treating it as an always-on
-   product feature; keep the accepted toggle and HUD-independent sampler.
+   31.85 ms. R55 uses Weston's native view mask to clip that surface to the
+   fixed HUD canvas region; Pixman/GL and real Qt/router/SDL host checks pass.
+   Compare it on R46H before treating the HUD as an always-on product feature;
+   keep the accepted toggle and HUD-independent sampler.
    The user-set external abort remains 85 C, not a kernel thermal-trip change.
    The two-second health sampler warns near voltage/thermal limits and blocks
    unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,

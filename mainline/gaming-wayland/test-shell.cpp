@@ -78,12 +78,19 @@ int main(int argc, char **argv)
         auto frame = captureOutput(); require(frame.error.isEmpty() && !frame.image.isNull(), "composed game capture");
         require(frame.image.pixelColor(20, 20) == QColor("#168b42") && frame.image.pixelColor(600, 20) == QColor("#168b42"), "game-only pixels");
         frame.image.save(QDir(argv[2]).filePath("game.png"));
+        set("overlay", "active", true);
+        frame = captureOutput(); require(frame.error.isEmpty(), "clipped overlay capture");
+        require(frame.image.pixelColor(20, 20) == QColor("#168b42") && frame.image.pixelColor(600, 20) == QColor("#ffe000")
+            && frame.image.pixelColor(600, 300) == QColor("#168b42"), "overlay mask limits the transparent UI surface");
+        frame.image.save(QDir(argv[2]).filePath("overlay.png"));
+        set("overlay", "active", false);
         QThread::msleep(2600);
         auto expired = captureOutput(); require(expired.image.isNull() && !expired.error.isEmpty(), "capture permission expires without client cleanup");
         set("privacy", "active", false);
         const auto old = set("panel", "active", true);
         frame = captureOutput(); require(frame.error.isEmpty(), "panel capture");
-        require(frame.image.pixelColor(20, 20) == QColor("#168b42") && frame.image.pixelColor(600, 20) == QColor("#ffe000"), "panel blends over game");
+        require(frame.image.pixelColor(20, 20) == QColor("#168b42") && frame.image.pixelColor(600, 20) == QColor("#ffe000")
+            && frame.image.pixelColor(600, 300) == QColor("#ffe000"), "panel restores the full UI surface over game");
         frame.image.save(QDir(argv[2]).filePath("panel.png"));
         const auto stale = call({{"op", "panel"}, {"active", false}, {"session", old.value("session")}, {"sequence", old.value("sequence").toInteger() - 1}});
         require(stale.value("error") == QJsonValue("stale_state"), "stale state rejected");
