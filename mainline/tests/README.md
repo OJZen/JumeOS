@@ -69,8 +69,8 @@ GL: read-only Metal Slug inputs, routed shortcuts, nontrivial save/load frame
 comparison and same-session return/relaunch. The [Neo host runbook](../gaming-wayland/HANDHELD.md#real-neo-host-check)
 owns its inputs and limits; this does not exercise the target-only native worker.
 
-`gaming-wayland/check-ports.sh` uses the actual GTA III/VC and Mono/Stardew
-engines in the shared desktop. `test-local-port-process.py` separately verifies
+`gaming-wayland/check-ports.sh` uses the hash-pinned source-built GTA III/VC and
+Mono/Stardew engines in the shared desktop. `test-local-port-process.py` separately verifies
 real signal/group cleanup with synthetic child processes in a disposable Linux
 container. Neither check proves target gameplay or durable native saves.
 `test-mono-compat.py` keeps unrelated lookup unchanged while checking provider-local

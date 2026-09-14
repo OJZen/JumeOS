@@ -269,8 +269,8 @@ get a one-second inner grace period before the desktop's 1.5-second group ceilin
 direct-display children retain their separate process group and five-second grace.
 This is process cleanup, not a promise that a game saves progress automatically.
 
-`gaming-wayland/check-ports.sh` runs the real retained re3/reVC and Mono/Stardew
-engines with the Qt desktop, headless Mesa GL and read-only original assets.
+`gaming-wayland/check-ports.sh` runs the hash-pinned source-built re3/reVC and
+Mono/Stardew engines with the Qt desktop, headless Mesa GL and read-only original assets.
 `mainline/out/.cache/r46h-compositor-20260910/ports/` holds the captured frontends,
 routed-only input descriptors, global panels and completion records. GTA III/VC
 menus move from Start Game to Options; Stardew's title screen accepts controller

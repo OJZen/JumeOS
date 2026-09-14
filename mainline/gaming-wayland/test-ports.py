@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Actual original ports through the shared desktop; synthetic input, no audio/device claim."""
+"""Source-built GTA and original Mono ports through the shared desktop; no device claim."""
 import importlib.util
 import json
 import os
@@ -29,10 +29,13 @@ def wait_for(check, message, seconds=8):
 
 with tempfile.TemporaryDirectory(prefix='r46h-ports-', dir='/run') as directory:
     state = Path(directory); apps = []
+    engines = {'gta3': '/gta-source/re3', 'gtavc': '/gta-source/reVC'}
     for game in ('gta3', 'gtavc', 'stardew'):
+        arguments = ['-I', '-B', '/code/local_port.py', game, '--host-test', '--shared-display', '--content-root', '/content',
+                     '--state', str(state / game), '--seconds', '70', '--mono', '/mono', '--mono-compat', '/mono-compat.so']
+        if game in engines: arguments += ['--engine', engines[game]]
         apps.append({'id': 'ports.' + game, 'title': game, 'program': '/usr/bin/python3',
-            'arguments': ['-I', '-B', '/code/local_port.py', game, '--host-test', '--shared-display', '--content-root', '/content',
-                          '--state', str(state / game), '--seconds', '70', '--mono', '/mono', '--mono-compat', '/mono-compat.so']})
+            'arguments': arguments})
     manifest = state / 'applications.json'; manifest.write_text(json.dumps({'version': 1, 'applications': apps}))
     pad = fixture.Pad(); routed = None
     log = (out / 'shell.log').open('w')
@@ -108,7 +111,7 @@ with tempfile.TemporaryDirectory(prefix='r46h-ports-', dir='/run') as directory:
             assert not list((state / game / 'sessions').iterdir()), 'Disposable game directory survived'
             results.append(result)
         (out / 'result.json').write_text(json.dumps({'status': 'SHARED_PORT_FRONTENDS_HOST_PASS', 'games': results,
-            'boundary': 'Actual retained engines, Wayland/software GL, synthetic routed inputs and silent audio. No target gameplay or save/load acceptance.'}, indent=2) + '\n')
+            'boundary': 'Hash-pinned source-built GTA and retained Mono/Stardew, Wayland/software GL, synthetic routed inputs and silent audio. No target gameplay or save/load acceptance.'}, indent=2) + '\n')
         print('SHARED_PORTS_PASS: three real engines, routed input endpoints, global panel and same desktop recovery')
     finally:
         if shell.poll() is None:
