@@ -306,7 +306,7 @@ real Qt/router/SDL desktop checks passed, including composed HUD and panel pixel
 Evidence is `mainline/out/.cache/r46h-hud-mask-r55-host-20260914/`. This is host
 proof only; the R46H pacing, colors, controls and thermal gate remain open.
 
-The current host-built no-Moonlight candidate is
+R56's no-Moonlight candidate is
 `mainline/out/.cache/r46h-gta-shared-20260914/r56/`, source
 `c5514be42c346f008c8fadf0982668c1d2ad3cf9`. It retains R55's HUD mask and
 aligns the status icons, labels and clock. Mac and ARM64 Qt fixture captures
@@ -315,13 +315,19 @@ independent readback; archive SHA-256 is
 `d21881d20f26b3a5e5208880211ff1c0304a88fe6881f82b4bf482c738eab762` and
 manifest SHA-256 is
 `22cfc859f0b268524122cb456a01ffc9979207632b38bb9f0c3207e5e4d346df`.
-The receipt owns remaining binary and evidence hashes; this package is not
-target-tested.
+Target readback/preflight and composed status/HUD capture passed. Its HUD-hidden
+GTA III intro averaged 5.57 submissions/s; the 121.17-second disappearance was a
+forced diagnostic bound, not a reproduced crash. Exact target evidence is
+`mainline/out/.cache/r46h-r56-device-20260914.L7Smy5/session.json`.
+
+R57 preserves the fast requested-stop path but gives a self-triggered bound five
+seconds for cleanup. Its slow-flush Linux process fixture and real ARM64 Wayland
+ports check pass; R46H graceful-exit and Panfrost cleanup proof remain open.
 
 R36 remains the accepted Moonlight/status comparison. The current target-tested
-no-Moonlight GTA candidate is `mainline/out/.cache/r46h-gta-shared-20260914/r54/`;
+no-Moonlight GTA candidate is `mainline/out/.cache/r46h-gta-shared-20260914/r56/`;
 its receipt owns source, shell, engine, archive and manifest hashes. Use its shell
-hash for SSH `--expect-binary` and manifest hash for the target probe. The R54
+hash for SSH `--expect-binary` and manifest hash for the target probe. The R56
 device `session.json` above owns physical results and limitations.
 
 The retained GTA diagnostic is `mainline/out/.cache/r46h-compositor-20260910/r39/`,

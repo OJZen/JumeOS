@@ -231,6 +231,7 @@ def run_game(game, content, state, seconds, mono=None, mono_compat=None, capture
         selector.register(proc.stdout, selectors.EVENT_READ)
         stop = False
         stop_started = None
+        stop_grace = 5
         captured = False
         forced_kill = False
         input_sent = False
@@ -274,9 +275,10 @@ def run_game(game, content, state, seconds, mono=None, mono_compat=None, capture
                     capture_tool = None
                 if (elapsed >= seconds or stop_requested) and stop_started is None:
                     stop = elapsed >= seconds
+                    stop_grace = 1 if shared_display and not stop else 5
                     stop_started = time.monotonic()
                     send_signal(signal.SIGTERM)
-                elif stop_started is not None and time.monotonic() - stop_started >= (1 if shared_display else 5):
+                elif stop_started is not None and time.monotonic() - stop_started >= stop_grace:
                     forced_kill = True
                     send_signal(signal.SIGKILL)
         finally:

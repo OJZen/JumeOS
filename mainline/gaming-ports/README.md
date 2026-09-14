@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-14: **R56 STATUS/HUD COMPOSED PASS / GTA III INTRO PACING FAIL / NATURAL CRASH OPEN**.
+Status 2026-09-14: **R56 GTA III INTRO PACING FAIL / R57 GRACEFUL BOUND HOST PASS**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -613,6 +613,16 @@ the GTA configuration stayed unchanged, managed saves stayed empty, limits/state
 services recovered, and serial confirmed poweroff. Exact evidence is
 `mainline/out/.cache/r46h-r56-device-20260914.L7Smy5/session.json`; Vice City and
 Moonlight were not run.
+
+R57 changes only the shared launcher's self-triggered bound: it now keeps the
+existing five-second direct cleanup grace, while an external shared stop retains
+its one-second deadline. The process fixture proves a two-second flush completes
+without `SIGKILL` and an ignored requested stop is still killed promptly. The real
+ARM64 Wayland ports check then passed GTA III, Vice City and Stardew frontend,
+routed-input, panel and same-desktop recovery with unchanged engine hashes. Host
+evidence is `mainline/out/.cache/r46h-gta-grace-r57-host-20260914.HOhs2f/ports/`.
+This does not prove that the R46H intro exits gracefully or eliminate the teardown
+Panfrost faults; those are the next target gate.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

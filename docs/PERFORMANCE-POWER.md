@@ -128,9 +128,11 @@ GUI apply waits for these target checks; memory/swap/pressure readout is impleme
    30.43/s with it hidden. R56's native view mask now confines the HUD to the
    top-right on R46H, but seven HUD-hidden intro samples averaged only 5.57/s
    with 121.24--226.62 ms median intervals. Its three HUD-on samples came from a
-   different intro phase and are not a matched comparison. First make the 120-second
-   diagnostic exit graceful, then compare the same phase and test one render-resolution
-   hypothesis. Keep the accepted toggle and HUD-independent sampler.
+   different intro phase and are not a matched comparison. R57 keeps fast requested
+   stops but gives a self-triggered bound five seconds for renderer cleanup; its
+   slow-cleanup fixture and real ARM64 Wayland ports check pass. Verify that boundary
+   on R46H, then compare the same phase and test one render-resolution hypothesis.
+   Keep the accepted toggle and HUD-independent sampler.
    The user-set external abort remains 85 C, not a kernel thermal-trip change.
    The two-second health sampler warns near voltage/thermal limits and blocks
    unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,

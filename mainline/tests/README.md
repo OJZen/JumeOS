@@ -70,9 +70,10 @@ comparison and same-session return/relaunch. The [Neo host runbook](../gaming-wa
 owns its inputs and limits; this does not exercise the target-only native worker.
 
 `gaming-wayland/check-ports.sh` uses the hash-pinned source-built GTA III/VC and
-Mono/Stardew engines in the shared desktop. `test-local-port-process.py` separately verifies
-real signal/group cleanup with synthetic child processes in a disposable Linux
-container. Neither check proves target gameplay or durable native saves.
+Mono/Stardew engines in the shared desktop. `test-local-port-process.py` separately
+verifies real signal/group cleanup, fast requested stops and a slow self-bound flush
+with synthetic children in a disposable Linux container. Neither check proves
+target gameplay or durable native saves.
 `test-mono-compat.py` keeps unrelated lookup unchanged while checking provider-local
 ELF resolution for Mesa GLX/EGL/GBM and Panfrost DRI names.
 

@@ -18,6 +18,7 @@ if len(sys.argv) > 1:
     state = Path(directory)
     if role == 'engine':
         def finish(signum, frame):
+            if mode == 'shared-bound-slow': time.sleep(2)
             (state / 'saves/flushed').write_text('saved before shutdown')
             sys.exit(0)
         signal.signal(signal.SIGTERM, signal.SIG_IGN if mode == 'shared-ignore' else finish)
@@ -35,10 +36,11 @@ if len(sys.argv) > 1:
         (state / 'cleaned').write_text('yes')
     port.prepared = prepared
     os.environ.update(WAYLAND_DISPLAY='fixture', SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT='0x5246/0x0049')
-    sys.exit(port.run_game('gta3', Path('/content'), state, 30, host_test=True, shared_display=mode != 'direct'))
+    seconds = 5 if mode == 'shared-bound-slow' else 30
+    sys.exit(port.run_game('gta3', Path('/content'), state, seconds, host_test=True, shared_display=mode != 'direct'))
 
 with tempfile.TemporaryDirectory(prefix='r46h-port-process-', dir='/run') as directory:
-    for mode in ('direct', 'shared', 'shared-ignore'):
+    for mode in ('direct', 'shared', 'shared-ignore', 'shared-bound-slow'):
         state = Path(directory) / mode; state.mkdir()
         worker = subprocess.Popen([sys.executable, '-B', __file__, 'worker', mode, str(state)],
                                   start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -48,22 +50,26 @@ with tempfile.TemporaryDirectory(prefix='r46h-port-process-', dir='/run') as dir
                 time.sleep(.02)
             engine = json.loads((state / 'engine.json').read_text())
             assert (engine['group'] == worker.pid) == (mode != 'direct')
-            start = time.monotonic()
-            if mode == 'direct':
-                worker.terminate()
+            if mode == 'shared-bound-slow':
+                output, _ = worker.communicate(timeout=10)
             else:
-                os.killpg(worker.pid, signal.SIGTERM)
-            output, _ = worker.communicate(timeout=4)
+                start = time.monotonic()
+                if mode == 'direct': worker.terminate()
+                else: os.killpg(worker.pid, signal.SIGTERM)
+                output, _ = worker.communicate(timeout=4)
             result = json.loads((state / 'host-result.json').read_text())
-            assert result['requestedStop'] and not result['boundedStop'], result
-            assert result['forcedKill'] == (mode == 'shared-ignore'), result
+            if mode == 'shared-bound-slow':
+                assert result['boundedStop'] and not result['requestedStop'] and not result['forcedKill'], result
+            else:
+                assert result['requestedStop'] and not result['boundedStop'], result
+                assert result['forcedKill'] == (mode == 'shared-ignore'), result
             assert worker.returncode == (1 if mode == 'shared-ignore' else 0), output
             assert not Path('/proc/' + str(engine['pid'])).exists()
             assert (state / 'cleaned').exists() and (state / 'saves/existing').read_text() == 'keep'
             assert (state / 'saves/flushed').exists() == (mode != 'shared-ignore')
-            if mode != 'direct':
+            if mode not in ('direct', 'shared-bound-slow'):
                 assert time.monotonic() - start < 1.5
         finally:
             if worker.poll() is None:
                 os.killpg(worker.pid, signal.SIGKILL); worker.wait(timeout=3)
-print('PORT_PROCESS_PASS: inherited shared group, graceful save/cleanup, direct-mode signal forwarding and bounded forced stop')
+print('PORT_PROCESS_PASS: inherited group, graceful save/cleanup, fast requested stop and slow bounded cleanup')
