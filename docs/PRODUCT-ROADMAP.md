@@ -64,8 +64,8 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
   save import occurred. R57 later proved two graceful GTA III bounds without a
   forced kill, but also captured Panfrost faults during active gameplay. A temporary
   640x480 run more than doubled intro submissions while reaching thermal cooling;
-  it is not yet an accepted default. Attended gameplay/audio/controls/save/relaunch
-  remain open.
+  it is not yet an accepted default. R58's GTA-only no-AFBC package/readback passed
+  on the host; its target comparison and attended gameplay/audio/controls/save/relaunch remain open.
   The separate SA Android-loader/direct-evdev findings do not establish a working
   target port.
 - **U1:** shared controls, headers, icons, font/spacing/motion rules and frame

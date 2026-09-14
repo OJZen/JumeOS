@@ -134,9 +134,9 @@ GUI apply waits for these target checks; memory/swap/pressure readout is impleme
    59-second HUD-on intro windows averaged 5.59 submissions/s at 1024x768 and
    12.32/s at a temporary 640x480. The lower-resolution run started hot, reached
    85.384 C with CPU/GPU cooling active and still produced two Panfrost runtime
-   faults, so it is not yet a product default. Isolate that fault, then repeat the
-   resolution candidate from a cooled start with physical LCD acceptance. Keep the
-   accepted toggle and HUD-independent sampler.
+   faults, so it is not yet a product default. R58's GTA-only no-AFBC package and
+   readback pass on the host; run its cooled target comparison next, then repeat the
+   resolution candidate with physical LCD acceptance. Keep the accepted toggle and HUD-independent sampler.
    The user-set external abort remains 85 C, not a kernel thermal-trip change.
    The two-second health sampler warns near voltage/thermal limits and blocks
    unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,

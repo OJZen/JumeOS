@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-14: **R56 CLIPPED HUD + STATUS BAR HOST PASS / R54 GTA HUD-OFF MENU DEVICE PASS / R56 DEVICE + INTRO OPEN / STREAMING DEFERRED**.
+Status 2026-09-14: **R58 NO-AFBC HOST PASS / R57 GTA GRACEFUL-BOUND DEVICE PASS + PANFROST FAULT / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
