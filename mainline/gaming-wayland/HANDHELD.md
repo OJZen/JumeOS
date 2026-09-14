@@ -306,6 +306,16 @@ real Qt/router/SDL desktop checks passed, including composed HUD and panel pixel
 Evidence is `mainline/out/.cache/r46h-hud-mask-r55-host-20260914/`. This is host
 proof only; the R46H pacing, colors, controls and thermal gate remain open.
 
+The current host-built no-Moonlight candidate is
+`mainline/out/.cache/r46h-gta-shared-20260914/r55/`, source
+`32ad0bd0db42d953411010ca215a29bdcb095820`. Its 1,727 regular files passed
+independent readback; archive SHA-256 is
+`01a5642a0c7f64abde7997a2991947c2f2eadf8492a664e84d420366c20e998b` and
+manifest SHA-256 is
+`04399813bd4281b0c1e146cde0413f93f3be5a298d50ef6f72df3a8285558b0b`.
+The receipt owns remaining binary and evidence hashes; this package is not
+target-tested.
+
 R36 remains the accepted Moonlight/status comparison. The current target-tested
 no-Moonlight GTA candidate is `mainline/out/.cache/r46h-gta-shared-20260914/r54/`;
 its receipt owns source, shell, engine, archive and manifest hashes. Use its shell

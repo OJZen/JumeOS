@@ -60,8 +60,9 @@ skipped, so content equality remains unverified. See
   but remote confirm did not leave the main menu, so intro/crash proof stays open.
 - R55 clips the resident HUD's transparent UI surface to its fixed top-right
   canvas region while a game is active; opening the panel restores the full UI.
-  Weston Pixman/GL and real Qt/router/SDL host checks passed. R46H performance,
-  colors, controls and thermal behavior remain untested.
+  Weston Pixman/GL, real Qt/router/SDL and the full package build passed; an
+  independent 1,727-file readback passed. R46H performance, colors, controls
+  and thermal behavior remain untested.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
