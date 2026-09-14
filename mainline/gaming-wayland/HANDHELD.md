@@ -322,7 +322,13 @@ forced diagnostic bound, not a reproduced crash. Exact target evidence is
 
 R57 preserves the fast requested-stop path but gives a self-triggered bound five
 seconds for cleanup. Its slow-flush Linux process fixture and real ARM64 Wayland
-ports check pass; R46H graceful-exit and Panfrost cleanup proof remain open.
+ports check pass. Clean source `30c1813422acd14078f40a9e9893f4f46f8dbf08`
+produced `mainline/out/.cache/r46h-gta-shared-20260914/r57/`; its 1,727 files
+passed independent readback with archive SHA-256
+`f0c9e735c8cf52db1d646aa3a94228a24fd798dcb569257db4a2e585ff535693`
+and manifest SHA-256
+`c2e222e2d0f9a16772d1190c0256ca7e0786078b62b4aaefc1ea33a2ad5f3234`.
+R46H graceful-exit and Panfrost cleanup proof remain open.
 
 R36 remains the accepted Moonlight/status comparison. The current target-tested
 no-Moonlight GTA candidate is `mainline/out/.cache/r46h-gta-shared-20260914/r56/`;

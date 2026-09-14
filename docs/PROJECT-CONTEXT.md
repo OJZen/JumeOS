@@ -73,7 +73,8 @@ skipped, so content equality remains unverified. See
 - R57 keeps the one-second shared user-stop deadline but gives a diagnostic's
   self-triggered bound the existing five-second cleanup grace. A Linux fixture
   completed a two-second flush without a forced kill, and the real ARM64 Wayland
-  GTA III/VC/Stardew frontend check passed. R46H cleanup proof remains open.
+  GTA III/VC/Stardew frontend check passed. Its clean no-Moonlight package passed
+  a 1,727-file independent readback. R46H cleanup proof remains open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role

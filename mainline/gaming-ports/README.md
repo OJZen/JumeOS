@@ -621,8 +621,16 @@ without `SIGKILL` and an ignored requested stop is still killed promptly. The re
 ARM64 Wayland ports check then passed GTA III, Vice City and Stardew frontend,
 routed-input, panel and same-desktop recovery with unchanged engine hashes. Host
 evidence is `mainline/out/.cache/r46h-gta-grace-r57-host-20260914.HOhs2f/ports/`.
-This does not prove that the R46H intro exits gracefully or eliminate the teardown
-Panfrost faults; those are the next target gate.
+Clean source `30c1813422acd14078f40a9e9893f4f46f8dbf08` produced the no-Moonlight
+package at `mainline/out/.cache/r46h-gta-shared-20260914/r57/`: archive SHA-256
+`f0c9e735c8cf52db1d646aa3a94228a24fd798dcb569257db4a2e585ff535693`,
+manifest SHA-256
+`c2e222e2d0f9a16772d1190c0256ca7e0786078b62b4aaefc1ea33a2ad5f3234`
+and shell SHA-256
+`c90d918c90e62b1bfd180fdb6eba985bbf508fa3adcef809288726a98a79b7b4`.
+All 1,727 files passed independent readback. This does not prove that the R46H
+intro exits gracefully or eliminate the teardown Panfrost faults; those are the
+next target gate.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
