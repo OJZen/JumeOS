@@ -30,18 +30,18 @@ with tempfile.TemporaryDirectory(prefix='elf-check-', dir=repo / 'mainline/out/.
     (payload / 'short').write_bytes(b'\x7fEL')
     (payload / 'link').symlink_to(executable)
     fake_ldd = """ldd() {
-        [[ $LD_LIBRARY_PATH == /private/libs:/private/libs/weston:/private/libs/libproxy && $LC_ALL == C ]] || return 2
+        [[ $LD_LIBRARY_PATH == /private/ports:/private/libs:/private/libs/weston:/private/libs/libproxy && $LC_ALL == C ]] || return 2
         printf '%s\\0' "$@" > "$CALL_RECORD"
         printf '%s\\n' "$LDD_OUTPUT"
         return "$LDD_STATUS"
     }
     """
     for status, output, rejected in [(0, 'all resolved', False), (0, 'libmissing.so => not found', True), (1, 'invalid ELF', True)]:
-        result = bash(fake_ldd + elf_check, scope=str(root), lib='/private/libs', CALL_RECORD=str(record), LDD_STATUS=str(status), LDD_OUTPUT=output)
+        result = bash(fake_ldd + elf_check, scope=str(root), lib='/private/libs', portlib='/private/ports', CALL_RECORD=str(record), LDD_STATUS=str(status), LDD_OUTPUT=output)
         assert (result.returncode != 0) == rejected, result
         assert set(record.read_bytes().split(b'\0')[:-1]) == {os.fsencode(executable), os.fsencode(library)}
     executable.unlink(); library.unlink(); record.unlink()
-    result = bash(fake_ldd + elf_check, scope=str(root), lib='/private/libs', CALL_RECORD=str(record), LDD_STATUS='0', LDD_OUTPUT='')
+    result = bash(fake_ldd + elf_check, scope=str(root), lib='/private/libs', portlib='/private/ports', CALL_RECORD=str(record), LDD_STATUS='0', LDD_OUTPUT='')
     assert result.returncode != 0 and not record.exists(), 'Empty ELF payload must fail before ldd'
 
 

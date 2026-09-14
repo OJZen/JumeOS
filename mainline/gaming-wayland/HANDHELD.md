@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-14: **R36 STATUS/NEO/CATALOG DEVICE PASS / R49 SHARED GTA OVERLAY CANDIDATE / STREAMING DEFERRED**.
+Status 2026-09-14: **R36 STATUS/NEO/CATALOG DEVICE PASS / R50 SHARED GTA OVERLAY CANDIDATE / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -255,13 +255,15 @@ audio, physical-control, save or relaunch proof.
 
 ## Resume and rebuild
 
-R49 reuses the existing composed game layer, resident performance panel,
+R50 reuses the existing composed game layer, resident performance panel,
 frame-submission telemetry, capture authorization and routed remote gamepad for
 the repaired source-built GTA engines. `build-handheld.sh` now verifies and
 mounts the same explicit hash-bound GTA engine directory used by the direct
 package; the receipt records both engine hashes. This adds no second overlay or
-remote protocol. Its host package and R46H composed-frame/input/performance gate
-remain open until the new candidate is built and run.
+remote protocol. R49 passed its 1,726-file target readback but its preflight
+omitted the already packaged private port library from the diagnostic `ldd`
+search path. R50 fixes only that diagnostic path; its R46H composed-frame,
+input and performance gate remains open until the candidate is built and run.
 
 R36 source `e82aa3874084f3d5edb31dea7b15c38ef1450dc9` on
 `codex/r46h-porthome-r36-candidate` contains R35's battery/charge/Wi-Fi correction

@@ -76,6 +76,7 @@ pgrep -f '(^|/)(retroarch|moonlight(-qt)?|r46h-shell|input-router|weston|seatd|r
 [[ ! -e /run/seatd.sock && ! -L /run/seatd.sock ]]
 [[ -c /dev/dri/card0 && -c /dev/dri/renderD128 ]]
 lib="$scope/usr/lib/aarch64-linux-gnu"
+portlib="$scope/usr/lib/r46h-ports"
 # Inspect headers with Bash builtins; keep one ldd call for the complete closure.
 binaries=()
 while IFS= read -r -d '' binary; do
@@ -84,7 +85,7 @@ while IFS= read -r -d '' binary; do
   [[ $signature != $'\177ELF' ]] || binaries+=("$binary")
 done < <(find "$scope/usr" -type f -print0)
 [[ ${#binaries[@]} -gt 0 ]]
-closure=$(LC_ALL=C LD_LIBRARY_PATH="$lib:$lib/weston:$lib/libproxy" ldd "${binaries[@]}")
+closure=$(LC_ALL=C LD_LIBRARY_PATH="$portlib:$lib:$lib/weston:$lib/libproxy" ldd "${binaries[@]}")
 [[ $closure != *'not found'* ]] || { printf '%s\n' "$closure" >&2; exit 1; }
 if [[ -f $scope/usr/share/r46h/ports/manager.py ]]; then
   /usr/bin/setpriv --reuid=ark --regid=ark --init-groups -- /usr/bin/env -u LD_LIBRARY_PATH -u PYTHONHOME -u PYTHONPATH \
