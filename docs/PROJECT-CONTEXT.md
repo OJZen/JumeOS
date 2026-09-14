@@ -68,13 +68,19 @@ skipped, so content equality remains unverified. See
   intervals at the same 1008/400 MHz caps. The HUD-on recorder covered only three
   samples from a different intro phase, so it is not a matched comparison. The
   observed disappearance at 121.17 seconds was the diagnostic bound's forced kill,
-  not a reproduced natural crash. Panfrost faults coincided with forced cleanup;
-  graceful termination must be proven before assigning a driver cause.
+  not a reproduced natural crash. That run alone could not separate Panfrost
+  runtime faults from its forced cleanup; R57 resolves that boundary below.
 - R57 keeps the one-second shared user-stop deadline but gives a diagnostic's
-  self-triggered bound the existing five-second cleanup grace. A Linux fixture
-  completed a two-second flush without a forced kill, and the real ARM64 Wayland
-  GTA III/VC/Stardew frontend check passed. Its clean no-Moonlight package passed
-  a 1,727-file independent readback. R46H cleanup proof remains open.
+  self-triggered bound the existing five-second cleanup grace. On R46H, two GTA III
+  bounds ended in 120.97/121.05 seconds with exit 0 and no forced kill, proving the
+  lifecycle fix. Panfrost `DATA_INVALID_FAULT` events occurred while the game was
+  still active, however, so they are a runtime fault rather than a forced-cleanup
+  artifact.
+- A similar roughly 59-second intro window averaged 5.59 submissions/s at
+  1024x768 and 12.32/s at a temporary 640x480. The lower resolution also reached
+  active thermal cooling from a hot start and did not prevent two Panfrost faults;
+  it is evidence for a rendering-cost bottleneck, not an accepted default. The
+  original configuration was hash-restored before poweroff.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -87,10 +93,10 @@ runbooks.
 
 ## Immediate next work
 
-1. Deploy R57 and verify that the GTA diagnostic bound exits without a forced kill
-   or coincident Panfrost fault.
-2. Repeat the same GTA III intro phase with HUD on/off at identical caps, then test
-   one render-resolution hypothesis if pacing remains low.
+1. Isolate the GTA/Panfrost runtime fault with one bounded hypothesis; do not treat
+   the now-proven graceful exit as a graphics fix.
+2. Recheck the 640x480 performance candidate from a cooled start and obtain physical
+   LCD quality acceptance before choosing a product default.
 3. Measure natural intro/gameplay/exit behavior, then recheck shared Vice City.
 4. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
 5. Keep Moonlight paused until requested; keep USB HID as a separate hardware-route gate.

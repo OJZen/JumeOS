@@ -91,12 +91,12 @@ pacing. Natural crash, physical LCD, USB, Moonlight and PSP remain open.
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
   R56 aligned the status row in a device-composed capture; physical LCD remains open.
   Reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope.
-- **Wayland/ports — R54 GTA HUD-OFF MENU PASS / R56 INTRO PACING FAIL / NATURAL CRASH OPEN.**
+- **Wayland/ports — R57 GRACEFUL BOUND PASS / GTA PANFROST RUNTIME FAULT.**
   R48 fixed D-pad Down. At 1008/400 MHz, R54's menu averaged 26.84/s with HUD and
-  30.43/s hidden; R56's HUD-hidden intro averaged only 5.57/s. Its HUD-on samples
-  covered another phase. The 121.17-second disappearance was a forced diagnostic
-  bound, not a reproduced crash; Panfrost faults coincided with cleanup. R56 powered
-  off cleanly. LCD FPS, graceful exit, gameplay/audio/saves, VC and Moonlight are open.
+  30.43/s hidden; R56's HUD-hidden intro averaged only 5.57/s. R57's two GTA III
+  bounds exited 0 without forced kills, but Panfrost faults occurred while active.
+  Temporary 640x480 more than doubled a similar intro window to 12.32/s while hot;
+  it is not a default. Natural gameplay/exit, LCD FPS, audio/saves and VC are open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**

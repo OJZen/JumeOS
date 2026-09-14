@@ -129,10 +129,14 @@ GUI apply waits for these target checks; memory/swap/pressure readout is impleme
    top-right on R46H, but seven HUD-hidden intro samples averaged only 5.57/s
    with 121.24--226.62 ms median intervals. Its three HUD-on samples came from a
    different intro phase and are not a matched comparison. R57 keeps fast requested
-   stops but gives a self-triggered bound five seconds for renderer cleanup; its
-   slow-cleanup fixture and real ARM64 Wayland ports check pass. Verify that boundary
-   on R46H, then compare the same phase and test one render-resolution hypothesis.
-   Keep the accepted toggle and HUD-independent sampler.
+   stops but gives a self-triggered bound five seconds for renderer cleanup. Two
+   R46H GTA III bounds then exited 0 without a forced kill. Similar roughly
+   59-second HUD-on intro windows averaged 5.59 submissions/s at 1024x768 and
+   12.32/s at a temporary 640x480. The lower-resolution run started hot, reached
+   85.384 C with CPU/GPU cooling active and still produced two Panfrost runtime
+   faults, so it is not yet a product default. Isolate that fault, then repeat the
+   resolution candidate from a cooled start with physical LCD acceptance. Keep the
+   accepted toggle and HUD-independent sampler.
    The user-set external abort remains 85 C, not a kernel thermal-trip change.
    The two-second health sampler warns near voltage/thermal limits and blocks
    unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,

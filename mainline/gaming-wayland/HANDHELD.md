@@ -328,7 +328,21 @@ passed independent readback with archive SHA-256
 `f0c9e735c8cf52db1d646aa3a94228a24fd798dcb569257db4a2e585ff535693`
 and manifest SHA-256
 `c2e222e2d0f9a16772d1190c0256ca7e0786078b62b4aaefc1ea33a2ad5f3234`.
-R46H graceful-exit and Panfrost cleanup proof remain open.
+
+On R46H, the 1024x768 and temporary 640x480 GTA III runs reached their
+120.97/121.05-second diagnostic bounds, exited 0 and reported `forcedKill=false`.
+The lifecycle fix therefore passes. One 1024x768 and two 640x480 Panfrost
+`DATA_INVALID_FAULT` events happened before those exits while game submissions
+continued, disproving the earlier teardown-only hypothesis. In similar roughly
+59-second HUD-on intro windows, 1024x768 averaged 5.59 submissions/s with a
+161.88 ms median interval sample; 640x480 averaged 12.32/s with 76.98 ms. The
+second run began hot and reached 85.384 C with CPU/GPU cooling active, so this is
+not a clean thermal comparison or an accepted display default. The exact managed
+configuration hash was restored; services, leases and temporary authorization
+were clean before serial-confirmed poweroff. Exact evidence is
+`mainline/out/.cache/r46h-r57-device-20260914.vAbRL9/session.json`. Moonlight and
+Vice City were not run; LCD motion, audio, physical controls, saves and relaunch
+remain open.
 
 R36 remains the accepted Moonlight/status comparison. The current target-tested
 no-Moonlight GTA candidate is `mainline/out/.cache/r46h-gta-shared-20260914/r56/`;

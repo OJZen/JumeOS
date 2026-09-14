@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-14: **R56 GTA III INTRO PACING FAIL / R57 GRACEFUL BOUND HOST PASS**.
+Status 2026-09-14: **R57 GRACEFUL BOUND DEVICE PASS / GTA III PANFROST RUNTIME FAULT**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -607,8 +607,8 @@ phase and do not support a matched comparison; the slowdown therefore persists
 without the HUD, but its incremental cost in the intro is unresolved. The game
 disappeared at 121.17 seconds with `boundedStop=true` and `forcedKill=true`: the
 diagnostic bound explains this exit and no natural crash was reproduced. Panfrost
-faults coincided with forced session/game cleanup, so graceful bounded termination
-is the next prerequisite before attributing a driver crash. Original content and
+faults coincided with forced session/game cleanup, so that run alone could not
+assign a driver cause. R57 later separates the boundary below. Original content and
 the GTA configuration stayed unchanged, managed saves stayed empty, limits/state/
 services recovered, and serial confirmed poweroff. Exact evidence is
 `mainline/out/.cache/r46h-r56-device-20260914.L7Smy5/session.json`; Vice City and
@@ -629,8 +629,20 @@ manifest SHA-256
 and shell SHA-256
 `c90d918c90e62b1bfd180fdb6eba985bbf508fa3adcef809288726a98a79b7b4`.
 All 1,727 files passed independent readback. This does not prove that the R46H
-intro exits gracefully or eliminate the teardown Panfrost faults; those are the
-next target gate.
+intro exits gracefully or eliminate the Panfrost faults by itself.
+
+The R46H run closes the lifecycle part of that gate: 1024x768 and temporary
+640x480 GTA III instances reached 120.97/121.05 seconds, exited 0 and reported no
+forced kill. A similar roughly 59-second HUD-on intro window improved from 5.59
+to 12.32 submissions/s at 640x480, with median interval samples improving from
+161.88 to 76.98 ms. The candidate still reached 85.384 C from a hot start and
+activated CPU/GPU cooling, so it is not a final quality/performance decision.
+More importantly, one native-resolution and two lower-resolution Panfrost
+`DATA_INVALID_FAULT` events occurred while the game stayed active and continued
+submitting buffers. They are not explained by forced teardown. The original
+configuration was hash-restored before clean serial poweroff. Exact evidence is
+`mainline/out/.cache/r46h-r57-device-20260914.vAbRL9/session.json`; no Moonlight,
+Vice City, physical LCD/audio/control/save or relaunch result is claimed.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
