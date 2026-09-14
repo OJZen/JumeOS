@@ -1,6 +1,6 @@
 # R46H project context
 
-> Current checkpoint: 2026-09-13. Read the
+> Current checkpoint: 2026-09-14. Read the
 > [experiment ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) before
 > hardware work; it owns physical evidence and limitations.
 
@@ -12,8 +12,8 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **off** after the R47 fresh-Ports probe gate. Serial confirmed
-sync, filesystem unmount, loop detach and poweroff. Temporary target services,
+The device is **off** after the R51 shared GTA diagnostic. Serial confirmed
+sync, filesystem unmount, loop detach and `Powering off.` Temporary target
 staging and the one-time public key were removed.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
@@ -35,18 +35,23 @@ skipped, so content equality remains unverified. See
   Wi-Fi signal, temperature, frequency, Neo Geo state persistence, and the
   PortMaster catalog. Physical UI controls, LCD motion, and sustained thermal
   acceptance remain open.
-- R42 source-built GTA III and Vice City used Panfrost OpenGL ES 3.1, reached
-  their target frontends, ran for 120 seconds, and returned to the tools UI.
-  Gameplay, display, audio, controls, saves, and relaunch are not yet accepted.
+- R48's repaired source-built GTA III and Vice City use Panfrost OpenGL ES 3.1.
+  The operator accepted both intro starts and GTA III D-pad Down after the
+  no-`O_NOATIME` and 10% deadzone repair, but reported abnormally slow motion.
 - R43/R44 still failed in SDL/GBM because their wrappers missed the real loader.
   R45 preloads the exact Debian Gallium provider with local symbol scope. Its
   exact 1,630-file package ran Stardew for the full 120.6-second bound, returned
   cleanly and kept the original saves read-only. LCD, audio, physical controls,
   gameplay, save/load and relaunch remain operator-open.
-- A clean R46 target exposed a missing private log directory before its Ports
-  UI could start. R47 fixes that probe-only fresh-`/run` defect; its exact 1,630
-  files rehashed on target, the UI completed its bound, and ES-DE recovered.
-  Stardew import and all operator checks remain unrun.
+- R47 imported the retained Stardew save through the product worker, preserved
+  equal source/copy hashes and refused a second overwrite. Stardew then ran its
+  120-second machine bound; no operator display/audio/gameplay result was given.
+- R51 reuses the shared compositor's existing performance HUD, capture and
+  bounded gamepad RPC. Its 1,726 files and preflight passed on target. A composed
+  GTA III menu measured 25.6 game submissions/s (36.3 ms median, 43.6 ms P95)
+  at the temporary 1008/400 MHz caps, and one remote Down sample completed.
+  The first run reached the 85 C guard; both runs restored ES-DE and all leases.
+  Displayed LCD FPS, GTA gameplay/audio/saves/relaunch and shared Vice City remain open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -59,11 +64,11 @@ runbooks.
 
 ## Immediate next work
 
-1. Run the R47 attended Stardew import, gameplay, audio, controls, save, exit,
-   and relaunch checks.
-2. Batch the matching attended GTA III/Vice City checks where safe.
-3. Keep Moonlight paused until requested.
-4. Investigate a physically reachable USB peripheral route before writing gadget code.
+1. Profile GTA pacing below the 85 C bound, comparing HUD off/on before changing
+   rendering or resolution; the direct stock-frequency run was also reported slow.
+2. Recheck shared Vice City only after the GTA thermal/performance hypothesis is bounded.
+3. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
+4. Keep Moonlight paused until requested; keep USB HID as a separate hardware-route gate.
 
 ## Working rules
 

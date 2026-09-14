@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-14: **R36 STATUS/NEO/CATALOG DEVICE PASS / R51 SHARED GTA OVERLAY CANDIDATE / STREAMING DEFERRED**.
+Status 2026-09-14: **R36 STATUS/NEO/CATALOG DEVICE PASS / R51 SHARED GTA HUD+INPUT DEVICE PASS / PERFORMANCE+THERMAL FAIL / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -265,8 +265,28 @@ omitted the already packaged private port library from the diagnostic `ldd`
 search path. R50 fixed that preflight and passed it on target, but its no-Moonlight
 fallback hid the built-in PortMaster page behind the diagnostic controller.
 R51 keeps that fallback only for sessions without shared ports; it adds no game,
-overlay or remote protocol. Its R46H composed-frame, input and performance gate
-remains open until the candidate is built and run.
+overlay or remote protocol. Source `75c1800d636b138635c589016b7f99e181760ec1`
+produced archive SHA-256
+`d7a1561f93f4c64d3e4825a0c265a624feda7b13fd6447a99d86905088f5d202`
+with manifest SHA-256
+`fe1f4b8c0662581307f75cfd470958549fff963b684014f3ad67df44282e7178`.
+All 1,726 files rehashed on host and target, and target preflight passed.
+
+The R46H composed capture showed the GTA III menu beneath the resident HUD at
+25.596 game submissions/s, 36.281 ms median and 43.572 ms P95 intervals under
+temporary 1008/400 MHz caps. The maintained fresh-frame gate separately measured
+26.572/s. A strict `game-input` Down sample completed for `native.gta3`; completion
+proves the bounded routed sample, not the game's response. The first run reached
+the external 85 C limit and stopped; a cooled second run was stopped immediately
+after input at 84.615 C. Both restored the three product services, device/port
+leases and seat state. Original save hashes were unchanged and managed GTA saves
+remained empty. After restoring 1296/480 MHz limits, serial confirmed filesystem
+unmount, loop detach and `Powering off.` at uptime 35646.117430.
+
+Exact device evidence is
+`mainline/out/.cache/r46h-r47-attended-device-20260913.oxUqYw/session.json`.
+The capture measures compositor submissions, not displayed LCD FPS. GTA gameplay,
+audio, save/relaunch, shared Vice City and Moonlight remain open or deferred.
 
 R36 source `e82aa3874084f3d5edb31dea7b15c38ef1450dc9` on
 `codex/r46h-porthome-r36-candidate` contains R35's battery/charge/Wi-Fi correction
@@ -419,7 +439,8 @@ are refused; the existing target cgroup and ES-DE recovery wrapper remain in use
 
 `handheld-client.sh` defaults to a private diagnostic application list: one separate
 copy of the controller-test UI. A shared ports session instead exposes the existing
-built-in PortMaster page without requiring a packaged Moonlight client. Settings are read-only unless the root supervisor
+built-in PortMaster page without requiring a packaged Moonlight client. Settings
+are read-only unless the root supervisor
 grants the [explicit device lease](../gaming-shell/DEVICE.md#shared-wayland-settings-candidate).
 The game child never inherits that control flag. `check-session.sh` runs these
 actual scripts as `nobody`, with `/dev/uinput` hidden after delegation. It verifies

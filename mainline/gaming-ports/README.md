@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-13: **R42/R45 TARGET AUTOMATION PASS / R47 PORTS INFRA TARGET PASS / ATTENDED OPEN**.
+Status 2026-09-14: **R47 STARDEW IMPORT PASS / R48 GTA START+D-PAD PASS / R51 SHARED HUD+INPUT PASS / PERFORMANCE+THERMAL FAIL**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -525,8 +525,28 @@ and reVC SHA-256
 `233d8b574b666208c31872429fa766bdaa6cb30d930b3739cd0311bf541e1156`;
 their build receipt records runtime patch SHA-256
 `1a9a8ca56459d87936d0df8274031e2e9d803a9aa584d554e3e70d1efe10d92b`.
-The hash-bound isolated workspace check passed. A packaged ARM64 run and target
-gameplay repeat remain required before this candidate is accepted.
+The hash-bound isolated workspace check passed. R48's exact 1,630-file target
+package is `mainline/out/.cache/r46h-gta-runtime-20260913/r48/`, archive SHA-256
+`175f6cb38a7b6783264b6a61020a198bfc59df7cf864686be3cfcf908a523cc6`.
+GTA III held the case-correct `gta3.img`, completed its 121-second bound without
+a forced kill, and the operator accepted D-pad Down plus the intro. Vice City
+also reached its intro. Both were reported abnormally slow; save/load, audio,
+gameplay, normal exit and relaunch remain open.
+
+R51 then packaged the same engines into the existing shared Wayland compositor,
+performance HUD, capture and bounded gamepad endpoint. Source
+`75c1800d636b138635c589016b7f99e181760ec1` produced the 1,726-file archive
+SHA-256 `d7a1561f93f4c64d3e4825a0c265a624feda7b13fd6447a99d86905088f5d202`;
+host and target readback plus target preflight passed. The composed GTA III menu
+reported 25.6 game submissions/s, 36.3 ms median and 43.6 ms P95 intervals at
+temporary 1008/400 MHz caps. A strict remote Down request completed for
+`native.gta3`. The first short run reached the 85 C guard; the second was stopped
+after input at 84.615 C. Services, mounts and leases recovered, original save
+hashes stayed unchanged and both managed GTA save directories stayed empty.
+The device then restored 1296/480 MHz maxima and serial-confirmed poweroff.
+Exact evidence is `mainline/out/.cache/r46h-r47-attended-device-20260913.oxUqYw/session.json`.
+This measures compositor submissions, not displayed LCD FPS; shared Vice City
+and Moonlight were not run.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

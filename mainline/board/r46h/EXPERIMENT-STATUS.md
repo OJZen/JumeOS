@@ -1,6 +1,6 @@
 # R46H experiment status ledger
 
-> Current checkpoint: 2026-09-13. This is the authoritative index of accepted
+> Current checkpoint: 2026-09-14. This is the authoritative index of accepted
 > physical evidence and open hardware gates. Exact commands, hashes and raw
 > receipts stay in the linked owning runbooks.
 
@@ -27,8 +27,8 @@ full target checksum/readback was skipped, so equality remains unverified; see
 P2 v0.7 is the last fully attended fallback; p2 v0.15 is the last accepted
 automated device fallback. The current card's exact p2 v0.17 passed its p2-only
 write, two full readbacks, cold/warm infrastructure and attended dual-stick smoke.
-R45 ran Stardew for 120.6 seconds; R47 passes fresh-`/run` Ports startup and recovery.
-Stardew/GTA attended proof, USB, Moonlight and PSP remain open or deferred.
+R47-R51 passed Stardew import/bound, both GTA intro starts, physical D-pad Down,
+the shared GTA III HUD/frame gate and one remote Down. Performance, thermals, USB, Moonlight and PSP remain open.
 
 ## Capability ledger
 
@@ -92,11 +92,11 @@ Stardew/GTA attended proof, USB, Moonlight and PSP remain open or deferred.
 - **Qt shell — R17 CONTROLS + R35 STATUS BAR DEVICE PASS / FOCUS PACING OPEN.**
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
   reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope; Wi-Fi/swap/suspend remain open.
-- **Wayland/ports — R42 GTA TARGET PASS; R45 STARDEW TARGET PASS; R47 INFRA TARGET PASS / ATTENDED OPEN.**
-  R45's exact package ran Stardew for 120.6
-  seconds. R47 safely imports the retained save in host checks; all 1,630 target
-  files, fresh runtime-state creation, bounded UI return and recovery passed.
-  Device import plus LCD/audio/controls/save/relaunch remain open.
+- **Wayland/ports — R48 GTA START/D-PAD PHYSICAL PASS; R51 SHARED HUD/INPUT
+  DEVICE PASS / PERFORMANCE+THERMAL FAIL.** R47 imported the Stardew save and
+  ran 120 seconds; R48 reached both intros and fixed D-pad Down. R51 rehashed
+  1,726 files, captured GTA III at 25.6 submissions/s and completed remote Down.
+  It hit 85 C and restored services/leases; LCD FPS, gameplay/audio/saves, shared VC and Moonlight remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**
