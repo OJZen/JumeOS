@@ -41,6 +41,7 @@ for package in /native/libopenal1.deb /native/libmpg123.deb /inputs/libopenal-de
   dpkg-deb -x "$package" "$sysroot"
 done
 common=(-DLIBRW_PLATFORM=GL3 -DLIBRW_GL3_GFXLIB=SDL2 -DLIBRW_FORCE_GLES=ON -DCMAKE_BUILD_TYPE=Release
+  -DCMAKE_C_FLAGS=-DMASTER -DCMAKE_CXX_FLAGS=-DMASTER
   -DOPENAL_INCLUDE_DIR="$sysroot/usr/include" -DOPENAL_LIBRARY="$sysroot/usr/lib/aarch64-linux-gnu/libopenal.so"
   -Dmpg123_INCLUDE_DIR="$sysroot/usr/include/aarch64-linux-gnu" -Dmpg123_LIBRARIES="$sysroot/usr/lib/aarch64-linux-gnu/libmpg123.so")
 cmake -S "$re3" -B "$work/build-re3" "${common[@]}" -DRE3_SNES_PAD=ON > /out/re3-configure.log.incoming 2>&1
@@ -49,6 +50,14 @@ cmake -S "$revc" -B "$work/build-revc" "${common[@]}" -DREVC_SNES_PAD=ON > /out/
 cmake --build "$work/build-revc" -j 4 > /out/revc-build.log.incoming 2>&1
 install -m 0755 "$work/build-re3/src/re3" /out/re3.incoming
 install -m 0755 "$work/build-revc/src/reVC" /out/reVC.incoming
+for binary in /out/re3.incoming /out/reVC.incoming; do
+  strings_file="$work/$(basename "$binary").strings"
+  strings "$binary" > "$strings_file"
+  if grep -Fq "Show Timebars" "$strings_file" || grep -Fq "Debug Render" "$strings_file"; then
+    echo "Release GTA binary retained development instrumentation: $binary" >&2
+    exit 1
+  fi
+done
 strip --strip-unneeded /out/re3.incoming /out/reVC.incoming
 mv /out/re3-configure.log.incoming /out/re3-configure.log
 mv /out/re3-build.log.incoming /out/re3-build.log
@@ -56,7 +65,7 @@ mv /out/revc-configure.log.incoming /out/revc-configure.log
 mv /out/revc-build.log.incoming /out/revc-build.log
 mv /out/re3.incoming /out/re3
 mv /out/reVC.incoming /out/reVC
-printf '\''re3_source=ead2747eadbbdbf0e134eea6679364153dd6c4b8\nrevc_source=b9f0b23466ab4db76615cc2c761df9013a838184\nlibrw_source=81c9426cdde73717b04ae4dfc0f6c255f74a3a8a\npatch_sha256=%s\nruntime_patch_sha256=%s\n'\'' "$(sha256sum /librw-context-fallback.patch | cut -d '\'' '\'' -f 1)" "$(sha256sum /r46h-gta-runtime.patch | cut -d '\'' '\'' -f 1)" > /out/BUILD-INFO.incoming
+printf '\''re3_source=ead2747eadbbdbf0e134eea6679364153dd6c4b8\nrevc_source=b9f0b23466ab4db76615cc2c761df9013a838184\nlibrw_source=81c9426cdde73717b04ae4dfc0f6c255f74a3a8a\nbuild_profile=MASTER_RELEASE\npatch_sha256=%s\nruntime_patch_sha256=%s\n'\'' "$(sha256sum /librw-context-fallback.patch | cut -d '\'' '\'' -f 1)" "$(sha256sum /r46h-gta-runtime.patch | cut -d '\'' '\'' -f 1)" > /out/BUILD-INFO.incoming
 (cd /out && sha256sum re3 reVC > SHA256SUMS.incoming)
 mv /out/BUILD-INFO.incoming /out/BUILD-INFO
 mv /out/SHA256SUMS.incoming /out/SHA256SUMS

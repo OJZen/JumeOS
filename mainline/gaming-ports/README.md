@@ -548,6 +548,19 @@ Exact evidence is `mainline/out/.cache/r46h-r47-attended-device-20260913.oxUqYw/
 This measures compositor submissions, not displayed LCD FPS; shared Vice City
 and Moonlight were not run.
 
+## R52 production build candidate
+
+The pinned re3/reVC sources state that released PC builds define `MASTER`, which
+also selects `FINAL`. `CMAKE_BUILD_TYPE=Release` only supplied compiler
+optimization and `NDEBUG`; the R48 binaries still contain `Show Timebars`, frame
+timer and Debug Menu strings. Those development paths run per-frame bookkeeping
+even when their overlay is hidden.
+
+`build-gta-source.sh` now supplies `MASTER` to both pinned engines and rejects an
+artifact retaining the two diagnostic markers. It does not change the 30 FPS
+limit, graphics settings, input, save layout or source game data. A clean ARM64
+build and R46H differential performance run are required before promotion.
+
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
 manifests and fixed identities passed. The final run peaked at 78.461 C under the
