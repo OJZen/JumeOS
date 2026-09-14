@@ -12,8 +12,8 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **off** after the R51 shared GTA diagnostic. Serial confirmed
-sync, filesystem unmount, loop detach and `Powering off.` Temporary target
+The device is **off** after the R54 GTA performance diagnostic. Serial confirmed
+sync, filesystem unmount, loop/MD/DM detach and `Powering off.` Temporary target
 staging and the one-time public key were removed.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
@@ -52,10 +52,12 @@ skipped, so content equality remains unverified. See
   at the temporary 1008/400 MHz caps, and one remote Down sample completed.
   The first run reached the 85 C guard; both runs restored ES-DE and all leases.
   Displayed LCD FPS, GTA gameplay/audio/saves/relaunch and shared Vice City remain open.
-- R54 replaces the GTA development profile with the upstream `MASTER`/`FINAL`
-  production profile. ARM64 software-rendered shared checks loaded the exact
-  R52 engine hashes, captured both main menus, moved Down to Options, overlaid
-  the global panel and returned cleanly. Target performance is not yet measured.
+- R54 replaces the GTA development profile with upstream `MASTER`/`FINAL`.
+  Its 1,727 files and preflight passed on target. At the same 1008/400 MHz caps,
+  GTA III averaged 26.84 submissions/s with the resident HUD and 30.43/s with
+  it hidden; the full-screen transparent HUD is a material compositor cost.
+  The hottest GPU sample was 83.846 C. All runs exited without a forced kill,
+  but remote confirm did not leave the main menu, so intro/crash proof stays open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -68,11 +70,12 @@ runbooks.
 
 ## Immediate next work
 
-1. Compare R54 against the R51 GTA III baseline under the same guarded clocks,
-   using the shared HUD/capture before changing rendering or resolution.
-2. Recheck shared Vice City only after the GTA thermal/performance hypothesis is bounded.
-3. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
-4. Keep Moonlight paused until requested; keep USB HID as a separate hardware-route gate.
+1. Replace or narrow the full-screen game HUD so performance data does not force
+   expensive whole-screen composition; preserve the existing toggle as fallback.
+2. Correctly map remote GTA confirm, then measure the actual intro and crash point.
+3. Recheck shared Vice City after the GTA HUD path is bounded.
+4. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
+5. Keep Moonlight paused until requested; keep USB HID as a separate hardware-route gate.
 
 ## Working rules
 

@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-14: **R47 STARDEW IMPORT PASS / R48 GTA START+D-PAD PASS / R51 SHARED HUD+INPUT PASS / PERFORMANCE+THERMAL FAIL**.
+Status 2026-09-14: **R54 GTA HUD-OFF MENU PACING DEVICE PASS / HUD-ON COST IDENTIFIED / INTRO OPEN**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -579,8 +579,19 @@ the same desktop without a forced kill. Evidence is
 and archive SHA-256
 `1b6627947d0ecdf0853d8b48dca21f15f40e8f5e58ea99bee5ed5f83209f7d92`.
 Its 1,727-file independent readback passed and it contains no Moonlight client.
-This is ARM64 software rendering evidence; an R46H differential performance
-run remains required.
+
+The same 1,727 files and preflight passed on the exact R46H. Under temporary
+1008/400 MHz caps, two 30-second GTA III menu phases averaged 26.84 game
+submissions/s with the full-screen HUD and 30.43/s with it hidden; median interval
+samples improved from 35.84 to 31.85 ms. A second HUD-off sample averaged 30.64/s.
+All engine bounds exited 0 without a forced kill, the hottest GPU sample was
+83.846 C under the 85 C guard, `/roms` stayed read-only and managed GTA saves
+stayed empty. Two bounded remote A inputs completed but identical captures stayed
+on the main menu, so the reported intro slowdown/crash remains untested. State,
+1296/480 MHz limits and the HUD preference were restored before serial-confirmed
+poweroff. Exact evidence is
+`mainline/out/.cache/r46h-r54-device-20260914.goly7P/session.json`. These are
+buffer submissions, not displayed LCD FPS.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

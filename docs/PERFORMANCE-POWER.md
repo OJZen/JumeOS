@@ -123,14 +123,12 @@ GUI apply waits for these target checks; memory/swap/pressure readout is impleme
 
 ## Next implementation order
 
-1. R32's maintained HUD-independent wait and three short samples per phase kept
-   game submissions near 60/s with control, capture, HUD and panel paths. R33's
-   external-stop cleanup passed on device. A later stock-frequency save-menu run
-   reached the 85 C guard; disposable save/load passed after cooldown with temporary
-   1008 MHz CPU / 400 MHz GPU caps, then restored 1296 MHz / 480 MHz. Longer
-   performance and thermal sampling remain open.
-   The user-set external test abort is 85 C, not a kernel thermal-trip change.
-   Retain the accepted remote/device controls and improve measured focus pacing.
+1. R54 measured the GTA III menu under identical 1008 MHz CPU / 400 MHz GPU
+   caps: 26.84 game submissions/s with the full-screen transparent HUD and
+   30.43/s with it hidden. Median interval samples improved from 35.84 to
+   31.85 ms. Replace or narrow that overlay before treating it as an always-on
+   product feature; keep the accepted toggle and HUD-independent sampler.
+   The user-set external abort remains 85 C, not a kernel thermal-trip change.
    The two-second health sampler warns near voltage/thermal limits and blocks
    unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,
    charge completion and suspend/resume remain open; supply alone is not net charging.

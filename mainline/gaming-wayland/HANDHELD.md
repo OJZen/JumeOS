@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-14: **R36 STATUS/NEO/CATALOG DEVICE PASS / R51 SHARED GTA HUD+INPUT DEVICE PASS / PERFORMANCE+THERMAL FAIL / STREAMING DEFERRED**.
+Status 2026-09-14: **R54 GTA HUD-OFF MENU PACING DEVICE PASS / FULL-SCREEN HUD COST IDENTIFIED / INTRO OPEN / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -288,17 +288,21 @@ Exact device evidence is
 The capture measures compositor submissions, not displayed LCD FPS. GTA gameplay,
 audio, save/relaunch, shared Vice City and Moonlight remain open or deferred.
 
-R36 source `e82aa3874084f3d5edb31dea7b15c38ef1450dc9` on
-`codex/r46h-porthome-r36-candidate` contains R35's battery/charge/Wi-Fi correction
-and the PortMaster HOME isolation. It reads battery sysfs and NetworkManager's
-cached active-AP signal with `--rescan no`, starting no scan or service.
+R54 source `8923172a3f50cfc37ccce5d8bcee503c6f1b6598` switches both GTA engines to
+upstream `MASTER`/`FINAL`. Its target manifest and preflight passed. At identical
+1008/400 MHz caps, the GTA III menu averaged 26.84 submissions/s with the
+full-screen transparent HUD and 30.43/s hidden; interval medians improved from
+35.84 to 31.85 ms. A second HUD-off sample averaged 30.64/s. GPU temperature
+peaked at 83.846 C without crossing the 85 C guard. All engine bounds exited 0,
+but two completed remote A requests left identical main-menu captures, so no intro
+or crash result is inferred. Exact evidence is
+`mainline/out/.cache/r46h-r54-device-20260914.goly7P/session.json`.
 
-Current accepted candidate: `mainline/out/.cache/r46h-compositor-20260910/r36/`.
-Read `receipt.json` for source, shell ELF, Moonlight, archive and manifest hashes;
-`readback.json` verifies all 1,726 manifest files. Use the shell hash for SSH
-`--expect-binary`, and the manifest hash for the target probe. The separate
-device `session.json` above owns later physical results; frozen host receipts
-and older failed timing scripts keep their original status.
+R36 remains the accepted Moonlight/status comparison. The current target-tested
+no-Moonlight GTA candidate is `mainline/out/.cache/r46h-gta-shared-20260914/r54/`;
+its receipt owns source, shell, engine, archive and manifest hashes. Use its shell
+hash for SSH `--expect-binary` and manifest hash for the target probe. The R54
+device `session.json` above owns physical results and limitations.
 
 The retained GTA diagnostic is `mainline/out/.cache/r46h-compositor-20260910/r39/`,
 source `286fcdfcf7643c43f19b1272beefd136e09cc08f` on

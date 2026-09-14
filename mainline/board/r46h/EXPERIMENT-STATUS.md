@@ -27,8 +27,8 @@ full target checksum/readback was skipped, so equality remains unverified; see
 P2 v0.7 is the last fully attended fallback; p2 v0.15 is the last accepted
 automated device fallback. The current card's exact p2 v0.17 passed its p2-only
 write, two full readbacks, cold/warm infrastructure and attended dual-stick smoke.
-R47-R51 passed Stardew import/bound, both GTA intro starts, physical D-pad Down,
-the shared GTA III HUD/frame gate and one remote Down. Performance, thermals, USB, Moonlight and PSP remain open.
+R47-R54 passed Stardew import/bound, R48 GTA intro starts/D-pad Down and the R54
+GTA III menu at the 30 FPS limit with HUD hidden. R54 intro/crash, USB, Moonlight and PSP remain open.
 
 ## Capability ledger
 
@@ -92,11 +92,11 @@ the shared GTA III HUD/frame gate and one remote Down. Performance, thermals, US
 - **Qt shell — R17 CONTROLS + R35 STATUS BAR DEVICE PASS / FOCUS PACING OPEN.**
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
   reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope; Wi-Fi/swap/suspend remain open.
-- **Wayland/ports — R48 GTA START/D-PAD PHYSICAL PASS; R51 SHARED HUD/INPUT
-  DEVICE PASS / PERFORMANCE+THERMAL FAIL.** R47 imported the Stardew save and
-  ran 120 seconds; R48 fixed D-pad Down; R51 measured 25.6 submissions/s, remote
-  Down and 85 C. R54's production GTA passes both host menus only; LCD FPS,
-  gameplay/audio/saves, shared VC and Moonlight remain open.
+- **Wayland/ports — R54 GTA HUD-OFF MENU DEVICE PASS / HUD-ON PACING FAIL / INTRO OPEN.**
+  R48 fixed D-pad Down; R51 measured 25.6 submissions/s and reached 85 C. At
+  1008/400 MHz R54 averaged 26.84/s with HUD, 30.43/s hidden and peaked at 83.846 C.
+  It restored all state and powered off; LCD FPS, intro/crash, gameplay/audio/saves,
+  shared VC and Moonlight remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**
