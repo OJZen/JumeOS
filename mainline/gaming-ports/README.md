@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-15: **R58 NO-AFBC TWO-RUN R46H FAULT-FREE MACHINE PASS / PACING + ATTENDED OPEN**.
+Status 2026-09-15: **R58 MATCHED GTA III/VC FAULT-FREE MACHINE PASS / PACING + ATTENDED OPEN**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -671,6 +671,20 @@ cleanup and serial poweroff passed. Exact evidence is
 two-run fault-suppression candidate result, not a completed fix or physical LCD
 FPS proof. Vice City, audio, physical controls, saves and relaunch remain open;
 Moonlight was not run.
+
+A same-boot R58 follow-up then supplied the missing phase match and Vice City
+machine pass. Bounded remote South/B presses opened New Game and started both
+intros. At 1008/400 MHz, GTA III's menu/cutscene measured 28.66/3.17 submissions/s
+(313.48 ms intro P95), while Vice City's measured 27.70/4.17/s (247.58 ms P95).
+Their 120.82/121.17-second bounded runs exited 0 without forced kills; a second
+49.81-second GTA III run was cleanly requested to stop by the outer preview bound.
+The whole boot again logged zero Panfrost data/GPU faults and ext4 errors. One
+earlier preview ended on a routed-controller disconnect before any game result,
+so it is retained as an infrastructure interruption, not a crash. Cleanup and
+serial poweroff passed. Exact evidence is
+`mainline/out/.cache/r46h-r58-matched-device-20260915.QUE1fH/session.json`.
+This confirms the intro pacing defect independently of R58's fault suppression;
+physical buttons, LCD motion, audio, gameplay, saves and relaunch remain open.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

@@ -135,11 +135,14 @@ GUI apply waits for these target checks; memory/swap/pressure readout is impleme
    12.32/s at a temporary 640x480. The lower-resolution run started hot, reached
    85.384 C with CPU/GPU cooling active and still produced two Panfrost runtime
    faults, so it is not yet a product default. With R58's GTA-only no-AFBC setting,
-   two target runs exited 0 without forced kills and the boot logged zero Panfrost
-   data/GPU faults. A fresh intro capture still measured 3.21 submissions/s; a later
-   27-sample active window averaged 29.51/s with 33.11 ms median intervals, but no
-   matching capture identifies its visual phase. Repeat a synchronized cooled scene,
-   then retry the resolution candidate with physical LCD acceptance. Keep the accepted toggle and HUD-independent sampler.
+   the first two-run boot and a later mixed-game boot logged zero Panfrost data/GPU
+   faults. The later run matched the visual phases: at 1008/400 MHz GTA III fell
+   from 28.66 submissions/s in its menu to 3.17/s in the car cutscene, and Vice City
+   fell from 27.70/s to 4.17/s in its intro. P95 intervals reached 313.48/247.58 ms
+   without thermal cooling. This confirms a phase-specific rendering stall, not a
+   menu-wide cap or a fault-driven exit. Profile that path before retrying the
+   resolution candidate; keep `noafbc` as the fault fallback and retain the
+   HUD-independent sampler.
    The user-set external abort remains 85 C, not a kernel thermal-trip change.
    The two-second health sampler warns near voltage/thermal limits and blocks
    unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,

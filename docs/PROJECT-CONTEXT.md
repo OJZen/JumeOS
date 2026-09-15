@@ -81,13 +81,16 @@ skipped, so content equality remains unverified. See
   active thermal cooling from a hot start and did not prevent two Panfrost faults;
   it is evidence for a rendering-cost bottleneck, not an accepted default. The
   original configuration was hash-restored before poweroff.
-- R58 sets Panfrost `noafbc` only for GTA III and Vice City. On one cold boot,
-  GTA III stopped cleanly after a 60.68-second requested run and a 120.38-second
-  bound; the boot then contained zero `DATA_INVALID`/GPU faults, versus R57's
-  active-game faults. One fresh intro capture still measured only 3.21 submissions/s.
-  A later 27-sample game-active window averaged 29.51/s, but lacks a matching
-  visual phase and is not a direct pacing comparison. This is a bounded candidate
-  pass, not a completed driver fix; Vice City and attended acceptance remain open.
+- R58 sets Panfrost `noafbc` only for GTA III and Vice City. A same-boot follow-up
+  drove each game's Switch-layout South/B path through menu, New Game and a fresh
+  intro capture at 1008/400 MHz. GTA III fell from 28.66/s at its menu to 3.17/s
+  in the car cutscene; Vice City fell from 27.70/s to 4.17/s. Their 120.82/121.17
+  second bounded runs and GTA III's later 49.81-second requested stop all exited 0
+  without a forced kill. The whole boot again logged zero `DATA_INVALID`/GPU faults.
+  One earlier preview ended on a routed-controller disconnect before producing a
+  game result and is not counted as a crash. R58 now has matched machine evidence
+  that fault suppression holds while the intro pacing defect remains. Physical
+  controls, LCD motion, audio, gameplay, saves and relaunch remain open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -100,11 +103,12 @@ runbooks.
 
 ## Immediate next work
 
-1. Repeat R58 from a cooled start with a synchronized, deterministic intro/gameplay
-   checkpoint; require both fresh frames and a fault-free kernel log before promotion.
-2. Recheck the 640x480 performance candidate from a cooled start and obtain physical
-   LCD quality acceptance before choosing a product default.
-3. Measure natural intro/gameplay/exit behavior, then recheck shared Vice City.
+1. Profile the shared GTA intro path without changing R58's accepted `noafbc` fault
+   fallback; isolate the large submission stalls before building another device candidate.
+2. Recheck the 640x480 candidate only after that diagnosis, from a cooled start,
+   and obtain physical LCD quality acceptance before choosing a product default.
+3. Batch attended GTA III/Vice City LCD, audio, physical-control, gameplay,
+   save/exit/relaunch checks once the next performance candidate is ready.
 4. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
 5. Keep Moonlight paused until requested; keep USB HID as a separate hardware-route gate.
 

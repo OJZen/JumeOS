@@ -64,10 +64,12 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
   save import occurred. R57 later proved two graceful GTA III bounds without a
   forced kill, but also captured Panfrost faults during active gameplay. A temporary
   640x480 run more than doubled intro submissions while reaching thermal cooling;
-  it is not yet an accepted default. R58's GTA-only no-AFBC package then completed
-  two target runs without a forced kill or any boot-time Panfrost fault. One fresh
-  intro capture remained slow, and a later faster window lacks a matched visual
-  phase; attended gameplay/audio/controls/save/relaunch remain open.
+  it is not yet an accepted default. R58's GTA-only no-AFBC package has now passed
+  two fault-free boots. In the later mixed-game run, matched captures fell from
+  28.66/27.70 submissions/s in the GTA III/Vice City menus to 3.17/4.17/s in their
+  intros. Both bounded runs exited 0 without forced kills. Fault suppression is a
+  machine candidate pass; the pacing defect and attended gameplay/audio/controls/
+  save/relaunch remain open.
   The separate SA Android-loader/direct-evdev findings do not establish a working
   target port.
 - **U1:** shared controls, headers, icons, font/spacing/motion rules and frame
@@ -88,9 +90,9 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
 
 ## Delivery sequence
 
-1. Repeat a synchronized R58 GTA III scene, then test Vice City for gameplay,
-   LCD/audio/controls and save/exit/relaunch; finish Stardew acceptance separately
-   and keep every save generation isolated.
+1. Diagnose the matched R58 GTA III/Vice City intro stalls, then batch the next
+   candidate's LCD/audio/physical-control/gameplay/save/exit/relaunch acceptance;
+   finish Stardew separately and keep every save generation isolated.
 2. Keep Moonlight paused until the user resumes it; its prepared Linux host,
    controller-test program and accepted v3 fallback remain available.
 3. Keep SA's loader/input adaptation

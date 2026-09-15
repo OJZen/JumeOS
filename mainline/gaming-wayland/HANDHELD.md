@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-15: **R58 NO-AFBC TWO-RUN R46H FAULT-FREE MACHINE PASS / PACING + ATTENDED OPEN / STREAMING DEFERRED**.
+Status 2026-09-15: **R58 MATCHED GTA III/VC FAULT-FREE MACHINE PASS / PACING + ATTENDED OPEN / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -364,10 +364,24 @@ reported exit 0 and no forced kill. The whole cold boot logged zero Panfrost
 as a direct pacing improvement. Temperature peaked at 78.846 C without cooling.
 State, services and 1296/480 MHz limits recovered; temporary staging and access
 were removed, and serial confirmed `Powering off.` Exact device evidence is
-`mainline/out/.cache/r46h-r58-device-20260914.nA6gGX/session.json`. This closes
-only the bounded two-run fault candidate; matched-scene repetition, LCD motion,
-audio, physical controls, saves, relaunch and Vice City remain open. Moonlight
-was not run.
+`mainline/out/.cache/r46h-r58-device-20260914.nA6gGX/session.json`. This first
+boot closes the bounded two-run fault candidate but did not phase-match its faster
+window or run Vice City.
+
+A same-boot follow-up drove both GTA III and Vice City from menu through two
+completed remote South/B samples into fresh cutscenes at 1008/400 MHz. GTA III
+fell from 28.66 submissions/s at the menu to 3.17/s in the car scene, with a
+313.48 ms P95 interval; Vice City fell from 27.70/s to 4.17/s, with 247.58 ms
+P95. Their 120.82/121.17-second bounded runs exited 0 without forced kills, and
+a second 49.81-second GTA III run stopped cleanly when the outer preview expired.
+One earlier preview logged `INPUT_ROUTER_ERROR: controller disconnected` before
+any game result; it was retried and is not classified as a game crash. The whole
+mixed-game boot again logged zero Panfrost data/GPU faults. Services and frequency
+limits recovered, staging/access were removed and serial poweroff passed. Exact
+evidence is `mainline/out/.cache/r46h-r58-matched-device-20260915.QUE1fH/session.json`.
+R58 now separates the intro pacing defect from the fault suppression result;
+physical controls, LCD motion, audio, gameplay, saves and relaunch remain open.
+Moonlight was not run.
 
 The retained GTA diagnostic is `mainline/out/.cache/r46h-compositor-20260910/r39/`,
 source `286fcdfcf7643c43f19b1272beefd136e09cc08f` on

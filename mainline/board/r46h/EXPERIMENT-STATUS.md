@@ -25,8 +25,8 @@ full target checksum/readback was skipped, so equality remains unverified; see
 [P3 Content Migration](../../../docs/P3-CONTENT-MIGRATION.md).
 
 Fallbacks are p2 v0.7 attended and v0.15 automated; current v0.17 passed readbacks, cold/warm infra and stick smoke.
-R58 suppressed R57's GTA III Panfrost faults across two bounded runs on one boot,
-but one fresh intro frame stayed slow. Physical LCD, USB, Moonlight and PSP remain open.
+R58 has two fault-free boots; a matched second boot drove GTA III and Vice City
+from about 28/s menus to 3.17/4.17/s intros. LCD, USB, Moonlight and PSP remain open.
 
 ## Capability ledger
 
@@ -91,12 +91,12 @@ but one fresh intro frame stayed slow. Physical LCD, USB, Moonlight and PSP rema
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
   R56 aligned the status row in a device-composed capture; physical LCD remains open.
   Reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope.
-- **Wayland/ports — R58 NO-AFBC TWO-RUN MACHINE PASS / ATTENDED OPEN.**
+- **Wayland/ports — R58 MATCHED GTA/VC MACHINE PASS / ATTENDED OPEN.**
   R48 fixed D-pad Down. At 1008/400 MHz, R54's menu averaged 26.84/s with HUD and
   30.43/s hidden; R56's HUD-hidden intro averaged 5.57/s. R57 proved graceful
-  bounds but faulted while active. R58's two GTA III runs exited 0 without forced
-  kills and the boot logged zero GPU faults; a fresh intro frame was still 3.21/s.
-  One later 29.51/s window lacks a matched visual phase. LCD/audio/saves and VC are open.
+  bounds but faulted while active. R58's GTA III/VC bounded runs exited 0 without
+  forced kills; matched menu/intro captures fell from 28.66/27.70 to 3.17/4.17/s,
+  while the second fault-free boot kept zero GPU faults. LCD/audio/physical controls/saves are open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**
