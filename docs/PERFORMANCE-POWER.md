@@ -166,10 +166,12 @@ GUI apply waits for these target checks; memory/swap/pressure readout is impleme
    exited 0 below 81 C without cooling or a new Panfrost fault; the original-Mesa
    GTA III control added one `DATA_INVALID_FAULT`. A Gallium-only trial failed at
    the frontend ABI boundary, so R60 packages the complete private closure and
-   leaves Debian's system Mesa unchanged. Formal package and exact-target proof
-   remain the next gate. If that passes, the remaining no-fidelity software
-   controls tested here are exhausted; sustained clocks require better cooling,
-   while sub-640 rendering or engine changes trade image quality or compatibility.
+   leaves Debian's system Mesa unchanged. Clean source `495c35232176f0c6ca39a93fd6ab4ac1f02e70bd`
+   produced the 1,741-file R60 package; host checks, target preflight and actual
+   Mesa 26 process maps passed. GTA III reached a captured intro and its 121.15-second
+   bound at exit 0 without a new fault. The remaining no-fidelity software controls
+   tested here are exhausted; sustained clocks require better cooling, while
+   sub-640 rendering or engine changes trade image quality or compatibility.
    The two-second health sampler warns near voltage/thermal limits and blocks
    unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,
    charge completion and suspend/resume remain open; supply alone is not net

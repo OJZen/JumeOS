@@ -751,9 +751,20 @@ GPU fault, so that partial ABI replacement is rejected.
 
 The retained integration packages the complete closure only inside the shared
 Wayland session. It does not overwrite Debian libraries or affect ES-DE. These
-rates are compositor submissions rather than physical LCD FPS; formal R60 host
-and exact-target verification, LCD motion, audio, controls, gameplay, saves and
-relaunch remain open.
+rates are compositor submissions rather than physical LCD FPS.
+
+Clean source `495c35232176f0c6ca39a93fd6ab4ac1f02e70bd` produced the formal
+1,741-file no-Moonlight R60 package. Archive, manifest and private Mesa SHA-256
+values are `0a0861bb2d4713f79cf198a50f8fed9cf37b9a174a7c3df9fb510fc90aaf20b3`,
+`ebb732de7ee71d830f2603667eabb421f969fc01b9df0cf03197814822bf8168` and
+`307c4ad9af58217a5f58ca936cf36984edff8efa43a857bd062e185b56a162f3`.
+Full host checks and exact-target preflight passed. Weston, the shell and re3
+mapped the private Mesa files; GTA III reported `OpenGL ES 3.1 Mesa 26.2.2`,
+rendered a captured intro and reached its 121.15-second bound at exit 0 without
+a forced kill or new GPU fault. The system Mesa hash, services and stock clocks
+were restored; access/staging were removed and the device stayed on. Evidence is
+`mainline/out/.cache/r46h-r60-formal-device-20260915/session.json`. LCD motion,
+audio, physical controls, gameplay, saves and relaunch remain open.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

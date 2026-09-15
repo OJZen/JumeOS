@@ -1,6 +1,6 @@
 # R46H private Mesa runtime
 
-Status 2026-09-15: **MESA 26.2.2 GTA III/VC SAME-BOOT PERFORMANCE PASS / FORMAL PAYLOAD OPEN**.
+Status 2026-09-15: **MESA 26.2.2 GTA III/VC PERFORMANCE + FORMAL TARGET PASS / ATTENDED OPEN**.
 
 This feature pins the Panfrost/softpipe Mesa 26.2.2 EGL, GBM and Gallium ABI
 closure used only by the shared Wayland game session. It does not replace Debian
@@ -25,3 +25,14 @@ the original Mesa GTA III comparison added one `DATA_INVALID_FAULT`. These are
 compositor submissions, not proof of LCD motion, audible output, gameplay or saves.
 A preceding Gallium-only frontend trial segfaulted without a GPU fault, so it is
 rejected; the complete private ABI closure is the smallest supported deployment.
+
+Clean source `495c35232176f0c6ca39a93fd6ab4ac1f02e70bd` produced the formal
+1,741-file package with archive SHA-256
+`0a0861bb2d4713f79cf198a50f8fed9cf37b9a174a7c3df9fb510fc90aaf20b3`.
+Host checks and exact R46H preflight passed. Weston, the shell and GTA III mapped
+the private files; GTA III reported Mesa 26.2.2, rendered a captured intro and
+exited 0 at its 121.15-second bound without a forced kill or new GPU fault. The
+system Mesa, services and stock clocks were restored and temporary access was
+removed. Exact evidence is
+`mainline/out/.cache/r46h-r60-formal-device-20260915/session.json`; physical LCD
+motion, audio, controls, gameplay, saves and relaunch remain open.

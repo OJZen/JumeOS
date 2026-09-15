@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-15: **R60 MESA A/B PASS / FORMAL INTEGRATION + ATTENDED OPEN / STREAMING DEFERRED**.
+Status 2026-09-15: **R60 MESA HOST + TARGET PASS / ATTENDED OPEN / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -363,7 +363,21 @@ Mesa 26.2.2 raised GTA III from 11.00 to 14.36 submissions/s and Vice City from
 or new Panfrost fault; the original-Mesa GTA III control added one
 `DATA_INVALID_FAULT`. A Gallium-only frontend trial segfaulted without a GPU
 fault and is rejected. The formal R60 package installs EGL, GBM and Gallium only
-under the private session root; host build and exact-target integration remain open.
+under the private session root.
+
+Clean source `495c35232176f0c6ca39a93fd6ab4ac1f02e70bd` produced its 1,741-file
+no-Moonlight package at `mainline/out/.cache/r46h-gta-shared-20260915/r60/`.
+Archive/manifest/private-Mesa SHA-256 values are
+`0a0861bb2d4713f79cf198a50f8fed9cf37b9a174a7c3df9fb510fc90aaf20b3`,
+`ebb732de7ee71d830f2603667eabb421f969fc01b9df0cf03197814822bf8168` and
+`307c4ad9af58217a5f58ca936cf36984edff8efa43a857bd062e185b56a162f3`.
+Full ARM64 checks and target preflight passed. Weston, the shell and re3 mapped
+the private runtime; GTA III reported Mesa 26.2.2, rendered a captured intro and
+ended its 121.15-second bound at exit 0 without a forced kill or new GPU fault.
+The system Mesa hash, services and stock clocks were restored; access/staging
+were removed and the device stayed on. Exact evidence is
+`mainline/out/.cache/r46h-r60-formal-device-20260915/session.json`. LCD motion,
+audio, physical controls, gameplay, saves and relaunch remain open.
 
 R58's exact target package and preflight passed. Two GTA III runs ended cleanly
 at 60.68 seconds by requested stop and 120.38 seconds by diagnostic bound; both

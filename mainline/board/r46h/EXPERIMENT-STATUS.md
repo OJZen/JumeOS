@@ -24,8 +24,8 @@ full target checksum/readback was skipped, so equality remains unverified; see
 [P3 Content Migration](../../../docs/P3-CONTENT-MIGRATION.md).
 
 Fallbacks are p2 v0.7 attended and v0.15 automated; current v0.17 passed readbacks, cold/warm infra and stick smoke.
-R58's 640x480 GTA III/VC reached 15.24/14.46/s; R60's private Mesa A/B added 30.6%/16.9%.
-Formal integration, LCD, USB, Moonlight and PSP remain open.
+R58's 640x480 GTA III/VC reached 15.24/14.46/s; R60 private Mesa added 30.6%/16.9% and passed target integration.
+LCD, USB, Moonlight and PSP remain open.
 
 ## Capability ledger
 
@@ -93,10 +93,10 @@ Formal integration, LCD, USB, Moonlight and PSP remain open.
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
   R56 aligned the status row in a device-composed capture; physical LCD remains open.
   Reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope.
-- **Wayland/ports — R60 MESA A/B PASS / FORMAL INTEGRATION + ATTENDED OPEN.**
+- **Wayland/ports — R60 MESA HOST + TARGET PASS / ATTENDED OPEN.**
   R48 fixed D-pad Down; R58's 640x480 runs exited cleanly; R59 passed first-config launch.
-  At 816/300 MHz, [private Mesa](../../gaming-mesa/README.md) raised GTA III/VC from 11.00/14.67 to
-  14.36/17.15/s without a new fault; formal R60 and attended acceptance are open.
+  [Private Mesa](../../gaming-mesa/README.md) raised GTA III/VC from 11.00/14.67 to 14.36/17.15/s.
+  Formal R60 preflight passed; GTA III rendered an intro and exited 0 fault-free. Attended acceptance is open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**
