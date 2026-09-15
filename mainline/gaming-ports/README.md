@@ -721,6 +721,23 @@ the accepted engine/no-AFBC paths remain unchanged. The temporary frequency caps
 are evidence controls, not a new persistent or per-game policy. Physical LCD
 quality, audio, controls, gameplay, saves and relaunch remain open.
 
+Clean source `944b753208d7073527ebf27b0309e5038c1b4941` produced the R59
+no-Moonlight package at `mainline/out/.cache/r46h-gta-shared-20260915/r59/`.
+Its 1,727 files passed independent verification; archive SHA-256 is
+`b6b02e33439d8472a4a0854faefdf1f910c083c9bbf6cce5c23efbed0ce8de23`,
+manifest SHA-256 is
+`172e7c9cf41816dd6f250b1dca1239bb94a5db79f54ea4a53391ae89da68cbeb`
+and shell SHA-256 is
+`650b4d9ee97f46d9fc89a3f5dc2859841587745bff99e2afcf36b4062a97adfc`.
+On the exact R46H, package readback/preflight passed and a fresh state generated
+GTA III config SHA-256
+`9caf644193bc42844112a86cfc8ed0bce11a721e0693efb23542528744020d29`
+at 640x480. The unchanged engine reached a real game frame and exited 0 without a
+forced kill. The original preview state, 1296/480 MHz limits and ES-DE were restored;
+staging/access were removed and the device stayed on. Exact evidence is the R59
+directory above and
+`mainline/out/.cache/r46h-r59-resolution-device-20260915.0uJai5/session.json`.
+
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
 manifests and fixed identities passed. The final run peaked at 78.461 C under the

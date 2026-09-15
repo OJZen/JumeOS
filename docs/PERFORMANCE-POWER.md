@@ -157,7 +157,9 @@ GUI apply waits for these target checks; memory/swap/pressure readout is impleme
    supported video mode. The implementation therefore seeds 640x480 only for a
    first managed GTA config and preserves later preferences; no speculative engine
    patch or per-game frequency framework was added. Physical LCD quality and a
-   product frequency policy remain separate gates. The two-second health sampler
+   product frequency policy remain separate gates. R59's 1,727-file host package
+   and exact target preflight passed; a fresh target state generated the expected
+   640x480 GTA III config and reached game submissions before a clean exit. The two-second health sampler
    warns near voltage/thermal limits and blocks unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,
    charge completion and suspend/resume remain open; supply alone is not net charging.
 2. Verify new/saved-Wi-Fi authorization, password privacy, persistence and reconnect;

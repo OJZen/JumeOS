@@ -105,6 +105,12 @@ skipped, so content equality remains unverified. See
   unsupported and exited cleanly. The next candidate seeds 640x480 only when a
   managed GTA configuration is first created; it does not overwrite an existing
   preference. Physical LCD quality remains open.
+- Clean source `944b753208d7073527ebf27b0309e5038c1b4941` produced the R59
+  no-Moonlight ARM64 package; all 1,727 files passed independent verification.
+  Exact target preflight and a fresh-state GTA III launch passed: R59 generated
+  the expected 640x480 config, reached real game submissions and exited 0 without
+  a forced kill. The prior state, ES-DE and stock 1296/480 MHz limits were restored;
+  temporary staging/access were removed and the device remains on as requested.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -117,12 +123,10 @@ runbooks.
 
 ## Immediate next work
 
-1. Freeze and host-check the first-managed-config 640x480 GTA candidate, then
-   verify one fresh-state target launch without changing the accepted engines.
-2. Batch attended GTA III/Vice City LCD, audio, physical-control, gameplay,
-   save/exit/relaunch checks once the next performance candidate is ready.
-3. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
-4. Keep Moonlight paused until requested; keep USB HID as a separate hardware-route gate.
+1. Batch attended R59 GTA III/Vice City LCD quality, audio, physical-control,
+   gameplay, save/exit/relaunch checks; decide a product frequency policy separately.
+2. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
+3. Keep Moonlight paused until requested; keep USB HID as a separate hardware-route gate.
 
 ## Working rules
 

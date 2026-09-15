@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-15: **R58 MATCHED GTA III/VC FAULT-FREE MACHINE PASS / PACING + ATTENDED OPEN / STREAMING DEFERRED**.
+Status 2026-09-15: **R59 FIRST-CONFIG + R58 GTA III/VC MACHINE PASS / ATTENDED OPEN / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -345,15 +345,16 @@ Vice City were not run; LCD motion, audio, physical controls, saves and relaunch
 remain open.
 
 R36 remains the accepted Moonlight/status comparison. The current no-Moonlight
-GTA candidate is R58 at
-`mainline/out/.cache/r46h-gta-shared-20260914/r58/`, source
-`b5e63c1cbebe00526ca134952977f9954a8e768f`. Its full ARM64 checks and 1,727-file
-readback passed; archive SHA-256 is
-`218e227b9853e3ff046c0afc727c37cee973b2ef04b3b4482f5477d6642bfb76`,
-manifest SHA-256 is
-`c3ddc421b11350d1fe67b21ff4cf988dd4438eccad0e0efa479ab326e4969099`
-and shell SHA-256 is
-`926f91926f4e5d32117a1ae268d28c4b68b47427793fefdb908145f21a8c3cfd`.
+GTA candidate is R59 at
+`mainline/out/.cache/r46h-gta-shared-20260915/r59/`, source
+`944b753208d7073527ebf27b0309e5038c1b4941`. Its full ARM64 checks and 1,727-file
+readback passed; archive/manifest/shell SHA-256 values are
+`b6b02e33439d8472a4a0854faefdf1f910c083c9bbf6cce5c23efbed0ce8de23`,
+`172e7c9cf41816dd6f250b1dca1239bb94a5db79f54ea4a53391ae89da68cbeb` and
+`650b4d9ee97f46d9fc89a3f5dc2859841587745bff99e2afcf36b4062a97adfc`.
+Exact target preflight and a fresh-state GTA III launch passed: R59 generated a
+640x480 managed config, reached real game submissions and exited 0 without a
+forced kill. State, stock limits and ES-DE were restored and the device stayed on.
 
 R58's exact target package and preflight passed. Two GTA III runs ended cleanly
 at 60.68 seconds by requested stop and 120.38 seconds by diagnostic bound; both
