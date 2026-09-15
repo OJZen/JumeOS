@@ -148,8 +148,17 @@ GUI apply waits for these target checks; memory/swap/pressure readout is impleme
    1024x768/640x480 A/B with transition and settled-cutscene windows separated;
    keep `noafbc` as the fault fallback and retain the HUD-independent sampler.
    The user-set external abort remains 85 C, not a kernel thermal-trip change.
-   The two-second health sampler warns near voltage/thermal limits and blocks
-   unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,
+   A cooled R58 follow-up completed that A/B. At 640x480 with temporary 1008/400
+   MHz caps, Vice City reached 14.53--19.67/s and GTA III reached 10.75--23.00/s
+   in observed intro phases; the latter touched the 85 C abort. Reducing only the
+   temporary caps to 816/300 MHz kept GTA III/Vice City 20-second intro windows
+   at 15.24/14.46/s averages, 76.538/77.692 C maxima and zero cooling state. Both
+   121-second bounds exited 0 without forced kills. A 512x384 request was not a
+   supported video mode. The implementation therefore seeds 640x480 only for a
+   first managed GTA config and preserves later preferences; no speculative engine
+   patch or per-game frequency framework was added. Physical LCD quality and a
+   product frequency policy remain separate gates. The two-second health sampler
+   warns near voltage/thermal limits and blocks unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,
    charge completion and suspend/resume remain open; supply alone is not net charging.
 2. Verify new/saved-Wi-Fi authorization, password privacy, persistence and reconnect;
    add a shared volume writer after confirming target service capabilities.

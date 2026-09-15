@@ -11,8 +11,7 @@
 - **REVOKED**: old evidence cannot authorize later work.
 - **OPEN**: the stated acceptance contract has not passed.
 
-Host artifact, media write/readback and physical R46H evidence are distinct; each row names its level.
-Operator audio/display/control observations are not implied by a machine exit code.
+Host/media/physical evidence are distinct; machine exits do not imply operator audio/display/control observations.
 
 ## Current accepted first version and next gate
 
@@ -25,8 +24,8 @@ full target checksum/readback was skipped, so equality remains unverified; see
 [P3 Content Migration](../../../docs/P3-CONTENT-MIGRATION.md).
 
 Fallbacks are p2 v0.7 attended and v0.15 automated; current v0.17 passed readbacks, cold/warm infra and stick smoke.
-R58 has two fault-free boots; a matched second boot drove GTA III and Vice City
-from about 28/s menus to 3.17/4.17/s intros. LCD, USB, Moonlight and PSP remain open.
+R58 has two fault-free boots; GTA III/VC intros rose from 3.17/4.17/s at 1024x768 to 15.24/14.46/s at 640x480.
+LCD, USB, Moonlight and PSP remain open.
 
 ## Capability ledger
 
@@ -92,11 +91,12 @@ from about 28/s menus to 3.17/4.17/s intros. LCD, USB, Moonlight and PSP remain 
   R56 aligned the status row in a device-composed capture; physical LCD remains open.
   Reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope.
 - **Wayland/ports — R58 MATCHED GTA/VC MACHINE PASS / ATTENDED OPEN.**
-  R48 fixed D-pad Down. At 1008/400 MHz, R54's menu averaged 26.84/s with HUD and
-  30.43/s hidden; R56's HUD-hidden intro averaged 5.57/s. R57 proved graceful
-  bounds but faulted while active. R58's GTA III/VC bounded runs exited 0 without
-  forced kills; matched menu/intro captures fell from 28.66/27.70 to 3.17/4.17/s,
-  while the second fault-free boot kept zero GPU faults. LCD/audio/physical controls/saves are open.
+  R48 fixed D-pad Down; R58's fault-free matched GTA III/VC run fell from
+  28.66/27.70/s menus to 3.17/4.17/s intros at 1024x768 and 1008/400 MHz.
+  Cooled 640x480 at temporary 816/300 MHz averaged 15.24/14.46/s, peaked at
+  76.538/77.692 C without cooling, and ended both 121-second bounds at exit 0
+  without forced kills. This supports a first-config 640x480 candidate, not LCD
+  quality or a permanent clock policy; audio/physical controls/saves remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**

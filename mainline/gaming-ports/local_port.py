@@ -29,6 +29,8 @@ SOURCE_PROFILES = {
     'gtavc': ('reVC', 'd19bbe5b90648e6ad0ae10b10f27fa256f84fd91381a38187ffd8c1e7814aa3c'),
 }
 
+DEVICE_VIDEO_MODE = (b'Width=1024\nHeight=768\n', b'Width=640\nHeight=480\n')
+
 STARDEW = {
     'SVLoader.exe': '8fcf12a5ec69fbcc40cc02d484a8e6f9cad20c9e8c57c16b78c47ed28a7fef36',
     'gamedata/Stardew Valley.exe': '0cb091faf1c3ade402340641fc47bcf9a8f6e591a645f27a4c0db2fcdc966086',
@@ -105,7 +107,10 @@ def prepared(game, content, state, host_test=False, mono=None, mono_compat=None,
         fd, temporary = tempfile.mkstemp(prefix='.initial-', dir=config)
         try:
             with os.fdopen(fd, 'wb') as output, original.open('rb') as input_file:
-                shutil.copyfileobj(input_file, output)
+                if host_test:
+                    shutil.copyfileobj(input_file, output)
+                else:
+                    output.write(input_file.read().replace(*DEVICE_VIDEO_MODE, 1))
                 output.flush()
                 os.fsync(output.fileno())
             # Publish a complete first copy without replacing another session's config.

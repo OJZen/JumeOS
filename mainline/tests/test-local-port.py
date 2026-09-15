@@ -36,6 +36,13 @@ with tempfile.TemporaryDirectory(prefix='local-port-', dir=repo / 'mainline/out/
             (work / config.name).write_text('host geometry only')
             assert config.read_bytes() == original
         assert not work.exists()
+        target = root / (game + '-target')
+        engine = args.content_root / 'ports' / game / port.ORIGINAL_PROFILES[game][0]
+        with port.prepared(game, args.content_root, target, engine=engine) as plan:
+            target_work = Path(plan['directory'])
+            config = target / 'config' / (engine.name + '.ini')
+            assert b'Width=640\nHeight=480\n' in config.read_bytes()
+        assert not target_work.exists()
     # An interrupted first copy must not leave a partial config that looks initialized.
     failed = root / 'failed-copy'
     with patch.object(port.shutil, 'copyfileobj', side_effect=OSError('disk full')):

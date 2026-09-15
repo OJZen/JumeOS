@@ -12,9 +12,9 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **off** after the R58 GTA diagnostic. Serial confirmed
-sync, filesystem unmount, loop/MD/DM detach and `Powering off.` Temporary target
-staging, the one-time key and the host serial bridge were removed.
+The device is **on at ES-DE** after the R58 resolution/thermal follow-up. The
+operator asked that it remain powered while connected to external power. Temporary
+CPU/GPU limits were restored; the disposable candidate is not installed.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -97,6 +97,14 @@ skipped, so content equality remains unverified. See
   matched captures contain separate 4.41/8.96-second transition gaps followed by
   sustained 3--4/s intro submissions. Together with R57's resolution sensitivity,
   this supports a cooled same-build resolution A/B before any speculative engine patch.
+- The cooled R58 A/B confirmed pixel cost as the useful control. At 640x480 and
+  temporary 816/300 MHz caps, GTA III and Vice City intro windows averaged
+  15.24/14.46 submissions/s and peaked at 76.538/77.692 C with no cooling state;
+  both 121-second bounds exited 0 without a forced kill. The earlier matched
+  1024x768 windows were 3.17/4.17/s at 1008/400 MHz. A 512x384 request was
+  unsupported and exited cleanly. The next candidate seeds 640x480 only when a
+  managed GTA configuration is first created; it does not overwrite an existing
+  preference. Physical LCD quality remains open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -109,15 +117,12 @@ runbooks.
 
 ## Immediate next work
 
-1. Run a cooled, same-build R58 `noafbc` 1024x768/640x480 A/B, recording the
-   New Game transition separately from the settled cutscene; retain 1024x768 as
-   the product default until physical LCD quality is accepted.
-2. Patch the engine only if that A/B or bounded process evidence contradicts the
-   current rendering-cost diagnosis.
-3. Batch attended GTA III/Vice City LCD, audio, physical-control, gameplay,
+1. Freeze and host-check the first-managed-config 640x480 GTA candidate, then
+   verify one fresh-state target launch without changing the accepted engines.
+2. Batch attended GTA III/Vice City LCD, audio, physical-control, gameplay,
    save/exit/relaunch checks once the next performance candidate is ready.
-4. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
-5. Keep Moonlight paused until requested; keep USB HID as a separate hardware-route gate.
+3. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
+4. Keep Moonlight paused until requested; keep USB HID as a separate hardware-route gate.
 
 ## Working rules
 

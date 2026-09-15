@@ -700,6 +700,27 @@ test is a cooled R58/no-AFBC 1024x768/640x480 A/B with transition and settled
 cutscene windows recorded separately. No source patch or product-default change is
 justified by this static audit.
 
+## R59 first-config resolution candidate
+
+A cooled R58 follow-up supplied the missing resolution control without changing
+either accepted engine. At 640x480 and temporary 1008/400 MHz caps, Vice City's
+transition samples averaged 15.36 submissions/s and a later intro capture reported
+19.67/s; GTA III's first ten seconds averaged 19.86/s and a later car frame reported
+10.75/s. GTA III then touched the external 85 C abort, so this was not retained as
+the thermal candidate. At temporary 816/300 MHz caps, 20-second GTA III/Vice City
+intro windows averaged 15.24/14.46 submissions/s, peaked at 76.538/77.692 C and
+never entered CPU/GPU cooling. Both engine bounds ended at 121.03/121.01 seconds,
+exit 0, with no forced kill. A 512x384 request was unsupported and exited 0 before
+the frontend. Exact evidence is
+`mainline/out/.cache/r46h-r59-resolution-device-20260915.0uJai5/`.
+
+This supports the smallest product change: a first target-managed GTA config
+copies an exact 1024x768 source preference as 640x480. Host tests keep their
+1024x768 disposable window, existing managed preferences are not rewritten and
+the accepted engine/no-AFBC paths remain unchanged. The temporary frequency caps
+are evidence controls, not a new persistent or per-game policy. Physical LCD
+quality, audio, controls, gameplay, saves and relaunch remain open.
+
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
 manifests and fixed identities passed. The final run peaked at 78.461 C under the
