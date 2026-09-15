@@ -15,6 +15,10 @@
     "platform": "linux/arm64",
     "base_image": "arkos4clone/r46h-debian13-p2-mvp:v0.1@sha256:bd09bf6db6f1fb8f882621e98d70f01f976fd8dfba1bc897766afebd64cf51b9",
     "base_image_id": "sha256:bd09bf6db6f1fb8f882621e98d70f01f976fd8dfba1bc897766afebd64cf51b9",
+    "patch": {
+      "name": "idle-frame-pacing.patch",
+      "sha256": "c159d8f3df0cebbdc9ee028da688f0124f968237436a197a1986aea7966fa896"
+    },
     "accepted_target_packages": {
       "kbd": "2.7.1-2",
       "libretro-desmume": "0.9.11+git20160819+dfsg1-2+b2",

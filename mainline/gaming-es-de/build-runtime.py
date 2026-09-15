@@ -220,6 +220,10 @@ def build_runtime(lock: dict[str, object], output_dir: Path) -> Path:
     try:
         shutil.copyfile(FEATURE_DIR / "Dockerfile", context / "Dockerfile")
         shutil.copyfile(FEATURE_DIR / "collect-runtime.sh", context / "collect-runtime.sh")
+        patch = FEATURE_DIR / lock["build"]["patch"]["name"]
+        if sha256(patch) != lock["build"]["patch"]["sha256"]:
+            die("idle frame pacing patch mismatch")
+        shutil.copyfile(patch, context / patch.name)
         shutil.copyfile(archive, context / archive.name)
         run(
             [

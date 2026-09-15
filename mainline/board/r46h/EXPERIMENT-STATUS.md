@@ -80,7 +80,10 @@ LCD, USB, Moonlight and PSP remain open.
 - **ES-DE successor — HOST + TARGET + GAME PHYSICAL PASS / VISUAL LCD MOTION OPEN.**
   NES/Metal Slug and the 60 FPS original-art view pass capture and health checks.
   Per-frame generic/minimal paths are 21.7/3.3 ms; one bad batch caused 12 recovered
-  watchdogs, then corrected/live runs added none. No-fill stays 60 FPS; CJK/startup/LCD remain open.
+  watchdogs, then corrected/live runs added none. No-fill stays 60 FPS. A transient
+  no-video idle-pacing candidate cut settled CPU from 51.16% to 25.08% and GPU
+  temperature from 82.45 C to 72.34 C while preserving the immediate input path;
+  its formal build and patched LCD motion remain open. CJK/startup/LCD remain open.
 - **Remote screen — V0.16/V0.17 ANCHORED GUARD DEVICE PASS.** ES-DE-only,
   ES-DE-plus-Game Gear and PPSSPP-after-`comm=Main` captures passed; pairing is
   still required after a new image write.

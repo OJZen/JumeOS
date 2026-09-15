@@ -13,8 +13,11 @@ Ozone rollback/reinstall and zero-error health pass on the current card. An
 unattended DRM probe measured the unmodified bundled theme at 15.0 FPS. The
 [visual profile](../gaming-es-de-visual/README.md) keeps its original system art
 and variants, selects its native OLED palette and bounds the expensive carousel;
-the settled system view measures 60 FPS. Exact rollback/reinstall and zero-error
-health pass; LCD motion still needs one operator observation.
+the settled system view measures 60 FPS. A target A/B of the locked idle-pacing
+patch cut settled no-video CPU from 51.16% to 25.08% and GPU temperature from
+82.45 C to 72.34 C; a remote input restored full-rate rendering immediately.
+Exact rollback/reinstall and zero-error health pass; patched LCD motion still
+needs one operator observation.
 
 Version 0.1 exposes only content backed by cores already present on the accepted
 p2:
@@ -42,6 +45,8 @@ Drive/Genesis and PSX remain the next unimplemented core wave.
   entry does not hide the bundled definition.
 - It is built natively for AArch64 with GLES, `DEINIT_ON_LAUNCH`, no updater and
   no hardware video decoding. The install prefix is `/opt/r46h/es-de`.
+- After one second without input, the no-video main loop sleeps 33 ms after each
+  swap. Input and video playback keep the original full-rate path.
 - The runtime library closure is compared with the exact accepted p2 package
   set. Mesa/DRM, glibc and libraries already owned by RetroArch stay on p2.
 - `/roms` remains read-only. `/home/ark/ROMs` contains only bounded symlinks;
@@ -88,7 +93,7 @@ PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B \
   mainline/gaming-es-de/build-runtime.py payload
 ```
 
-`source-lock.json` owns source/build/runtime identity. The build runs
+`source-lock.json` owns source, patch, build and runtime identity. The build runs
 `ES-DE --version` after recreating the accepted p2 package state;
 `build-runtime.py validate` rechecks the locked archive, resources, recorded
 version and AArch64 ELF identity without requiring target libraries on the host.

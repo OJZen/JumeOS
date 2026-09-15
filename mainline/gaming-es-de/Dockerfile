@@ -26,13 +26,16 @@ RUN apt-get install -y --no-install-recommends \
       libavfilter-dev libavformat-dev libavutil-dev libbluetooth-dev \
       libcurl4-openssl-dev libfreeimage-dev libfreetype6-dev libgit2-dev \
       libgles-dev libharfbuzz-dev libicu-dev libpoppler-cpp-dev libpugixml-dev \
-      libsdl2-dev pkg-config \
+      libsdl2-dev patch pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 COPY emulationstation-de-v3.4.1.tar.gz /tmp/source.tar.gz
+COPY idle-frame-pacing.patch /tmp/idle-frame-pacing.patch
 COPY --chmod=0755 collect-runtime.sh /usr/local/bin/collect-runtime
 RUN mkdir /src /build \
     && tar -xzf /tmp/source.tar.gz -C /src --strip-components=1 \
+    && cd /src \
+    && patch -p1 < /tmp/idle-frame-pacing.patch \
     && cmake -S /src -B /build \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=/opt/r46h/es-de \

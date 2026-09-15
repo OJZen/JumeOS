@@ -111,6 +111,12 @@ skipped, so content equality remains unverified. See
   the expected 640x480 config, reached real game submissions and exited 0 without
   a forced kill. The prior state, ES-DE and stock 1296/480 MHz limits were restored;
   temporary staging/access were removed and the device remains on as requested.
+- An ES-DE target A/B added one 33 ms sleep only after one second without input
+  and with no active video. Over the settled final 120 seconds, CPU fell from
+  51.16% to 25.08%, SoC from 81.20 C to 70.68 C and GPU from 82.45 C to 72.34 C.
+  A remote direction input restored full-rate rendering for about one second and
+  then returned to the low-overhead path. The original installed frontend was
+  restored after the transient test; patched LCD motion remains operator-open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -123,8 +129,8 @@ runbooks.
 
 ## Immediate next work
 
-1. Batch attended R59 GTA III/Vice City LCD quality, audio, physical-control,
-   gameplay, save/exit/relaunch checks; decide a product frequency policy separately.
+1. Build and promote the proven ES-DE idle-pacing patch, then batch attended R59
+   GTA III/Vice City LCD quality, audio, physical-control, gameplay and save checks.
 2. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
 3. Keep Moonlight paused until requested; keep USB HID as a separate hardware-route gate.
 

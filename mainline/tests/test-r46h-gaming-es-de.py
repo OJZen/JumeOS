@@ -44,6 +44,7 @@ class EsDeCandidateTests(unittest.TestCase):
         cls.dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
         cls.builder = (ROOT / "build-runtime.py").read_text(encoding="utf-8")
         cls.collector = (ROOT / "collect-runtime.sh").read_text(encoding="utf-8")
+        cls.pacing_patch = (ROOT / "idle-frame-pacing.patch").read_text(encoding="utf-8")
         cls.settings_text = (ROOT / "es_settings.xml").read_text(encoding="utf-8")
         cls.theme = ET.parse(ROOT / "r46h-theme.xml").getroot()
         cls.systems = ET.parse(ROOT / "es_systems.xml").getroot()
@@ -88,6 +89,15 @@ class EsDeCandidateTests(unittest.TestCase):
         ):
             self.assertIn(option, self.lock["build"]["cmake_options"])
             self.assertIn(option, self.dockerfile)
+        self.assertEqual(self.lock["build"]["patch"]["name"], "idle-frame-pacing.patch")
+        self.assertEqual(
+            self.lock["build"]["patch"]["sha256"], sha256(ROOT / "idle-frame-pacing.patch")
+        )
+        self.assertIn("COPY idle-frame-pacing.patch", self.dockerfile)
+        self.assertIn('lock["build"]["patch"]', self.builder)
+        self.assertIn("getTimeSinceLastInput() >= 1000", self.pacing_patch)
+        self.assertIn("getVideoPlayerCount() == 0", self.pacing_patch)
+        self.assertIn("SDL_Delay(33)", self.pacing_patch)
         self.assertLess(self.dockerfile.index("retroarch=1.20.0"), self.dockerfile.index("base-sonames"))
         for package, version in self.lock["build"]["accepted_target_packages"].items():
             self.assertIn(f"{package}={version}", self.dockerfile)

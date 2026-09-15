@@ -1,0 +1,21 @@
+--- a/es-app/src/main.cpp
++++ b/es-app/src/main.cpp
+@@ -571,6 +571,8 @@
+         window->render();
+ 
+         renderer->swapBuffers();
++        if (window->getTimeSinceLastInput() >= 1000 && window->getVideoPlayerCount() == 0)
++            SDL_Delay(33);
+         Log::flush();
+ #if !defined(__EMSCRIPTEN__)
+     }
+--- a/es-core/src/Window.h
++++ b/es-core/src/Window.h
+@@ -160,6 +160,7 @@
+     void increaseVideoPlayerCount() { ++mVideoPlayerCount; }
+     void decreaseVideoPlayerCount() { --mVideoPlayerCount; }
+     int getVideoPlayerCount();
++    int getTimeSinceLastInput() const { return mTimeSinceLastInput; }
+ 
+     void setLaunchedGame(bool state) { mGameLaunchedState = state; }
+     void invalidateCachedBackground();
