@@ -159,9 +159,21 @@ GUI apply waits for these target checks; memory/swap/pressure readout is impleme
    patch or per-game frequency framework was added. Physical LCD quality and a
    product frequency policy remain separate gates. R59's 1,727-file host package
    and exact target preflight passed; a fresh target state generated the expected
-   640x480 GTA III config and reached game submissions before a clean exit. The two-second health sampler
-   warns near voltage/thermal limits and blocks unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,
-   charge completion and suspend/resume remain open; supply alone is not net charging.
+   640x480 GTA III config and reached game submissions before a clean exit.
+   A same-boot 816/300 MHz driver A/B then isolated a software-side gain. A private
+   Mesa 26.2.2 EGL/GBM/Gallium closure raised GTA III from 11.00 to 14.36 and
+   Vice City from 14.67 to 17.15 submissions/s at 640x480. Both candidate runs
+   exited 0 below 81 C without cooling or a new Panfrost fault; the original-Mesa
+   GTA III control added one `DATA_INVALID_FAULT`. A Gallium-only trial failed at
+   the frontend ABI boundary, so R60 packages the complete private closure and
+   leaves Debian's system Mesa unchanged. Formal package and exact-target proof
+   remain the next gate. If that passes, the remaining no-fidelity software
+   controls tested here are exhausted; sustained clocks require better cooling,
+   while sub-640 rendering or engine changes trade image quality or compatibility.
+   The two-second health sampler warns near voltage/thermal limits and blocks
+   unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,
+   charge completion and suspend/resume remain open; supply alone is not net
+   charging.
 2. Verify new/saved-Wi-Fi authorization, password privacy, persistence and reconnect;
    add a shared volume writer after confirming target service capabilities.
    Discover Bluetooth hardware before implementing pairing policy.

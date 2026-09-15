@@ -738,6 +738,23 @@ staging/access were removed and the device stayed on. Exact evidence is the R59
 directory above and
 `mainline/out/.cache/r46h-r59-resolution-device-20260915.0uJai5/session.json`.
 
+## R60 private Mesa runtime candidate
+
+A same-boot 816/300 MHz A/B kept the accepted engines, 640x480 configuration,
+no-AFBC setting and HUD policy fixed. With Debian Mesa 25.0.7, the active GTA III
+window averaged 11.00 submissions/s and Vice City averaged 14.67/s. A private
+Mesa 26.2.2 EGL/GBM/Gallium closure raised them to 14.36/s and 17.15/s,
+respectively. Candidate runs exited 0 below 81 C with zero cooling state and no
+new Panfrost fault; the original-Mesa GTA III control added one
+`DATA_INVALID_FAULT`. A preceding Gallium-only frontend run segfaulted without a
+GPU fault, so that partial ABI replacement is rejected.
+
+The retained integration packages the complete closure only inside the shared
+Wayland session. It does not overwrite Debian libraries or affect ES-DE. These
+rates are compositor submissions rather than physical LCD FPS; formal R60 host
+and exact-target verification, LCD motion, audio, controls, gameplay, saves and
+relaunch remain open.
+
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
 manifests and fixed identities passed. The final run peaked at 78.461 C under the

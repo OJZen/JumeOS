@@ -20,19 +20,23 @@ image=cgutman/moonlight-packaging@sha256:f25a3e2ad90b85d1a4358e2d612ed311165cddd
 portmaster=${R46H_PORTMASTER_BUNDLE:-$cache/r46h-portmaster/portmaster-backend.tar.gz}
 native=${R46H_PORT_NATIVE_CACHE:-$cache/r46h-ports-native}
 gta=${R46H_GTA_SOURCE_OUTPUT:-$cache/r46h-gta-source-r52-20260914}
+mesa=${R46H_MESA_RUNTIME:-$cache/r46h-mesa-26.2.2/r60/mesa-26.2.2-r46h-runtime.tar.gz}
 [[ -f $portmaster && $(shasum -a 256 "$portmaster" | cut -d ' ' -f 1) == "$(cat "$(dirname "$portmaster")/runtime.sha256")" ]]
 python3 -B "$repo/mainline/gaming-ports/prepare-native.py" "$native" --check
 [[ -f $gta/BUILD-INFO && -f $gta/SHA256SUMS ]] && (cd "$gta" && sha256sum --check --quiet SHA256SUMS)
+PYTHONDONTWRITEBYTECODE=1 python3 -B "$repo/mainline/gaming-mesa/runtime.py" validate-runtime "$mesa"
 # Retained font/client plugins are test inputs; the candidate itself uses the hashed runtime.
 mkdir -p "$output/share/fonts/truetype/droid" "$output/qt-wayland"
 cp "$cache/r46h-compositor-20260910/share/fonts/truetype/droid/DroidSansFallbackFull.ttf" "$output/share/fonts/truetype/droid/"
 cp -R "$cache/r46h-compositor-20260910/qt-wayland/." "$output/qt-wayland/"
 docker run --rm --init --network none --memory 1536m --cpus 3 --pids-limit 256 --cap-add SYS_PTRACE \
+  --tmpfs /run:rw,nosuid,nodev,exec,size=192m,mode=755 \
   --entrypoint /bin/bash --device-cgroup-rule 'c 10:223 rwm' --device-cgroup-rule 'c 13:* rwm' \
   -v "$source_dir:/wayland:ro" -v "$source_dir:/gaming-wayland:ro" \
   -v "$repo/mainline/gaming-shell:/src:ro" -v "$repo/mainline/gaming-shell:/project/mainline/gaming-shell:ro" \
   -v "$repo/mainline/gaming-remote-screen:/project/mainline/gaming-remote-screen:ro" \
   -v "$repo/mainline/gaming-ports:/project/mainline/gaming-ports:ro" -v "$repo/mainline/tests:/project/mainline/tests:ro" \
+  -v "$repo/mainline/gaming-mesa:/mesa:ro" -v "$mesa:/mesa-runtime.tar.gz:ro" \
   -v "$portmaster:/portmaster-backend.tar.gz:ro" -v "$native:/native-debs:ro" -v "$gta:/gta-source:ro" \
   -v "$cache/r46h-compositor-20260910/ssh-debs:/ssh-debs:ro" \
   -v "$output:/out" -v "$output/desktop:/project/mainline/out" \

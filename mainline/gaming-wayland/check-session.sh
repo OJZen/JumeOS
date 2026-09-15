@@ -5,7 +5,7 @@ trap 'printf "HANDHELD_SESSION_FAILED line=%s status=%s\n" "$LINENO" "$?" >&2' E
 [[ -f /.dockerenv && -d /wayland && -d /out ]] || exit 2
 [[ $# == 0 || ( $# == 1 && $1 =~ ^[0-9a-f]{40}$ ) ]] || exit 2
 [[ $(sha256sum /wayland-runtime.tar.gz | cut -d ' ' -f 1) == 355a2913ed11eaab8300f4de13de88b82b2e7413c59a776f5e5d5a0e8faecf50 ]]
-stage=$(mktemp -d /run/r46h-handheld-package.XXXXXX)
+stage=$(mktemp -d /out/r46h-handheld-package.XXXXXX)
 trap 'rm -rf -- "$stage"; rm -f /out/r46h-handheld-desktop-arm64.tar.gz.incoming' EXIT
 chmod 755 "$stage"
 tar -xzf /wayland-runtime.tar.gz -C "$stage"
@@ -13,6 +13,7 @@ install -m 755 /out/linux-build/r46h-shell "$stage/usr/bin/"
 install -m 755 /out/input-router "$stage/usr/bin/"
 install -m 755 /out/handheld-shell.so "$stage/usr/lib/aarch64-linux-gnu/weston/"
 install -m 755 /wayland/session.sh /wayland/session-leases.sh /wayland/clients.sh /wayland/handheld-client.sh /wayland/probe-r46h.sh /src/shell-client.sh /src/remote-session.sh /src/device-lease.sh "$stage/"
+python3 -B /mesa/runtime.py install /mesa-runtime.tar.gz "$stage/usr"
 bash /project/mainline/gaming-ports/install-runtime.sh "$stage"
 QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software timeout 45 python3 -B /project/mainline/tests/test-portmaster-ui.py \
   --binary "$stage/usr/bin/r46h-shell" --runtime "$stage/usr/share/r46h/portmaster" \
@@ -54,8 +55,9 @@ def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 manifest = ''.join(f'{digest(f)}  {f.relative_to(root)}\n' for f in sorted(root.rglob('*'))
                    if f.is_file() and not f.is_symlink() and f != root / 'SHA256SUMS')
 (root / 'SHA256SUMS').write_text(manifest)
-record = {'revision': 59, 'status': 'GTA_640_FIRST_CONFIG_HOST_PASS_R46H_UNTESTED',
+record = {'revision': 60, 'status': 'MESA_26_RUNTIME_HOST_PASS_R46H_UNTESTED',
           'source_commit': sys.argv[2], 'base_runtime_sha256': digest(pathlib.Path('/wayland-runtime.tar.gz')),
+          'mesa_runtime_sha256': digest(pathlib.Path('/mesa-runtime.tar.gz')),
           'manifest_sha256': digest(root / 'SHA256SUMS'),
           'binaries': {str(f.relative_to(root)): digest(f) for f in [root / 'usr/bin/r46h-shell', root / 'usr/bin/input-router',
                        root / 'usr/lib/r46h-ports/re3', root / 'usr/lib/r46h-ports/reVC',

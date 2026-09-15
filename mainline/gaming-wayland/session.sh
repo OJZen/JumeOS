@@ -48,6 +48,8 @@ export QT_QPA_PLATFORM=wayland R46H_VIRTUAL_KEYBOARD=0 SDL_NO_SIGNAL_HANDLERS=1
 unset QT_IM_MODULE QT_QPA_EGLFS_INTEGRATION
 lib="$base/usr/lib/aarch64-linux-gnu"
 export LD_LIBRARY_PATH="$lib:$lib/weston:$lib/libproxy"
+export GBM_BACKENDS_PATH="$lib/gbm" GBM_BACKEND=dri
+export __EGL_VENDOR_LIBRARY_FILENAMES="$base/usr/share/glvnd/egl_vendor.d/50_mesa.json"
 export WAYLAND_DISPLAY=r46h-wayland-probe
 export WESTON_DATA_DIR="$base/usr/share/weston"
 WESTON_MODULE_MAP=''

@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-15: **R59 FIRST-CONFIG + R58 GTA III/VC MACHINE PASS / ATTENDED OPEN / STREAMING DEFERRED**.
+Status 2026-09-15: **R60 MESA A/B PASS / FORMAL INTEGRATION + ATTENDED OPEN / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -355,6 +355,15 @@ readback passed; archive/manifest/shell SHA-256 values are
 Exact target preflight and a fresh-state GTA III launch passed: R59 generated a
 640x480 managed config, reached real game submissions and exited 0 without a
 forced kill. State, stock limits and ES-DE were restored and the device stayed on.
+
+An R60 same-boot A/B then held the 640x480 engines and temporary 816/300 MHz
+caps fixed while replacing only the candidate session's Mesa ABI closure. Private
+Mesa 26.2.2 raised GTA III from 11.00 to 14.36 submissions/s and Vice City from
+14.67 to 17.15/s. Both candidate runs exited 0 below 81 C with no cooling state
+or new Panfrost fault; the original-Mesa GTA III control added one
+`DATA_INVALID_FAULT`. A Gallium-only frontend trial segfaulted without a GPU
+fault and is rejected. The formal R60 package installs EGL, GBM and Gallium only
+under the private session root; host build and exact-target integration remain open.
 
 R58's exact target package and preflight passed. Two GTA III runs ended cleanly
 at 60.68 seconds by requested stop and 120.38 seconds by diagnostic bound; both

@@ -24,8 +24,8 @@ full target checksum/readback was skipped, so equality remains unverified; see
 [P3 Content Migration](../../../docs/P3-CONTENT-MIGRATION.md).
 
 Fallbacks are p2 v0.7 attended and v0.15 automated; current v0.17 passed readbacks, cold/warm infra and stick smoke.
-R58 has two fault-free boots; GTA III/VC intros rose from 3.17/4.17/s at 1024x768 to 15.24/14.46/s at 640x480.
-LCD, USB, Moonlight and PSP remain open.
+R58's 640x480 GTA III/VC reached 15.24/14.46/s; R60's private Mesa A/B added 30.6%/16.9%.
+Formal integration, LCD, USB, Moonlight and PSP remain open.
 
 ## Capability ledger
 
@@ -93,13 +93,10 @@ LCD, USB, Moonlight and PSP remain open.
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
   R56 aligned the status row in a device-composed capture; physical LCD remains open.
   Reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope.
-- **Wayland/ports — R59 FIRST-CONFIG + R58 GTA/VC MACHINE PASS / ATTENDED OPEN.**
-  R48 fixed D-pad Down; R58's fault-free matched GTA III/VC run fell from
-  28.66/27.70/s menus to 3.17/4.17/s intros at 1024x768 and 1008/400 MHz.
-  Cooled 640x480 at temporary 816/300 MHz averaged 15.24/14.46/s, peaked at
-  76.538/77.692 C without cooling, and ended both 121-second bounds at exit 0
-  without forced kills. R59's host build and fresh-state target launch then generated
-  640x480 and reached a real game frame; LCD quality, clocks, audio, controls and saves remain open.
+- **Wayland/ports — R60 MESA A/B PASS / FORMAL INTEGRATION + ATTENDED OPEN.**
+  R48 fixed D-pad Down; R58's 640x480 runs exited cleanly; R59 passed first-config launch.
+  At 816/300 MHz, [private Mesa](../../gaming-mesa/README.md) raised GTA III/VC from 11.00/14.67 to
+  14.36/17.15/s without a new fault; formal R60 and attended acceptance are open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**
