@@ -91,6 +91,12 @@ skipped, so content equality remains unverified. See
   game result and is not counted as a crash. R58 now has matched machine evidence
   that fault suppression holds while the intro pacing defect remains. Physical
   controls, LCD motion, audio, gameplay, saves and relaunch remain open.
+- A host audit of the exact pinned Release/`MASTER` sources found no explicit GPU
+  readback or `glFinish` in the normal frame path, while ordinary world streaming
+  remains asynchronous and the costly optional renderer paths are disabled. The
+  matched captures contain separate 4.41/8.96-second transition gaps followed by
+  sustained 3--4/s intro submissions. Together with R57's resolution sensitivity,
+  this supports a cooled same-build resolution A/B before any speculative engine patch.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -103,10 +109,11 @@ runbooks.
 
 ## Immediate next work
 
-1. Profile the shared GTA intro path without changing R58's accepted `noafbc` fault
-   fallback; isolate the large submission stalls before building another device candidate.
-2. Recheck the 640x480 candidate only after that diagnosis, from a cooled start,
-   and obtain physical LCD quality acceptance before choosing a product default.
+1. Run a cooled, same-build R58 `noafbc` 1024x768/640x480 A/B, recording the
+   New Game transition separately from the settled cutscene; retain 1024x768 as
+   the product default until physical LCD quality is accepted.
+2. Patch the engine only if that A/B or bounded process evidence contradicts the
+   current rendering-cost diagnosis.
 3. Batch attended GTA III/Vice City LCD, audio, physical-control, gameplay,
    save/exit/relaunch checks once the next performance candidate is ready.
 4. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.

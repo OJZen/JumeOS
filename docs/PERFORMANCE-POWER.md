@@ -140,9 +140,13 @@ GUI apply waits for these target checks; memory/swap/pressure readout is impleme
    from 28.66 submissions/s in its menu to 3.17/s in the car cutscene, and Vice City
    fell from 27.70/s to 4.17/s in its intro. P95 intervals reached 313.48/247.58 ms
    without thermal cooling. This confirms a phase-specific rendering stall, not a
-   menu-wide cap or a fault-driven exit. Profile that path before retrying the
-   resolution candidate; keep `noafbc` as the fault fallback and retain the
-   HUD-independent sampler.
+   menu-wide cap or a fault-driven exit. A host audit of the exact Release/`MASTER`
+   sources found no explicit readback or `glFinish` in the normal frame path;
+   ordinary streaming is asynchronous and the optional renderer paths are off.
+   The captures instead retain distinct 4.41/8.96-second transition gaps followed
+   by sustained 3--4/s intro submissions. Run one cooled, same-build
+   1024x768/640x480 A/B with transition and settled-cutscene windows separated;
+   keep `noafbc` as the fault fallback and retain the HUD-independent sampler.
    The user-set external abort remains 85 C, not a kernel thermal-trip change.
    The two-second health sampler warns near voltage/thermal limits and blocks
    unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,

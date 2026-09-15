@@ -686,6 +686,20 @@ serial poweroff passed. Exact evidence is
 This confirms the intro pacing defect independently of R58's fault suppression;
 physical buttons, LCD motion, audio, gameplay, saves and relaunch remain open.
 
+A host-only audit then traced the exact pinned re3/reVC and librw sources used by
+R58. Both engines are Release/`MASTER` builds with `SQUEEZE_PERFORMANCE`; their
+runtime seeds disable VSync, multisampling, the new renderer and vehicle pipeline,
+and GTA III also disables trails. The normal GL frame path has no explicit
+`glFinish` or framebuffer readback, and `CStreaming::Update` schedules ordinary
+world reads asynchronously. The matched frame histories nevertheless retain one
+4.41-second GTA III gap and one 8.96-second Vice City gap around New Game, followed
+by sustained 3--4/s cutscene submissions. This separates a transition hiatus from
+the continuing render cost but does not prove which subsystem owns either delay.
+Because R57 already showed strong resolution sensitivity, the next discriminating
+test is a cooled R58/no-AFBC 1024x768/640x480 A/B with transition and settled
+cutscene windows recorded separately. No source patch or product-default change is
+justified by this static audit.
+
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
 manifests and fixed identities passed. The final run peaked at 78.461 C under the
