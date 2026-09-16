@@ -781,6 +781,20 @@ serial-confirmed poweroff. Exact evidence is
 machine relaunch gate only; physical LCD motion, audio, controls, gameplay and
 saves remain open.
 
+A same-day follow-up exercised the guarded Stardew save path: the original two
+save files, managed copy and timestamped backup kept identical SHA-256 values,
+and a second import was refused without overwriting either tree. `/roms` stayed
+read-only. Temporarily removing and restoring the managed `Saves` directory did
+not change launch behavior. At both 816/300 MHz and stock 1296/480 MHz, Mono
+remained before SDL/Wayland initialization for the full 120-second bound, with
+no game window or buffer submission; lower GTA caps only made that wait longer.
+In the same boot Vice City completed another 120.40-second run at exit 0; eleven
+valid samples averaged 58.26 submissions/s, peaked at 77.307 C and never entered
+a cooling state. Evidence is under
+`mainline/out/.cache/r46h-unattended-20260916-2/`. The copy/backup and mixed-run
+gates are closed; Stardew save selection/load and shared-window readiness remain
+open.
+
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
 manifests and fixed identities passed. The final run peaked at 78.461 C under the

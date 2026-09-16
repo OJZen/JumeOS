@@ -12,11 +12,11 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device was last left **powered off** after a power-backed ES-DE and R60 game
-batch. Charger `online=1` and positive battery current were observed. Health,
-sync and controlled shutdown passed; temporary CPU/GPU limits were restored,
-temporary access/runtime files were removed and no disposable candidate is
-installed.
+The device was last left **powered off** after the follow-up Stardew/mixed-game,
+Wi-Fi policy and isolated zram batch. Charger `online=1` was observed. Health,
+sync and controlled shutdown passed; stock CPU/GPU limits and product services
+were restored, temporary access/policy/kernel files were removed and no
+disposable candidate is installed.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -48,6 +48,10 @@ skipped, so content equality remains unverified. See
 - R47 imported the retained Stardew save through the product worker, preserved
   equal source/copy hashes and refused a second overwrite. Stardew then ran its
   120-second machine bound; no operator display/audio/gameplay result was given.
+- A same-day follow-up also kept the managed copy and timestamped backup exact,
+  refused a second overwrite and restored a temporarily removed managed save.
+  Stardew still remained before SDL/Wayland for the full 120-second bound at both
+  816/300 and stock 1296/480 MHz; save selection/load and a shared game window stay open.
 - R51 reuses the shared compositor's existing performance HUD, capture and
   bounded gamepad RPC. Its 1,726 files and preflight passed on target. A composed
   GTA III menu measured 25.6 game submissions/s (36.3 ms median, 43.6 ms P95)
@@ -121,6 +125,15 @@ skipped, so content equality remains unverified. See
   both relaunched, and a 28.56-second Vice City relaunch stopped on request. No
   ext4/Panfrost/GPU fault or cooling state appeared. The system Mesa was not
   replaced; physical LCD motion, audio, controls, gameplay and saves remain open.
+- A temporary minimal polkit policy gave ark only the three required NetworkManager
+  permissions and passed scan, disposable profile create/delete and saved-profile
+  reconnect with DHCP/gateway reachability. It was not promoted; a future image
+  must test new-password activation and reboot persistence. Bluetooth is blocked
+  because this unit exposes no controller/firmware path and currently lacks BlueZ.
+- The isolated v0.18 zram kernel booted one-shot with the accepted DTB. A guarded
+  256 MiB LZ4 device reached 43.5 MiB swap use under bounded pressure, disabled
+  and unloaded cleanly, and normal v0.15 plus unchanged boot media were restored.
+  Promotion waits for real-game benefit.
 - ES-DE's 33 ms no-video idle-pacing A/B cut settled CPU from 51.16% to
   25.08%, SoC from 81.20 C to 70.68 C and GPU from 82.45 C to 72.34 C; input
   restored full-rate rendering for about one second. Its patched archive and
@@ -140,9 +153,12 @@ runbooks.
 
 ## Immediate next work
 
-1. Unattended: exercise Stardew's guarded save lifecycle and a mixed-game endurance run.
-2. Unattended: test Wi-Fi reconnect and Bluetooth discovery; keep zram a separate fallback-backed kernel gate.
-3. Attended/deferred: batch LCD/audio/physical-control/gameplay/save observations; pause Moonlight, USB HID and dynamic frequency policy until requested or their hardware gate changes.
+1. Future image: include `polkitd` plus the proven ark-only three-action rule;
+   verify new-password activation and persistence after reboot.
+2. Attended: batch LCD/audio/physical-control/gameplay/save observations and keep
+   Stardew's shared-window/save-load gate separate.
+3. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
+   dynamic frequency policy until requested or their hardware gates change.
 
 ## Working rules
 

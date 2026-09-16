@@ -104,7 +104,12 @@ LCD, USB, Moonlight and PSP remain open.
   Vice City through two remote South/B samples into captured cutscenes at
   20.32/19.03 submissions/s. Their 120.97/121.15-second bounds and later
   relaunches exited or stopped cleanly without a forced kill, ext4/Panfrost/GPU
-  fault or cooling state. Attended LCD/audio/control/gameplay/save acceptance is open.
+  fault or cooling state. A follow-up preserved exact Stardew source/managed/backup
+  save hashes and refused overwrite; with or without managed saves, Stardew stayed
+  before SDL/Wayland for 120 seconds at both tested clock profiles. A same-boot
+  Vice City run averaged 58.26 submissions/s over eleven valid samples, peaked at
+  77.307 C and exited 0. Attended LCD/audio/control/gameplay/save acceptance and
+  Stardew shared-window/save-load readiness remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**
@@ -123,6 +128,20 @@ LCD, USB, Moonlight and PSP remain open.
 - **Wi-Fi / streaming — V0.17 PICTURE/AUDIO + 60 FPS SAMPLE PASS / SSH UNPAIRED.**
   Patched Sunshine removed alternating frame gaps; L1 + R1 exits, with transient black before ES-DE recovery.
   [Streaming](../../../docs/GAME-STREAMING.md): low-delay A/V pass; Qt ~60 FPS Hantro sample; product/gamepad open.
+- **Local Wi-Fi control — TEMPORARY POLICY DEVICE PASS / IMAGE + NEW PASSWORD OPEN.**
+  The base image lacks polkit and denies ark. A temporary ark-only three-action
+  rule passed scan, isolated profile create/delete and saved-profile down/up with
+  unchanged DHCP and gateway reachability; unrelated permissions stayed denied.
+  The candidate was not promoted. AddAndActivateConnection2 with a new password
+  and reboot persistence remain open.
+- **Bluetooth — HARDWARE BLOCKED.** Boot reports `BT=0`; rfkill/sysfs/USB expose
+  no controller and BlueZ is absent. Require a controller route and firmware
+  before pairing work.
+- **Zram — ONE-SHOT KERNEL + APPLY/DISABLE DEVICE PASS / PROMOTION OPEN.** The
+  v0.18 candidate booted with the accepted v0.17 DTB and unchanged U-Boot state.
+  A guarded 256 MiB LZ4 device used 43.5 MiB swap under bounded pressure, then
+  reset and unloaded without OOM, ext4 or GPU faults. Normal v0.15 and media hashes
+  were restored. Persistent policy and real-game benefit remain open.
 - **Hantro media — QT V3 SHORT HUD/A/V/RETURN PASS / LONG SESSION OPEN.**
   Default-preset native HUD, picture/audio, shoulders, host-loss return and reconnect
   were accepted; 59.25 rendered FPS reported. Application-list retrieval failed to

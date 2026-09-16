@@ -176,18 +176,28 @@ A failed remembered connection can leave a saved profile; remove it through
 deleting it and may disconnect an active connection. Existing-profile activation
 also uses UUID; disconnect requires exactly one active Wi-Fi.
 
-The adapter uses the bundled Qt DBus library; no new runtime library or host
-service was installed. Host checks use an isolated bus and fake NetworkManager,
-including real message serialization, state signals, denial, timeout and changed
-AP refusal. Target authorization, actual DHCP, persistence and reconnection remain
-open. Read ark's `nmcli general permissions` on the device before applying; no
-polkit bypass or broad permission grant is included.
+The adapter uses the bundled Qt DBus library. Host checks use an isolated bus and
+fake NetworkManager, including real message serialization, state signals, denial,
+timeout and changed-AP refusal. The current image omits `polkitd`, so ark's direct
+NetworkManager control is denied even though root reconnect, autoconnect and DHCP
+already pass. A temporary target test installed Debian's polkit packages and an
+ark-only rule for exactly `network-control`, `settings.modify.system` and
+`wifi.scan`. Ark then rescanned, created/deleted an isolated profile, disconnected
+and reactivated the saved profile, retained its address and reached the gateway;
+all unrelated NetworkManager permissions stayed denied. The packages and rule were
+not promoted. A future image may carry that minimal policy, but new-password
+AddAndActivateConnection2 and reboot persistence still require acceptance.
 The [test index](../tests/README.md#current-review-gaps) records the Mac window-
 activation limitation separately from the passing offscreen/ARM64 checks.
 
 Switching/disconnecting Wi-Fi can cut the remote session. Keep serial available
 and perform that step after navigation/capture checks; reconnect through the
 physical UI or serial. Never disable SSH host-key verification to recover.
+
+Bluetooth is not a software-only follow-up on the current unit: the boot reports
+`BT=0`, rfkill exposes only Wi-Fi, `/sys/class/bluetooth` is empty, no controller
+appears on USB and BlueZ is absent. Discovery/pairing stays blocked until a
+controller route, firmware and BlueZ are supplied.
 
 ## Memory experiment CLI
 
@@ -212,17 +222,22 @@ record is bound to the boot/device generation. Swapoff requires available RAM
 above used swap plus max(128 MiB, RAM/8); failure retains the active configuration.
 Disk priority is 10, zram 100. There is no fstab, startup service or automatic
 activation. Disk-off removes the owned file; temporary settings must be disabled
-and checked before cleanup. These checks have not performed real swapon/swapoff.
+and checked before cleanup.
 
 The isolated `codex/r46h-zram-candidate-v1` commit `2b89c5d` built
 `6.12.99-r46h-mainline-v0.18-zram-candidate`; its source/config/metadata and verified
 archive remain in `mainline/out/.cache/r46h-unattended-20260909/zram-candidate/`.
-It adds modular zram
-and LZ4/Zstd, without writeback or zswap. **Use only its Image/modules with the
+It adds modular zram and LZ4/Zstd, without writeback or zswap. A one-shot serial
+boot used its Image/modules with the accepted v0.17 DTB and unchanged U-Boot
+environment. A guarded 256 MiB LZ4 device reached 43.5 MiB swap use under bounded
+650 MiB zero plus 32 MiB random pressure, then `--zram-off` reset its size and the
+module unloaded. The run peaked at 72.083 C and logged no OOM, ext4, data-invalid
+or GPU fault. Normal v0.15 boot, services and boot-file hashes were restored and
+candidate target files were removed. Persistent activation and measurable
+real-game benefit remain open. **Use only its Image/modules with the
 accepted v0.17 DTB and existing boot fallback.** The generic archive's boot.ini
-and DTB are not the accepted card configuration. No media write or boot occurred;
-do not rewrite the TF base. This Qt adapter intentionally still accepts only
-the accepted kernel; the first zram run uses serial and this CLI.
+and DTB are not the accepted card configuration; do not rewrite the TF base. This
+Qt adapter intentionally still accepts only the accepted kernel.
 
 ## Combined acceptance route
 
