@@ -6,8 +6,9 @@ the accepted Ozone/FBNeo feature; it does not change BOOT, p1 or p3.
 
 ## Status and scope
 
-Status: **HOST + TARGET + REPRESENTATIVE GAME PHYSICAL PASS / VISUAL PROFILE LCD
-MOTION OPEN.** The guarded install, exact runtime identity, 7-system discovery,
+Status: **HOST + POWER-BACKED TRANSIENT TARGET + REPRESENTATIVE GAME PHYSICAL
+PASS / PERSISTENT PROMOTION + VISUAL PROFILE LCD MOTION OPEN.** The guarded
+install, exact runtime identity, 7-system discovery,
 3,417 media links, corrected controller GUID, strict-SSH screenshots, exact
 Ozone rollback/reinstall and zero-error health pass on the current card. An
 unattended DRM probe measured the unmodified bundled theme at 15.0 FPS. The
@@ -16,8 +17,13 @@ and variants, selects its native OLED palette and bounds the expensive carousel;
 the settled system view measures 60 FPS. A target A/B of the locked idle-pacing
 patch cut settled no-video CPU from 51.16% to 25.08% and GPU temperature from
 82.45 C to 72.34 C; a remote input restored full-rate rendering immediately.
-The patched archive and embedded executable hashes now reproduce on host. Target
-promotion and patched LCD motion still need one power-backed pass.
+The patched archive and embedded executable hashes reproduce on host. A later
+power-backed transient bind held the patched service to 23.57% CPU over 60
+seconds; strict DRM captures before and after remote Right changed from SHA-256
+`d569468527351804efaa8ca3b42c88035089414c368b837ebf2c3debd02a3c13` to
+`a5feae1e074b220d31ed8c9cea39b350a7cf61ef48bbe101c6d6e1f89743773a`.
+The installed executable, service and temporary access were restored exactly and
+final health passed. Persistent promotion and physical patched LCD motion remain open.
 
 Version 0.1 exposes only content backed by cores already present on the accepted
 p2:

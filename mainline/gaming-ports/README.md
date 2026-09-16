@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-15: **R58 MATCHED GTA III/VC FAULT-FREE MACHINE PASS / PACING + ATTENDED OPEN**.
+Status 2026-09-16: **R60 GTA III/VC BATCHED MACHINE PASS / PACING + ATTENDED OPEN**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -763,8 +763,23 @@ mapped the private Mesa files; GTA III reported `OpenGL ES 3.1 Mesa 26.2.2`,
 rendered a captured intro and reached its 121.15-second bound at exit 0 without
 a forced kill or new GPU fault. The system Mesa hash, services and stock clocks
 were restored; access/staging were removed and the device stayed on. Evidence is
-`mainline/out/.cache/r46h-r60-formal-device-20260915/session.json`. LCD motion,
-audio, physical controls, gameplay, saves and relaunch remain open.
+`mainline/out/.cache/r46h-r60-formal-device-20260915/session.json`. At that
+checkpoint, LCD motion, audio, physical controls, gameplay, saves and relaunch
+were open.
+
+A power-backed R60 batch on 2026-09-16 revalidated the exact archive and target
+preflight. At temporary 816/300 MHz caps, two completed remote South/B samples
+started fresh GTA III and Vice City cutscenes. Their composed captures reported
+20.32/19.03 submissions/s; later 20-second windows had 10.31/16.73 median
+submissions/s in their observed phases and peaked at 76.923/76.153 C without a
+cooling state. Both 120.97/121.15-second bounds exited 0 without a forced kill.
+Fresh sessions relaunched both games; a 28.56-second Vice City relaunch stopped
+on request without a forced kill. The boot logged zero ext4/Panfrost/GPU faults,
+and stock clocks, services, access and runtime state were restored before
+serial-confirmed poweroff. Exact evidence is
+`mainline/out/.cache/r46h-unattended-20260916/session.json`. This closes the
+machine relaunch gate only; physical LCD motion, audio, controls, gameplay and
+saves remain open.
 
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four

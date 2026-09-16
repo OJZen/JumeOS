@@ -77,13 +77,17 @@ LCD, USB, Moonlight and PSP remain open.
 - **Ozone + FBNeo/Metal Slug — HOST + TARGET + PHYSICAL PASS / MILD PACING OPEN.**
   Guarded install, clean UniBIOS frames and advancing frame 480 passed; the
   operator accepted clean LCD startup and gameplay. Mild pacing artifacts remain.
-- **ES-DE successor — HOST + TARGET + GAME PHYSICAL PASS / PATCHED LCD MOTION OPEN.**
+- **ES-DE successor — HOST + POWER-BACKED TRANSIENT TARGET + GAME PHYSICAL PASS /
+  PERSISTENT PROMOTION + PATCHED LCD MOTION OPEN.**
   NES/Metal Slug and the 60 FPS original-art view pass capture and health checks.
   Per-frame generic/minimal paths are 21.7/3.3 ms; one bad batch caused 12 recovered
   watchdogs, then corrected/live runs added none. No-fill stays 60 FPS. A transient
   no-video idle-pacing candidate cut CPU 51.16% to 25.08% and GPU 82.45 C to 72.34 C
-  while preserving immediate input; its archive/executable now reproduce on host.
-  Power-backed target promotion and patched LCD motion remain open; CJK/startup/LCD too.
+  while preserving immediate input; its archive/executable reproduce on host. A
+  power-backed transient re-run held the patched service to 23.57% CPU over 60
+  seconds and changed the verified DRM frame after remote Right. Exact restoration
+  of the installed executable/service and final health passed. Persistent promotion,
+  physical patched LCD motion, CJK and startup remain open.
 - **Remote screen — V0.16/V0.17 ANCHORED GUARD DEVICE PASS.** ES-DE-only,
   ES-DE-plus-Game Gear and PPSSPP-after-`comm=Main` captures passed; pairing is
   still required after a new image write.
@@ -93,10 +97,14 @@ LCD, USB, Moonlight and PSP remain open.
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
   R56 aligned the status row in a device-composed capture; physical LCD remains open.
   Reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope.
-- **Wayland/ports — R60 MESA HOST + TARGET PASS / ATTENDED OPEN.**
+- **Wayland/ports — R60 MESA BATCHED MACHINE PASS / ATTENDED OPEN.**
   R48 fixed D-pad Down; R58's 640x480 runs exited cleanly; R59 passed first-config launch.
   [Private Mesa](../../gaming-mesa/README.md) raised GTA III/VC from 11.00/14.67 to 14.36/17.15/s.
-  Formal R60 preflight passed; GTA III rendered an intro and exited 0 fault-free. Attended acceptance is open.
+  Formal R60 preflight passed. A power-backed 816/300 MHz batch drove GTA III and
+  Vice City through two remote South/B samples into captured cutscenes at
+  20.32/19.03 submissions/s. Their 120.97/121.15-second bounds and later
+  relaunches exited or stopped cleanly without a forced kill, ext4/Panfrost/GPU
+  fault or cooling state. Attended LCD/audio/control/gameplay/save acceptance is open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**

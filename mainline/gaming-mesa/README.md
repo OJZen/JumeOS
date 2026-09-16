@@ -1,6 +1,6 @@
 # R46H private Mesa runtime
 
-Status 2026-09-15: **MESA 26.2.2 GTA III/VC PERFORMANCE + FORMAL TARGET PASS / ATTENDED OPEN**.
+Status 2026-09-16: **MESA 26.2.2 GTA III/VC PERFORMANCE + BATCHED TARGET PASS / ATTENDED OPEN**.
 
 This feature pins the Panfrost/softpipe Mesa 26.2.2 EGL, GBM and Gallium ABI
 closure used only by the shared Wayland game session. It does not replace Debian
@@ -34,5 +34,18 @@ the private files; GTA III reported Mesa 26.2.2, rendered a captured intro and
 exited 0 at its 121.15-second bound without a forced kill or new GPU fault. The
 system Mesa, services and stock clocks were restored and temporary access was
 removed. Exact evidence is
-`mainline/out/.cache/r46h-r60-formal-device-20260915/session.json`; physical LCD
-motion, audio, controls, gameplay, saves and relaunch remain open.
+`mainline/out/.cache/r46h-r60-formal-device-20260915/session.json`. At that
+checkpoint, physical LCD motion, audio, controls, gameplay, saves and relaunch
+were open.
+
+A later power-backed batch revalidated the exact archive and target preflight,
+then drove GTA III and Vice City through two remote South/B samples into captured
+640x480 cutscenes at temporary 816/300 MHz caps. The captures reported
+20.32 submissions/s with 43.19 ms median/54.18 ms P95 intervals for GTA III and
+19.03/s with 50.15/61.78 ms for Vice City. Their 120.97/121.15-second bounds
+exited 0 without a forced kill. Fresh sessions relaunched both games; Vice City's
+second run stopped on request at 28.56 seconds without a forced kill. No cooling
+state or ext4/Panfrost/GPU fault appeared, and stock clocks, ES-DE and temporary
+access/runtime state were restored before serial-confirmed poweroff. Evidence is
+`mainline/out/.cache/r46h-unattended-20260916/session.json`. These are composed
+frame and remote-input results, not physical LCD/audio/control/gameplay/save proof.

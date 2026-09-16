@@ -12,10 +12,11 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device was last left **powered off** after a low-load check found charger
-`online=0`, battery discharge and the old ES-DE using about 52% CPU at idle.
-Health, sync and controlled shutdown passed. Temporary CPU/GPU limits were
-restored; no disposable candidate is installed.
+The device was last left **powered off** after a power-backed ES-DE and R60 game
+batch. Charger `online=1` and positive battery current were observed. Health,
+sync and controlled shutdown passed; temporary CPU/GPU limits were restored,
+temporary access/runtime files were removed and no disposable candidate is
+installed.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -113,14 +114,20 @@ skipped, so content equality remains unverified. See
   a forced kill. The prior state, ES-DE and stock 1296/480 MHz limits were restored;
   temporary staging/access were removed and the candidate was not promoted.
 - A [private Mesa 26.2.2](../mainline/gaming-mesa/README.md) same-boot A/B raised
-  640x480 GTA III/VC from 11.00/14.67 to 14.36/17.15 submissions/s. Formal R60
-  host/target checks passed; GTA III rendered a captured intro and exited 0 after
-  121.15 seconds with no new fault. The system Mesa was not replaced.
+  640x480 GTA III/VC from 11.00/14.67 to 14.36/17.15 submissions/s. A later
+  power-backed R60 batch drove both games through two remote South/B samples into
+  captured cutscenes at 816/300 MHz. The captures reported 20.32/19.03
+  submissions/s; both 120.97/121.15-second bounds exited 0 without a forced kill,
+  both relaunched, and a 28.56-second Vice City relaunch stopped on request. No
+  ext4/Panfrost/GPU fault or cooling state appeared. The system Mesa was not
+  replaced; physical LCD motion, audio, controls, gameplay and saves remain open.
 - ES-DE's 33 ms no-video idle-pacing A/B cut settled CPU from 51.16% to
   25.08%, SoC from 81.20 C to 70.68 C and GPU from 82.45 C to 72.34 C; input
   restored full-rate rendering for about one second. Its patched archive and
-  executable now reproduce and validate on host. The old frontend remains
-  installed; transient promotion and patched LCD motion remain open.
+  executable reproduce on host. A power-backed transient re-run held the patched
+  service to 23.57% CPU over 60 seconds and a remote Right changed the verified
+  DRM frame. The original executable and service were restored exactly; persistent
+  promotion and physical patched LCD motion remain open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -133,8 +140,8 @@ runbooks.
 
 ## Immediate next work
 
-1. Unattended: after external power is confirmed, test locked ES-DE idle pacing transiently, then batch R60 GTA III/VC launch, New Game, capture, thermal/fault, exit and relaunch at 640x480 and 816/300 MHz.
-2. Unattended: exercise Stardew's guarded save lifecycle and mixed-game endurance, then Wi-Fi reconnect/Bluetooth discovery; keep zram a separate fallback-backed kernel gate.
+1. Unattended: exercise Stardew's guarded save lifecycle and a mixed-game endurance run.
+2. Unattended: test Wi-Fi reconnect and Bluetooth discovery; keep zram a separate fallback-backed kernel gate.
 3. Attended/deferred: batch LCD/audio/physical-control/gameplay/save observations; pause Moonlight, USB HID and dynamic frequency policy until requested or their hardware gate changes.
 
 ## Working rules

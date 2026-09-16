@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-15: **R60 MESA HOST + TARGET PASS / ATTENDED OPEN / STREAMING DEFERRED**.
+Status 2026-09-16: **R60 MESA BATCHED MACHINE PASS / ATTENDED OPEN / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -376,8 +376,21 @@ the private runtime; GTA III reported Mesa 26.2.2, rendered a captured intro and
 ended its 121.15-second bound at exit 0 without a forced kill or new GPU fault.
 The system Mesa hash, services and stock clocks were restored; access/staging
 were removed and the device stayed on. Exact evidence is
-`mainline/out/.cache/r46h-r60-formal-device-20260915/session.json`. LCD motion,
-audio, physical controls, gameplay, saves and relaunch remain open.
+`mainline/out/.cache/r46h-r60-formal-device-20260915/session.json`. At that
+checkpoint, LCD motion, audio, physical controls, gameplay, saves and relaunch
+were open.
+
+The 2026-09-16 power-backed R60 batch revalidated the exact target preflight and
+drove both GTA games through two remote South/B samples into captured 640x480
+cutscenes at temporary 816/300 MHz caps. GTA III reported 20.32 submissions/s
+with 43.19 ms median/54.18 ms P95 intervals; Vice City reported 19.03/s with
+50.15/61.78 ms. Their 120.97/121.15-second bounds exited 0 without forced kills.
+Fresh sessions relaunched both games, and a 28.56-second Vice City relaunch
+stopped on request without a forced kill. No cooling state or ext4/Panfrost/GPU
+fault appeared. Stock clocks, ES-DE and all temporary device state were restored
+before serial-confirmed poweroff. Evidence is
+`mainline/out/.cache/r46h-unattended-20260916/session.json`; physical LCD/audio,
+controls, gameplay and saves remain open.
 
 R58's exact target package and preflight passed. Two GTA III runs ended cleanly
 at 60.68 seconds by requested stop and 120.38 seconds by diagnostic bound; both
