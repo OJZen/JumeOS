@@ -77,6 +77,8 @@ class Debian13GamingRootfsV18Tests(unittest.TestCase):
             self.assertIn(required, script)
         for forbidden in ("/dev/disk", "saveenv", "curl ", "wget ", "apt-get update", "--net=host"):
             self.assertNotIn(forbidden, script)
+        self.assertIn("'-f=${Package}\\t${Version}\\t${Architecture}\\n'", script)
+        self.assertNotIn("'-f=${binary:Package}\\t${Version}\\t${Architecture}\\n'", script)
         framework = (REPO / "mainline/scripts/build-debian13-gaming-rootfs-v06.py").read_text(encoding="utf-8")
         self.assertIn("if CONTAINER_PRIVILEGED:", framework)
         self.assertIn('SUCCESSOR_METHOD = "offline-debugfs-bounded-overlay"', framework)

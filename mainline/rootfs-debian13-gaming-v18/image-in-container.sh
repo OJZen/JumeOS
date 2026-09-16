@@ -296,7 +296,7 @@ verify_final() {
 
   : > "$EVIDENCE/PACKAGE-VERIFY.txt"
   while IFS=$'\t' read -r package version architecture filename digest; do
-    actual=$(chroot "$FINAL" dpkg-query -W '-f=${binary:Package}\t${Version}\t${Architecture}\n' "$package")
+    actual=$(chroot "$FINAL" dpkg-query -W '-f=${Package}\t${Version}\t${Architecture}\n' "$package")
     [[ $actual == "$package"$'\t'"$version"$'\t'"$architecture" ]] || die "installed package mismatch: $package"
     printf '%s\n' "$actual" >> "$EVIDENCE/PACKAGE-VERIFY.txt"
   done < "$INPUTS/POLKIT-PACKAGES.tsv"
