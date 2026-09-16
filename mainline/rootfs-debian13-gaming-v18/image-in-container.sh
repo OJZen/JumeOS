@@ -11,6 +11,7 @@ readonly ACTION=${1:-}
 readonly IMAGE=/output/${IMAGE_NAME:?}
 readonly INPUTS=/payload/product-inputs
 readonly SCRATCH=/work/rootfs-work.ext4
+readonly EVIDENCE=/evidence
 readonly ROOT=/mnt/root
 readonly SOURCE=/mnt/source
 readonly FINAL=/mnt/final
