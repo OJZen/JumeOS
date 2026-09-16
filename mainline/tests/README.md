@@ -20,7 +20,8 @@ The latter tests transform the current screenshot source but compare it with
 historical pinned hashes; the anchored process-guard change altered those
 bytes. Preserve the pins and use version-bound inputs if these historical
 paths need repair. These failures do not revalidate or revoke already
-published images. P2 v0.16/v0.17 host checks pass separately.
+published images. P2 v0.16/v0.17 host checks pass separately; v0.18 owns its
+new package/repack path.
 
 Those checks do not establish that each ES-DE core is discoverable through
 RetroArch's configured core directory. The
@@ -179,8 +180,10 @@ and full 6,115-link readback. It does not prove a media write or R46H behavior.
 `test-debian13-gaming-rootfs-v15.py` owns the Game Gear successor;
 `test-debian13-gaming-rootfs-v16.py` owns the 10 ms input and anchored capture
 overlay; `test-debian13-gaming-rootfs-v17.py` owns exclusive custom systems and
-retained runtime identity. These are host checks; actual ES-DE system loading,
-transport, media and operator observations remain separate gates.
+retained runtime identity; `test-debian13-gaming-rootfs-v18.py` owns the exact
+polkit packages, ark-only rule and external-scratch ext4 repack. These are host
+checks; actual ES-DE system loading, transport, media and operator observations
+remain separate gates.
 
 ## Qt desktop preview
 
@@ -262,7 +265,8 @@ activation, permission denial, changed APs and deadline handling. Native systems
 without dbus-daemon skip that wire test; the ARM64 builder runs it. No actual
 network, saved password, system bus or host NetworkManager is touched.
 `test-shell-network-policy.py` pins the exact target-tested polkit rule and its
-three ark-only NetworkManager actions; it does not claim image integration.
+three ark-only NetworkManager actions. The v0.18 rootfs test owns host image
+integration; media and reboot/new-password behavior remain separate.
 `wifiChooserPasswordPrivacyAndForget` checks the shared chooser, password masking,
 capture-refusal state, cancellation/clear, remember switch and confirmed UUID
 removal. Actual device permissions, DHCP, reconnect and persisted secrets remain

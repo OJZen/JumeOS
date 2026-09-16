@@ -101,6 +101,8 @@ BASE_BUILD_INFO_RECEIPT_NAME = "r46h-debian13-p2-gaming-v0.5.BUILD-INFO"
 DEBUGFS_EVIDENCE_NAME = "DEBUGFS-V06.txt"
 INDEPENDENT_DEBUGFS_EVIDENCE_NAME = "INDEPENDENT-DEBUGFS-V06.txt"
 ARTIFACT_STATUS = "host-only-not-authorized-for-media-write"
+SUCCESSOR_METHOD = "offline-debugfs-bounded-overlay"
+CONTAINER_PRIVILEGED = False
 EXTRA_BUILD_ENVIRONMENT: dict[str, str] = {}
 EXTRA_BUILD_INFO: dict[str, str] = {}
 CONSOLIDATED_RECEIPT_EXTRA_MARKERS: tuple[str, ...] = ()
@@ -632,6 +634,10 @@ def run_image_tool(
         "linux/arm64",
         "--network",
         "none",
+    ]
+    if CONTAINER_PRIVILEGED:
+        arguments.append("--privileged")
+    arguments.extend((
         "--mount",
         f"type=bind,source={source},target=/source,readonly",
         "--mount",
@@ -645,7 +651,7 @@ def run_image_tool(
         f"type=bind,source={work},target=/work",
         "--mount",
         f"type=bind,source={evidence},target=/evidence",
-    ]
+    ))
     for key, value in environment.items():
         arguments.extend(("--env", f"{key}={value}"))
     arguments.extend(
@@ -749,7 +755,7 @@ def write_build_metadata(
         "source_git_tree": source_tree,
         "source_manifest_sha256": sha256_bytes(source_manifest),
         "source_snapshot_method": "exact-committed-blobs",
-        "successor_method": "offline-debugfs-bounded-overlay",
+        "successor_method": SUCCESSOR_METHOD,
         "udev_vendor_rule_sha256": ALSA_VENDOR_RULE_SHA256,
         "udev_override_rule_sha256": ALSA_OVERRIDE_RULE_SHA256,
     }
@@ -822,7 +828,7 @@ def validate_stage(stage: Path, expected_source_commit: str | None = None) -> st
         "root_partuuid": "c9f931c9-02",
         "source_date_epoch": SOURCE_DATE_EPOCH,
         "source_snapshot_method": "exact-committed-blobs",
-        "successor_method": "offline-debugfs-bounded-overlay",
+        "successor_method": SUCCESSOR_METHOD,
         "udev_vendor_rule_sha256": ALSA_VENDOR_RULE_SHA256,
         "udev_override_rule_sha256": ALSA_OVERRIDE_RULE_SHA256,
     }
