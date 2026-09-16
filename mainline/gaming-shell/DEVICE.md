@@ -185,8 +185,10 @@ ark-only rule for exactly `network-control`, `settings.modify.system` and
 `wifi.scan`. Ark then rescanned, created/deleted an isolated profile, disconnected
 and reactivated the saved profile, retained its address and reached the gateway;
 all unrelated NetworkManager permissions stayed denied. The packages and rule were
-not promoted. A future image may carry that minimal policy, but new-password
-AddAndActivateConnection2 and reboot persistence still require acceptance.
+not promoted. The exact target-tested rule is retained as
+`49-r46h-network.rules`; a future image must add Debian's `polkitd` and install
+that file without broadening it. New-password AddAndActivateConnection2 and
+reboot persistence still require acceptance.
 The [test index](../tests/README.md#current-review-gaps) records the Mac window-
 activation limitation separately from the passing offscreen/ARM64 checks.
 

@@ -6,12 +6,9 @@
 
 ## How to read this ledger
 
-- **PASS**: evidence exists for the stated boundary; repeat only after a relevant change or reviewed regression.
-- **FAIL**: the tested path failed; do not repeat without a new hypothesis or implementation.
-- **REVOKED**: old evidence cannot authorize later work.
-- **OPEN**: the stated acceptance contract has not passed.
-
-Host/media/physical evidence are distinct; machine exits do not imply operator audio/display/control observations.
+**PASS** is accepted only for its stated boundary; **FAIL** needs a new hypothesis,
+**REVOKED** cannot authorize later work, and **OPEN** has not passed. Host, media,
+machine and operator evidence remain distinct.
 
 ## Current accepted first version and next gate
 
@@ -23,40 +20,31 @@ The current card's EASYROMS p3 import passed write, eject and physical use; its
 full target checksum/readback was skipped, so equality remains unverified; see
 [P3 Content Migration](../../../docs/P3-CONTENT-MIGRATION.md).
 
-Fallbacks are p2 v0.7 attended and v0.15 automated; current v0.17 passed readbacks, cold/warm infra and stick smoke.
-R58's 640x480 GTA III/VC reached 15.24/14.46/s; R60 private Mesa added 30.6%/16.9% and passed target integration.
-LCD, USB, Moonlight and PSP remain open.
+Fallbacks are p2 v0.7 attended and v0.15 automated; current v0.17 passed readbacks,
+cold/warm infra and stick smoke. LCD, USB, Moonlight and PSP remain open.
 
 ## Capability ledger
 
 - **Full-card first-version release v0.1 — HOST + MEDIA + PHYSICAL PASS.** Its
-  v0.17/v0.15 and p2 v0.5 cold-booted cleanly. Current p2/p3 later changed;
-  blank-card provisioning and statistical reliability remain open.
+  v0.17/v0.15 and p2 v0.5 cold-booted; current p2/p3 later changed.
 - **Original-card EASYROMS — P3 WRITE/PHYSICAL PASS; READBACK UNVERIFIED.**
-  Exact-size exFAT read-only fsck, p3 write/sync/eject, cold/warm read-only mount,
-  frontend and one game passed. Checksums were skipped; retain a recovery path.
+  Write/sync/eject, read-only mounts, frontend and one game passed; checksums were skipped.
 - **Cold MMC — V0.17 ONE-SHOT + TWO PERSISTENT PASS / RELIABILITY OPEN.**
-  Three SDR104/150 MHz cold samples retained exact v0.15 bytes without MMC/ext4
-  faults. v0.16 persistent isolation reproduced the fault and was rolled back.
-  Do not loop unchanged boots or claim statistical reliability.
+  Three SDR104/150 MHz samples had no MMC/ext4 fault; v0.16 reproduced the fault
+  and was rolled back. Do not loop unchanged boots.
 - **Debian 13 gaming p2 v0.7 — HOST + P2 MEDIA + PHYSICAL PASS.** Exact payload
-  v0.6 is embedded. Two readbacks, serial cold boot,
-  product sample, zero-error health and controlled poweroff passed.
+  v0.6, two readbacks, cold boot, product sample, health and poweroff passed.
 - **Debian 13 gaming p2 v0.15 — HOST + P2 MEDIA + DEVICE AUTOMATION PASS /
-  ATTENDED OPEN / DREAMCAST FAIL.** Builds/readbacks, cold boot, SDR104/150 MHz,
-  read-only `/roms`, ES-DE, Game Gear/PSP/CPS capture/PCM, warm reboot, health
-  and poweroff passed. LCD, audible output, controls and saves were not observed.
+  ATTENDED OPEN / DREAMCAST FAIL.** Build/readback, boot, `/roms`, automated game
+  samples, reboot, health and poweroff passed; operator evidence stayed open.
 - **Debian 13 gaming p2 v0.16 — HOST + P2 MEDIA + DEVICE INFRA PASS / PRODUCT
-  FAIL.** Two builds/readbacks, cold boot, base smoke, storage, 10 ms input,
-  guarded captures, health and poweroff passed. ES-DE merged bundled Dreamcast,
-  loaded 14 systems and failed the intended 13-system menu contract.
+  FAIL.** Infra passed, but ES-DE merged bundled Dreamcast and loaded 14 systems
+  instead of the intended 13.
 - **Debian 13 gaming p2 v0.17 exclusive systems — HOST + P2 MEDIA + DEVICE
-  INFRA + STICK SMOKE PASS / SAVE MENU FAIL / PSP DEFERRED.** Builds/readbacks, cold/warm
-  identity, base/storage checks, actual 13-system loading, exact input roundtrip,
-  ES-DE/Game Gear/PSP frames, health and poweroff passed. Two Game Gear samples
-  had no operator-reported issue. Ozone save entries are absent; custom cores
-  sit outside RetroArch's discovery path. Both sticks passed attended RetroArch
-  direction/centering checks; no mapping changed. PSP-specific follow-up is deferred.
+  INFRA + STICK SMOKE PASS / SAVE MENU FAIL / PSP DEFERRED.** Build/readback,
+  cold/warm identity, 13 systems, input/captures, health and poweroff passed.
+  Ozone save entries are absent because custom cores sit outside discovery;
+  both sticks passed direction/centering without a mapping change.
 - **Persistent v0.15 BOOT — PASS.** Versioned promotion kept v0.10/v0.8
   fallbacks and U-Boot environment unchanged. Roll back only for a regression;
   never use `saveenv`.
@@ -79,15 +67,10 @@ LCD, USB, Moonlight and PSP remain open.
   operator accepted clean LCD startup and gameplay. Mild pacing artifacts remain.
 - **ES-DE successor — HOST + POWER-BACKED TRANSIENT TARGET + GAME PHYSICAL PASS /
   PERSISTENT PROMOTION + PATCHED LCD MOTION OPEN.**
-  NES/Metal Slug and the 60 FPS original-art view pass capture and health checks.
-  Per-frame generic/minimal paths are 21.7/3.3 ms; one bad batch caused 12 recovered
-  watchdogs, then corrected/live runs added none. No-fill stays 60 FPS. A transient
-  no-video idle-pacing candidate cut CPU 51.16% to 25.08% and GPU 82.45 C to 72.34 C
-  while preserving immediate input; its archive/executable reproduce on host. A
-  power-backed transient re-run held the patched service to 23.57% CPU over 60
-  seconds and changed the verified DRM frame after remote Right. Exact restoration
-  of the installed executable/service and final health passed. Persistent promotion,
-  physical patched LCD motion, CJK and startup remain open.
+  NES/Metal Slug and 60 FPS original-art capture passed. Transient idle pacing cut
+  CPU 51.16% to 25.08% and GPU 82.45 C to 72.34 C while preserving immediate input;
+  a power-backed repeat held 23.57% CPU and changed the DRM frame after input.
+  Exact restoration passed; promotion, physical patched motion, CJK and startup remain open.
 - **Remote screen — V0.16/V0.17 ANCHORED GUARD DEVICE PASS.** ES-DE-only,
   ES-DE-plus-Game Gear and PPSSPP-after-`comm=Main` captures passed; pairing is
   still required after a new image write.
@@ -98,18 +81,11 @@ LCD, USB, Moonlight and PSP remain open.
   R56 aligned the status row in a device-composed capture; physical LCD remains open.
   Reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope.
 - **Wayland/ports — R60 MESA BATCHED MACHINE PASS / ATTENDED OPEN.**
-  R48 fixed D-pad Down; R58's 640x480 runs exited cleanly; R59 passed first-config launch.
-  [Private Mesa](../../gaming-mesa/README.md) raised GTA III/VC from 11.00/14.67 to 14.36/17.15/s.
-  Formal R60 preflight passed. A power-backed 816/300 MHz batch drove GTA III and
-  Vice City through two remote South/B samples into captured cutscenes at
-  20.32/19.03 submissions/s. Their 120.97/121.15-second bounds and later
-  relaunches exited or stopped cleanly without a forced kill, ext4/Panfrost/GPU
-  fault or cooling state. A follow-up preserved exact Stardew source/managed/backup
-  save hashes and refused overwrite; with or without managed saves, Stardew stayed
-  before SDL/Wayland for 120 seconds at both tested clock profiles. A same-boot
-  Vice City run averaged 58.26 submissions/s over eleven valid samples, peaked at
-  77.307 C and exited 0. Attended LCD/audio/control/gameplay/save acceptance and
-  Stardew shared-window/save-load readiness remain open.
+  R48 fixed D-pad Down; 640x480, first-config and [private Mesa](../../gaming-mesa/README.md)
+  passed. R60 reached GTA III/VC cutscenes, clean 121-second exits and relaunches
+  without storage/GPU faults. Stardew source/managed/backup saves remained exact
+  and overwrite was refused, but its 120-second runs stayed before SDL/Wayland.
+  Attended play and Stardew shared-window/save-load remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**
@@ -129,19 +105,14 @@ LCD, USB, Moonlight and PSP remain open.
   Patched Sunshine removed alternating frame gaps; L1 + R1 exits, with transient black before ES-DE recovery.
   [Streaming](../../../docs/GAME-STREAMING.md): low-delay A/V pass; Qt ~60 FPS Hantro sample; product/gamepad open.
 - **Local Wi-Fi control — TEMPORARY POLICY DEVICE PASS / IMAGE + NEW PASSWORD OPEN.**
-  The base image lacks polkit and denies ark. A temporary ark-only three-action
-  rule passed scan, isolated profile create/delete and saved-profile down/up with
-  unchanged DHCP and gateway reachability; unrelated permissions stayed denied.
-  The candidate was not promoted. AddAndActivateConnection2 with a new password
-  and reboot persistence remain open.
+  The base lacks polkit. An ark-only three-action rule passed scan, profile
+  create/delete and saved reconnect; unrelated permissions stayed denied.
+  Image integration, new-password activation and reboot persistence remain open.
 - **Bluetooth — HARDWARE BLOCKED.** Boot reports `BT=0`; rfkill/sysfs/USB expose
-  no controller and BlueZ is absent. Require a controller route and firmware
-  before pairing work.
+  no controller and BlueZ is absent. Require controller/firmware before pairing.
 - **Zram — ONE-SHOT KERNEL + APPLY/DISABLE DEVICE PASS / PROMOTION OPEN.** The
-  v0.18 candidate booted with the accepted v0.17 DTB and unchanged U-Boot state.
-  A guarded 256 MiB LZ4 device used 43.5 MiB swap under bounded pressure, then
-  reset and unloaded without OOM, ext4 or GPU faults. Normal v0.15 and media hashes
-  were restored. Persistent policy and real-game benefit remain open.
+  v0.18 candidate used 43.5 MiB of 256 MiB LZ4 swap under bounded pressure, then
+  reset/unloaded cleanly. Normal v0.15/media were restored; benefit remains open.
 - **Hantro media — QT V3 SHORT HUD/A/V/RETURN PASS / LONG SESSION OPEN.**
   Default-preset native HUD, picture/audio, shoulders, host-loss return and reconnect
   were accepted; 59.25 rendered FPS reported. Application-list retrieval failed to
@@ -163,15 +134,11 @@ LCD, USB, Moonlight and PSP remain open.
 
 ## Evidence owners
 
-- Release/media/boot: [release](../../first-version-release/README.md),
-  [v0.17 power settle](../../bringup-tests/V17-MMC-POWER-SETTLE.md),
-  [v0.15 promotion](../../gaming-product-boot-promotion/README.md) and
-  [p3 migration](../../../docs/P3-CONTENT-MIGRATION.md).
-- Product/rootfs: [product](../../bringup-tests/GAMING-PRODUCT.md),
-  [v0.7](../../rootfs-debian13-gaming-v07/README.md), [v0.15](../../rootfs-debian13-gaming-v15/README.md),
-  [v0.16](../../rootfs-debian13-gaming-v16/README.md), [v0.17](../../rootfs-debian13-gaming-v17/README.md),
-  and [MVP](../../bringup-tests/GAMING-MVP.md).
-- Attended/power/media: [input/audio](../../bringup-tests/ATTENDED-INPUT-AUDIO-COMPLETION.md),
-  [audio route](../../bringup-tests/AUDIO-ROUTE-PROBE.md), [charging](../../bringup-tests/V12-CHARGE-TERM-POLICY.md),
-  [fast card](../../deploy/FAST-CARD-62534975488.md), [Hantro](../../bringup-tests/HANTRO-CODEC-DECODE-PROBE.md),
-  [USB](../../bringup-tests/USB-STORAGE-READ-PROBE.md) and [rumble](../../bringup-tests/RUMBLE-PROBE.md).
+- Boot/media: [release](../../first-version-release/README.md),
+  [power settle](../../bringup-tests/V17-MMC-POWER-SETTLE.md),
+  [promotion](../../gaming-product-boot-promotion/README.md), [p3](../../../docs/P3-CONTENT-MIGRATION.md).
+- Product: [rootfs](../../rootfs-debian13-gaming-v17/README.md),
+  [MVP](../../bringup-tests/GAMING-MVP.md), [input/audio](../../bringup-tests/ATTENDED-INPUT-AUDIO-COMPLETION.md).
+- Hardware: [audio](../../bringup-tests/AUDIO-ROUTE-PROBE.md),
+  [charging](../../bringup-tests/V12-CHARGE-TERM-POLICY.md),
+  [Hantro](../../bringup-tests/HANTRO-CODEC-DECODE-PROBE.md), [USB](../../bringup-tests/USB-STORAGE-READ-PROBE.md).

@@ -261,6 +261,8 @@ message types, volatile/disk options, open/PSK settings, initial and signalled
 activation, permission denial, changed APs and deadline handling. Native systems
 without dbus-daemon skip that wire test; the ARM64 builder runs it. No actual
 network, saved password, system bus or host NetworkManager is touched.
+`test-shell-network-policy.py` pins the exact target-tested polkit rule and its
+three ark-only NetworkManager actions; it does not claim image integration.
 `wifiChooserPasswordPrivacyAndForget` checks the shared chooser, password masking,
 capture-refusal state, cancellation/clear, remember switch and confirmed UUID
 removal. Actual device permissions, DHCP, reconnect and persisted secrets remain

@@ -33,114 +33,27 @@ skipped, so content equality remains unverified. See
 
 ## Current feature evidence
 
-- The Qt candidate has machine proof for battery percentage, charging state,
-  Wi-Fi signal, temperature, frequency, Neo Geo state persistence, and the
-  PortMaster catalog. Physical UI controls, LCD motion, and sustained thermal
-  acceptance remain open.
-- R48's repaired source-built GTA III and Vice City use Panfrost OpenGL ES 3.1.
-  The operator accepted both intro starts and GTA III D-pad Down after the
-  no-`O_NOATIME` and 10% deadzone repair, but reported abnormally slow motion.
-- R43/R44 still failed in SDL/GBM because their wrappers missed the real loader.
-  R45 preloads the exact Debian Gallium provider with local symbol scope. Its
-  exact 1,630-file package ran Stardew for the full 120.6-second bound, returned
-  cleanly and kept the original saves read-only. LCD, audio, physical controls,
-  gameplay, save/load and relaunch remain operator-open.
-- R47 imported the retained Stardew save through the product worker, preserved
-  equal source/copy hashes and refused a second overwrite. Stardew then ran its
-  120-second machine bound; no operator display/audio/gameplay result was given.
-- A same-day follow-up also kept the managed copy and timestamped backup exact,
-  refused a second overwrite and restored a temporarily removed managed save.
-  Stardew still remained before SDL/Wayland for the full 120-second bound at both
-  816/300 and stock 1296/480 MHz; save selection/load and a shared game window stay open.
-- R51 reuses the shared compositor's existing performance HUD, capture and
-  bounded gamepad RPC. Its 1,726 files and preflight passed on target. A composed
-  GTA III menu measured 25.6 game submissions/s (36.3 ms median, 43.6 ms P95)
-  at the temporary 1008/400 MHz caps, and one remote Down sample completed.
-  The first run reached the 85 C guard; both runs restored ES-DE and all leases.
-  Displayed LCD FPS, GTA gameplay/audio/saves/relaunch and shared Vice City remain open.
-- R54 replaces the GTA development profile with upstream `MASTER`/`FINAL`.
-  Its 1,727 files and preflight passed on target. At the same 1008/400 MHz caps,
-  GTA III averaged 26.84 submissions/s with the resident HUD and 30.43/s with
-  it hidden; the full-screen transparent HUD is a material compositor cost.
-  The hottest GPU sample was 83.846 C. All runs exited without a forced kill,
-  but remote confirm did not leave the main menu, so intro/crash proof stays open.
-- R56 retains R55's clipped game HUD and aligns the top-right Wi-Fi, battery and
-  clock with shared icon boxes, gaps, caption size and centerline. Its complete
-  1,727-file readback and preflight passed on R46H. A Weston capture shows the
-  status row aligned and the HUD confined to the top-right over a real GTA III
-  intro frame; physical LCD confirmation remains open.
-- GTA III intro pacing stayed abnormally low with the HUD hidden: seven samples
-  averaged 5.57 submissions/s (median 5.00), with 121.24--226.62 ms median frame
-  intervals at the same 1008/400 MHz caps. The HUD-on recorder covered only three
-  samples from a different intro phase, so it is not a matched comparison. The
-  observed disappearance at 121.17 seconds was the diagnostic bound's forced kill,
-  not a reproduced natural crash. That run alone could not separate Panfrost
-  runtime faults from its forced cleanup; R57 resolves that boundary below.
-- R57 keeps the one-second shared user-stop deadline but gives a diagnostic's
-  self-triggered bound the existing five-second cleanup grace. On R46H, two GTA III
-  bounds ended in 120.97/121.05 seconds with exit 0 and no forced kill, proving the
-  lifecycle fix. Panfrost `DATA_INVALID_FAULT` events occurred while the game was
-  still active, however, so they are a runtime fault rather than a forced-cleanup
-  artifact.
-- A similar roughly 59-second intro window averaged 5.59 submissions/s at
-  1024x768 and 12.32/s at a temporary 640x480. The lower resolution also reached
-  active thermal cooling from a hot start and did not prevent two Panfrost faults;
-  it is evidence for a rendering-cost bottleneck, not an accepted default. The
-  original configuration was hash-restored before poweroff.
-- R58 sets Panfrost `noafbc` only for GTA III and Vice City. A same-boot follow-up
-  drove each game's Switch-layout South/B path through menu, New Game and a fresh
-  intro capture at 1008/400 MHz. GTA III fell from 28.66/s at its menu to 3.17/s
-  in the car cutscene; Vice City fell from 27.70/s to 4.17/s. Their 120.82/121.17
-  second bounded runs and GTA III's later 49.81-second requested stop all exited 0
-  without a forced kill. The whole boot again logged zero `DATA_INVALID`/GPU faults.
-  One earlier preview ended on a routed-controller disconnect before producing a
-  game result and is not counted as a crash. R58 now has matched machine evidence
-  that fault suppression holds while the intro pacing defect remains. Physical
-  controls, LCD motion, audio, gameplay, saves and relaunch remain open.
-- A host audit of the exact pinned Release/`MASTER` sources found no explicit GPU
-  readback or `glFinish` in the normal frame path, while ordinary world streaming
-  remains asynchronous and the costly optional renderer paths are disabled. The
-  matched captures contain separate 4.41/8.96-second transition gaps followed by
-  sustained 3--4/s intro submissions. Together with R57's resolution sensitivity,
-  this supports a cooled same-build resolution A/B before any speculative engine patch.
-- The cooled R58 A/B confirmed pixel cost as the useful control. At 640x480 and
-  temporary 816/300 MHz caps, GTA III and Vice City intro windows averaged
-  15.24/14.46 submissions/s and peaked at 76.538/77.692 C with no cooling state;
-  both 121-second bounds exited 0 without a forced kill. The earlier matched
-  1024x768 windows were 3.17/4.17/s at 1008/400 MHz. A 512x384 request was
-  unsupported and exited cleanly. The next candidate seeds 640x480 only when a
-  managed GTA configuration is first created; it does not overwrite an existing
-  preference. Physical LCD quality remains open.
-- Clean source `944b753208d7073527ebf27b0309e5038c1b4941` produced the R59
-  no-Moonlight ARM64 package; all 1,727 files passed independent verification.
-  Exact target preflight and a fresh-state GTA III launch passed: R59 generated
-  the expected 640x480 config, reached real game submissions and exited 0 without
-  a forced kill. The prior state, ES-DE and stock 1296/480 MHz limits were restored;
-  temporary staging/access were removed and the candidate was not promoted.
-- A [private Mesa 26.2.2](../mainline/gaming-mesa/README.md) same-boot A/B raised
-  640x480 GTA III/VC from 11.00/14.67 to 14.36/17.15 submissions/s. A later
-  power-backed R60 batch drove both games through two remote South/B samples into
-  captured cutscenes at 816/300 MHz. The captures reported 20.32/19.03
-  submissions/s; both 120.97/121.15-second bounds exited 0 without a forced kill,
-  both relaunched, and a 28.56-second Vice City relaunch stopped on request. No
-  ext4/Panfrost/GPU fault or cooling state appeared. The system Mesa was not
-  replaced; physical LCD motion, audio, controls, gameplay and saves remain open.
-- A temporary minimal polkit policy gave ark only the three required NetworkManager
-  permissions and passed scan, disposable profile create/delete and saved-profile
-  reconnect with DHCP/gateway reachability. It was not promoted; a future image
-  must test new-password activation and reboot persistence. Bluetooth is blocked
-  because this unit exposes no controller/firmware path and currently lacks BlueZ.
-- The isolated v0.18 zram kernel booted one-shot with the accepted DTB. A guarded
-  256 MiB LZ4 device reached 43.5 MiB swap use under bounded pressure, disabled
-  and unloaded cleanly, and normal v0.15 plus unchanged boot media were restored.
-  Promotion waits for real-game benefit.
-- ES-DE's 33 ms no-video idle-pacing A/B cut settled CPU from 51.16% to
-  25.08%, SoC from 81.20 C to 70.68 C and GPU from 82.45 C to 72.34 C; input
-  restored full-rate rendering for about one second. Its patched archive and
-  executable reproduce on host. A power-backed transient re-run held the patched
-  service to 23.57% CPU over 60 seconds and a remote Right changed the verified
-  DRM frame. The original executable and service were restored exactly; persistent
-  promotion and physical patched LCD motion remain open.
+- The Qt candidate has machine proof for status values, storage/settings,
+  PortMaster and routed remote control. R56 aligns Wi-Fi, battery, clock and the
+  clipped game HUD in composed output; physical LCD confirmation remains open.
+- Repaired GTA III/Vice City accept the Switch-layout controls and no longer
+  reproduce the bounded-exit crash. GTA-only `noafbc`, first-config 640x480 and
+  private Mesa 26.2.2 passed target integration. The R60 batch reached captured
+  cutscenes, clean 121-second exits and relaunches without storage/GPU faults;
+  [ports](../mainline/gaming-ports/README.md) owns exact pacing and thermal data.
+- Stardew's source, managed copy and backup hashes match and overwrite is refused.
+  Its 120-second runs still remain before SDL/Wayland at both tested clock profiles;
+  shared-window save selection/load and all attended gameplay evidence stay open.
+- ES-DE's transient 33 ms idle pacing roughly halved settled CPU use and reduced
+  temperature while retaining immediate input. The original executable remains
+  installed; persistent promotion and physical patched LCD motion are open.
+- A temporary ark-only three-action polkit rule passed scan, profile create/delete
+  and saved-profile reconnect. The exact rule is now retained, but image packaging,
+  new-password activation and reboot persistence remain. Bluetooth is blocked by
+  absent controller/firmware and BlueZ.
+- The isolated v0.18 zram kernel passed one-shot boot and 256 MiB LZ4 apply,
+  pressure, disable and unload. Normal v0.15/media were restored; promotion waits
+  for measurable real-game benefit.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
