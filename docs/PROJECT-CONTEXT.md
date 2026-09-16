@@ -12,9 +12,10 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **on at ES-DE** after the R58 resolution/thermal follow-up. The
-operator asked that it remain powered while connected to external power. Temporary
-CPU/GPU limits were restored; the disposable candidate is not installed.
+The device was last left **on at ES-DE** after the R60 target pass and ES-DE
+idle-pacing A/B. The operator asked that it remain powered while connected to
+external power. Temporary CPU/GPU limits were restored; neither disposable
+candidate is installed.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -133,9 +134,9 @@ runbooks.
 
 ## Immediate next work
 
-1. Promote ES-DE idle pacing, then batch attended R60 GTA III/VC acceptance.
-2. Finish Stardew display/audio/gameplay/save/relaunch acceptance when attended.
-3. Keep Moonlight paused until requested; keep USB HID as a separate hardware-route gate.
+1. Unattended: build/test ES-DE idle pacing transiently, then batch R60 GTA III/VC launch, New Game, capture, thermal/fault, exit and relaunch at 640x480 and 816/300 MHz.
+2. Unattended: exercise Stardew's guarded save lifecycle and mixed-game endurance, then Wi-Fi reconnect/Bluetooth discovery; keep zram a separate fallback-backed kernel gate.
+3. Attended/deferred: batch LCD/audio/physical-control/gameplay/save observations; pause Moonlight, USB HID and dynamic frequency policy until requested or their hardware gate changes.
 
 ## Working rules
 
