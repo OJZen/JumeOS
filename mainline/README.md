@@ -12,7 +12,7 @@ candidate.
 | [`board/r46h/`](board/r46h/) | Board DTS, notes, and physical evidence ledger |
 | [`config/`](config/), [`patches/`](patches/) | Kernel configuration and patch series |
 | [`rootfs-debian13/`](rootfs-debian13/) | Debian base system |
-| [`rootfs-debian13-gaming-v17/`](rootfs-debian13-gaming-v17/) | Current gaming rootfs entry point |
+| [`rootfs-debian13-gaming-v18/`](rootfs-debian13-gaming-v18/) | Current gaming rootfs entry point |
 | [`gaming-es-de/`](gaming-es-de/) | ES-DE runtime and frontend integration |
 | [`gaming-shell/`](gaming-shell/) | Qt Quick handheld desktop |
 | [`gaming-wayland/`](gaming-wayland/) | Shared Wayland session and routed input |
@@ -24,7 +24,7 @@ candidate.
 | [`tools/`](tools/) | Card Agent and next-generation card toolchain |
 | [`tests/`](tests/) | Focused host regression checks |
 
-The v0.17 rootfs builder imports the preceding versioned builders, so those
+The v0.18 rootfs builder imports the preceding versioned builders, so those
 directories are source dependencies rather than archived releases. Generated
 artifacts and device evidence live under ignored `out/` or `.cache/`.
 

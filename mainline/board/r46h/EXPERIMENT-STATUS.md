@@ -22,6 +22,7 @@ full target checksum/readback was skipped, so equality remains unverified; see
 
 Fallbacks are p2 v0.7 attended and v0.15 automated; current v0.17 passed readbacks,
 cold/warm infra and stick smoke. LCD, USB, Moonlight and PSP remain open.
+The v0.18 local-network-policy successor is host-only; media and physical gates are open.
 
 ## Capability ledger
 
@@ -104,10 +105,11 @@ cold/warm infra and stick smoke. LCD, USB, Moonlight and PSP remain open.
 - **Wi-Fi / streaming — V0.17 PICTURE/AUDIO + 60 FPS SAMPLE PASS / SSH UNPAIRED.**
   Patched Sunshine removed alternating frame gaps; L1 + R1 exits, with transient black before ES-DE recovery.
   [Streaming](../../../docs/GAME-STREAMING.md): low-delay A/V pass; Qt ~60 FPS Hantro sample; product/gamepad open.
-- **Local Wi-Fi control — TEMPORARY POLICY DEVICE PASS / IMAGE + NEW PASSWORD OPEN.**
-  The base lacks polkit. An ark-only three-action rule passed scan, profile
-  create/delete and saved reconnect; unrelated permissions stayed denied.
-  Image integration, new-password activation and reboot persistence remain open.
+- **Local Wi-Fi control — TEMPORARY POLICY DEVICE + V0.18 HOST PASS / MEDIA + NEW PASSWORD OPEN.**
+  The ark-only three-action rule passed scan, profile create/delete and saved
+  reconnect; unrelated permissions stayed denied. Exact packages/rule now pass
+  byte-reproducible host composition and independent validation. Fixed-profile
+  deployment, new-password activation and reboot persistence remain open.
 - **Bluetooth — HARDWARE BLOCKED.** Boot reports `BT=0`; rfkill/sysfs/USB expose
   no controller and BlueZ is absent. Require controller/firmware before pairing.
 - **Zram — ONE-SHOT KERNEL + APPLY/DISABLE DEVICE PASS / PROMOTION OPEN.** The

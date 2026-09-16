@@ -48,7 +48,8 @@ skipped, so content equality remains unverified. See
   temperature while retaining immediate input. The original executable remains
   installed; persistent promotion and physical patched LCD motion are open.
 - A temporary ark-only three-action polkit rule passed scan, profile create/delete
-  and saved-profile reconnect. The exact rule is now retained, but image packaging,
+  and saved-profile reconnect. The exact six-package/rule successor is now the
+  byte-reproducible, independently validated v0.18 host artifact. Media deployment,
   new-password activation and reboot persistence remain. Bluetooth is blocked by
   absent controller/firmware and BlueZ.
 - The isolated v0.18 zram kernel passed one-shot boot and 256 MiB LZ4 apply,
@@ -66,8 +67,8 @@ runbooks.
 
 ## Immediate next work
 
-1. Future image: include `polkitd` plus the proven ark-only three-action rule;
-   verify new-password activation and persistence after reboot.
+1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
+   identity, new-password activation, unrelated-action denial and reboot persistence.
 2. Attended: batch LCD/audio/physical-control/gameplay/save observations and keep
    Stardew's shared-window/save-load gate separate.
 3. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and

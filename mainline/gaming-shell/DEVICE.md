@@ -178,17 +178,17 @@ also uses UUID; disconnect requires exactly one active Wi-Fi.
 
 The adapter uses the bundled Qt DBus library. Host checks use an isolated bus and
 fake NetworkManager, including real message serialization, state signals, denial,
-timeout and changed-AP refusal. The current image omits `polkitd`, so ark's direct
+timeout and changed-AP refusal. The deployed v0.17 image omits `polkitd`, so ark's direct
 NetworkManager control is denied even though root reconnect, autoconnect and DHCP
 already pass. A temporary target test installed Debian's polkit packages and an
 ark-only rule for exactly `network-control`, `settings.modify.system` and
 `wifi.scan`. Ark then rescanned, created/deleted an isolated profile, disconnected
 and reactivated the saved profile, retained its address and reached the gateway;
-all unrelated NetworkManager permissions stayed denied. The packages and rule were
-not promoted. The exact target-tested rule is retained as
-`49-r46h-network.rules`; a future image must add Debian's `polkitd` and install
-that file without broadening it. New-password AddAndActivateConnection2 and
-reboot persistence still require acceptance.
+all unrelated NetworkManager permissions stayed denied. The exact packages and
+`49-r46h-network.rules` are now integrated in the byte-reproducible
+[v0.18 host artifact](../rootfs-debian13-gaming-v18/README.md), without broadening
+the rule. It is not deployed; media proof, new-password AddAndActivateConnection2
+and reboot persistence still require acceptance.
 The [test index](../tests/README.md#current-review-gaps) records the Mac window-
 activation limitation separately from the passing offscreen/ARM64 checks.
 

@@ -157,7 +157,7 @@ class ProjectDocumentationTests(unittest.TestCase):
 
     def test_current_rootfs_and_predecessor_contract_are_indexed(self) -> None:
         index = (REPO / "mainline/README.md").read_text(encoding="utf-8")
-        self.assertIn("](rootfs-debian13-gaming-v17/)", index)
+        self.assertIn("](rootfs-debian13-gaming-v18/)", index)
         self.assertIn("imports the preceding versioned builders", index)
 
     def test_all_local_markdown_links_resolve(self) -> None:
