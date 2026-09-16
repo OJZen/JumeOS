@@ -1,6 +1,6 @@
 # R46H experiment status ledger
 
-> Current checkpoint: 2026-09-15. This is the authoritative index of accepted
+> Current checkpoint: 2026-09-16. This is the authoritative index of accepted
 > physical evidence and open hardware gates. Exact commands, hashes and raw
 > receipts stay in the linked owning runbooks.
 
@@ -77,13 +77,13 @@ LCD, USB, Moonlight and PSP remain open.
 - **Ozone + FBNeo/Metal Slug — HOST + TARGET + PHYSICAL PASS / MILD PACING OPEN.**
   Guarded install, clean UniBIOS frames and advancing frame 480 passed; the
   operator accepted clean LCD startup and gameplay. Mild pacing artifacts remain.
-- **ES-DE successor — HOST + TARGET + GAME PHYSICAL PASS / VISUAL LCD MOTION OPEN.**
+- **ES-DE successor — HOST + TARGET + GAME PHYSICAL PASS / PATCHED LCD MOTION OPEN.**
   NES/Metal Slug and the 60 FPS original-art view pass capture and health checks.
   Per-frame generic/minimal paths are 21.7/3.3 ms; one bad batch caused 12 recovered
   watchdogs, then corrected/live runs added none. No-fill stays 60 FPS. A transient
-  no-video idle-pacing candidate cut settled CPU from 51.16% to 25.08% and GPU
-  temperature from 82.45 C to 72.34 C while preserving the immediate input path;
-  its formal build and patched LCD motion remain open. CJK/startup/LCD remain open.
+  no-video idle-pacing candidate cut CPU 51.16% to 25.08% and GPU 82.45 C to 72.34 C
+  while preserving immediate input; its archive/executable now reproduce on host.
+  Power-backed target promotion and patched LCD motion remain open; CJK/startup/LCD too.
 - **Remote screen — V0.16/V0.17 ANCHORED GUARD DEVICE PASS.** ES-DE-only,
   ES-DE-plus-Game Gear and PPSSPP-after-`comm=Main` captures passed; pairing is
   still required after a new image write.

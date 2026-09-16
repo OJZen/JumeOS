@@ -16,8 +16,8 @@ and variants, selects its native OLED palette and bounds the expensive carousel;
 the settled system view measures 60 FPS. A target A/B of the locked idle-pacing
 patch cut settled no-video CPU from 51.16% to 25.08% and GPU temperature from
 82.45 C to 72.34 C; a remote input restored full-rate rendering immediately.
-Exact rollback/reinstall and zero-error health pass; patched LCD motion still
-needs one operator observation.
+The patched archive and embedded executable hashes now reproduce on host. Target
+promotion and patched LCD motion still need one power-backed pass.
 
 Version 0.1 exposes only content backed by cores already present on the accepted
 p2:

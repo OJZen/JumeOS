@@ -39,8 +39,9 @@
   },
   "artifact": {
     "name": "r46h-es-de-runtime-v3.4.1.tar.gz",
-    "size": 81738580,
-    "sha256": "d5de91eb79fa229336d3f0f9c5e0e0d34b0096950cc67928914603209003aa70",
+    "size": 81744252,
+    "sha256": "f831de043c9fb8910a103ad5b004a8b38adabc0236cf755d37cbec0d3ab9853f",
+    "es_de_sha256": "a92fcf2d0a4b462c27087f953b3501aa4b8527aaa1f45f5b34a386172c6d92d3",
     "version_output": "ES-DE 3.4.1 (r51)"
   }
 }

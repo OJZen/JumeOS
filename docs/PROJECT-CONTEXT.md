@@ -1,6 +1,6 @@
 # R46H project context
 
-> Current checkpoint: 2026-09-15. Read the
+> Current checkpoint: 2026-09-16. Read the
 > [experiment ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) before
 > hardware work; it owns physical evidence and limitations.
 
@@ -12,10 +12,10 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device was last left **on at ES-DE** after the R60 target pass and ES-DE
-idle-pacing A/B. The operator asked that it remain powered while connected to
-external power. Temporary CPU/GPU limits were restored; neither disposable
-candidate is installed.
+The device was last left **powered off** after a low-load check found charger
+`online=0`, battery discharge and the old ES-DE using about 52% CPU at idle.
+Health, sync and controlled shutdown passed. Temporary CPU/GPU limits were
+restored; no disposable candidate is installed.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -111,17 +111,16 @@ skipped, so content equality remains unverified. See
   Exact target preflight and a fresh-state GTA III launch passed: R59 generated
   the expected 640x480 config, reached real game submissions and exited 0 without
   a forced kill. The prior state, ES-DE and stock 1296/480 MHz limits were restored;
-  temporary staging/access were removed and the device remains on as requested.
+  temporary staging/access were removed and the candidate was not promoted.
 - A [private Mesa 26.2.2](../mainline/gaming-mesa/README.md) same-boot A/B raised
   640x480 GTA III/VC from 11.00/14.67 to 14.36/17.15 submissions/s. Formal R60
   host/target checks passed; GTA III rendered a captured intro and exited 0 after
   121.15 seconds with no new fault. The system Mesa was not replaced.
-- An ES-DE target A/B added one 33 ms sleep only after one second without input
-  and with no active video. Over the settled final 120 seconds, CPU fell from
-  51.16% to 25.08%, SoC from 81.20 C to 70.68 C and GPU from 82.45 C to 72.34 C.
-  A remote direction input restored full-rate rendering for about one second and
-  then returned to the low-overhead path. The original installed frontend was
-  restored after the transient test; patched LCD motion remains operator-open.
+- ES-DE's 33 ms no-video idle-pacing A/B cut settled CPU from 51.16% to
+  25.08%, SoC from 81.20 C to 70.68 C and GPU from 82.45 C to 72.34 C; input
+  restored full-rate rendering for about one second. Its patched archive and
+  executable now reproduce and validate on host. The old frontend remains
+  installed; transient promotion and patched LCD motion remain open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -134,7 +133,7 @@ runbooks.
 
 ## Immediate next work
 
-1. Unattended: build/test ES-DE idle pacing transiently, then batch R60 GTA III/VC launch, New Game, capture, thermal/fault, exit and relaunch at 640x480 and 816/300 MHz.
+1. Unattended: after external power is confirmed, test locked ES-DE idle pacing transiently, then batch R60 GTA III/VC launch, New Game, capture, thermal/fault, exit and relaunch at 640x480 and 816/300 MHz.
 2. Unattended: exercise Stardew's guarded save lifecycle and mixed-game endurance, then Wi-Fi reconnect/Bluetooth discovery; keep zram a separate fallback-backed kernel gate.
 3. Attended/deferred: batch LCD/audio/physical-control/gameplay/save observations; pause Moonlight, USB HID and dynamic frequency policy until requested or their hardware gate changes.
 

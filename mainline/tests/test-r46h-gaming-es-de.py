@@ -112,6 +112,11 @@ class EsDeCandidateTests(unittest.TestCase):
         self.assertIsInstance(artifact["size"], int)
         self.assertGreater(artifact["size"], 1_000_000)
         self.assertRegex(artifact["sha256"], r"^[0-9a-f]{64}$")
+        self.assertRegex(artifact["es_de_sha256"], r"^[0-9a-f]{64}$")
+        self.assertIn(f'RUNTIME_ARCHIVE_SHA256={artifact["sha256"]}', self.installer)
+        self.assertIn(f'RUNTIME_ARCHIVE_SIZE={artifact["size"]}', self.installer)
+        for script in (self.installer, self.rollback, self.runner):
+            self.assertIn(f'ES_DE_SHA256={artifact["es_de_sha256"]}', script)
         path = OUTPUT / artifact["name"]
         if path.exists():
             self.assertEqual(path.stat().st_size, artifact["size"])

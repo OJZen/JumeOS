@@ -163,6 +163,8 @@ def inspect_artifact(artifact: Path, lock: dict[str, object]) -> None:
             if not required.exists() or required.is_symlink():
                 die(f"runtime bundle member is missing or unsafe: {required.relative_to(validation)}")
         require_aarch64_elf(prefix / "bin/es-de")
+        if sha256(prefix / "bin/es-de") != expected["es_de_sha256"]:
+            die("ES-DE executable SHA-256 mismatch")
         output = (prefix / "share/r46h/VERSION").read_text(encoding="utf-8").strip()
         if output != expected["version_output"]:
             die(f"unexpected ES-DE version output: {output}")
