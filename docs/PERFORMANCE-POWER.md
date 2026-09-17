@@ -174,9 +174,14 @@ readout is implemented.
    leaves Debian's system Mesa unchanged. Clean source `495c35232176f0c6ca39a93fd6ab4ac1f02e70bd`
    produced the 1,741-file R60 package; host checks, target preflight and actual
    Mesa 26 process maps passed. GTA III reached a captured intro and its 121.15-second
-   bound at exit 0 without a new fault. The remaining no-fidelity software controls
-   tested here are exhausted; sustained clocks require better cooling, while
-   sub-640 rendering or engine changes trade image quality or compatibility.
+   bound at exit 0 without a new fault. A later attended Vice City batch compared
+   816/300, 1008/400 and 1296/480 MHz: the stock maximum reached the 85 C guard while
+   its median submission rate was only 19.52/s versus 18.67/s at 816/300. Disabling
+   the frame limiter reduced the median to 17.24/s. Profiling found render-thread
+   Panfrost BO waits and repeated immediate-buffer map/unmap activity, but sizing
+   each allocation to the current draw also regressed to 17.60/s and was reverted.
+   Keep R60 and 640x480; the next software experiment needs buffer reuse/batching
+   with engine-side timing rather than more clock policy or blind allocation edits.
    The two-second health sampler warns near voltage/thermal limits and blocks
    unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,
    charge completion and suspend/resume remain open; supply alone is not net

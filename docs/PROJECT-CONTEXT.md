@@ -12,14 +12,12 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device was last left **powered off** after the 2026-09-17 unattended R60
-shell/status and post-power-cycle cleanup recheck. Exact v0.17 identity, R60's
-1,741-file manifest, ES-DE's exclusive 13-system startup, final rootfs smoke,
-service restoration, cleanup, sync and controlled shutdown passed. Temporary
-access/policy/kernel files remain absent and no disposable candidate is installed.
-This adds composed-frame evidence only; physical LCD/audio/controls/gameplay/save
-acceptance remains batched below. Exact evidence is
-`mainline/out/.cache/r46h-unattended-20260917.qwwsfZ/session.json`.
+The device was last left **powered off** after the 2026-09-17 attended R60
+Vice City performance batch. Exact v0.17/R60 identity, service restoration,
+temporary-access cleanup, `sync` and controlled shutdown passed. The operator
+accepted Vice City intro LCD motion, audio and controls at temporary 816/300 MHz;
+broader gameplay, saves and GTA III physical acceptance remain open. Exact evidence
+is `mainline/out/.cache/r46h-attended-cooling-20260917.vlknbF/session.json`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -43,7 +41,11 @@ skipped, so content equality remains unverified. See
 - Repaired GTA III/Vice City accept the Switch-layout controls and no longer
   reproduce the bounded-exit crash. GTA-only `noafbc`, first-config 640x480 and
   private Mesa 26.2.2 passed target integration. The R60 batch reached captured
-  cutscenes, clean 121-second exits and relaunches without storage/GPU faults;
+  cutscenes, clean 121-second exits and relaunches without storage/GPU faults.
+  The attended Vice City run found only a small 816-to-1296 MHz pacing gain before
+  the 85 C abort; disabling its frame limiter and an exact-size immediate-buffer
+  candidate both regressed and were restored. Profiling instead points to repeated
+  Panfrost buffer wait/map churn as the next software investigation;
   [ports](../mainline/gaming-ports/README.md) owns exact pacing and thermal data.
 - Stardew's source, managed copy and backup hashes match and overwrite is refused.
   Its 120-second runs still remain before SDL/Wayland at both tested clock profiles;

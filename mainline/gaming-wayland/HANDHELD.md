@@ -405,6 +405,14 @@ were removed, and serial confirmed `Powering off.` Exact device evidence is
 boot closes the bounded two-run fault candidate but did not phase-match its faster
 window or run Vice City.
 
+The 2026-09-17 attended follow-up accepted Vice City intro LCD motion, audio and
+controls at 816/300 MHz. A stock 1296/480 MHz sample reached the external 85 C
+abort while improving median game submissions only from 18.67 to 19.52/s.
+Frame-limiter-off and exact-size per-draw immediate-buffer candidates both
+regressed, were restored and are not part of R60. Render-thread tracing instead
+showed Panfrost BO wait plus buffer map/unmap churn. Exact measurements and the
+remaining physical gates are owned by the [ports record](../gaming-ports/README.md).
+
 A same-boot follow-up drove both GTA III and Vice City from menu through two
 completed remote South/B samples into fresh cutscenes at 1008/400 MHz. GTA III
 fell from 28.66 submissions/s at the menu to 3.17/s in the car scene, with a

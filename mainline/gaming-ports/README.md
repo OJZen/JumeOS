@@ -795,6 +795,31 @@ a cooling state. Evidence is under
 gates are closed; Stardew save selection/load and shared-window readiness remain
 open.
 
+An attended 2026-09-17 R60 Vice City batch then supplied the first physical
+intro acceptance: the operator reported normal LCD motion, audio and controls at
+temporary 816/300 MHz. Its 25 game samples averaged 18.24 submissions/s with an
+18.67/s median, 52.55 ms median interval and 66.538 C maximum. A 1008/400 MHz
+sample reached a 20.87/s median, while stock 1296/480 MHz reached the external
+85 C abort at only 19.52/s median. The rates are client buffer commits, not LCD
+FPS, but the weak scaling and physical observation reject clocks as the primary
+remaining pacing limit.
+
+Two single-variable software candidates were rejected. Disabling Vice City's
+frame limiter reduced the 816/300 MHz median to 17.24/s and the original config
+was restored. A 15-second `strace -c -f` of accepted R60 recorded 65,277 syscalls:
+57.96% of syscall time in `ppoll`, 21.68% in `ioctl`, 9.68% in `mmap` and 7.85%
+in `munmap`; render-thread detail repeatedly showed Panfrost BO waits and
+immediate-buffer map/unmap activity. R61 therefore sized librw immediate buffers
+to each draw, but its phase-matched first 64.5 seconds regressed from R60's
+18.97/s median to 17.60/s. Commit `354ab53` was reverted by `dce8dad`; R60 remains
+the accepted fallback. Investigate persistent/ring-buffer reuse or batching only
+with engine-side phase timing. Evidence is
+`mainline/out/.cache/r46h-attended-cooling-20260917.vlknbF/session.json`.
+
+This run did not accept GTA III physical play, broader Vice City gameplay, saves
+or relaunch. Stock clocks, services, configuration and ES-DE were restored before
+cleanup and controlled poweroff.
+
 The R36-R39 target record is
 `mainline/out/.cache/r46h-r36-gta3-device-20260912.KssIkj/session.json`. All four
 manifests and fixed identities passed. The final run peaked at 78.461 C under the

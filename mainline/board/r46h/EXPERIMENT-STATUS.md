@@ -81,12 +81,14 @@ The v0.18 local-network-policy successor is host-only; media and physical gates 
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
   R56 aligned the status row in a device-composed capture; physical LCD remains open.
   Reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope.
-- **Wayland/ports — R60 MESA BATCHED MACHINE PASS / ATTENDED OPEN.**
+- **Wayland/ports — R60 VICE CITY INTRO PHYSICAL PASS / BROADER PLAY OPEN.**
   R48 fixed D-pad Down; 640x480, first-config and [private Mesa](../../gaming-mesa/README.md)
   passed. R60 reached GTA III/VC cutscenes, clean 121-second exits and relaunches
-  without storage/GPU faults. Stardew source/managed/backup saves remained exact
-  and overwrite was refused, but its 120-second runs stayed before SDL/Wayland.
-  Attended play and Stardew shared-window/save-load remain open.
+  without storage/GPU faults. The operator accepted Vice City intro LCD motion,
+  audio and controls at 816/300 MHz. Stock 1296/480 MHz reached the 85 C guard for
+  only a small pacing gain; frame-limiter-off and per-draw exact buffer sizing both
+  regressed and were restored. GTA III physical play, broader gameplay/saves and
+  Stardew shared-window/save-load remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**
