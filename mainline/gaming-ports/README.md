@@ -559,9 +559,9 @@ even when their overlay is hidden.
 `build-gta-source.sh` now supplies `MASTER` to both pinned engines and rejects an
 artifact retaining the two diagnostic markers. Clean source
 `b2d82f707025473ebf47b59c09f9317e10c9d5cc` produced re3 SHA-256
-`6ebf8aedffa2a43bfeac93863917da33b13ae2ce0bff672d7a02018444bc12f4`
+`843bdd64be6ab0b1322c690a1dd441eb60c530f63085a848aba475c94fe4770c`
 and reVC SHA-256
-`d19bbe5b90648e6ad0ae10b10f27fa256f84fd91381a38187ffd8c1e7814aa3c`.
+`64df8fb2c4455976173a6ff03d97c220defcb2de5b94461c72f8779bb7b2e9d6`.
 Both hashes pass readback, and the former diagnostic markers are absent. The
 stripped binaries are 204,016 and 271,152 bytes smaller than R48. This does not
 change the 30 FPS limit, graphics settings, input, save layout or source game
