@@ -12,11 +12,14 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device was last left **powered off** after the follow-up Stardew/mixed-game,
-Wi-Fi policy and isolated zram batch. Charger `online=1` was observed. Health,
-sync and controlled shutdown passed; stock CPU/GPU limits and product services
-were restored, temporary access/policy/kernel files were removed and no
-disposable candidate is installed.
+The device was last left **powered off** after the 2026-09-17 unattended R60
+shell/status and post-power-cycle cleanup recheck. Exact v0.17 identity, R60's
+1,741-file manifest, ES-DE's exclusive 13-system startup, final rootfs smoke,
+service restoration, cleanup, sync and controlled shutdown passed. Temporary
+access/policy/kernel files remain absent and no disposable candidate is installed.
+This adds composed-frame evidence only; physical LCD/audio/controls/gameplay/save
+acceptance remains batched below. Exact evidence is
+`mainline/out/.cache/r46h-unattended-20260917.qwwsfZ/session.json`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
