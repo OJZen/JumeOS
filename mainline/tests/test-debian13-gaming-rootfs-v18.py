@@ -21,6 +21,7 @@ SPEC.loader.exec_module(WRAPPER)
 BUILDER = WRAPPER.BASE
 ROOT = REPO / "mainline/rootfs-debian13-gaming-v18"
 IMAGE_TOOL = ROOT / "image-in-container.sh"
+PAIR_TOOL = ROOT / "pair-remote-key.sh"
 
 
 class Debian13GamingRootfsV18Tests(unittest.TestCase):
@@ -83,15 +84,30 @@ class Debian13GamingRootfsV18Tests(unittest.TestCase):
         self.assertIn("if CONTAINER_PRIVILEGED:", framework)
         self.assertIn('SUCCESSOR_METHOD = "offline-debugfs-bounded-overlay"', framework)
 
+    def test_pairing_is_bound_to_exact_v18_image(self) -> None:
+        script = PAIR_TOOL.read_text(encoding="utf-8")
+        for required in (
+            "EXPECTED_UUID=d3130018-46a4-4d56-9001-000000000018",
+            "GATEWAY_SHA256=1b1ec52cec6d6e670d49789738d1a6c38d7f1b35c50bb24ba86ff1cd6203f9da",
+            "SUDOERS_SHA256=2486b57b1312bea2477c4de629c2b5e60641f9016a3d3fb9c5be70e38b15e1fe",
+            "only one OpenSSH ED25519 public key is accepted",
+            'restrict,command=\\"/usr/local/bin/r46h-screenshot-ssh\\"',
+            "R46H_REMOTE_PAIR result=pass",
+        ):
+            self.assertIn(required, script)
+
     def test_entry_points_and_docs_are_valid(self) -> None:
-        self.assertEqual(subprocess.run(["/bin/bash", "-n", str(IMAGE_TOOL)]).returncode, 0)
-        self.assertEqual(stat.S_IMODE(IMAGE_TOOL.stat().st_mode), 0o755)
+        for path in (IMAGE_TOOL, PAIR_TOOL):
+            self.assertEqual(subprocess.run(["/bin/bash", "-n", str(path)]).returncode, 0)
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o755)
         self.assertEqual(stat.S_IMODE(BUILDER_PATH.stat().st_mode), 0o755)
         compile(BUILDER_PATH.read_text(encoding="utf-8"), str(BUILDER_PATH), "exec")
         text = " ".join((ROOT / "README.md").read_text(encoding="utf-8").split())
         for required in (
             "exact v0.17 successor", "hash-pinned local `.deb`", "never opens a host block device",
             "composed twice byte-for-byte", "Media write/readback and physical acceptance are separate",
+            "--artifact-id debian13-p2-gaming-v0.18",
+            "The public key remains deployment state, not image content",
         ):
             self.assertIn(required, text)
 

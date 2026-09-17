@@ -31,6 +31,7 @@ FAST_CARD_ONLY_ARTIFACTS = frozenset(
         "debian13-p2-gaming-v0.15",
         "debian13-p2-gaming-v0.16",
         "debian13-p2-gaming-v0.17",
+        "debian13-p2-gaming-v0.18",
     }
 )
 ARTIFACTS = {
@@ -111,6 +112,14 @@ ARTIFACTS = {
         "build_info_sha256": "45c7c732d36b8fb6ee5b33232ae69041e6159b285b667ab7eba2a81f34a9947e",
         "operation_id": "write-debian13-p2-gaming-v0.17",
         "description": "Write R46H Debian 13 gaming product p2 v0.17 root filesystem",
+    },
+    "debian13-p2-gaming-v0.18": {
+        "output_name": "r46h-debian13-p2-gaming-v0.18",
+        "image_name": "r46h-debian13-p2-gaming-v0.18.ext4",
+        "image_sha256": "461d47535870568c854b1edf7016629a6fa66a60da81915c14449ac8700c4cae",
+        "build_info_sha256": "1ee96f46377d3fb579adae226b5eba8f86cde2bc3efe4b5920b256e20391fadd",
+        "operation_id": "write-debian13-p2-gaming-v0.18",
+        "description": "Write R46H Debian 13 gaming product p2 v0.18 root filesystem",
     },
 }
 PROFILE_IDS = frozenset(

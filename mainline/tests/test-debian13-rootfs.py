@@ -434,6 +434,13 @@ class Debian13RootfsTests(unittest.TestCase):
                 "45c7c732d36b8fb6ee5b33232ae69041e6159b285b667ab7eba2a81f34a9947e",
                 "efccaf9b1d6b48624427f96f0d995c0143cb50e3447f31506ef6553973538897",
             ),
+            (
+                "debian13-p2-gaming-v0.18",
+                "23",
+                "c",
+                "1ee96f46377d3fb579adae226b5eba8f86cde2bc3efe4b5920b256e20391fadd",
+                "461d47535870568c854b1edf7016629a6fa66a60da81915c14449ac8700c4cae",
+            ),
         )
         for artifact_id, disk, target_digit, build_sha, image_sha in cases:
             with self.subTest(artifact_id=artifact_id):

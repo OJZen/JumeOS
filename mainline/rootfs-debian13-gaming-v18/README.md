@@ -13,6 +13,13 @@ PYTHONDONTWRITEBYTECODE=1 python3 -B \
   mainline/scripts/build-debian13-gaming-rootfs-v18.py build
 PYTHONDONTWRITEBYTECODE=1 python3 -B \
   mainline/scripts/build-debian13-gaming-rootfs-v18.py validate
+
+PYTHONDONTWRITEBYTECODE=1 python3 -B \
+  mainline/scripts/generate-debian13-write-plan.py \
+  --device /dev/diskN \
+  --profile-id hl-r46h-v22-g92-62534975488-v1 \
+  --artifact-id debian13-p2-gaming-v0.18 \
+  --target-sha256-before <independent-full-p2-sha256>
 ```
 
 The offline builder uses the published v0.17 image and hash-pinned local `.deb`
@@ -32,3 +39,8 @@ Media write/readback and physical acceptance are separate. After a guarded p2
 write, verify cold identity, a newly changed ark password, scan/profile
 create-delete/reconnect, denial of unrelated polkit actions, warm-reboot
 persistence, product health, sync and controlled poweroff.
+
+Only exact p2 v0.18 can use [`pair-remote-key.sh`](pair-remote-key.sh). Stage it
+and one approved ED25519 public key as root-owned mode-0600 files under
+`/run/r46h-pair-v0.18`, then pass both independently computed SHA-256 values.
+The public key remains deployment state, not image content.
