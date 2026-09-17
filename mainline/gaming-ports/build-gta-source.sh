@@ -16,7 +16,6 @@ mkdir -p "$output"
 docker run --rm --network none --entrypoint /bin/bash \
   -v "$inputs:/inputs:ro" -v "$native:/native:ro" -v "$output:/out" \
   -v "$base/mainline/gaming-ports/librw-context-fallback.patch:/librw-context-fallback.patch:ro" \
-  -v "$base/mainline/gaming-ports/librw-immediate-buffer-size.patch:/librw-immediate-buffer-size.patch:ro" \
   -v "$base/mainline/gaming-ports/r46h-gta-runtime.patch:/r46h-gta-runtime.patch:ro" \
   cgutman/moonlight-packaging@sha256:f25a3e2ad90b85d1a4358e2d612ed311165cddd62aa194455a5dbed844d66d69 -c '
 set -Eeuo pipefail
@@ -35,7 +34,6 @@ for source in "$re3" "$revc"; do
   rm -rf "$source/vendor/librw"
   cp -a "$librw" "$source/vendor/librw"
   patch --batch --forward -d "$source/vendor/librw" -p1 < /librw-context-fallback.patch
-  patch --batch --forward -d "$source/vendor/librw" -p1 < /librw-immediate-buffer-size.patch
 done
 sysroot="$work/sysroot"
 mkdir -p "$sysroot"
@@ -67,7 +65,7 @@ mv /out/revc-configure.log.incoming /out/revc-configure.log
 mv /out/revc-build.log.incoming /out/revc-build.log
 mv /out/re3.incoming /out/re3
 mv /out/reVC.incoming /out/reVC
-printf '\''re3_source=ead2747eadbbdbf0e134eea6679364153dd6c4b8\nrevc_source=b9f0b23466ab4db76615cc2c761df9013a838184\nlibrw_source=81c9426cdde73717b04ae4dfc0f6c255f74a3a8a\nbuild_profile=MASTER_RELEASE\npatch_sha256=%s\nbuffer_patch_sha256=%s\nruntime_patch_sha256=%s\n'\'' "$(sha256sum /librw-context-fallback.patch | cut -d '\'' '\'' -f 1)" "$(sha256sum /librw-immediate-buffer-size.patch | cut -d '\'' '\'' -f 1)" "$(sha256sum /r46h-gta-runtime.patch | cut -d '\'' '\'' -f 1)" > /out/BUILD-INFO.incoming
+printf '\''re3_source=ead2747eadbbdbf0e134eea6679364153dd6c4b8\nrevc_source=b9f0b23466ab4db76615cc2c761df9013a838184\nlibrw_source=81c9426cdde73717b04ae4dfc0f6c255f74a3a8a\nbuild_profile=MASTER_RELEASE\npatch_sha256=%s\nruntime_patch_sha256=%s\n'\'' "$(sha256sum /librw-context-fallback.patch | cut -d '\'' '\'' -f 1)" "$(sha256sum /r46h-gta-runtime.patch | cut -d '\'' '\'' -f 1)" > /out/BUILD-INFO.incoming
 (cd /out && sha256sum re3 reVC > SHA256SUMS.incoming)
 mv /out/BUILD-INFO.incoming /out/BUILD-INFO
 mv /out/SHA256SUMS.incoming /out/SHA256SUMS
