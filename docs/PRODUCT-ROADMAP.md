@@ -1,6 +1,6 @@
 # R46H product roadmap
 
-Updated 2026-09-15. This owns the feature backlog and completion criteria.
+Updated 2026-09-17. This owns the feature backlog and completion criteria.
 [Project Context](PROJECT-CONTEXT.md) owns the immediate order and current device
 state; the [ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) owns physical proof.
 P0 closes the first usable gameplay flows. P1 builds the product around them.
@@ -27,7 +27,7 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
 | S3 / P1 | Power management | Retain real dim/wake and supervised reboot/poweroff; measure charging/battery reporting and low-voltage policy, then design bounded suspend/wake recovery |
 | Q1 / P1→P2 | Product installation and endurance | Persistent settings/pairing/saves, bounded logs and caches, upgrades/rollback, repeated launches and a sustained gameplay run; replace ES-DE only after recovery paths pass |
 
-## Current evidence by workstream — 2026-09-13
+## Current evidence by workstream — 2026-09-16
 
 - **M1/M2:** v5 fixes the empty application-list path. Real pairing, listing,
   H.264/PCM, native stats and virtual controller roundtrip passed the isolated
@@ -46,32 +46,12 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
   owns exact evidence and the 85 C limit. Physical L3+R3, LCD/audio, sustained
   performance, precise overlay cost and actual Moonlight remain open.
 - **P1–P4:** resource/save management and HarbourMaster lifecycle have host checks.
-  R36 isolated HarbourMaster's home, refreshed 1,396 entries on R46H and displayed
-  them beside the four original local projects. R36-R39 then preserved read-only
-  GTA III assets and empty managed saves, but the target engine never reached a
-  frame: R36 lacked the packaged `libOpenGL.so.0` path; R37 fixed it and R37-R39
-  stopped at `gladLoadGLLoader` on Panfrost GLES 3.1. The same R39 profile reaches
-  the frontend with software GLES 3.2 on the AArch64 host, which is not target
-  acceptance. R40 reproduced the loader failure under direct KMSDRM, rejecting a
-  Wayland-only cause. R41 then mounted the verified Mono runtime and reached Stardew's
-  program entry before `SDL_CreateWindow`/GBM crashed; Vice City hit the same librw
-  GL loader source boundary as GTA III. R42's 1,630 target hashes passed. Its patched
-  source re3/reVC used Panfrost GLES 3.1, reached `GS_FRONTEND`, ran for 120 seconds
-  and returned cleanly; attended gameplay/audio/controls/save/relaunch remain open.
-  R45 then preloaded the actual Gallium provider and ran Stardew for its complete
-  120.6-second target bound. R47's exact package fixed and passed fresh-`/run`
-  Ports startup, its bounded UI return and service recovery; no operator input or
-  save import occurred. R57 later proved two graceful GTA III bounds without a
-  forced kill, but also captured Panfrost faults during active gameplay. A temporary
-  640x480 run more than doubled intro submissions while reaching thermal cooling;
-  it is not yet an accepted default. R58's GTA-only no-AFBC package has now passed
-  two fault-free boots. In the later mixed-game run, matched captures fell from
-  28.66/27.70 submissions/s in the GTA III/Vice City menus to 3.17/4.17/s in their
-  intros. Both bounded runs exited 0 without forced kills. Fault suppression is a
-  machine candidate pass; the pacing defect and attended gameplay/audio/controls/
-  save/relaunch remain open.
-  The separate SA Android-loader/direct-evdev findings do not establish a working
-  target port.
+  R60's exact GTA III/Vice City package reached captured cutscenes, clean
+  121-second exits and relaunches without storage or GPU faults. Stardew's source,
+  managed copy and backup remain hash-equal with overwrite refused, but both
+  120-second profiles still stop before SDL/Wayland. Attended gameplay/audio/
+  controls/save checks and Stardew shared-window save/load remain open. The
+  separate SA Android-loader/direct-evdev findings do not establish a working port.
 - **U1:** shared controls, headers, icons, font/spacing/motion rules and frame
   diagnostics are implemented; R35 displayed actual battery/charge/Wi-Fi status,
   and R32 adds the bounded HUD-independent first-frame
@@ -81,28 +61,20 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
 - **I1:** the independent USB profile page and offline HID encoder/export exist.
   R41 confirmed the current device has Host-only DWC2 and no UDC/gadget/role entry.
   Output stays disabled pending connector routing evidence and a separate kernel/DT candidate.
-- **S1/S2/S3/Q1:** R17 CPU/backlight/dim/keyboard/power results are retained.
-  Wi-Fi policy/persistence, Bluetooth, memory apply, suspend and product installation
-  remain open. Shared settings/Mono lease and persistent-state recovery have host
-  checks; R35 proved Neo state across warm reboot, while settings, pairing and port
-  saves retain separate persistence gates. The zram kernel is a
-  separate unbooted candidate, not part of the shared-display acceptance.
+- **S1/S2/S3/Q1:** the temporary ark-only Wi-Fi policy passed its exact three
+  actions and denied unrelated permissions. Its byte-reproducible v0.18 successor
+  passes host validation; media deployment, a new password and reboot persistence
+  remain open. The isolated zram kernel passed one-shot apply/pressure/disable,
+  but promotion waits for measurable game benefit. Bluetooth remains hardware
+  blocked; suspend and product installation remain open.
 
-## Delivery sequence
+## Delivery constraints
 
-1. Diagnose the matched R58 GTA III/Vice City intro stalls, then batch the next
-   candidate's LCD/audio/physical-control/gameplay/save/exit/relaunch acceptance;
-   finish Stardew separately and keep every save generation isolated.
-2. Keep Moonlight paused until the user resumes it; its prepared Linux host,
-   controller-test program and accepted v3 fallback remain available.
-3. Keep SA's loader/input adaptation
-   separate, and preserve original assets and every existing save generation.
-4. Continue USB schematic/continuity work and Wi-Fi/memory/power preparation without
-   mixing a new kernel/role candidate into renderer tests. Source inspection does not
-   authorize running an arbitrary legacy launcher or switching an unknown USB role.
-5. Batch only changed-path LCD/audio/physical-button checks after the packages
-   and exact steps are ready. Product installation/endurance follows successful
-   recovery and save-retention gates; do not remove ES-DE yet.
+[Project Context](PROJECT-CONTEXT.md#immediate-next-work) owns the current order.
+Keep Moonlight paused until the user resumes it; keep SA and every save generation
+isolated. USB work still requires connector-routing evidence before a separate
+recoverable kernel/DT candidate. Batch only changed-path attended checks, and do
+not remove ES-DE before recovery and save-retention gates pass.
 
 Sunshine stays a manually started test tool with isolated state and no host
 service registration. Windows is optional if the Linux-on-Mac path cannot satisfy
