@@ -32,6 +32,8 @@ class ShellCheck final : public QObject {
     Q_OBJECT
 private slots:
     void initTestCase() {
+        QGuiApplication::setApplicationDisplayName(QStringLiteral(JUME_LAUNCHER_NAME));
+        QCoreApplication::setApplicationVersion(QStringLiteral(JUME_LAUNCHER_VERSION));
         QGuiApplication::styleHints()->setTabFocusBehavior(Qt::TabFocusAllControls);
         const auto font = QCoreApplication::applicationDirPath() + "/../share/fonts/truetype/droid/DroidSansFallbackFull.ttf";
         if (QFileInfo::exists(font)) QVERIFY(QFontDatabase::addApplicationFont(font) >= 0);
@@ -244,7 +246,7 @@ private slots:
         const auto captures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
         for (int scale : {100, 120}) {
             if (scale == 120) { state.adjust("font", 1); state.adjust("font", 1); }
-            for (const auto &scene : {"home", "library", "settings", "power", "controller", "quick", "input"}) {
+            for (const auto &scene : {"home", "library", "settings", "about", "power", "controller", "quick", "input"}) {
                 action("home");
                 QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString(scene))));
                 QTest::qWait(200);
@@ -254,6 +256,14 @@ private slots:
                 if (root->property("quickOpen").toBool()) action("back");
             }
         }
+        QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QStringLiteral("about"))));
+        QCOMPARE(root->property("settingsCategory").toInt(), 12);
+        QCOMPARE(root->findChild<QObject *>("brandName")->property("text").toString(), QStringLiteral("Jume"));
+        const auto about = root->findChild<QObject *>("settingsView")->property("rows").toList();
+        QCOMPARE(about.size(), 3);
+        QCOMPARE(about[0].toMap().value("value").toString(), QStringLiteral(JUME_LAUNCHER_NAME));
+        QCOMPARE(about[1].toMap().value("value").toString(), QStringLiteral(JUME_LAUNCHER_VERSION));
+        QCOMPARE(about[2].toMap().value("value").toString(), QStringLiteral("https://github.com/OJZen/JumeOS"));
         action("home"); QVERIFY(labels().contains("收藏"));
         action("nextTab"); action("nextTab"); QTest::qWait(200);
         QVERIFY(!labels().contains("收藏")); QVERIFY(labels().contains("选择分类"));

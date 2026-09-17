@@ -1,6 +1,6 @@
 # R46H project context
 
-> Current checkpoint: 2026-09-16. Read the
+> Current checkpoint: 2026-09-17. Read the
 > [experiment ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) before
 > hardware work; it owns physical evidence and limitations.
 
@@ -27,8 +27,8 @@ acceptance remains batched below. Exact evidence is
   v0.17 BOOT/power-settle DTB.
 - Accepted fallbacks: attended p2 v0.7, automated p2 v0.15, and the p2 v0.5
   full-card recovery reference.
-- Installed frontend: ES-DE 3.4.1/r51. The Qt shell remains an experimental,
-  non-default candidate.
+- Installed frontend: ES-DE 3.4.1/r51. Jume Launcher `0.1.0-dev` remains an
+  experimental, non-default Qt candidate.
 
 The card's p3 contains imported EASYROMS. Its full target checksum/readback was
 skipped, so content equality remains unverified. See
@@ -36,9 +36,10 @@ skipped, so content equality remains unverified. See
 
 ## Current feature evidence
 
-- The Qt candidate has machine proof for status values, storage/settings,
+- Jume Launcher has machine proof for status values, storage/settings,
   PortMaster and routed remote control. R56 aligns Wi-Fi, battery, clock and the
   clipped game HUD in composed output; physical LCD confirmation remains open.
+  The `0.1.0-dev` name/version/About page passes host Qt tests and awaits target deployment.
 - Repaired GTA III/Vice City accept the Switch-layout controls and no longer
   reproduce the bounded-exit crash. GTA-only `noafbc`, first-config 640x480 and
   private Mesa 26.2.2 passed target integration. The R60 batch reached captured

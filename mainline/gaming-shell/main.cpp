@@ -88,16 +88,19 @@ int main(int argc, char **argv) {
     qputenv("QML_DISABLE_DISK_CACHE", "1");
     QCoreApplication::setAttribute(Qt::AA_DisableShaderDiskCache);
     QGuiApplication app(argc, argv);
-    app.setApplicationName("R46H Shell Preview");
+    app.setApplicationName(QStringLiteral(JUME_LAUNCHER_NAME));
+    app.setApplicationDisplayName(QStringLiteral(JUME_LAUNCHER_NAME));
+    app.setApplicationVersion(QStringLiteral(JUME_LAUNCHER_VERSION));
     const auto bundledFont = QCoreApplication::applicationDirPath() + "/../share/fonts/truetype/droid/DroidSansFallbackFull.ttf";
     if (QFileInfo::exists(bundledFont)) QFontDatabase::addApplicationFont(bundledFont);
     QCommandLineParser parser;
-    parser.setApplicationDescription("R46H desktop preview; hardware controls require a guarded session.");
+    parser.setApplicationDescription("Jume Launcher preview; hardware controls require a guarded session.");
     parser.addHelpOption();
+    parser.addVersionOption();
     parser.addOptions({
         {"state-dir", "Required preview state directory (use external workspace).", "path"},
         {"capture", "Save this preview window as PNG, then exit.", "path"},
-        {"scene", "Initial scene: home, library, settings, quick, session, performance, controller, power, input, streaming, neo, ports or usb.", "name", "home"},
+        {"scene", "Initial scene: home, library, settings, about, quick, session, performance, controller, power, input, streaming, neo, ports or usb.", "name", "home"},
         {"quit-after", "Exit after the specified seconds (1..3600).", "seconds"},
         {"fullscreen", "Show fullscreen; does not establish a global overlay."},
         {"control-dir", "Opt-in private local UI control directory; no network listener.", "path"},
@@ -120,7 +123,7 @@ int main(int argc, char **argv) {
     const auto state = parser.value("state-dir");
     auto scene = parser.value("scene");
     if (state.isEmpty() || !QDir::isAbsolutePath(state) ||
-        !QStringList{"home", "library", "settings", "quick", "session", "performance", "controller", "power", "input", "streaming", "neo", "ports", "usb"}.contains(scene)) {
+        !QStringList{"home", "library", "settings", "about", "quick", "session", "performance", "controller", "power", "input", "streaming", "neo", "ports", "usb"}.contains(scene)) {
         qCritical("Use --state-dir with an absolute external path and a valid --scene."); return 2;
     }
     bool durationOk = true;
@@ -161,7 +164,7 @@ int main(int argc, char **argv) {
     window.preferences = &preferences;
     window.tools = &tools;
     window.applications = &applications;
-    window.setTitle(QStringLiteral("R46H · 桌面预览"));
+    window.setTitle(app.applicationDisplayName() + QStringLiteral(" · R46H"));
     window.setResizeMode(QQuickView::SizeRootObjectToView);
     window.setInitialProperties({{"store", QVariant::fromValue(&preferences)}, {"metrics", QVariant::fromValue(&telemetry)},
         {"sharedDisplay", handheldMode},

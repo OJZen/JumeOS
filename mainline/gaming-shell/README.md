@@ -1,4 +1,7 @@
-# R46H Qt shell preview
+# Jume Launcher
+
+Version **0.1.0-dev**. The internal executable and control-protocol identifier
+remain `r46h-shell` for compatibility.
 
 **R36 STATUS/NEO PERSISTENCE/PORTMASTER CATALOG DEVICE PASS / R17 FALLBACK.** This is a desktop prototype,
 not the installed frontend. Its [shared R35/R36 path](../gaming-wayland/HANDHELD.md#r35r36-device-follow-up-2026-09-12)
@@ -11,6 +14,11 @@ settings or Sunshine service are installed by this preview.
 R35's identified-device candidate showed actual Wi-Fi link quality,
 battery percentage and charge/discharge state beside the clock. Host previews keep
 their explicit preview label instead of inventing device values.
+Settings now includes an About page with the launcher name, version and
+`https://github.com/OJZen/JumeOS`.
+The 2026-09-17 native build passed all three Qt test targets; reviewed 100% and
+120% host captures are under `mainline/out/.cache/jume-launcher-about-20260917/`.
+This is host-window evidence, not an R46H LCD result.
 
 ## Run on this Mac
 
@@ -189,7 +197,7 @@ Since revision 4, it runs beside the package's `qt.conf`, excluding the SDK's fa
 QML imports. Removing `Qt.labs.folderlistmodel` makes this check fail; that module
 and its library/license are now included in the full shell package.
 
-`--scene home|library|settings|quick|session|performance|controller|power|input|neo|ports|usb --capture /absolute/path.png`
+`--scene home|library|settings|about|quick|session|performance|controller|power|input|neo|ports|usb --capture /absolute/path.png`
 captures only this window and exits. The command requires a running window
 system or a selected offscreen Qt backend. ARM64/software screenshots and
 native Mac captures were reviewed. The Mac used Metal on Apple M4; these are

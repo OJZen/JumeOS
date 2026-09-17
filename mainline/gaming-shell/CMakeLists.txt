@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
-project(R46HShell LANGUAGES CXX)
+project(JumeLauncher VERSION 0.1.0 LANGUAGES CXX)
+set(JUME_LAUNCHER_VERSION "${PROJECT_VERSION}-dev")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Qt 6.8 injects obsolete AGL linkage on current macOS SDKs (QTBUG-137687).
@@ -14,6 +15,7 @@ find_package(SDL2 REQUIRED)
 qt_standard_project_setup(REQUIRES 6.8)
 set_source_files_properties(controls/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 qt_add_executable(r46h-shell main.cpp input.cpp input.h handheld.cpp handheld.h preferences.cpp preferences.h telemetry.cpp telemetry.h control.cpp control.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
+target_compile_definitions(r46h-shell PRIVATE JUME_LAUNCHER_NAME="Jume Launcher" JUME_LAUNCHER_VERSION="${JUME_LAUNCHER_VERSION}")
 qt_add_qml_module(r46h-shell URI R46H.Shell VERSION 1.0
     QML_FILES ShellView.qml GameCard.qml SettingRow.qml SettingsView.qml PerformancePanel.qml ControlHints.qml StreamingView.qml ToolPage.qml PortCatalog.qml
         controls/Theme.qml controls/PageHeader.qml controls/Motion.qml controls/Label.qml controls/Icon.qml controls/FocusFrame.qml
@@ -44,7 +46,7 @@ if(BUILD_TESTING)
     qt_add_executable(shell-check tests/check.cpp preferences.cpp preferences.h input.cpp input.h telemetry.cpp telemetry.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
     target_include_directories(shell-check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(shell-check PRIVATE Qt6::Quick Qt6::Test Qt6::Network Qt6::DBus SDL2::SDL2)
-    target_compile_definitions(shell-check PRIVATE SHELL_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_compile_definitions(shell-check PRIVATE SHELL_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}" JUME_LAUNCHER_NAME="Jume Launcher" JUME_LAUNCHER_VERSION="${JUME_LAUNCHER_VERSION}")
     add_test(NAME shell-check COMMAND shell-check)
     qt_add_executable(network-check tests/network-check.cpp network.cpp network.h)
     target_include_directories(network-check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

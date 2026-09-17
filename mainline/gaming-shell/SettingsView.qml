@@ -4,6 +4,7 @@ import "controls" as Ui
 
 Item {
     id: settings
+    objectName: "settingsView"
     required property var store
     required property var metrics
     required property var controller
@@ -21,8 +22,8 @@ Item {
     property bool tester: false
     readonly property real fontScale: store.fontPercent / 100
     readonly property bool choiceOpen: choices.visible
-    readonly property var categories: ["常用", "网络与 Wi-Fi", "蓝牙", "摇杆测试", "声音", "屏幕", "存储", "系统信息", "电量与电源", "字体与输入", "CPU 频率", "内存与 Swap"]
-    readonly property var categoryIcons: ["settings", "wifi", "bluetooth", "gamepad", "volume", "display", "storage", "info", "battery", "keyboard", "cpu", "memory"]
+    readonly property var categories: ["常用", "网络与 Wi-Fi", "蓝牙", "摇杆测试", "声音", "屏幕", "存储", "系统信息", "电量与电源", "字体与输入", "CPU 频率", "内存与 Swap", "关于"]
+    readonly property var categoryIcons: ["settings", "wifi", "bluetooth", "gamepad", "volume", "display", "storage", "info", "battery", "keyboard", "cpu", "memory", "info"]
     readonly property var hints: choices.visible ? choices.hints : sidebar ? [["↑↓", "选择分类"], ["A / ↵", "进入"], ["B / Esc", "主页"]]
         : adjustingValue ? [["↑↓", "增减数值"], ["A / B", "完成调整"], ["←", "返回分类"]]
         : [["↑↓", "选择项目"], ["← / B", "返回分类"]].concat(rows[rowIndex] && canActivate(rows[rowIndex].key)
@@ -46,7 +47,9 @@ Item {
         case 8: return [{name: "空闲变暗", detail: "", key: "dim"}, {name: "电池与供电", detail: "", key: "battery"}, {name: "关机", detail: "", key: "poweroff"}, {name: "重启", detail: "", key: "reboot"}]
         case 9: return [{name: "界面字体大小", detail: "", key: "font"}, {name: "文字输入测试", detail: "退出后清空", value: "打开", key: "input"}]
         case 10: return [{name: "频率预设", detail: "本次测试会话生效", key: "cpuPreset"}, {name: "调速器", detail: "", key: "cpuGovernor"}, {name: "最低频率", detail: "", key: "cpuMin"}, {name: "最高频率", detail: "", key: "cpuMax"}, {name: "当前频率", detail: "", key: "cpuCurrent"}]
-        default: return [{name: "Swap 使用", detail: "", key: "swap"}, {name: "zram 内存压缩", detail: "", key: "zram"}, {name: "压缩算法", detail: "", key: "zramAlgorithms"}, {name: "压缩内存占用", detail: "", key: "zramMemory"}]
+        case 11: return [{name: "Swap 使用", detail: "", key: "swap"}, {name: "zram 内存压缩", detail: "", key: "zram"}, {name: "压缩算法", detail: "", key: "zramAlgorithms"}, {name: "压缩内存占用", detail: "", key: "zramMemory"}]
+        default: return [{name: "启动器", value: Qt.application.displayName}, {name: "版本", value: Qt.application.version},
+            {name: "项目地址", value: "https://github.com/OJZen/JumeOS"}]
         }
     }
     signal notice(string text)

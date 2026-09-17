@@ -1,6 +1,6 @@
 # R46H experiment status ledger
 
-> Current checkpoint: 2026-09-16. This is the authoritative index of accepted
+> Current checkpoint: 2026-09-17. This is the authoritative index of accepted
 > physical evidence and open hardware gates. Exact commands, hashes and raw
 > receipts stay in the linked owning runbooks.
 
@@ -77,7 +77,7 @@ The v0.18 local-network-policy successor is host-only; media and physical gates 
   still required after a new image write.
 - **Remote input — V0.16/V0.17 10 MS DEVICE PASS.** Self-test and exact
   screenshot-verified right/left single-step roundtrip passed; v0.15 uses 100 ms.
-- **Qt shell — R17 CONTROLS + R35 STATUS VALUES DEVICE PASS / R56 GEOMETRY COMPOSED PASS.**
+- **Jume Launcher (Qt shell) — R17 CONTROLS + R35 STATUS VALUES DEVICE PASS / R56 GEOMETRY COMPOSED PASS.**
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
   R56 aligned the status row in a device-composed capture; physical LCD remains open.
   Reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope.

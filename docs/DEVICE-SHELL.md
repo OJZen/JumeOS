@@ -1,4 +1,4 @@
-# R46H desktop and system UI
+# Jume Launcher
 
 Status: **R36 STATUS/NEO PERSISTENCE/PORTMASTER CATALOG DEVICE PASS; STREAMING DEFERRED**.
 The operator selected a custom Switch-inspired desktop, settings and a
@@ -30,7 +30,11 @@ blur or animated page layout to achieve depth.
 
 The host prototype includes home/library/settings, favorite persistence,
 keyboard and SDL controller navigation, an interactive session placeholder and
-a modal quick panel. Its [performance, settings and power plan](PERFORMANCE-POWER.md)
+a modal quick panel. The product-facing name is **Jume Launcher**; the internal
+`r46h-shell` binary and control-protocol identifier stay stable while existing
+deployment and evidence tooling depend on them. Version `0.1.0-dev` and the
+project URL are visible under **Settings → About**. Its
+[performance, settings and power plan](PERFORMANCE-POWER.md)
 owns the local HUD, device-setting categories, keyboard, CPU presets and swap/
 compression work. Placeholder content is identified in the UI. The retained
 EGLFS preview's panel is local to its process. R36's shared Wayland path separately
@@ -79,6 +83,14 @@ the streaming exit chord.
 | Shared display | Actual Moonlight plus a separate surface on R46H; retain Hantro use, correct colors and A/V; measure overlay hidden/visible costs |
 | System integration | Real app launch/exit, supported settings operations, global input isolation, crash recovery and persistent state |
 | Product acceptance | Attended gameplay and repeated menu/launch/exit cycles; only then select a replacement frontend |
+
+## ES-DE removal gate
+
+Jume Launcher may become the default frontend after its persistent image install,
+cold boot, repeated launch/exit/crash recovery, input ownership and save-retention
+gates pass. Keep ES-DE as a recovery entry during that transition. Remove it only
+after an endurance and upgrade/rollback cycle proves that Jume Launcher can recover
+without ES-DE, plus attended LCD, audio, physical-control and gameplay acceptance.
 
 Use the temporary remote tool to automate Qt navigation and window captures
 after its device gate passes. Keep attended LCD/audio/physical-input results

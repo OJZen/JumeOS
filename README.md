@@ -9,7 +9,7 @@ stable image or upgrade path yet.
 
 - Linux 6.12, Debian 13, Mesa/Panfrost graphics, ALSA audio, and unified gamepad input.
 - ES-DE with RetroArch/Ozone as the current gaming frontend and fallback.
-- An experimental Qt Quick home screen with battery, charging, Wi-Fi signal,
+- Jume Launcher, an experimental Qt Quick home screen with battery, charging, Wi-Fi signal,
   temperature, frequency, and basic settings status.
 - Neo Geo, a PortMaster catalog, isolated local saves, and source-built GTA III
   and Vice City reaching their target frontends.
@@ -33,7 +33,7 @@ from Git.
 ## 中文简介
 
 JumeOS 是面向 R46H 的实验性 Linux 掌机系统，目前已有主线内核、Debian、
-Panfrost、ES-DE/RetroArch 和实验性 Qt 掌机桌面。项目仍在开发中，暂不提供稳定
+Panfrost、ES-DE/RetroArch 和实验性的 Jume Launcher。项目仍在开发中，暂不提供稳定
 镜像或升级承诺。
 
 Licensed under the [MIT License](LICENSE).
