@@ -898,3 +898,6 @@ preparation in `CRenderer::PreRender`; split or optimize that path before more
 clock work. A direct unsynchronized-map candidate was rejected after an early
 `SIGSEGV` and was removed. Exact evidence is in
 `mainline/out/.cache/r46h-vblank-r65-device-20260919.LIMH3N/session.json`.
+The current diagnostic revision also reports time and call counts for visible
+building, vehicle, ped and object preparation plus invisible, alpha, helicopter
+and shadow buckets; target attribution remains open.

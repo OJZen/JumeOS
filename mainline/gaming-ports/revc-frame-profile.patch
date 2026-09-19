@@ -1,12 +1,30 @@
 --- a/src/core/timebars.h
 +++ b/src/core/timebars.h
-@@ -3 +3 @@
+@@ -3 +3,15 @@
 -#ifdef TIMEBARS
 +#if defined(TIMEBARS) || defined(MASTER)
++enum eR46HPreRenderProfile
++{
++	R46H_PRERENDER_BUILDING,
++	R46H_PRERENDER_VEHICLE,
++	R46H_PRERENDER_PED,
++	R46H_PRERENDER_OBJECT,
++	R46H_PRERENDER_OTHER,
++	R46H_PRERENDER_INVISIBLE,
++	R46H_PRERENDER_ALPHA,
++	R46H_PRERENDER_HELI,
++	R46H_PRERENDER_SHADOWS,
++	R46H_PRERENDER_COUNT,
++};
++
+@@ -7,0 +22,2 @@
++uint64 tbProfileNowNs();
++void tbAddPreRenderTime(int32, uint64);
 --- a/src/core/timebars.cpp
 +++ b/src/core/timebars.cpp
-@@ -1,5 +1,97 @@
- #include "common.h"
+@@ -1,0 +2 @@
++#include "timebars.h"
+@@ -2 +2,121 @@
 -#ifndef MASTER
 +#ifdef MASTER
 +#include <stdio.h>
@@ -36,6 +54,12 @@
 +	{ "Render2dStuff-Fade", "afterfade" },
 +	{ "Swap", "swap" },
 +};
++static const char *r46hPreRenderKeys[R46H_PRERENDER_COUNT] = {
++	"pre_building", "pre_vehicle", "pre_ped", "pre_object", "pre_other",
++	"pre_invisible", "pre_alpha", "pre_heli", "pre_shadows",
++};
++static uint64 r46hPreRenderNs[R46H_PRERENDER_COUNT];
++static uint32 r46hPreRenderCalls[R46H_PRERENDER_COUNT];
 +static uint64 r46hFrameStartNs, r46hWindowStartNs, r46hFrameTotalNs;
 +static uint32 r46hFrameCount;
 +
@@ -45,6 +69,21 @@
 +	struct timespec ts;
 +	clock_gettime(CLOCK_MONOTONIC, &ts);
 +	return (uint64)ts.tv_sec*1000000000ULL + ts.tv_nsec;
++}
++
++uint64
++tbProfileNowNs(void)
++{
++	return r46hNowNs();
++}
++
++void
++tbAddPreRenderTime(int32 category, uint64 startNs)
++{
++	if(category < 0 || category >= R46H_PRERENDER_COUNT)
++		return;
++	r46hPreRenderNs[category] += r46hNowNs() - startNs;
++	r46hPreRenderCalls[category]++;
 +}
 +
 +void
@@ -94,6 +133,13 @@
 +			(unsigned long long)(r46hTimers[i].totalNs/r46hFrameCount/1000));
 +		r46hTimers[i].totalNs = 0;
 +	}
++	for(uint32 i = 0; i < R46H_PRERENDER_COUNT; i++){
++		fprintf(stderr, " %s_us=%llu %s_calls=%u", r46hPreRenderKeys[i],
++			(unsigned long long)(r46hPreRenderNs[i]/r46hFrameCount/1000),
++			r46hPreRenderKeys[i], r46hPreRenderCalls[i]/r46hFrameCount);
++		r46hPreRenderNs[i] = 0;
++		r46hPreRenderCalls[i] = 0;
++	}
 +	fputc('\n', stderr);
 +	fflush(stderr);
 +	r46hFrameTotalNs = 0;
@@ -101,61 +147,76 @@
 +	r46hWindowStartNs = now;
 +}
 +#else
- #include "Font.h"
- #include "Frontend.h"
- #include "Timer.h"
-@@ -118,4 +210,4 @@
- #endif // !FINAL
- 	}
- }
+@@ -121 +241 @@
 -#endif // !MASTER
 \ No newline at end of file
 +#endif // MASTER
 --- a/src/core/main.cpp
 +++ b/src/core/main.cpp
-@@ -1597,6 +1597,7 @@
- 		RwCameraSetFogDistance(Scene.camera, CTimeCycle::GetFogStart());
- #endif
- 
+@@ -1599,0 +1600 @@
 +		tbStartTimer(0, "BeginFrame");
- 		if(CWeather::LightningFlash && !CCullZones::CamNoRain()){
- 			if(!DoRWStuffStartOfFrame_Horizon(255, 255, 255, 255, 255, 255, 255))
- 				goto popret;
-@@ -1606,6 +1607,7 @@
- 						255))
- 				goto popret;
- 		}
+@@ -1608,0 +1610 @@
 +		tbEndTimer("BeginFrame");
- 
- 		DefinedState();
- 
-@@ -1617,13 +1619,14 @@
- 		tbStartTimer(0, "RenderScene");
- 		RenderScene();
- 		tbEndTimer("RenderScene");
+@@ -1620 +1622 @@
 -
 +		tbStartTimer(0, "Effects");
- #ifdef EXTENDED_PIPELINES
- 		CustomPipes::EnvMapRender();
- #endif
- 
- 		RenderDebugShit();
- 		RenderEffects();
+@@ -1626,0 +1629 @@
 +		tbEndTimer("Effects");
- 
- 		if((TheCamera.m_BlurType == MOTION_BLUR_NONE || TheCamera.m_BlurType == MOTION_BLUR_LIGHT_SCENE) &&
- 		   TheCamera.m_ScreenReductionPercentage > 0.0f)
-@@ -1676,10 +1679,10 @@
- 	FrontEndMenuManager.DrawOverlays();
- #endif
- 
+@@ -1679,3 +1682 @@
 -	if (gbShowTimebars)
 -		tbDisplay();
 -
 +	tbStartTimer(0, "Swap");
- 	DoRWStuffEndOfFrame();
+@@ -1682,0 +1684,2 @@
 +	tbEndTimer("Swap");
 +	tbDisplay();
- 
- 	POP_MEMID();	// MEMID_RENDER
- 
+--- a/src/renderer/Renderer.cpp
++++ b/src/renderer/Renderer.cpp
+@@ -27,0 +28 @@
++#include "timebars.h"
+@@ -88,0 +90,20 @@
++static int32
++r46hPreRenderCategory(CEntity *entity)
++{
++	switch(entity->GetType()){
++	case ENTITY_TYPE_BUILDING: return R46H_PRERENDER_BUILDING;
++	case ENTITY_TYPE_VEHICLE: return R46H_PRERENDER_VEHICLE;
++	case ENTITY_TYPE_PED: return R46H_PRERENDER_PED;
++	case ENTITY_TYPE_OBJECT: return R46H_PRERENDER_OBJECT;
++	default: return R46H_PRERENDER_OTHER;
++	}
++}
++
++static void
++r46hPreRenderEntity(CEntity *entity, int32 category)
++{
++	uint64 startNs = tbProfileNowNs();
++	entity->PreRender();
++	tbAddPreRenderTime(category, startNs);
++}
++
+@@ -96 +117 @@
+-		ms_aVisibleEntityPtrs[i]->PreRender();
++		r46hPreRenderEntity(ms_aVisibleEntityPtrs[i], r46hPreRenderCategory(ms_aVisibleEntityPtrs[i]));
+@@ -101 +122 @@
+-			ms_aVisibleVehiclePtrs[i]->PreRender();
++			r46hPreRenderEntity(ms_aVisibleVehiclePtrs[i], R46H_PRERENDER_VEHICLE);
+@@ -104 +125 @@
+-			ms_aVisibleBuildingPtrs[i]->PreRender();
++			r46hPreRenderEntity(ms_aVisibleBuildingPtrs[i], R46H_PRERENDER_BUILDING);
+@@ -108 +129 @@
+-			((CEntity*)node->item.entity)->PreRender();
++			r46hPreRenderEntity((CEntity*)node->item.entity, R46H_PRERENDER_BUILDING);
+@@ -116 +137 @@
+-		ms_aInVisibleEntityPtrs[i]->PreRender();
++		r46hPreRenderEntity(ms_aInVisibleEntityPtrs[i], R46H_PRERENDER_INVISIBLE);
+@@ -122 +143 @@
+-		((CEntity*)node->item.entity)->PreRender();
++		r46hPreRenderEntity((CEntity*)node->item.entity, R46H_PRERENDER_ALPHA);
+@@ -123,0 +145 @@
++	uint64 startNs = tbProfileNowNs();
+@@ -124,0 +147,2 @@
++	tbAddPreRenderTime(R46H_PRERENDER_HELI, startNs);
++	startNs = tbProfileNowNs();
+@@ -125,0 +150 @@
++	tbAddPreRenderTime(R46H_PRERENDER_SHADOWS, startNs);
