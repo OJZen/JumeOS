@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-19: **R63 VICE CITY SHORT ATTENDED PASS / BROADER PLAY OPEN**.
+Status 2026-09-19: **R74 VICE CITY SHORT ATTENDED PASS / BROADER PLAY OPEN**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -912,12 +912,24 @@ the expensive update fell to zero while the fallback registration used only
 The uninstrumented R74 product candidate captured the same intro at a 28.93/s
 median and 33.89 ms median interval across nine complete samples, peaked at
 80.384 C, and exited its 121.06-second bound at status 0 without a forced kill.
-This is machine and composed-frame proof, not physical LCD/audio/control or a
-judgment of the shadow-quality tradeoff, so R63 remains the accepted candidate
-and R60 its rollback. Exact R71 evidence is in
+The following R75 operator check found no LCD motion, picture, audio or control
+problem and accepts R74 for that short path. Later open-world play did not hold
+30 FPS; broader play and saves remain open. R63 and R60 remain rollbacks. Exact
+R71 evidence is in
 `mainline/out/.cache/r46h-prerender-r71-device-20260919.ATo8aL/`.
 Exact R72 evidence is in
 `mainline/out/.cache/r46h-cutscene-r72-device-20260919.OL5FJ2/`.
 Exact R73/R74 evidence is in
 `mainline/out/.cache/r46h-simple-shadow-r73-device-20260919.dlSzrS/` and
 `mainline/out/.cache/r46h-simple-shadow-r74-device-20260919.jH33JR/`.
+
+The later SGSR1 experiment rendered Vice City into a 480x360 offscreen target
+and attempted a full-frame upscale to the existing 640x480 output. The shader
+from upstream commit `d926f074bcb9d714e179f1ce0fcb9ee2eeb5074e` did not compile
+under Mesa 26.2.2/Panfrost because its gather component was not a constant
+expression. The apparent working fallback was not SGSR and did not improve the
+matched intro rate. Specializing the fixed mode removed that diagnostic, but
+reVC exited -11 after 6.14 seconds before reaching the frontend. The candidate
+is rejected, its product code was removed, and unchanged reruns are not useful.
+Evidence is under
+`mainline/out/.cache/r46h-sgsr-r76-device-20260919.Ryx78e/`.

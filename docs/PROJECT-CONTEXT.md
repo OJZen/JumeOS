@@ -12,13 +12,12 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **powered on** after the 2026-09-19 R74 Vice City machine run.
-R74 exited 0 after its 121-second bound, peaked at 80.384 C below the 85 C
-guard, restored services and default policies, passed health and `sync`, and
-removed temporary access/staging. R63 remains the accepted GTA candidate; R74
-is the faster simple-cutscene-shadow candidate pending attended visual/audio/
-control acceptance, and R60 remains the rollback. Latest evidence is under
-`mainline/out/.cache/r46h-simple-shadow-r74-device-20260919.jH33JR/`.
+The device is **powered on** with ES-DE restored after the 2026-09-19 Vice City
+SGSR1 experiment. Services and default 600--1008/200--480 MHz policies passed
+health checks, `sync` completed, and temporary target access/staging was removed.
+R74 is the accepted GTA candidate after attended picture/audio/control approval;
+R63 and R60 remain rollbacks. Latest experiment evidence is under
+`mainline/out/.cache/r46h-sgsr-r76-device-20260919.Ryx78e/`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -63,9 +62,12 @@ skipped, so content equality remains unverified. See
   shadow fallback: matched profiler medians fell from 40.72 to 27.37 ms/frame
   and `PreRender` from 13.73 to 0.46 ms. The uninstrumented R74 run then recorded
   nine complete intro samples at 28.93 submissions/s and 33.89 ms median interval,
-  captured the composed scene, and exited 0; physical shadow quality, audio and
-  controls remain unaccepted. [Ports](../mainline/gaming-ports/README.md) owns
-  exact pacing and thermal data.
+  captured the composed scene, and exited 0. The operator then accepted its LCD
+  motion, picture, audio and controls; later open-world play remained below 30 FPS.
+  A full-frame 480x360-to-640x480 SGSR1 experiment was rejected: the upstream
+  shader failed Mesa/Panfrost GLSL compilation, and the fixed-mode specialization
+  exited -11 before the frontend. No SGSR product code was retained.
+  [Ports](../mainline/gaming-ports/README.md) owns exact pacing and thermal data.
 - Stardew's source, managed copy and backup hashes match and overwrite is refused.
   Its 120-second runs still remain before SDL/Wayland at both tested clock profiles;
   shared-window save selection/load and all attended gameplay evidence stay open.
@@ -98,10 +100,9 @@ runbooks.
 
 1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
    identity, new-password activation, unrelated-action denial and reboot persistence.
-2. Run one attended R74 Vice City intro comparison for LCD motion, shadow quality,
-   audio and controls. Promote it only if that tradeoff is accepted; then continue
-   broader gameplay/save proof. Keep R63/R60 available and do not repeat a live
-   GPU minimum-frequency raise.
+2. Continue R74 broader gameplay/save proof and profile the below-30-FPS
+   open-world phase only when a new software hypothesis exists. Keep R63/R60
+   available; do not repeat SGSR1 or a live GPU minimum-frequency raise unchanged.
 3. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
    other hardware-gated work until requested or its evidence changes.
 

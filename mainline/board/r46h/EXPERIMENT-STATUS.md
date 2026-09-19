@@ -80,19 +80,19 @@ cold/warm infra. LCD, USB, Moonlight and PSP remain open; v0.18 is still host-on
   R64 composed `GPU 200 MHz` matching target state; physical LCD remains open.
 - **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
   Dynamic `schedutil` and both GTA engines passed; reset recovered a live GPU-min panic. Do not repeat it.
-- **Wayland/ports — R63 SHORT ATTENDED PASS / R74 MACHINE PASS / BROADER PLAY OPEN.**
+- **Wayland/ports — R74 SHORT ATTENDED PASS / BROADER PLAY OPEN.**
   R48 fixed D-pad Down; 640x480, first-config and [private Mesa](../../gaming-mesa/README.md)
   passed. R60's Vice City LCD/audio/controls passed at 816/300 MHz. R62 found
   15--20% wall time in tiny uploads; R63 raised the same-clock median 18.67→20.52/s.
-  A 1008 MHz CPU follow-up completed three clean GTA bounds; matched 480/400/300 MHz
-  GPU medians were 23.08/22.91/22.46/s, so maximum devfreq is not the primary limit.
-  A later R63 run averaged 23.26/s and peaked at 82.307 C; R66's no-wait gain was only 6.6%.
-  R69 attributed 13.37 of 40.06 ms/frame to `PreRender`; R72 isolated
-  11.8--16.1 ms in real-time cutscene-shadow updates. R73's fallback reduced its
-  matched median to 0.46 ms and total frame time from 40.72 to 27.37 ms. R74 captured
+  At 1008 MHz CPU, matched 480/400/300 MHz GPU medians were 23.08/22.91/22.46/s;
+  a later R63 run averaged 23.26/s, and R66's no-wait gain was only 6.6%.
+  R69 put 13.37 of 40.06 ms/frame in `PreRender`; R72 isolated 11.8--16.1 ms in
+  cutscene shadows, and R73 cut median total frame time from 40.72 to 27.37 ms. R74 captured
   the intro, recorded nine complete samples at 28.93/s and 33.89 ms median interval,
-  exited 0 after 121.06 seconds and peaked at 80.384 C. R70 remains the accepted
-  R63 physical proof; R74 physical/shadow quality, broader play and saves remain open.
+  exited 0 after 121.06 seconds and peaked at 80.384 C. R75 accepted picture/motion,
+  audio and controls; open-world play stayed below 30 FPS, and saves remain open.
+  A 480x360 SGSR1 candidate failed Mesa compilation, then its fixed-mode variant
+  exited -11 before the frontend. R63/R60 remain rollbacks.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**

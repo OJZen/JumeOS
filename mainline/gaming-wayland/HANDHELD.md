@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-19: **R63 VICE CITY SHORT ATTENDED PASS / BROADER PLAY OPEN / STREAMING DEFERRED**.
+Status 2026-09-19: **R74 VICE CITY SHORT ATTENDED PASS / BROADER PLAY OPEN / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -430,8 +430,12 @@ real-time shadow map. The existing ordinary-ped shadow fallback reduced matched
 R73 median frame time from 40.72 to 27.37 ms. The uninstrumented R74 candidate
 then captured the intro, recorded nine complete samples at 28.93 submissions/s
 and 33.89 ms median interval, exited 0 after 121.06 seconds and peaked at
-80.384 C. This is machine and composed-frame proof only; keep R63 accepted until
-R74 shadow quality, LCD motion, audio and physical controls pass attended review.
+80.384 C. R75 then passed the short attended picture/motion, audio and physical
+control review, so R74 is accepted and R63/R60 remain rollbacks. Later open-world
+play stayed below 30 FPS; broader play and saves remain open. A subsequent
+480x360-to-640x480 SGSR1 candidate was rejected after the upstream shader failed
+Mesa/Panfrost compilation and its fixed-mode specialization exited -11 before
+the frontend; the [ports record](../gaming-ports/README.md) owns the details.
 
 A same-boot follow-up drove both GTA III and Vice City from menu through two
 completed remote South/B samples into fresh cutscenes at 1008/400 MHz. GTA III
