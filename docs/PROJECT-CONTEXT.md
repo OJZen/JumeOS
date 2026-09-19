@@ -12,14 +12,13 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **powered on** after the 2026-09-19 R69 Vice City phase-profile
-run. An unsafe earlier live GPU
-minimum-frequency raise panicked the kernel; operator reset restored the
-600--1008 MHz `schedutil` CPU default and 200--480 MHz `simple_ondemand` GPU
-policy. R69 exited 0 on request, restored product services and policies, and
-passed health, `sync` and temporary-access cleanup. Operator LCD/audio/control
-confirmation remains open. R60 is still the accepted fallback. Latest evidence
-is under `mainline/out/.cache/r46h-vblank-r65-device-20260919.LIMH3N/`.
+The device is **powered on** after the 2026-09-19 R70 short attended R63 Vice
+City acceptance. The operator reported no issue with the requested intro
+LCD/audio/control observation; the preview exited 0, peaked at 82.692 C below
+the 85 C guard, restored services and default policies, passed health and
+`sync`, and removed temporary access/staging. R63 is the accepted current GTA
+candidate; R60 remains its rollback. Latest evidence is under
+`mainline/out/.cache/r46h-r63-acceptance-20260919.m1uKjv/`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -50,7 +49,7 @@ skipped, so content equality remains unverified. See
   tiny immediate uploads/s consuming 15--20% wall time. R63 reused fixed-capacity
   upload regions and raised the same 816/300 MHz median from 18.67 to 20.52
   client commits/s, with clean bounded exit and no thermal/GPU fault; one isolated
-  1.116-second maximum interval and physical reacceptance remain. A same-boot R63
+  1.116-second maximum interval remains in that machine sample. A same-boot R63
   follow-up at CPU 600--1008 MHz ran two 121-second Vice City bounds and one
   121-second GTA III bound at exit 0. Vice City's matched 480/400/300 MHz GPU
   medians were 23.08/22.91/22.46 submissions/s, so a 37.5% GPU-clock reduction
@@ -60,7 +59,7 @@ skipped, so content equality remains unverified. See
   only a 6.6% same-boot gain. R69's frame profiler measured 40.06 ms/frame after
   warm-up: `CRenderer::PreRender` led at 13.37 ms (33.4%), `RenderScene` used
   8.79 ms and swap used 3.66 ms. CPU-side entity preparation is the primary
-  remaining bottleneck. Operator R63 reacceptance remains open;
+  remaining bottleneck. R70 then passed the short attended R63 intro observation;
   [ports](../mainline/gaming-ports/README.md) owns exact pacing and thermal data.
 - Stardew's source, managed copy and backup hashes match and overwrite is refused.
   Its 120-second runs still remain before SDL/Wayland at both tested clock profiles;
@@ -95,8 +94,8 @@ runbooks.
 1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
    identity, new-password activation, unrelated-action denial and reboot persistence.
 2. Optimize or subdivide Vice City's measured `CRenderer::PreRender` path before
-   more clock work. Obtain operator confirmation for R63 LCD/audio/controls and
-   keep R60 until that pass. Do not repeat a live GPU minimum-frequency raise.
+   more clock work. Keep R60 as rollback until broader R63 gameplay/save proof.
+   Do not repeat a live GPU minimum-frequency raise.
 3. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
    other hardware-gated work until requested or its evidence changes.
 

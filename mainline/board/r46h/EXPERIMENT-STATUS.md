@@ -80,7 +80,7 @@ cold/warm infra. LCD, USB, Moonlight and PSP remain open; v0.18 is still host-on
   R64 composed `GPU 200 MHz` matching target state; physical LCD remains open.
 - **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
   Dynamic `schedutil` and both GTA engines passed; reset recovered a live GPU-min panic. Do not repeat it.
-- **Wayland/ports — R60 PHYSICAL PASS / R63 MACHINE PASS / OPERATOR + BROADER PLAY OPEN.**
+- **Wayland/ports — R63 SHORT ATTENDED PASS / BROADER PLAY OPEN.**
   R48 fixed D-pad Down; 640x480, first-config and [private Mesa](../../gaming-mesa/README.md)
   passed. R60's Vice City LCD/audio/controls passed at 816/300 MHz. R62 found
   15--20% wall time in tiny uploads; R63 raised the same-clock median 18.67→20.52/s.
@@ -89,8 +89,8 @@ cold/warm infra. LCD, USB, Moonlight and PSP remain open; v0.18 is still host-on
   A later R63 run averaged 23.26/s and peaked at 82.307 C; R66's no-wait gain was
   only 6.6%. R69 attributed 13.37 of 40.06 ms/frame (33.4%) to
   `CRenderer::PreRender`, versus 8.79 ms in `RenderScene` and 3.66 ms in swap.
-  CPU-side entity preparation is primary. Operator confirmation remains open;
-  R60 stays fallback; GTA III physical play, broader saves and Stardew save-load remain open.
+  CPU-side entity preparation is primary. R70's short R63 intro LCD/audio/control
+  pass peaked at 82.692 C and restored cleanly. Broader play/saves remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**

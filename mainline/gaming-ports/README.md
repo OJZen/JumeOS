@@ -1,6 +1,6 @@
 # Original ports and PortMaster integration
 
-Status 2026-09-16: **R60 GTA III/VC BATCHED MACHINE PASS / PACING + ATTENDED OPEN**.
+Status 2026-09-19: **R63 VICE CITY SHORT ATTENDED PASS / BROADER PLAY OPEN**.
 The [roadmap](../../docs/PRODUCT-ROADMAP.md) owns ordering. The guarded profile
 executed the fixed-hash GTA III engine, never the original launcher script; original
 game data stayed read-only and the managed save directory stayed empty.
@@ -853,8 +853,8 @@ At 816/300 MHz, 16 active Vice City samples reached a 20.52/s median and 45.23 m
 median interval, improving R60's 18.67/s and 52.55 ms by 9.9% and 13.9%. The
 120.88-second run exited 0 without cooling or GPU faults, but one isolated interval
 reached 1.116 seconds. With both options unset, rebuilt engines remain byte-identical
-to R60 and contain neither optional receipt. R60 remains the accepted fallback
-until attended R63 LCD/audio/control acceptance. Exact R62/R63 evidence is in
+to R60 and contain neither optional receipt. R60 remains the rollback. Exact
+R62/R63 evidence is in
 `mainline/out/.cache/r46h-gta-profile-device-20260919.aakor9/session.json` and
 `mainline/out/.cache/r46h-gta-ring-device-20260919.axyBwv/session.json`.
 
@@ -864,10 +864,19 @@ over 45 seconds. Submission rate ranged from 19.34 to 26.60/s (23.26/s mean),
 frame-interval median averaged 40.32 ms, CPU/GPU stayed at 1008/480 MHz and the
 temperature peaked at 82.307 C without reaching the 85 C guard. The engine exited
 0 after 115.16 seconds, with no forced kill, low voltage or current-boot fault;
-services, policies, `sync` and temporary-access cleanup passed. This is machine
-proof only: operator LCD motion, audible output and physical controls remain open.
-Evidence is in
+services, policies, `sync` and temporary-access cleanup passed. This run was
+machine proof only. Evidence is in
 `mainline/out/.cache/r46h-r63-physical-20260919.jo53TV/session.json`.
+
+R70 then repeated the exact R63/default-policy intro path for the operator. The
+operator reported no issue with the requested LCD motion/picture, audible output
+and physical-control observation. Nine 30-second machine samples averaged 23.13
+submissions/s and 41.26 ms median intervals; the thermal guard peaked at 82.692 C
+without firing. The preview exited 0, health and `sync` passed, services/policies
+were restored, temporary access/staging was removed and the device remained on.
+This accepts the short R63 intro path; broader gameplay, saves and GTA III physical
+play remain open. Evidence is in
+`mainline/out/.cache/r46h-r63-acceptance-20260919.m1uKjv/session.json`.
 
 Set `R46H_GTA_SWAP_NOWAIT=1` only for the isolated swap-wait experiment. It
 keeps the engine's 30 FPS frame limiter but forces SDL GL swap interval zero,

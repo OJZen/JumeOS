@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-16: **R60 MESA BATCHED MACHINE PASS / ATTENDED OPEN / STREAMING DEFERRED**.
+Status 2026-09-19: **R63 VICE CITY SHORT ATTENDED PASS / BROADER PLAY OPEN / STREAMING DEFERRED**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -419,9 +419,11 @@ buffers and orphans only on wrap. At the same 816/300 MHz caps its 16 active
 Vice City samples reached a 20.52/s median and 45.23 ms median interval, versus
 R60's 18.67/s and 52.55 ms. It captured the intro and exited its 120.88-second
 bound cleanly without cooling or GPU faults, but retained one isolated 1.116-second
-maximum interval. Cleanup and serial poweroff passed. R60 remains the accepted
-fallback until R63's LCD motion, audio and physical controls are attended; exact
-receipts are in `mainline/out/.cache/r46h-gta-ring-device-20260919.axyBwv/`.
+maximum interval. Cleanup and serial poweroff passed. R70 later passed the short
+attended R63 intro LCD/audio/control observation at default 1008/480 MHz; R60 is
+retained as rollback while broader gameplay and saves remain open. Exact receipts
+are in `mainline/out/.cache/r46h-gta-ring-device-20260919.axyBwv/` and
+`mainline/out/.cache/r46h-r63-acceptance-20260919.m1uKjv/`.
 
 A same-boot follow-up drove both GTA III and Vice City from menu through two
 completed remote South/B samples into fresh cutscenes at 1008/400 MHz. GTA III
