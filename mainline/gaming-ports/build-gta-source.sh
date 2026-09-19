@@ -12,8 +12,10 @@ case "$output" in "$base/mainline/out/"*) ;; *) echo 'Output must be under mainl
 native=${R46H_PORT_NATIVE_CACHE:-"$base/mainline/out/.cache/r46h-ports-native"}
 profile=${R46H_GTA_IMMEDIATE_PROFILE:-0}
 ring=${R46H_GTA_IMMEDIATE_RING:-0}
+swap_nowait=${R46H_GTA_SWAP_NOWAIT:-0}
 [[ $profile == 0 || $profile == 1 ]] || { echo 'R46H_GTA_IMMEDIATE_PROFILE must be 0 or 1.' >&2; exit 2; }
 [[ $ring == 0 || $ring == 1 ]] || { echo 'R46H_GTA_IMMEDIATE_RING must be 0 or 1.' >&2; exit 2; }
+[[ $swap_nowait == 0 || $swap_nowait == 1 ]] || { echo 'R46H_GTA_SWAP_NOWAIT must be 0 or 1.' >&2; exit 2; }
 (( profile + ring <= 1 )) || { echo 'Immediate profiling and ring upload are separate candidates.' >&2; exit 2; }
 PYTHONDONTWRITEBYTECODE=1 python3 -B "$base/mainline/gaming-ports/prepare-gta-source.py" "$inputs" --check
 PYTHONDONTWRITEBYTECODE=1 python3 -B "$base/mainline/gaming-ports/prepare-native.py" "$native" --check
@@ -23,8 +25,10 @@ docker run --rm --network none --entrypoint /bin/bash \
   -v "$base/mainline/gaming-ports/librw-context-fallback.patch:/librw-context-fallback.patch:ro" \
   -v "$base/mainline/gaming-ports/librw-immediate-profile.patch:/librw-immediate-profile.patch:ro" \
   -v "$base/mainline/gaming-ports/librw-immediate-ring.patch:/librw-immediate-ring.patch:ro" \
+  -v "$base/mainline/gaming-ports/librw-swap-nowait.patch:/librw-swap-nowait.patch:ro" \
   -v "$base/mainline/gaming-ports/r46h-gta-runtime.patch:/r46h-gta-runtime.patch:ro" \
   -e R46H_GTA_IMMEDIATE_PROFILE="$profile" -e R46H_GTA_IMMEDIATE_RING="$ring" \
+  -e R46H_GTA_SWAP_NOWAIT="$swap_nowait" \
   cgutman/moonlight-packaging@sha256:f25a3e2ad90b85d1a4358e2d612ed311165cddd62aa194455a5dbed844d66d69 -c '
 set -Eeuo pipefail
 work=/out/.build
@@ -47,6 +51,9 @@ for source in "$re3" "$revc"; do
   fi
   if [[ ${R46H_GTA_IMMEDIATE_RING:-0} == 1 ]]; then
     patch --batch --forward -d "$source/vendor/librw" -p1 < /librw-immediate-ring.patch
+  fi
+  if [[ ${R46H_GTA_SWAP_NOWAIT:-0} == 1 ]]; then
+    patch --batch --forward -d "$source/vendor/librw" -p1 < /librw-swap-nowait.patch
   fi
 done
 sysroot="$work/sysroot"
@@ -85,6 +92,9 @@ if [[ ${R46H_GTA_IMMEDIATE_PROFILE:-0} == 1 ]]; then
 fi
 if [[ ${R46H_GTA_IMMEDIATE_RING:-0} == 1 ]]; then
   printf '\''immediate_ring_patch_sha256=%s\n'\'' "$(sha256sum /librw-immediate-ring.patch | cut -d '\'' '\'' -f 1)" >> /out/BUILD-INFO.incoming
+fi
+if [[ ${R46H_GTA_SWAP_NOWAIT:-0} == 1 ]]; then
+  printf '\''swap_nowait_patch_sha256=%s\n'\'' "$(sha256sum /librw-swap-nowait.patch | cut -d '\'' '\'' -f 1)" >> /out/BUILD-INFO.incoming
 fi
 (cd /out && sha256sum re3 reVC > SHA256SUMS.incoming)
 mv /out/BUILD-INFO.incoming /out/BUILD-INFO

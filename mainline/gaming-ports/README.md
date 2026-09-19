@@ -868,3 +868,8 @@ services, policies, `sync` and temporary-access cleanup passed. This is machine
 proof only: operator LCD motion, audible output and physical controls remain open.
 Evidence is in
 `mainline/out/.cache/r46h-r63-physical-20260919.jo53TV/session.json`.
+
+Set `R46H_GTA_SWAP_NOWAIT=1` only for the isolated swap-wait experiment. It
+keeps the engine's 30 FPS frame limiter but forces SDL GL swap interval zero,
+separating that limiter from compositor/VSync waiting. Combine it with the R63
+ring candidate for the target A/B; it is not a product default.
