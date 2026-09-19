@@ -425,6 +425,14 @@ retained as rollback while broader gameplay and saves remain open. Exact receipt
 are in `mainline/out/.cache/r46h-gta-ring-device-20260919.axyBwv/` and
 `mainline/out/.cache/r46h-r63-acceptance-20260919.m1uKjv/`.
 
+R71/R72 later isolated Vice City's dominant cutscene cost to its per-character
+real-time shadow map. The existing ordinary-ped shadow fallback reduced matched
+R73 median frame time from 40.72 to 27.37 ms. The uninstrumented R74 candidate
+then captured the intro, recorded nine complete samples at 28.93 submissions/s
+and 33.89 ms median interval, exited 0 after 121.06 seconds and peaked at
+80.384 C. This is machine and composed-frame proof only; keep R63 accepted until
+R74 shadow quality, LCD motion, audio and physical controls pass attended review.
+
 A same-boot follow-up drove both GTA III and Vice City from menu through two
 completed remote South/B samples into fresh cutscenes at 1008/400 MHz. GTA III
 fell from 28.66 submissions/s at the menu to 3.17/s in the car scene, with a

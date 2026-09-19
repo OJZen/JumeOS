@@ -194,9 +194,15 @@ readout is implemented.
    HUD-on cutscene sample at the default 1008/480 MHz limits averaged 23.26
    submissions/s, peaked at 82.307 C and exited 0 after 115.16 seconds. R69 then
    measured 40.06 ms/frame after warm-up: `CRenderer::PreRender` led at 13.37 ms,
-   `RenderScene` used 8.79 ms and swap used 3.66 ms. R70 passed the short attended
-   R63 LCD/audio/control intro observation. Optimize or subdivide `PreRender`, keep
-   R60 as rollback until broader gameplay/save proof and avoid unsupported GPU OPPs.
+   `RenderScene` used 8.79 ms and swap used 3.66 ms. R72 then isolated the dominant
+   work as per-character real-time cutscene-shadow updates. Reusing the engine's
+   ordinary-ped shadow fallback reduced matched R73 profiler medians from 40.72
+   to 27.37 ms/frame and `PreRender` from 13.73 to 0.46 ms. The uninstrumented R74
+   run sustained a 28.93/s median with 33.89 ms median intervals across nine
+   complete samples, exited 0 after 121.06 seconds and peaked at 80.384 C. R70's
+   R63 LCD/audio/control proof remains accepted; R74 needs attended shadow-quality
+   and physical acceptance before promotion. Keep R60 as rollback until broader
+   gameplay/save proof and avoid unsupported GPU OPPs.
    The two-second health sampler warns near voltage/thermal limits and blocks
    unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,
    charge completion and suspend/resume remain open; supply alone is not net

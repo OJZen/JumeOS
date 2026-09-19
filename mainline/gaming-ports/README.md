@@ -905,8 +905,19 @@ real-time cutscene-shadow updates cost 11.8--16.1 ms/frame and their registratio
 another 1.6--2.1 ms, while animation cost only 0.16--0.25 ms. Set
 `R46H_GTA_SIMPLE_CUTSCENE_SHADOWS=1` for the isolated fallback-shadow candidate;
 it retains the engine's ordinary ped shadow but skips the per-character offscreen
-shadow map. It is not a product default until target visual/performance comparison
-passes. Exact R71 evidence is in
+shadow map. In matched profiler builds, R73 reduced median `PreRender` from
+13.73 to 0.46 ms/frame and median total frame time from 40.72 to 27.37 ms;
+the expensive update fell to zero while the fallback registration used only
+0.01 ms. Its longer run reached the external 85 C guard, then restored cleanly.
+The uninstrumented R74 product candidate captured the same intro at a 28.93/s
+median and 33.89 ms median interval across nine complete samples, peaked at
+80.384 C, and exited its 121.06-second bound at status 0 without a forced kill.
+This is machine and composed-frame proof, not physical LCD/audio/control or a
+judgment of the shadow-quality tradeoff, so R63 remains the accepted candidate
+and R60 its rollback. Exact R71 evidence is in
 `mainline/out/.cache/r46h-prerender-r71-device-20260919.ATo8aL/`.
 Exact R72 evidence is in
 `mainline/out/.cache/r46h-cutscene-r72-device-20260919.OL5FJ2/`.
+Exact R73/R74 evidence is in
+`mainline/out/.cache/r46h-simple-shadow-r73-device-20260919.dlSzrS/` and
+`mainline/out/.cache/r46h-simple-shadow-r74-device-20260919.jH33JR/`.
