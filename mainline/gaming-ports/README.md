@@ -872,8 +872,20 @@ Evidence is in
 Set `R46H_GTA_SWAP_NOWAIT=1` only for the isolated swap-wait experiment. It
 keeps the engine's 30 FPS frame limiter but forces SDL GL swap interval zero,
 separating that limiter from compositor/VSync waiting. Combine it with the R63
-ring candidate for the target A/B; it is not a product default.
+ring candidate for the target A/B; it is not a product default. The R66 target
+run averaged 24.17 submissions/s versus 22.67/s for its same-boot control, a
+6.6% gain that leaves the cutscene below 30 FPS. Swap waiting is secondary.
 
 Set `R46H_GTA_FRAME_PROFILE=1` for the Vice City phase profiler. It records
 one-second averages for game processing, render phases and swap to stderr and
-can be combined with the R63 ring candidate. It is not a product default.
+can be combined with the R63 ring candidate. It is not a product default. R69
+excluded the first ten startup/menu windows and retained 48 windows containing
+1,222 frames. The weighted mean was 40.06 ms/frame: `CRenderer::PreRender`
+13.37 ms (33.4%), `RenderScene` 8.79 ms (21.9%), swap 3.66 ms (9.1%) and game
+processing 3.07 ms (7.7%). Its matched display sample averaged 24.25
+submissions/s at 1008/480 MHz, the engine exited 0 on request, and temperature
+peaked at 83.076 C. The primary remaining bottleneck is CPU-side entity
+preparation in `CRenderer::PreRender`; split or optimize that path before more
+clock work. A direct unsynchronized-map candidate was rejected after an early
+`SIGSEGV` and was removed. Exact evidence is in
+`mainline/out/.cache/r46h-vblank-r65-device-20260919.LIMH3N/session.json`.

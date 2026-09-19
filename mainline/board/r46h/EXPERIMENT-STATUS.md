@@ -86,11 +86,11 @@ cold/warm infra. LCD, USB, Moonlight and PSP remain open; v0.18 is still host-on
   15--20% wall time in tiny uploads; R63 raised the same-clock median 18.67→20.52/s.
   A 1008 MHz CPU follow-up completed three clean GTA bounds; matched 480/400/300 MHz
   GPU medians were 23.08/22.91/22.46/s, so maximum devfreq is not the primary limit.
-  A later default-policy R63 run captured the Vice City intro, routed two B presses
-  and averaged 23.26 submissions/s for 45 seconds. It peaked at 82.307 C and exited
-  0 after 115.16 seconds without a current-boot fault. Operator LCD/audio/control
-  confirmation remains open; R60 stays fallback. GTA III physical play, broader
-  saves and Stardew save-load remain open.
+  A later R63 run averaged 23.26/s and peaked at 82.307 C; R66's no-wait gain was
+  only 6.6%. R69 attributed 13.37 of 40.06 ms/frame (33.4%) to
+  `CRenderer::PreRender`, versus 8.79 ms in `RenderScene` and 3.66 ms in swap.
+  CPU-side entity preparation is primary. Operator confirmation remains open;
+  R60 stays fallback; GTA III physical play, broader saves and Stardew save-load remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**
