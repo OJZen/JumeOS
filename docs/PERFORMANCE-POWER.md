@@ -209,6 +209,8 @@ readout is implemented.
    A live 200→480 MHz minimum-frequency raise during the R64 session triggered a
    Panfrost power-domain external abort and kernel panic. Do not repeat that
    transition; verify future GPU policy changes only through a cold boot candidate.
+   Operator reset restored the default dynamic range; services, current-boot
+   fault scan, temporary-access cleanup and `sync` passed.
    R32 measured HUD-on UI CPU near 8.6% of one core and panel-open near 24.1%
    during the short run. Actual streaming, GPU time and audio-device metrics
    remain separate producer/acceptance work.

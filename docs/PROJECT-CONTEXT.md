@@ -12,12 +12,12 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **halted at a kernel panic** after a successful 2026-09-19 GPU-HUD
-capture and an unsafe live GPU minimum-frequency raise. A cold power cycle and
-temporary-access cleanup are required. Before the incident, the 600--1008 MHz
-`schedutil` CPU default had passed a warm reboot and all product services were
-healthy; the GPU policy was 200--480 MHz `simple_ondemand`. R63 remains a
-machine-tested upload-ring candidate and R60 the accepted fallback. Evidence is under
+The device is **powered on** after recovery from the 2026-09-19 GPU-HUD test.
+An unsafe live GPU minimum-frequency raise panicked the kernel; operator reset
+restored the 600--1008 MHz `schedutil` CPU default and 200--480 MHz
+`simple_ondemand` GPU policy. Product services, current-boot fault scan, `sync`
+and temporary-access cleanup passed. R63 remains a machine-tested upload-ring
+candidate and R60 the accepted fallback. Evidence is under
 `mainline/out/.cache/r46h-cpufreq-r63-device-20260919.oDoApN/`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
@@ -87,9 +87,8 @@ runbooks.
 
 1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
    identity, new-password activation, unrelated-action denial and reboot persistence.
-2. Cold-boot the device, verify default clocks/services and remove the temporary
-   access key. Then reaccept R63 Vice City LCD motion, audio and physical controls;
-   keep R60 until that pass. Do not repeat a live GPU minimum-frequency raise.
+2. Reaccept R63 Vice City LCD motion, audio and physical controls; keep R60 until
+   that pass. Do not repeat a live GPU minimum-frequency raise.
 3. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
    other hardware-gated work until requested or its evidence changes.
 
