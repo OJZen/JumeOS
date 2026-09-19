@@ -14,10 +14,12 @@ profile=${R46H_GTA_IMMEDIATE_PROFILE:-0}
 ring=${R46H_GTA_IMMEDIATE_RING:-0}
 frame_profile=${R46H_GTA_FRAME_PROFILE:-0}
 swap_nowait=${R46H_GTA_SWAP_NOWAIT:-0}
+simple_cutscene_shadows=${R46H_GTA_SIMPLE_CUTSCENE_SHADOWS:-0}
 [[ $profile == 0 || $profile == 1 ]] || { echo 'R46H_GTA_IMMEDIATE_PROFILE must be 0 or 1.' >&2; exit 2; }
 [[ $ring == 0 || $ring == 1 ]] || { echo 'R46H_GTA_IMMEDIATE_RING must be 0 or 1.' >&2; exit 2; }
 [[ $frame_profile == 0 || $frame_profile == 1 ]] || { echo 'R46H_GTA_FRAME_PROFILE must be 0 or 1.' >&2; exit 2; }
 [[ $swap_nowait == 0 || $swap_nowait == 1 ]] || { echo 'R46H_GTA_SWAP_NOWAIT must be 0 or 1.' >&2; exit 2; }
+[[ $simple_cutscene_shadows == 0 || $simple_cutscene_shadows == 1 ]] || { echo 'R46H_GTA_SIMPLE_CUTSCENE_SHADOWS must be 0 or 1.' >&2; exit 2; }
 (( profile + ring <= 1 )) || { echo 'Immediate profiling and ring upload are separate candidates.' >&2; exit 2; }
 PYTHONDONTWRITEBYTECODE=1 python3 -B "$base/mainline/gaming-ports/prepare-gta-source.py" "$inputs" --check
 PYTHONDONTWRITEBYTECODE=1 python3 -B "$base/mainline/gaming-ports/prepare-native.py" "$native" --check
@@ -28,11 +30,13 @@ docker run --rm --network none --entrypoint /bin/bash \
   -v "$base/mainline/gaming-ports/librw-immediate-profile.patch:/librw-immediate-profile.patch:ro" \
   -v "$base/mainline/gaming-ports/librw-immediate-ring.patch:/librw-immediate-ring.patch:ro" \
   -v "$base/mainline/gaming-ports/revc-frame-profile.patch:/revc-frame-profile.patch:ro" \
+  -v "$base/mainline/gaming-ports/revc-simple-cutscene-shadows.patch:/revc-simple-cutscene-shadows.patch:ro" \
   -v "$base/mainline/gaming-ports/librw-swap-nowait.patch:/librw-swap-nowait.patch:ro" \
   -v "$base/mainline/gaming-ports/r46h-gta-runtime.patch:/r46h-gta-runtime.patch:ro" \
   -e R46H_GTA_IMMEDIATE_PROFILE="$profile" -e R46H_GTA_IMMEDIATE_RING="$ring" \
   -e R46H_GTA_FRAME_PROFILE="$frame_profile" \
   -e R46H_GTA_SWAP_NOWAIT="$swap_nowait" \
+  -e R46H_GTA_SIMPLE_CUTSCENE_SHADOWS="$simple_cutscene_shadows" \
   cgutman/moonlight-packaging@sha256:f25a3e2ad90b85d1a4358e2d612ed311165cddd62aa194455a5dbed844d66d69 -c '
 set -Eeuo pipefail
 work=/out/.build
@@ -62,6 +66,9 @@ for source in "$re3" "$revc"; do
 done
 if [[ ${R46H_GTA_FRAME_PROFILE:-0} == 1 ]]; then
   patch --batch --forward -d "$revc" -p1 < /revc-frame-profile.patch
+fi
+if [[ ${R46H_GTA_SIMPLE_CUTSCENE_SHADOWS:-0} == 1 ]]; then
+  patch --batch --forward -d "$revc" -p1 < /revc-simple-cutscene-shadows.patch
 fi
 sysroot="$work/sysroot"
 mkdir -p "$sysroot"
@@ -105,6 +112,9 @@ if [[ ${R46H_GTA_FRAME_PROFILE:-0} == 1 ]]; then
 fi
 if [[ ${R46H_GTA_SWAP_NOWAIT:-0} == 1 ]]; then
   printf '\''swap_nowait_patch_sha256=%s\n'\'' "$(sha256sum /librw-swap-nowait.patch | cut -d '\'' '\'' -f 1)" >> /out/BUILD-INFO.incoming
+fi
+if [[ ${R46H_GTA_SIMPLE_CUTSCENE_SHADOWS:-0} == 1 ]]; then
+  printf '\''simple_cutscene_shadows_patch_sha256=%s\n'\'' "$(sha256sum /revc-simple-cutscene-shadows.patch | cut -d '\'' '\'' -f 1)" >> /out/BUILD-INFO.incoming
 fi
 (cd /out && sha256sum re3 reVC > SHA256SUMS.incoming)
 mv /out/BUILD-INFO.incoming /out/BUILD-INFO

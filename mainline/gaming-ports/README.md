@@ -900,7 +900,13 @@ clock work. A direct unsynchronized-map candidate was rejected after an early
 `mainline/out/.cache/r46h-vblank-r65-device-20260919.LIMH3N/session.json`.
 R71 then attributed the low-rate intro phase to the object bucket: roughly
 13--17 ms/frame came from 6--11 object calls while the other entity buckets
-stayed below about 0.2 ms/frame. These are cutscene objects, so the current
-diagnostic further splits attachment, animation, dynamic-shadow update/store and
-material work before changing the rendered result. Exact R71 evidence is in
+stayed below about 0.2 ms/frame. R72 identified the exact cause: four or five
+real-time cutscene-shadow updates cost 11.8--16.1 ms/frame and their registration
+another 1.6--2.1 ms, while animation cost only 0.16--0.25 ms. Set
+`R46H_GTA_SIMPLE_CUTSCENE_SHADOWS=1` for the isolated fallback-shadow candidate;
+it retains the engine's ordinary ped shadow but skips the per-character offscreen
+shadow map. It is not a product default until target visual/performance comparison
+passes. Exact R71 evidence is in
 `mainline/out/.cache/r46h-prerender-r71-device-20260919.ATo8aL/`.
+Exact R72 evidence is in
+`mainline/out/.cache/r46h-cutscene-r72-device-20260919.OL5FJ2/`.

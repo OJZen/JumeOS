@@ -1,0 +1,8 @@
+--- a/src/animation/CutsceneMgr.cpp
++++ b/src/animation/CutsceneMgr.cpp
+@@ -131 +131 @@
+-bool CCutsceneMgr::ms_useCutsceneShadows = true;
++bool CCutsceneMgr::ms_useCutsceneShadows = false;
+@@ -422 +422 @@
+-	ms_useCutsceneShadows = true;
++	ms_useCutsceneShadows = false;
