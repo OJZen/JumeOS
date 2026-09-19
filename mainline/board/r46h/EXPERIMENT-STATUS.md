@@ -1,6 +1,6 @@
 # R46H experiment status ledger
 
-> Current checkpoint: 2026-09-19. This is the authoritative index of accepted
+> Current checkpoint: 2026-09-20. This is the authoritative index of accepted
 > physical evidence and open hardware gates. Exact commands, hashes and raw
 > receipts stay in the linked owning runbooks.
 

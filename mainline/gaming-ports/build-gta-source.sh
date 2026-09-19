@@ -11,10 +11,10 @@ case "$inputs" in "$base/mainline/out/"*) ;; *) echo 'Input cache must be under 
 case "$output" in "$base/mainline/out/"*) ;; *) echo 'Output must be under mainline/out.' >&2; exit 2;; esac
 native=${R46H_PORT_NATIVE_CACHE:-"$base/mainline/out/.cache/r46h-ports-native"}
 profile=${R46H_GTA_IMMEDIATE_PROFILE:-0}
-ring=${R46H_GTA_IMMEDIATE_RING:-0}
+ring=${R46H_GTA_IMMEDIATE_RING:-1}
 frame_profile=${R46H_GTA_FRAME_PROFILE:-0}
 swap_nowait=${R46H_GTA_SWAP_NOWAIT:-0}
-simple_cutscene_shadows=${R46H_GTA_SIMPLE_CUTSCENE_SHADOWS:-0}
+simple_cutscene_shadows=${R46H_GTA_SIMPLE_CUTSCENE_SHADOWS:-1}
 [[ $profile == 0 || $profile == 1 ]] || { echo 'R46H_GTA_IMMEDIATE_PROFILE must be 0 or 1.' >&2; exit 2; }
 [[ $ring == 0 || $ring == 1 ]] || { echo 'R46H_GTA_IMMEDIATE_RING must be 0 or 1.' >&2; exit 2; }
 [[ $frame_profile == 0 || $frame_profile == 1 ]] || { echo 'R46H_GTA_FRAME_PROFILE must be 0 or 1.' >&2; exit 2; }

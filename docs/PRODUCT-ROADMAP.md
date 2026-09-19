@@ -1,6 +1,6 @@
 # R46H product roadmap
 
-Updated 2026-09-17. This owns the feature backlog and completion criteria.
+Updated 2026-09-20. This owns the feature backlog and completion criteria.
 [Project Context](PROJECT-CONTEXT.md) owns the immediate order and current device
 state; the [ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) owns physical proof.
 P0 closes the first usable gameplay flows. P1 builds the product around them.
@@ -27,7 +27,7 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
 | S3 / P1 | Power management | Retain real dim/wake and supervised reboot/poweroff; measure charging/battery reporting and low-voltage policy, then design bounded suspend/wake recovery |
 | Q1 / P1→P2 | Product installation and endurance | Make Jume Launcher the persistent default after settings/pairing/saves, bounded logs/caches, repeated launches and sustained gameplay pass; remove ES-DE only after cold-boot, crash recovery and upgrade/rollback no longer depend on it |
 
-## Current evidence by workstream — 2026-09-16
+## Current evidence by workstream — 2026-09-20
 
 - **M1/M2:** v5 fixes the empty application-list path. Real pairing, listing,
   H.264/PCM, native stats and virtual controller roundtrip passed the isolated
@@ -46,11 +46,12 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
   owns exact evidence and the 85 C limit. Physical L3+R3, LCD/audio, sustained
   performance, precise overlay cost and actual Moonlight remain open.
 - **P1–P4:** resource/save management and HarbourMaster lifecycle have host checks.
-  R60's exact GTA III/Vice City package reached captured cutscenes, clean
-  121-second exits and relaunches without storage or GPU faults. Stardew's source,
+  R74's accepted GTA III/Vice City engines pin the ring-upload and simple-shadow
+  source build; Vice City's short intro passed picture, audio and controls, while
+  open-world performance, broader play and saves remain open. Stardew's source,
   managed copy and backup remain hash-equal with overwrite refused, but both
-  120-second profiles still stop before SDL/Wayland. Attended gameplay/audio/
-  controls/save checks and Stardew shared-window save/load remain open. The
+  120-second profiles still stop before SDL/Wayland. GTA III broader physical play
+  and Stardew shared-window save/load remain open. The
   separate SA Android-loader/direct-evdev findings do not establish a working port.
 - **U1:** shared controls, headers, icons, font/spacing/motion rules and frame
   diagnostics are implemented; R35 displayed actual battery/charge/Wi-Fi status,

@@ -834,7 +834,8 @@ acquisition cleanup with fake mounts. `test-local-port.py` checks actual retaine
 inputs and isolated writable paths without launching games. These and the native
 supervisor tests cannot substitute for actual LCD/audio/input/save acceptance.
 
-Set `R46H_GTA_IMMEDIATE_PROFILE=1` for the behavior-preserving profiler. Its R62
+Set `R46H_GTA_IMMEDIATE_PROFILE=1 R46H_GTA_IMMEDIATE_RING=0` for the
+behavior-preserving profiler. Its R62
 Vice City target run retained Mesa 26.2.2 and the 816/300 MHz caps, exited 0 at
 121.04 seconds, and produced 103 valid one-second intervals. Tiny uploads used a
 weighted 18.44% of wall time overall and 15.40% in the last 37 intervals despite
@@ -914,7 +915,10 @@ median and 33.89 ms median interval across nine complete samples, peaked at
 80.384 C, and exited its 121.06-second bound at status 0 without a forced kill.
 The following R75 operator check found no LCD motion, picture, audio or control
 problem and accepts R74 for that short path. Later open-world play did not hold
-30 FPS; broader play and saves remain open. R63 and R60 remain rollbacks. Exact
+30 FPS; broader play and saves remain open. R74's ring upload and simple cutscene
+shadows are now the default source build and packaged-runtime hash contract;
+set both feature variables to `0` only to reproduce the R60 rollback. R63 and R60
+remain rollbacks. Exact
 R71 evidence is in
 `mainline/out/.cache/r46h-prerender-r71-device-20260919.ATo8aL/`.
 Exact R72 evidence is in

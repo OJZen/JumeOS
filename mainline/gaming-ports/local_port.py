@@ -25,8 +25,8 @@ ORIGINAL_PROFILES = {
     'gtavc': ('reVC', 'ab149ae9c2372ee7f5f4384fe8b2ffc37446fe0ccbf0a48722289fc5a803d5b9'),
 }
 SOURCE_PROFILES = {
-    'gta3': ('re3', '6ebf8aedffa2a43bfeac93863917da33b13ae2ce0bff672d7a02018444bc12f4'),
-    'gtavc': ('reVC', 'd19bbe5b90648e6ad0ae10b10f27fa256f84fd91381a38187ffd8c1e7814aa3c'),
+    'gta3': ('re3', '575fe67064b8250dfbb06645a7046b30677ebbc5515838bda551f4fec37df6b7'),
+    'gtavc': ('reVC', 'bf95d1f4ba3f360d92414e52ada07cd653934627fd2eefc06e4f87c024c13fcf'),
 }
 
 DEVICE_VIDEO_MODE = (b'Width=1024\nHeight=768\n', b'Width=640\nHeight=480\n')

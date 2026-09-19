@@ -1,6 +1,6 @@
 # R46H project context
 
-> Current checkpoint: 2026-09-19. Read the
+> Current checkpoint: 2026-09-20. Read the
 > [experiment ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) before
 > hardware work; it owns physical evidence and limitations.
 
@@ -12,11 +12,12 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **powered on** with ES-DE restored after the 2026-09-19 Vice City
-SGSR1 experiment. Services and default 600--1008/200--480 MHz policies passed
-health checks, `sync` completed, and temporary target access/staging was removed.
-R74 is the accepted GTA candidate after attended picture/audio/control approval;
-R63 and R60 remain rollbacks. Latest experiment evidence is under
+The device is **powered off** after ES-DE, services and default
+600--1008/200--480 MHz policies were restored following the 2026-09-19 Vice City
+SGSR1 experiment. Health checks and `sync` passed, and temporary target
+access/staging was removed. R74 is the accepted and source-build-default GTA
+candidate after attended picture/audio/control approval; R63 and R60 remain
+rollbacks. Latest experiment evidence is under
 `mainline/out/.cache/r46h-sgsr-r76-device-20260919.Ryx78e/`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
@@ -100,10 +101,12 @@ runbooks.
 
 1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
    identity, new-password activation, unrelated-action denial and reboot persistence.
-2. Continue R74 broader gameplay/save proof and profile the below-30-FPS
+2. Deploy Jume Launcher `0.1.0-dev`, make it the persistent default only after its
+   cold-boot, settings, game-return and recovery gates pass; retain ES-DE rollback.
+3. Continue R74 broader gameplay/save proof and profile the below-30-FPS
    open-world phase only when a new software hypothesis exists. Keep R63/R60
    available; do not repeat SGSR1 or a live GPU minimum-frequency raise unchanged.
-3. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
+4. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
    other hardware-gated work until requested or its evidence changes.
 
 ## Working rules

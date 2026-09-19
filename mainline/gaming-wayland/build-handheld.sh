@@ -17,9 +17,9 @@ case "$cache:$output" in /Volumes/*:/Volumes/*) ;; *) echo 'Use the external wor
 [[ -z $(git -C "$repo" status --porcelain) && -z $(ls -A "$output") ]]
 commit=$(git -C "$repo" rev-parse HEAD)
 image=cgutman/moonlight-packaging@sha256:f25a3e2ad90b85d1a4358e2d612ed311165cddd62aa194455a5dbed844d66d69
-portmaster=${R46H_PORTMASTER_BUNDLE:-$cache/r46h-portmaster/portmaster-backend.tar.gz}
+portmaster=${R46H_PORTMASTER_BUNDLE:-$cache/r46h-ports-backend-20260910/prepared/portmaster-backend.tar.gz}
 native=${R46H_PORT_NATIVE_CACHE:-$cache/r46h-ports-native}
-gta=${R46H_GTA_SOURCE_OUTPUT:-$cache/r46h-gta-source-r52-20260914}
+gta=${R46H_GTA_SOURCE_OUTPUT:-$cache/r46h-gta-source-ring-simple-shadow-r74-20260919}
 mesa=${R46H_MESA_RUNTIME:-$cache/r46h-mesa-26.2.2/r60/mesa-26.2.2-r46h-runtime.tar.gz}
 [[ -f $portmaster && $(shasum -a 256 "$portmaster" | cut -d ' ' -f 1) == "$(cat "$(dirname "$portmaster")/runtime.sha256")" ]]
 python3 -B "$repo/mainline/gaming-ports/prepare-native.py" "$native" --check
