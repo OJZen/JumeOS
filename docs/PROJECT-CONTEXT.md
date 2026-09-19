@@ -75,8 +75,10 @@ runbooks.
 
 1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
    identity, new-password activation, unrelated-action denial and reboot persistence.
-2. Attended: batch LCD/audio/physical-control/gameplay/save observations and keep
-   Stardew's shared-window/save-load gate separate.
+2. Before another GTA buffer change, run the host-built, behavior-preserving
+   immediate-upload profiler at 816/300 MHz; use its per-second call/byte/CPU-time
+   data to decide whether a ring upload is justified. Then batch remaining attended
+   gameplay/save observations; keep Stardew's shared-window/save-load gate separate.
 3. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
    dynamic frequency policy until requested or their hardware gates change.
 

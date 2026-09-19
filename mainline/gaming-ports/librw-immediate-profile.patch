@@ -1,0 +1,73 @@
+diff --git a/src/gl/gl3immed.cpp b/src/gl/gl3immed.cpp
+--- a/src/gl/gl3immed.cpp
++++ b/src/gl/gl3immed.cpp
+@@ -4,0 +5,2 @@
++#include <stdint.h>
++#include <time.h>
+@@ -19,0 +22,50 @@
++
++struct ImmediateProfile
++{
++	uint64_t started;
++	uint64_t uploadTime;
++	uint64_t uploadBytes;
++	uint64_t maxUploadTime;
++	uint32_t im2dCalls;
++	uint32_t im3dCalls;
++};
++
++static uint64_t
++profileClock(void)
++{
++	struct timespec now;
++	clock_gettime(CLOCK_MONOTONIC, &now);
++	return (uint64_t)now.tv_sec*1000000000ULL + now.tv_nsec;
++}
++
++static uint64_t
++profileBegin(void)
++{
++	static int enabled = -1;
++	if(enabled < 0)
++		enabled = getenv("R46H_IMMEDIATE_PROFILE") != nil;
++	return enabled ? profileClock() : 0;
++}
++
++static void
++profileEnd(uint64_t started, uint64_t bytes, bool im3d)
++{
++	static ImmediateProfile profile;
++	if(started == 0)
++		return;
++	uint64_t now = profileClock();
++	uint64_t elapsed = now - started;
++	if(profile.started == 0)
++		profile.started = started;
++	profile.uploadTime += elapsed;
++	profile.uploadBytes += bytes;
++	profile.maxUploadTime = elapsed > profile.maxUploadTime ? elapsed : profile.maxUploadTime;
++	if(im3d) profile.im3dCalls++; else profile.im2dCalls++;
++	if(now - profile.started < 1000000000ULL)
++		return;
++	fprintf(stderr, "R46H_IMMEDIATE_PROFILE interval_ms=%llu im2d=%u im3d=%u bytes=%llu upload_us=%llu max_upload_us=%llu\n",
++		(unsigned long long)((now-profile.started)/1000000ULL), profile.im2dCalls, profile.im3dCalls,
++		(unsigned long long)profile.uploadBytes, (unsigned long long)(profile.uploadTime/1000ULL),
++		(unsigned long long)(profile.maxUploadTime/1000ULL));
++	memset(&profile, 0, sizeof(profile));
++}
+@@ -135,0 +188 @@
++	uint64_t profileStarted = profileBegin();
+@@ -137,0 +191 @@
++	profileEnd(profileStarted, numVertices*sizeof(Im2DVertex), false);
+@@ -164,0 +219 @@
++	uint64_t profileStarted = profileBegin();
+@@ -171,0 +227 @@
++	profileEnd(profileStarted, numIndices*2 + numVertices*sizeof(Im2DVertex), false);
+@@ -265,0 +322 @@
++	uint64_t profileStarted = profileBegin();
+@@ -267,0 +325 @@
++	profileEnd(profileStarted, numVertices*sizeof(Im3DVertex), true);
+@@ -286,0 +345 @@
++	uint64_t profileStarted = profileBegin();
+@@ -288,0 +348 @@
++	profileEnd(profileStarted, numIndices*2, true);

@@ -10,13 +10,17 @@ output=$2
 case "$inputs" in "$base/mainline/out/"*) ;; *) echo 'Input cache must be under mainline/out.' >&2; exit 2;; esac
 case "$output" in "$base/mainline/out/"*) ;; *) echo 'Output must be under mainline/out.' >&2; exit 2;; esac
 native=${R46H_PORT_NATIVE_CACHE:-"$base/mainline/out/.cache/r46h-ports-native"}
+profile=${R46H_GTA_IMMEDIATE_PROFILE:-0}
+[[ $profile == 0 || $profile == 1 ]] || { echo 'R46H_GTA_IMMEDIATE_PROFILE must be 0 or 1.' >&2; exit 2; }
 PYTHONDONTWRITEBYTECODE=1 python3 -B "$base/mainline/gaming-ports/prepare-gta-source.py" "$inputs" --check
 PYTHONDONTWRITEBYTECODE=1 python3 -B "$base/mainline/gaming-ports/prepare-native.py" "$native" --check
 mkdir -p "$output"
 docker run --rm --network none --entrypoint /bin/bash \
   -v "$inputs:/inputs:ro" -v "$native:/native:ro" -v "$output:/out" \
   -v "$base/mainline/gaming-ports/librw-context-fallback.patch:/librw-context-fallback.patch:ro" \
+  -v "$base/mainline/gaming-ports/librw-immediate-profile.patch:/librw-immediate-profile.patch:ro" \
   -v "$base/mainline/gaming-ports/r46h-gta-runtime.patch:/r46h-gta-runtime.patch:ro" \
+  -e R46H_GTA_IMMEDIATE_PROFILE="$profile" \
   cgutman/moonlight-packaging@sha256:f25a3e2ad90b85d1a4358e2d612ed311165cddd62aa194455a5dbed844d66d69 -c '
 set -Eeuo pipefail
 work=/out/.build
@@ -34,6 +38,9 @@ for source in "$re3" "$revc"; do
   rm -rf "$source/vendor/librw"
   cp -a "$librw" "$source/vendor/librw"
   patch --batch --forward -d "$source/vendor/librw" -p1 < /librw-context-fallback.patch
+  if [[ ${R46H_GTA_IMMEDIATE_PROFILE:-0} == 1 ]]; then
+    patch --batch --forward -d "$source/vendor/librw" -p1 < /librw-immediate-profile.patch
+  fi
 done
 sysroot="$work/sysroot"
 mkdir -p "$sysroot"
@@ -66,6 +73,9 @@ mv /out/revc-build.log.incoming /out/revc-build.log
 mv /out/re3.incoming /out/re3
 mv /out/reVC.incoming /out/reVC
 printf '\''re3_source=ead2747eadbbdbf0e134eea6679364153dd6c4b8\nrevc_source=b9f0b23466ab4db76615cc2c761df9013a838184\nlibrw_source=81c9426cdde73717b04ae4dfc0f6c255f74a3a8a\nbuild_profile=MASTER_RELEASE\npatch_sha256=%s\nruntime_patch_sha256=%s\n'\'' "$(sha256sum /librw-context-fallback.patch | cut -d '\'' '\'' -f 1)" "$(sha256sum /r46h-gta-runtime.patch | cut -d '\'' '\'' -f 1)" > /out/BUILD-INFO.incoming
+if [[ ${R46H_GTA_IMMEDIATE_PROFILE:-0} == 1 ]]; then
+  printf '\''immediate_profile_patch_sha256=%s\n'\'' "$(sha256sum /librw-immediate-profile.patch | cut -d '\'' '\'' -f 1)" >> /out/BUILD-INFO.incoming
+fi
 (cd /out && sha256sum re3 reVC > SHA256SUMS.incoming)
 mv /out/BUILD-INFO.incoming /out/BUILD-INFO
 mv /out/SHA256SUMS.incoming /out/SHA256SUMS

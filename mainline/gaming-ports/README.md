@@ -833,3 +833,14 @@ readiness; attended gameplay is next.
 acquisition cleanup with fake mounts. `test-local-port.py` checks actual retained
 inputs and isolated writable paths without launching games. These and the native
 supervisor tests cannot substitute for actual LCD/audio/input/save acceptance.
+
+For the next profiling-only candidate, set `R46H_GTA_IMMEDIATE_PROFILE=1` while
+running `build-gta-source.sh`. The resulting engines keep the upload strategy
+unchanged and emit one-second `R46H_IMMEDIATE_PROFILE` counters only when the same
+variable is present at runtime. The 2026-09-19 ARM64 build produced re3/reVC
+SHA-256 values `c33d9c34ef077e5e3491751c1623cc3500aa7da63617a4698e2a1f2c0f1bd852`
+and `a35107a57df6d8d3ce32f919bd445bfc528d6a896d4c69bed6a14e430b3e2387`;
+its patch SHA-256 is
+`6f55fa14f43e435793f83426c76c2cc48cb6c1de12cd12c5b91544c476903509`.
+This is host-only instrumentation, not a performance candidate. A default rebuild
+remained byte-identical to R60 and contained neither marker nor receipt field.
