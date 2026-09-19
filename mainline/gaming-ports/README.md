@@ -834,13 +834,26 @@ acquisition cleanup with fake mounts. `test-local-port.py` checks actual retaine
 inputs and isolated writable paths without launching games. These and the native
 supervisor tests cannot substitute for actual LCD/audio/input/save acceptance.
 
-For the next profiling-only candidate, set `R46H_GTA_IMMEDIATE_PROFILE=1` while
-running `build-gta-source.sh`. The resulting engines keep the upload strategy
-unchanged and emit one-second `R46H_IMMEDIATE_PROFILE` counters only when the same
-variable is present at runtime. The 2026-09-19 ARM64 build produced re3/reVC
-SHA-256 values `c33d9c34ef077e5e3491751c1623cc3500aa7da63617a4698e2a1f2c0f1bd852`
-and `a35107a57df6d8d3ce32f919bd445bfc528d6a896d4c69bed6a14e430b3e2387`;
-its patch SHA-256 is
-`6f55fa14f43e435793f83426c76c2cc48cb6c1de12cd12c5b91544c476903509`.
-This is host-only instrumentation, not a performance candidate. A default rebuild
-remained byte-identical to R60 and contained neither marker nor receipt field.
+Set `R46H_GTA_IMMEDIATE_PROFILE=1` for the behavior-preserving profiler. Its R62
+Vice City target run retained Mesa 26.2.2 and the 816/300 MHz caps, exited 0 at
+121.04 seconds, and produced 103 valid one-second intervals. Tiny uploads used a
+weighted 18.44% of wall time overall and 15.40% in the last 37 intervals despite
+only 0.44 MB/s median bandwidth; the latter window had 793 calls/s median. This
+identifies per-call synchronization overhead rather than upload bandwidth.
+
+Set `R46H_GTA_IMMEDIATE_RING=1` for the R63 candidate. It appends 2D/3D vertex and
+index uploads inside the existing fixed-capacity buffers, orphaning only when a
+buffer wraps; profiling and ring modes are mutually exclusive. Its ARM64 re3/reVC
+SHA-256 values are
+`575fe67064b8250dfbb06645a7046b30677ebbc5515838bda551f4fec37df6b7` and
+`dc36256b6e51b65e7f615fe6ab4a18f4f74bd5e99dff78c2118467d0ab922883`;
+the patch SHA-256 is
+`cbed003ac36ffd75788653c61c1d6a754d30c8258504689304bd2d8929acbfdb`.
+At 816/300 MHz, 16 active Vice City samples reached a 20.52/s median and 45.23 ms
+median interval, improving R60's 18.67/s and 52.55 ms by 9.9% and 13.9%. The
+120.88-second run exited 0 without cooling or GPU faults, but one isolated interval
+reached 1.116 seconds. With both options unset, rebuilt engines remain byte-identical
+to R60 and contain neither optional receipt. R60 remains the accepted fallback
+until attended R63 LCD/audio/control acceptance. Exact R62/R63 evidence is in
+`mainline/out/.cache/r46h-gta-profile-device-20260919.aakor9/session.json` and
+`mainline/out/.cache/r46h-gta-ring-device-20260919.axyBwv/session.json`.

@@ -1,6 +1,6 @@
 # R46H project context
 
-> Current checkpoint: 2026-09-17. Read the
+> Current checkpoint: 2026-09-19. Read the
 > [experiment ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) before
 > hardware work; it owns physical evidence and limitations.
 
@@ -12,12 +12,12 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device was last left **powered off** after the 2026-09-17 attended R60
-Vice City performance batch. Exact v0.17/R60 identity, service restoration,
-temporary-access cleanup, `sync` and controlled shutdown passed. The operator
-accepted Vice City intro LCD motion, audio and controls at temporary 816/300 MHz;
-broader gameplay, saves and GTA III physical acceptance remain open. Exact evidence
-is `mainline/out/.cache/r46h-attended-cooling-20260917.vlknbF/session.json`.
+The device was last left **powered off** after the 2026-09-19 R62/R63 Vice City
+batch. Exact v0.17/R60 identity, service restoration, temporary-access cleanup,
+`sync` and serial-confirmed shutdown passed. R63 is a machine-tested upload-ring
+candidate; R60 remains the accepted fallback until R63's LCD motion, audio and
+physical controls are attended. Exact evidence is
+`mainline/out/.cache/r46h-gta-ring-device-20260919.axyBwv/session.json`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -44,8 +44,11 @@ skipped, so content equality remains unverified. See
   cutscenes, clean 121-second exits and relaunches without storage/GPU faults.
   The attended Vice City run found only a small 816-to-1296 MHz pacing gain before
   the 85 C abort; disabling its frame limiter and an exact-size immediate-buffer
-  candidate both regressed and were restored. Profiling instead points to repeated
-  Panfrost buffer wait/map churn as the next software investigation;
+  candidate both regressed and were restored. R62 then measured roughly 700--800
+  tiny immediate uploads/s consuming 15--20% wall time. R63 reused fixed-capacity
+  upload regions and raised the same 816/300 MHz median from 18.67 to 20.52
+  client commits/s, with clean bounded exit and no thermal/GPU fault; one isolated
+  1.116-second maximum interval and physical reacceptance remain;
   [ports](../mainline/gaming-ports/README.md) owns exact pacing and thermal data.
 - Stardew's source, managed copy and backup hashes match and overwrite is refused.
   Its 120-second runs still remain before SDL/Wayland at both tested clock profiles;
@@ -75,10 +78,10 @@ runbooks.
 
 1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
    identity, new-password activation, unrelated-action denial and reboot persistence.
-2. Before another GTA buffer change, run the host-built, behavior-preserving
-   immediate-upload profiler at 816/300 MHz; use its per-second call/byte/CPU-time
-   data to decide whether a ring upload is justified. Then batch remaining attended
-   gameplay/save observations; keep Stardew's shared-window/save-load gate separate.
+2. Reaccept R63 Vice City LCD motion, audio and physical controls at 816/300 MHz,
+   then phase-match/relaunch it before packaging or promoting it over R60. Batch
+   broader GTA gameplay/save observations separately; keep Stardew's
+   shared-window/save-load gate separate.
 3. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
    dynamic frequency policy until requested or their hardware gates change.
 

@@ -413,6 +413,16 @@ regressed, were restored and are not part of R60. Render-thread tracing instead
 showed Panfrost BO wait plus buffer map/unmap churn. Exact measurements and the
 remaining physical gates are owned by the [ports record](../gaming-ports/README.md).
 
+The 2026-09-19 R62 profiler measured roughly 700--800 tiny immediate uploads/s
+using 15--20% wall time. R63 therefore appends uploads within the existing fixed
+buffers and orphans only on wrap. At the same 816/300 MHz caps its 16 active
+Vice City samples reached a 20.52/s median and 45.23 ms median interval, versus
+R60's 18.67/s and 52.55 ms. It captured the intro and exited its 120.88-second
+bound cleanly without cooling or GPU faults, but retained one isolated 1.116-second
+maximum interval. Cleanup and serial poweroff passed. R60 remains the accepted
+fallback until R63's LCD motion, audio and physical controls are attended; exact
+receipts are in `mainline/out/.cache/r46h-gta-ring-device-20260919.axyBwv/`.
+
 A same-boot follow-up drove both GTA III and Vice City from menu through two
 completed remote South/B samples into fresh cutscenes at 1008/400 MHz. GTA III
 fell from 28.66 submissions/s at the menu to 3.17/s in the car scene, with a

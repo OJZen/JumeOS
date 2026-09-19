@@ -1,0 +1,92 @@
+--- a/src/gl/gl3immed.cpp
++++ b/src/gl/gl3immed.cpp
+@@ -21,0 +22 @@
++static int32 im2DVertexOffset, im2DIndexOffset;
+@@ -42,0 +44,10 @@
++static void
++setImmediateAttribPointers(AttribDesc *attribDescs, int32 numAttribs, uint32 offset)
++{
++	for(AttribDesc *a = attribDescs; a != &attribDescs[numAttribs]; a++){
++		glEnableVertexAttribArray(a->index);
++		glVertexAttribPointer(a->index, a->size, a->type, a->normalized,
++		                      a->stride, (void*)(uint64)(offset + a->offset));
++	}
++}
++
+@@ -72,0 +84 @@
++	im2DVertexOffset = im2DIndexOffset = 0;
+@@ -136,2 +148,6 @@
+-	glBufferData(GL_ARRAY_BUFFER, STARTVERTICES*sizeof(Im2DVertex), nil, GL_STREAM_DRAW);
+-	glBufferSubData(GL_ARRAY_BUFFER, 0, numVertices*sizeof(Im2DVertex), vertices);
++	if(im2DVertexOffset + numVertices > STARTVERTICES){
++		glBufferData(GL_ARRAY_BUFFER, STARTVERTICES*sizeof(Im2DVertex), nil, GL_STREAM_DRAW);
++		im2DVertexOffset = 0;
++	}
++	uint32 vertexOffset = im2DVertexOffset*sizeof(Im2DVertex);
++	glBufferSubData(GL_ARRAY_BUFFER, vertexOffset, numVertices*sizeof(Im2DVertex), vertices);
+@@ -143,3 +159 @@
+-#ifndef RW_GL_USE_VAOS
+-	setAttribPointers(im2dattribDesc, 3);
+-#endif
++	setImmediateAttribPointers(im2dattribDesc, 3, vertexOffset);
+@@ -150,0 +165 @@
++	im2DVertexOffset += numVertices;
+@@ -166,2 +181,6 @@
+-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, STARTINDICES*2, nil, GL_STREAM_DRAW);
+-	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, numIndices*2, indices);
++	if(im2DIndexOffset + numIndices > STARTINDICES){
++		glBufferData(GL_ELEMENT_ARRAY_BUFFER, STARTINDICES*2, nil, GL_STREAM_DRAW);
++		im2DIndexOffset = 0;
++	}
++	uint32 indexOffset = im2DIndexOffset*2;
++	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, indexOffset, numIndices*2, indices);
+@@ -170,2 +189,6 @@
+-	glBufferData(GL_ARRAY_BUFFER, STARTVERTICES*sizeof(Im2DVertex), nil, GL_STREAM_DRAW);
+-	glBufferSubData(GL_ARRAY_BUFFER, 0, numVertices*sizeof(Im2DVertex), vertices);
++	if(im2DVertexOffset + numVertices > STARTVERTICES){
++		glBufferData(GL_ARRAY_BUFFER, STARTVERTICES*sizeof(Im2DVertex), nil, GL_STREAM_DRAW);
++		im2DVertexOffset = 0;
++	}
++	uint32 vertexOffset = im2DVertexOffset*sizeof(Im2DVertex);
++	glBufferSubData(GL_ARRAY_BUFFER, vertexOffset, numVertices*sizeof(Im2DVertex), vertices);
+@@ -177,3 +200 @@
+-#ifndef RW_GL_USE_VAOS
+-	setAttribPointers(im2dattribDesc, 3);
+-#endif
++	setImmediateAttribPointers(im2dattribDesc, 3, vertexOffset);
+@@ -185 +206,3 @@
+-	               GL_UNSIGNED_SHORT, nil);
++	               GL_UNSIGNED_SHORT, (void*)(uint64)indexOffset);
++	im2DVertexOffset += numVertices;
++	im2DIndexOffset += numIndices;
+@@ -204,0 +228 @@
++static int32 im3DVertexOffset, im3DIndexOffset;
+@@ -226,0 +251 @@
++	im3DVertexOffset = im3DIndexOffset = 0;
+@@ -266,5 +291,8 @@
+-	glBufferData(GL_ARRAY_BUFFER, STARTVERTICES*sizeof(Im3DVertex), nil, GL_STREAM_DRAW);
+-	glBufferSubData(GL_ARRAY_BUFFER, 0, numVertices*sizeof(Im3DVertex), vertices);
+-#ifndef RW_GL_USE_VAOS
+-	setAttribPointers(im3dattribDesc, 3);
+-#endif
++	if(im3DVertexOffset + numVertices > STARTVERTICES){
++		glBufferData(GL_ARRAY_BUFFER, STARTVERTICES*sizeof(Im3DVertex), nil, GL_STREAM_DRAW);
++		im3DVertexOffset = 0;
++	}
++	uint32 vertexOffset = im3DVertexOffset*sizeof(Im3DVertex);
++	glBufferSubData(GL_ARRAY_BUFFER, vertexOffset, numVertices*sizeof(Im3DVertex), vertices);
++	setImmediateAttribPointers(im3dattribDesc, 3, vertexOffset);
++	im3DVertexOffset += numVertices;
+@@ -287,2 +315,6 @@
+-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, STARTINDICES*2, nil, GL_STREAM_DRAW);
+-	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, numIndices*2, indices);
++	if(im3DIndexOffset + numIndices > STARTINDICES){
++		glBufferData(GL_ELEMENT_ARRAY_BUFFER, STARTINDICES*2, nil, GL_STREAM_DRAW);
++		im3DIndexOffset = 0;
++	}
++	uint32 indexOffset = im3DIndexOffset*2;
++	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, indexOffset, numIndices*2, indices);
+@@ -292 +324,2 @@
+-	               GL_UNSIGNED_SHORT, nil);
++	               GL_UNSIGNED_SHORT, (void*)(uint64)indexOffset);
++	im3DIndexOffset += numIndices;

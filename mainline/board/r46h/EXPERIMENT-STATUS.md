@@ -1,6 +1,6 @@
 # R46H experiment status ledger
 
-> Current checkpoint: 2026-09-17. This is the authoritative index of accepted
+> Current checkpoint: 2026-09-19. This is the authoritative index of accepted
 > physical evidence and open hardware gates. Exact commands, hashes and raw
 > receipts stay in the linked owning runbooks.
 
@@ -81,14 +81,16 @@ The v0.18 local-network-policy successor is host-only; media and physical gates 
   Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
   R56 aligned the status row in a device-composed capture; physical LCD remains open.
   Reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope.
-- **Wayland/ports — R60 VICE CITY INTRO PHYSICAL PASS / BROADER PLAY OPEN.**
+- **Wayland/ports — R60 VICE CITY INTRO PHYSICAL PASS / R63 MACHINE CANDIDATE / BROADER PLAY OPEN.**
   R48 fixed D-pad Down; 640x480, first-config and [private Mesa](../../gaming-mesa/README.md)
-  passed. R60 reached GTA III/VC cutscenes, clean 121-second exits and relaunches
-  without storage/GPU faults. The operator accepted Vice City intro LCD motion,
-  audio and controls at 816/300 MHz. Stock 1296/480 MHz reached the 85 C guard for
-  only a small pacing gain; frame-limiter-off and per-draw exact buffer sizing both
-  regressed and were restored. GTA III physical play, broader gameplay/saves and
-  Stardew shared-window/save-load remain open.
+  passed. R60 reached GTA III/VC cutscenes and clean exits/relaunches without faults;
+  the operator accepted Vice City LCD motion, audio and controls at 816/300 MHz.
+  Stock clocks gave little benefit; frame-limiter-off and exact buffer sizing regressed.
+  R62 attributed 15--20% wall time to about 700--800 tiny uploads/s. R63's upload
+  ring raised the same-clock median from 18.67 to 20.52 client commits/s and passed
+  capture, bounded exit, cleanup and poweroff. One 1.116-second maximum interval and
+  attended LCD/audio/control reacceptance remain; R60 stays the fallback. GTA III
+  physical play, broader saves/gameplay and Stardew save-load remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**
