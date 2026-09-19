@@ -898,6 +898,9 @@ preparation in `CRenderer::PreRender`; split or optimize that path before more
 clock work. A direct unsynchronized-map candidate was rejected after an early
 `SIGSEGV` and was removed. Exact evidence is in
 `mainline/out/.cache/r46h-vblank-r65-device-20260919.LIMH3N/session.json`.
-The current diagnostic revision also reports time and call counts for visible
-building, vehicle, ped and object preparation plus invisible, alpha, helicopter
-and shadow buckets; target attribution remains open.
+R71 then attributed the low-rate intro phase to the object bucket: roughly
+13--17 ms/frame came from 6--11 object calls while the other entity buckets
+stayed below about 0.2 ms/frame. These are cutscene objects, so the current
+diagnostic further splits attachment, animation, dynamic-shadow update/store and
+material work before changing the rendered result. Exact R71 evidence is in
+`mainline/out/.cache/r46h-prerender-r71-device-20260919.ATo8aL/`.

@@ -1,6 +1,6 @@
 --- a/src/core/timebars.h
 +++ b/src/core/timebars.h
-@@ -3 +3,15 @@
+@@ -3 +3,20 @@
 -#ifdef TIMEBARS
 +#if defined(TIMEBARS) || defined(MASTER)
 +enum eR46HPreRenderProfile
@@ -14,17 +14,22 @@
 +	R46H_PRERENDER_ALPHA,
 +	R46H_PRERENDER_HELI,
 +	R46H_PRERENDER_SHADOWS,
++	R46H_PRERENDER_CUT_ATTACH,
++	R46H_PRERENDER_CUT_HANIM,
++	R46H_PRERENDER_CUT_SHADOW_UPDATE,
++	R46H_PRERENDER_CUT_SHADOW_STORE,
++	R46H_PRERENDER_CUT_MATERIAL,
 +	R46H_PRERENDER_COUNT,
 +};
 +
-@@ -7,0 +22,2 @@
+@@ -7,0 +27,2 @@
 +uint64 tbProfileNowNs();
 +void tbAddPreRenderTime(int32, uint64);
 --- a/src/core/timebars.cpp
 +++ b/src/core/timebars.cpp
 @@ -1,0 +2 @@
 +#include "timebars.h"
-@@ -2 +2,121 @@
+@@ -2 +2,122 @@
 -#ifndef MASTER
 +#ifdef MASTER
 +#include <stdio.h>
@@ -57,6 +62,7 @@
 +static const char *r46hPreRenderKeys[R46H_PRERENDER_COUNT] = {
 +	"pre_building", "pre_vehicle", "pre_ped", "pre_object", "pre_other",
 +	"pre_invisible", "pre_alpha", "pre_heli", "pre_shadows",
++	"cut_attach", "cut_hanim", "cut_shadow_update", "cut_shadow_store", "cut_material",
 +};
 +static uint64 r46hPreRenderNs[R46H_PRERENDER_COUNT];
 +static uint32 r46hPreRenderCalls[R46H_PRERENDER_COUNT];
@@ -220,3 +226,34 @@
 +	startNs = tbProfileNowNs();
 @@ -125,0 +150 @@
 +	tbAddPreRenderTime(R46H_PRERENDER_SHADOWS, startNs);
+--- a/src/objects/CutsceneObject.cpp
++++ b/src/objects/CutsceneObject.cpp
+@@ -7,0 +8 @@
++#include "timebars.h"
+@@ -96,0 +98 @@
++	uint64 startNs = tbProfileNowNs();
+@@ -112,0 +115 @@
++	tbAddPreRenderTime(R46H_PRERENDER_CUT_ATTACH, startNs);
+@@ -113,0 +117 @@
++	startNs = tbProfileNowNs();
+@@ -115,0 +120 @@
++	tbAddPreRenderTime(R46H_PRERENDER_CUT_HANIM, startNs);
+@@ -120,0 +126 @@
++			startNs = tbProfileNowNs();
+@@ -127,0 +134 @@
++			tbAddPreRenderTime(R46H_PRERENDER_CUT_SHADOW_STORE, startNs);
+@@ -131 +138,2 @@
+-			if ( m_pShadow->IsInitialized() )
++			if ( m_pShadow->IsInitialized() ) {
++				startNs = tbProfileNowNs();
+@@ -132,0 +141,2 @@
++				tbAddPreRenderTime(R46H_PRERENDER_CUT_SHADOW_UPDATE, startNs);
++			}
+@@ -133,0 +144 @@
++			startNs = tbProfileNowNs();
+@@ -140,0 +152 @@
++			tbAddPreRenderTime(R46H_PRERENDER_CUT_SHADOW_STORE, startNs);
+@@ -143,0 +156 @@
++		startNs = tbProfileNowNs();
+@@ -146,0 +160 @@
++		tbAddPreRenderTime(R46H_PRERENDER_CUT_MATERIAL, startNs);
