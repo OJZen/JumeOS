@@ -190,9 +190,12 @@ readout is implemented.
    480/400/300 MHz: matched 30-second medians were 23.08/22.91/22.46 submissions/s.
    Cutting GPU clock 37.5% cost only 2.7%, and the governor sometimes dropped to
    200 MHz during the cutscene, so raw GPU throughput is not the primary limit.
-   GTA III also completed its 121-second R63 bound at exit 0. Investigate the
-   phase-specific driver/engine submission path; keep R60 until attended R63
-   reacceptance and avoid unsupported GPU OPPs.
+   GTA III also completed its 121-second R63 bound at exit 0. A later 45-second
+   HUD-on cutscene sample at the default 1008/480 MHz limits averaged 23.26
+   submissions/s, peaked at 82.307 C and exited 0 after 115.16 seconds; operator
+   LCD/audio/control confirmation remains open. Investigate the phase-specific
+   driver/engine submission path; keep R60 until attended R63 reacceptance and
+   avoid unsupported GPU OPPs.
    The two-second health sampler warns near voltage/thermal limits and blocks
    unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,
    charge completion and suspend/resume remain open; supply alone is not net

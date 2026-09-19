@@ -80,17 +80,17 @@ cold/warm infra. LCD, USB, Moonlight and PSP remain open; v0.18 is still host-on
   R64 composed `GPU 200 MHz` matching target state; physical LCD remains open.
 - **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
   Dynamic `schedutil` and both GTA engines passed; reset recovered a live GPU-min panic. Do not repeat it.
-- **Wayland/ports — R60 VICE CITY INTRO PHYSICAL PASS / R63 MACHINE CANDIDATE / BROADER PLAY OPEN.**
+- **Wayland/ports — R60 PHYSICAL PASS / R63 MACHINE PASS / OPERATOR + BROADER PLAY OPEN.**
   R48 fixed D-pad Down; 640x480, first-config and [private Mesa](../../gaming-mesa/README.md)
-  passed. R60 reached both cutscenes/clean relaunches; the operator accepted Vice
-  City LCD/audio/controls at 816/300 MHz. Stock clocks helped little; two experiments
-  regressed. R62 attributed 15--20% wall time to 700--800 tiny uploads/s; R63's
-  upload ring raised the same-clock median 18.67→20.52/s. A 1008 MHz CPU follow-up
-  added two clean Vice City bounds and one GTA III bound; matched 480/400/300 MHz
-  GPU medians were 23.08/22.91/22.46/s, so maximum devfreq is not utilization proof
-  or the primary cutscene limit. One 1.116-second interval and R63 physical
-  reacceptance remain; R60 stays fallback. GTA III physical play, broader saves and
-  Stardew save-load remain open.
+  passed. R60's Vice City LCD/audio/controls passed at 816/300 MHz. R62 found
+  15--20% wall time in tiny uploads; R63 raised the same-clock median 18.67→20.52/s.
+  A 1008 MHz CPU follow-up completed three clean GTA bounds; matched 480/400/300 MHz
+  GPU medians were 23.08/22.91/22.46/s, so maximum devfreq is not the primary limit.
+  A later default-policy R63 run captured the Vice City intro, routed two B presses
+  and averaged 23.26 submissions/s for 45 seconds. It peaked at 82.307 C and exited
+  0 after 115.16 seconds without a current-boot fault. Operator LCD/audio/control
+  confirmation remains open; R60 stays fallback. GTA III physical play, broader
+  saves and Stardew save-load remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**

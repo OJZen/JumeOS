@@ -857,3 +857,14 @@ to R60 and contain neither optional receipt. R60 remains the accepted fallback
 until attended R63 LCD/audio/control acceptance. Exact R62/R63 evidence is in
 `mainline/out/.cache/r46h-gta-profile-device-20260919.aakor9/session.json` and
 `mainline/out/.cache/r46h-gta-ring-device-20260919.axyBwv/session.json`.
+
+A later default-policy R63 reacceptance run remotely delivered the two B presses,
+captured the Vice City intro with `GPU 480 MHz` in the HUD and recorded 14 samples
+over 45 seconds. Submission rate ranged from 19.34 to 26.60/s (23.26/s mean),
+frame-interval median averaged 40.32 ms, CPU/GPU stayed at 1008/480 MHz and the
+temperature peaked at 82.307 C without reaching the 85 C guard. The engine exited
+0 after 115.16 seconds, with no forced kill, low voltage or current-boot fault;
+services, policies, `sync` and temporary-access cleanup passed. This is machine
+proof only: operator LCD motion, audible output and physical controls remain open.
+Evidence is in
+`mainline/out/.cache/r46h-r63-physical-20260919.jo53TV/session.json`.

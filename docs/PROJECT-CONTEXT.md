@@ -12,13 +12,14 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **powered on** after recovery from the 2026-09-19 GPU-HUD test.
-An unsafe live GPU minimum-frequency raise panicked the kernel; operator reset
-restored the 600--1008 MHz `schedutil` CPU default and 200--480 MHz
-`simple_ondemand` GPU policy. Product services, current-boot fault scan, `sync`
-and temporary-access cleanup passed. R63 remains a machine-tested upload-ring
-candidate and R60 the accepted fallback. Evidence is under
-`mainline/out/.cache/r46h-cpufreq-r63-device-20260919.oDoApN/`.
+The device is **powered on** after recovery from the 2026-09-19 GPU-HUD test
+and a subsequent R63 Vice City machine run. An unsafe live GPU
+minimum-frequency raise panicked the kernel; operator reset restored the
+600--1008 MHz `schedutil` CPU default and 200--480 MHz `simple_ondemand` GPU
+policy. The later run captured the intro with the GPU HUD, exited 0 and passed
+health, `sync` and temporary-access cleanup; operator LCD/audio/control
+confirmation remains open. R60 is still the accepted fallback. Evidence is
+under `mainline/out/.cache/r46h-r63-physical-20260919.jo53TV/`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -53,7 +54,9 @@ skipped, so content equality remains unverified. See
   follow-up at CPU 600--1008 MHz ran two 121-second Vice City bounds and one
   121-second GTA III bound at exit 0. Vice City's matched 480/400/300 MHz GPU
   medians were 23.08/22.91/22.46 submissions/s, so a 37.5% GPU-clock reduction
-  cost only 2.7%; raw GPU throughput is not the primary cutscene limit;
+  cost only 2.7%; raw GPU throughput is not the primary cutscene limit. A later
+  45-second HUD sample at 1008/480 MHz averaged 23.26 submissions/s, peaked at
+  82.307 C and exited 0 after 115.16 seconds. Operator R63 reacceptance remains open;
   [ports](../mainline/gaming-ports/README.md) owns exact pacing and thermal data.
 - Stardew's source, managed copy and backup hashes match and overwrite is refused.
   Its 120-second runs still remain before SDL/Wayland at both tested clock profiles;
@@ -87,8 +90,8 @@ runbooks.
 
 1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
    identity, new-password activation, unrelated-action denial and reboot persistence.
-2. Reaccept R63 Vice City LCD motion, audio and physical controls; keep R60 until
-   that pass. Do not repeat a live GPU minimum-frequency raise.
+2. Obtain operator confirmation for the completed R63 Vice City LCD/audio/control
+   run; keep R60 until that pass. Do not repeat a live GPU minimum-frequency raise.
 3. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
    other hardware-gated work until requested or its evidence changes.
 
