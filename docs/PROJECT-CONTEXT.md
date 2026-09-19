@@ -38,7 +38,8 @@ skipped, so content equality remains unverified. See
 - Jume Launcher has machine proof for status values, storage/settings,
   PortMaster and routed remote control. R56 aligns Wi-Fi, battery and clock; R64
   captured the HUD's `GPU 200 MHz` matching target state. Physical LCD remains open.
-  The `0.1.0-dev` name/version/About page passes host Qt tests and awaits target deployment.
+  The `0.1.0-dev` name/version/About page passes host Qt tests. The R77 full
+  handheld package pins R74 and passes host checks; target deployment remains open.
 - Repaired GTA III/Vice City accept the Switch-layout controls and no longer
   reproduce the bounded-exit crash. GTA-only `noafbc`, first-config 640x480 and
   private Mesa 26.2.2 passed target integration. The R60 batch reached captured

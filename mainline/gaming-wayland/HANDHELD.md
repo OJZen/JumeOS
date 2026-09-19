@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-19: **R74 VICE CITY SHORT ATTENDED PASS / BROADER PLAY OPEN / STREAMING DEFERRED**.
+Status 2026-09-20: **R74 VICE CITY SHORT ATTENDED PASS / R77 HOST PACKAGE PASS / DEVICE OPEN**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -254,6 +254,16 @@ uptime 3448.012302. This is a negative compatibility result, not gameplay, LCD,
 audio, physical-control, save or relaunch proof.
 
 ## Resume and rebuild
+
+R77 is the current no-Moonlight deployment candidate at
+`mainline/out/.cache/r46h-handheld-r77-r74-default-20260920/`. Clean source
+`228497c8a0e7c95a310f225b7b41c7de26b6ecb2` produced archive SHA-256
+`12c7d1543532e017dfb5758c20253386e60cda85983d7c9c758beb7522841aa8`
+with manifest SHA-256
+`2e17f989a96b78c5b7ee3360bee2f7cafd7e4c9f41a60258c2d33edfcc443357`.
+The full ARM64 shell, Wayland, session, PortMaster and remote checks passed; its
+receipt pins the accepted R74 re3/reVC hashes. This is host evidence only and
+awaits exact target readback, preflight and physical acceptance.
 
 R51 reuses the existing composed game layer, resident performance panel,
 frame-submission telemetry, capture authorization and routed remote gamepad for
