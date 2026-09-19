@@ -1,0 +1,12 @@
+[Unit]
+Description=R46H dynamic CPU frequency default
+After=systemd-remount-fs.service
+Before=r46h-gaming-frontend.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/r46h-cpufreq-default
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

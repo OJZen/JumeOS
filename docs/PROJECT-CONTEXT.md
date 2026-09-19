@@ -12,12 +12,13 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device was last left **powered off** after the 2026-09-19 R62/R63 Vice City
-batch. Exact v0.17/R60 identity, service restoration, temporary-access cleanup,
-`sync` and serial-confirmed shutdown passed. R63 is a machine-tested upload-ring
-candidate; R60 remains the accepted fallback until R63's LCD motion, audio and
-physical controls are attended. Exact evidence is
-`mainline/out/.cache/r46h-gta-ring-device-20260919.axyBwv/session.json`.
+The device is **powered on** on v0.17 after the 2026-09-19 R63 CPU/GPU follow-up.
+The 600--1008 MHz `schedutil` CPU default is enabled and passed a warm reboot;
+GPU devfreq remains 200--480 MHz `simple_ondemand`. ES-DE, input and volume
+services are healthy. R63 remains a machine-tested upload-ring candidate; R60
+is the accepted fallback until R63's LCD motion, audio and physical controls are
+attended. Exact evidence is under
+`mainline/out/.cache/r46h-cpufreq-r63-device-20260919.oDoApN/`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
@@ -48,7 +49,11 @@ skipped, so content equality remains unverified. See
   tiny immediate uploads/s consuming 15--20% wall time. R63 reused fixed-capacity
   upload regions and raised the same 816/300 MHz median from 18.67 to 20.52
   client commits/s, with clean bounded exit and no thermal/GPU fault; one isolated
-  1.116-second maximum interval and physical reacceptance remain;
+  1.116-second maximum interval and physical reacceptance remain. A same-boot R63
+  follow-up at CPU 600--1008 MHz ran two 121-second Vice City bounds and one
+  121-second GTA III bound at exit 0. Vice City's matched 480/400/300 MHz GPU
+  medians were 23.08/22.91/22.46 submissions/s, so a 37.5% GPU-clock reduction
+  cost only 2.7%; raw GPU throughput is not the primary cutscene limit;
   [ports](../mainline/gaming-ports/README.md) owns exact pacing and thermal data.
 - Stardew's source, managed copy and backup hashes match and overwrite is refused.
   Its 120-second runs still remain before SDL/Wayland at both tested clock profiles;
@@ -64,6 +69,10 @@ skipped, so content equality remains unverified. See
 - The isolated v0.18 zram kernel passed one-shot boot and 256 MiB LZ4 apply,
   pressure, disable and unload. Normal v0.15/media were restored; promotion waits
   for measurable real-game benefit.
+- The CPU default keeps dynamic `schedutil` scaling but caps policy0 at the
+  hardware's nearest 1 GHz OPP, 600--1008 MHz. Target apply/readback, game/thermal
+  and warm-reboot persistence passed on the current v0.17 device. GPU devfreq and
+  the frozen v0.18 image remain unchanged; next-image integration is open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
 - The current image exposes DWC2 as host-only with no UDC, gadget, or role
@@ -78,12 +87,11 @@ runbooks.
 
 1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
    identity, new-password activation, unrelated-action denial and reboot persistence.
-2. Reaccept R63 Vice City LCD motion, audio and physical controls at 816/300 MHz,
-   then phase-match/relaunch it before packaging or promoting it over R60. Batch
-   broader GTA gameplay/save observations separately; keep Stardew's
-   shared-window/save-load gate separate.
+2. Deploy the GPU-frequency HUD build, then reaccept R63 Vice City LCD motion,
+   audio and physical controls under the proven 600--1008 MHz policy. Keep R60
+   until that pass; broader GTA saves/gameplay and Stardew save-load stay separate.
 3. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
-   dynamic frequency policy until requested or their hardware gates change.
+   other hardware-gated work until requested or its evidence changes.
 
 ## Working rules
 

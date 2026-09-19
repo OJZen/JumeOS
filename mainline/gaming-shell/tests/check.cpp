@@ -856,6 +856,7 @@ private slots:
         put("sys/class/thermal/thermal_zone0/type","soc-thermal");
         put("sys/class/thermal/cooling_device0/type","cpufreq-cpu0");put("sys/class/thermal/cooling_device0/cur_state","0");
         put("sys/class/thermal/cooling_device1/type","devfreq-ff400000.gpu");put("sys/class/thermal/cooling_device1/cur_state","0");
+        put("sys/class/devfreq/ff400000.gpu/cur_freq","480000000");
         DeviceState untrusted(directory.path(),true);QVERIFY(!untrusted.target());QVERIFY(!untrusted.setBrightness(70));
         QCOMPARE(untrusted.diagnostics(),QVariantMap({{"target",false},{"controls",false}}));QVERIFY(untrusted.storage().isEmpty());
         DeviceState device(directory.path(),true,true);QVERIFY(device.target());QVERIFY(device.controls());
@@ -910,6 +911,7 @@ private slots:
         QCOMPARE(hud->height(),150.);QVERIFY(hud->y()+hud->height()<183);
         QVERIFY(hud->findChild<QObject *>("hudMemory")->property("text").toString().contains("768.0 / 1024.0"));
         QVERIFY(hud->findChild<QObject *>("hudTemperature")->property("text").toString().contains("55.0"));
+        QVERIFY(hud->findChild<QObject *>("hudGpuFrequency")->property("text").toString().contains("GPU 480 MHz"));
         QVERIFY(hud->property("thermalStatus").toString().contains(QStringLiteral("未介入")));
         put("sys/class/thermal/cooling_device0/cur_state","1");device.refresh();
         QVERIFY(hud->property("thermalStatus").toString().contains(QStringLiteral("CPU 温控限频")));

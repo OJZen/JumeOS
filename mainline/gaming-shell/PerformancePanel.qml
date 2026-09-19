@@ -16,6 +16,7 @@ Rectangle {
     layer.enabled: true
     function number(value, suffix) { return typeof value !== "number" || !isFinite(value) || value < 0 ? "—" : value.toFixed(1) + suffix }
     function frequency(value) { return value > 0 ? (value / 1000).toFixed(0) : "—" }
+    function frequencyHz(value) { return value > 0 ? (value / 1000000).toFixed(0) : "—" }
     readonly property string thermalStatus: !hardware ? "" : device.info.cpuCoolingState > 0 && device.info.gpuCoolingState > 0 ? "CPU/GPU 温控限频"
         : device.info.cpuCoolingState > 0 ? "CPU 温控限频" : device.info.gpuCoolingState > 0 ? "GPU 温控限频"
         : device.info.cpuCoolingState === 0 && device.info.gpuCoolingState === 0 ? "温控未介入" : "温控状态未知"
@@ -42,7 +43,7 @@ Rectangle {
         }
     }
     Ui.Label {
-        x: 18; y: panel.hardware ? 123 : 104; text: panel.hardware ? panel.thermalStatus + " · 界面更新 " + panel.number(panel.metrics.submissions, " 次/秒") : "按需刷新 · 界面更新不是游戏 FPS"; color: "#a1b4c1"; font.pixelSize: 11 * panel.fontScale
+        objectName: "hudGpuFrequency"; x: 18; y: panel.hardware ? 123 : 104; text: panel.hardware ? "GPU " + panel.frequencyHz(panel.device.info.gpuFrequencyHz) + " MHz · " + panel.thermalStatus + " · 界面 " + panel.number(panel.metrics.submissions, " 次/秒") : "按需刷新 · 界面更新不是游戏 FPS"; color: "#a1b4c1"; font.pixelSize: 11 * panel.fontScale
     }
     Ui.Label { objectName: "gameFrameRate"; x: 18; y: panel.hardware ? 150 : 130; visible: panel.game || panel.streaming; color: Ui.Theme.accent; font.pixelSize: 15 * panel.fontScale; text: panel.streaming ? "串流渲染  " + panel.number(panel.metrics.stream.renderedFps, " FPS") : "游戏提交  " + panel.number(panel.metrics.game.submissions, " FPS") }
     Ui.Label { objectName: "gameFrameIntervals"; x: 18; y: panel.hardware ? 177 : 157; visible: panel.game || panel.streaming; color: Ui.Theme.text; font.pixelSize: 12 * panel.fontScale; text: panel.streaming ? "解码  " + panel.number(panel.metrics.stream.decodeMs, " ms") + "  ·  RTT " + panel.number(panel.metrics.stream.rttMs, " ms") : "间隔  " + panel.number(panel.metrics.game.intervalMedianMs, " ms") + "  ·  P95 " + panel.number(panel.metrics.game.intervalP95Ms, " ms") }

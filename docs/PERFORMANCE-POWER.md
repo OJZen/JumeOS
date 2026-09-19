@@ -92,13 +92,16 @@ hardware range and, when exported, selected from the available-frequency table.
 An unavailable governor is rejected, not silently substituted or loaded.
 Revision 14 implements these rules with fixed-path writes, readback, rollback and
 original-state restoration at the end of a temporary probe. No voltage changes,
-overclocking, persistence or per-game profiles are offered. R17 passed GUI
+overclocking or per-game profiles are offered. R17 passed GUI
 1296 → 1200 → 1296 MHz limits with serial readback and restoration.
 [Linux CPUFreq policy interface](https://docs.kernel.org/admin-guide/pm/cpufreq.html).
 
-Next: capture fresh policies for each session and measure the effect of bounded
-changes on temperature, frequency residency and frame intervals. Keep thermal
-protection active. The device runbook owns exact authorization and cleanup.
+The user-approved persistent default selects the nearest supported 1 GHz OPP:
+`schedutil` with a 600--1008 MHz CPU range. It leaves GPU devfreq and thermal
+protection unchanged. Host fixtures cover supported-OPP validation, write order
+and readback. The current v0.17 device passed dynamic residency, GTA/thermal use
+and a warm reboot with the oneshot enabled; the frozen v0.18 image is unchanged,
+so the next p2 integration remains open.
 
 ## Compressed memory and disk swap
 
@@ -180,8 +183,14 @@ readout is implemented.
    the frame limiter reduced the median to 17.24/s. Profiling found render-thread
    Panfrost BO waits and repeated immediate-buffer map/unmap activity, but sizing
    each allocation to the current draw also regressed to 17.60/s and was reverted.
-   Keep R60 and 640x480; the next software experiment needs buffer reuse/batching
-   with engine-side timing rather than more clock policy or blind allocation edits.
+   R63's fixed-capacity upload reuse now passes the machine gate. A same-boot
+   follow-up held CPU at dynamic 600--1008 MHz and compared Vice City at GPU
+   480/400/300 MHz: matched 30-second medians were 23.08/22.91/22.46 submissions/s.
+   Cutting GPU clock 37.5% cost only 2.7%, and the governor sometimes dropped to
+   200 MHz during the cutscene, so raw GPU throughput is not the primary limit.
+   GTA III also completed its 121-second R63 bound at exit 0. Investigate the
+   phase-specific driver/engine submission path; keep R60 until attended R63
+   reacceptance and avoid unsupported GPU OPPs.
    The two-second health sampler warns near voltage/thermal limits and blocks
    unsafe CPU adjustment. Automatic low-battery shutdown, calibrated percentage,
    charge completion and suspend/resume remain open; supply alone is not net
@@ -193,7 +202,7 @@ readout is implemented.
    waits for controller/firmware evidence before BlueZ or pairing work.
 3. The isolated zram boot, bounded pressure and apply/disable gate pass. Promote
    no startup or GUI policy until a real game demonstrates a measurable benefit.
-4. The HUD now reads system CPU, available RAM and temperature on the target;
+4. The HUD now reads system CPU, available RAM, temperature and current GPU MHz;
    settings show policies, swap/zram, GPU frequency and PSI where available.
    R32 measured HUD-on UI CPU near 8.6% of one core and panel-open near 24.1%
    during the short run. Actual streaming, GPU time and audio-device metrics

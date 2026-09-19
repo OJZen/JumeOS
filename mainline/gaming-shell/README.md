@@ -148,6 +148,16 @@ The current v0.17 device has no Python interpreter. Its first capability sample
 used serial sysfs/proc reads and host-side validation; do not install Python or
 rewrite the base just to run this diagnostic.
 
+`r46h-cpufreq-default` is the user-approved product-policy candidate for the
+nearest supported 1 GHz OPP. It keeps `schedutil`, lowers the CPU range from
+600--1296 to 600--1008 MHz and leaves GPU devfreq unchanged. The adjacent oneshot
+unit orders it before the frontend. Host tests plus current-v0.17 target
+apply/readback, GTA/thermal use and warm-reboot persistence pass. It is not in the
+frozen v0.18 image; integrate it only in the next p2 successor.
+
+The performance HUD reuses the existing device sample to show current GPU MHz on
+the thermal/status line. It adds no sampler and does not claim GPU utilization.
+
 ## Checks and evidence
 
 `tests/check.cpp` runs the actual QML view through Qt Test and exercises the

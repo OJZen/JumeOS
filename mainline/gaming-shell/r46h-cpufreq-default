@@ -1,0 +1,58 @@
+#!/bin/bash
+set -Eeuo pipefail
+[[ $# == 0 ]]
+
+readonly target_min=600000
+readonly target_max=1008000
+readonly target_governor=schedutil
+
+if [[ -n ${R46H_CPUFREQ_TEST_ROOT:-} ]]; then
+    [[ $R46H_CPUFREQ_TEST_ROOT == /* && -d $R46H_CPUFREQ_TEST_ROOT && ! -L $R46H_CPUFREQ_TEST_ROOT ]]
+    root=$(CDPATH= cd -- "$R46H_CPUFREQ_TEST_ROOT" && pwd -P)
+    [[ $root != / ]]
+else
+    [[ $EUID == 0 ]]
+    root=
+fi
+
+readonly base="$root/sys/devices/system/cpu/cpufreq"
+readonly policy="$base/policy0"
+[[ -d $base && ! -L $base && -d $policy && ! -L $policy ]]
+policies=$(find "$base" -mindepth 1 -maxdepth 1 -type d -name 'policy[0-9]*' -print)
+[[ $policies == "$policy" ]]
+
+for name in scaling_available_frequencies scaling_available_governors scaling_min_freq \
+    scaling_max_freq scaling_governor cpuinfo_min_freq cpuinfo_max_freq; do
+    [[ -f $policy/$name && ! -L $policy/$name ]]
+done
+
+read -ra frequencies < "$policy/scaling_available_frequencies"
+read -ra governors < "$policy/scaling_available_governors"
+[[ " ${frequencies[*]} " == *" $target_min "* && " ${frequencies[*]} " == *" $target_max "* ]] || exit 1
+[[ " ${governors[*]} " == *" $target_governor "* ]] || exit 1
+minimum=$(<"$policy/cpuinfo_min_freq")
+maximum=$(<"$policy/cpuinfo_max_freq")
+current_min=$(<"$policy/scaling_min_freq")
+[[ $minimum =~ ^[0-9]+$ && $maximum =~ ^[0-9]+$ && $current_min =~ ^[0-9]+$ ]]
+(( minimum <= target_min && target_min <= target_max && target_max <= maximum ))
+
+if (( target_max < current_min )); then
+    printf '%s\n' "$target_min" > "$policy/scaling_min_freq"
+    printf '%s\n' "$target_max" > "$policy/scaling_max_freq"
+else
+    printf '%s\n' "$target_max" > "$policy/scaling_max_freq"
+    printf '%s\n' "$target_min" > "$policy/scaling_min_freq"
+fi
+printf '%s\n' "$target_governor" > "$policy/scaling_governor"
+
+for _ in {1..20}; do
+    [[ $(<"$policy/scaling_min_freq") == "$target_min" && \
+       $(<"$policy/scaling_max_freq") == "$target_max" && \
+       $(<"$policy/scaling_governor") == "$target_governor" ]] && break
+    sleep .01
+done
+[[ $(<"$policy/scaling_min_freq") == "$target_min" ]]
+[[ $(<"$policy/scaling_max_freq") == "$target_max" ]]
+[[ $(<"$policy/scaling_governor") == "$target_governor" ]]
+printf 'R46H_CPUFREQ_DEFAULT result=pass governor=%s min_khz=%s max_khz=%s\n' \
+    "$target_governor" "$target_min" "$target_max"

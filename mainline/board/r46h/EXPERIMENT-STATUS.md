@@ -20,9 +20,8 @@ The current card's EASYROMS p3 import passed write, eject and physical use; its
 full target checksum/readback was skipped, so equality remains unverified; see
 [P3 Content Migration](../../../docs/P3-CONTENT-MIGRATION.md).
 
-Fallbacks are p2 v0.7 attended and v0.15 automated; current v0.17 passed readbacks,
-cold/warm infra and stick smoke. LCD, USB, Moonlight and PSP remain open.
-The v0.18 local-network-policy successor is host-only; media and physical gates are open.
+Fallbacks are p2 v0.7 attended and v0.15 automated; current v0.17 passed readbacks and
+cold/warm infra. LCD, USB, Moonlight and PSP remain open; v0.18 is still host-only.
 
 ## Capability ledger
 
@@ -77,20 +76,21 @@ The v0.18 local-network-policy successor is host-only; media and physical gates 
   still required after a new image write.
 - **Remote input — V0.16/V0.17 10 MS DEVICE PASS.** Self-test and exact
   screenshot-verified right/left single-step roundtrip passed; v0.15 uses 100 ms.
-- **Jume Launcher (Qt shell) — R17 CONTROLS + R35 STATUS VALUES DEVICE PASS / R56 GEOMETRY COMPOSED PASS.**
-  Remote taps/captures, CPU restore, keyboard, HUD, dim/wake, battery/charge/Wi-Fi passed;
-  R56 aligned the status row in a device-composed capture; physical LCD remains open.
-  Reboot/poweroff passed. [Device settings](../../gaming-shell/DEVICE.md) owns scope.
+- **[Jume Launcher](../../gaming-shell/DEVICE.md) — R17 CONTROLS + R35 STATUS + R56 GEOMETRY PASS.**
+  Remote controls/status/HUD, CPU restore, keyboard and dim/wake passed; physical LCD remains open.
+- **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
+  Dynamic `schedutil`, both GTA engines, 77.692 C peak and zero cooling/faults passed; GPU unchanged.
 - **Wayland/ports — R60 VICE CITY INTRO PHYSICAL PASS / R63 MACHINE CANDIDATE / BROADER PLAY OPEN.**
   R48 fixed D-pad Down; 640x480, first-config and [private Mesa](../../gaming-mesa/README.md)
-  passed. R60 reached GTA III/VC cutscenes and clean exits/relaunches without faults;
-  the operator accepted Vice City LCD motion, audio and controls at 816/300 MHz.
-  Stock clocks gave little benefit; frame-limiter-off and exact buffer sizing regressed.
-  R62 attributed 15--20% wall time to about 700--800 tiny uploads/s. R63's upload
-  ring raised the same-clock median from 18.67 to 20.52 client commits/s and passed
-  capture, bounded exit, cleanup and poweroff. One 1.116-second maximum interval and
-  attended LCD/audio/control reacceptance remain; R60 stays the fallback. GTA III
-  physical play, broader saves/gameplay and Stardew save-load remain open.
+  passed. R60 reached both cutscenes/clean relaunches; the operator accepted Vice
+  City LCD/audio/controls at 816/300 MHz. Stock clocks helped little; two experiments
+  regressed. R62 attributed 15--20% wall time to 700--800 tiny uploads/s; R63's
+  upload ring raised the same-clock median 18.67→20.52/s. A 1008 MHz CPU follow-up
+  added two clean Vice City bounds and one GTA III bound; matched 480/400/300 MHz
+  GPU medians were 23.08/22.91/22.46/s, so maximum devfreq is not utilization proof
+  or the primary cutscene limit. One 1.116-second interval and R63 physical
+  reacceptance remain; R60 stays fallback. GTA III physical play, broader saves and
+  Stardew save-load remain open.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
   No ALSA XRUN; much smoother than software rendering, with occasional minor stutter.
 - **Hardware volume keys — PHYSICAL + REBOOT PERSISTENCE PASS / OVERLAY OPEN.**
@@ -143,8 +143,8 @@ The v0.18 local-network-policy successor is host-only; media and physical gates 
 - Boot/media: [release](../../first-version-release/README.md),
   [power settle](../../bringup-tests/V17-MMC-POWER-SETTLE.md),
   [promotion](../../gaming-product-boot-promotion/README.md), [p3](../../../docs/P3-CONTENT-MIGRATION.md).
-- Product: [rootfs](../../rootfs-debian13-gaming-v17/README.md),
-  [MVP](../../bringup-tests/GAMING-MVP.md), [input/audio](../../bringup-tests/ATTENDED-INPUT-AUDIO-COMPLETION.md).
+- Product: [rootfs](../../rootfs-debian13-gaming-v17/README.md), [MVP](../../bringup-tests/GAMING-MVP.md),
+  [input/audio](../../bringup-tests/ATTENDED-INPUT-AUDIO-COMPLETION.md).
 - Hardware: [audio](../../bringup-tests/AUDIO-ROUTE-PROBE.md),
   [charging](../../bringup-tests/V12-CHARGE-TERM-POLICY.md),
   [Hantro](../../bringup-tests/HANTRO-CODEC-DECODE-PROBE.md), [USB](../../bringup-tests/USB-STORAGE-READ-PROBE.md).
