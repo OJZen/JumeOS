@@ -873,3 +873,7 @@ Set `R46H_GTA_SWAP_NOWAIT=1` only for the isolated swap-wait experiment. It
 keeps the engine's 30 FPS frame limiter but forces SDL GL swap interval zero,
 separating that limiter from compositor/VSync waiting. Combine it with the R63
 ring candidate for the target A/B; it is not a product default.
+
+Set `R46H_GTA_FRAME_PROFILE=1` for the Vice City phase profiler. It records
+one-second averages for game processing, render phases and swap to stderr and
+can be combined with the R63 ring candidate. It is not a product default.

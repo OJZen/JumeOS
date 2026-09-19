@@ -1,0 +1,161 @@
+--- a/src/core/timebars.h
++++ b/src/core/timebars.h
+@@ -3 +3 @@
+-#ifdef TIMEBARS
++#if defined(TIMEBARS) || defined(MASTER)
+--- a/src/core/timebars.cpp
++++ b/src/core/timebars.cpp
+@@ -1,5 +1,97 @@
+ #include "common.h"
+-#ifndef MASTER
++#ifdef MASTER
++#include <stdio.h>
++#include <string.h>
++#include <time.h>
++
++struct R46HProfileTimer
++{
++	const char *name;
++	const char *key;
++	uint64 startNs;
++	uint64 totalNs;
++};
++
++static R46HProfileTimer r46hTimers[] = {
++	{ "CGame::Process", "process" },
++	{ "DMAudio.Service", "audio" },
++	{ "CnstrRenderList", "construct" },
++	{ "PreRender", "prerender" },
++	{ "BeginFrame", "begin" },
++	{ "RenderScene", "scene" },
++	{ "Effects", "effects" },
++	{ "RenderMotionBlur", "blur" },
++	{ "Render2dStuff", "hud" },
++	{ "RenderMenus", "menus" },
++	{ "DoFade", "fade" },
++	{ "Render2dStuff-Fade", "afterfade" },
++	{ "Swap", "swap" },
++};
++static uint64 r46hFrameStartNs, r46hWindowStartNs, r46hFrameTotalNs;
++static uint32 r46hFrameCount;
++
++static uint64
++r46hNowNs(void)
++{
++	struct timespec ts;
++	clock_gettime(CLOCK_MONOTONIC, &ts);
++	return (uint64)ts.tv_sec*1000000000ULL + ts.tv_nsec;
++}
++
++void
++tbInit(void)
++{
++	r46hFrameStartNs = r46hNowNs();
++	if(r46hWindowStartNs == 0)
++		r46hWindowStartNs = r46hFrameStartNs;
++	for(uint32 i = 0; i < ARRAY_SIZE(r46hTimers); i++)
++		r46hTimers[i].startNs = 0;
++}
++
++void
++tbStartTimer(int32, Const char *name)
++{
++	for(uint32 i = 0; i < ARRAY_SIZE(r46hTimers); i++)
++		if(strcmp(name, r46hTimers[i].name) == 0){
++			r46hTimers[i].startNs = r46hNowNs();
++			return;
++		}
++}
++
++void
++tbEndTimer(Const char *name)
++{
++	uint64 now = r46hNowNs();
++	for(uint32 i = 0; i < ARRAY_SIZE(r46hTimers); i++)
++		if(strcmp(name, r46hTimers[i].name) == 0 && r46hTimers[i].startNs != 0){
++			r46hTimers[i].totalNs += now - r46hTimers[i].startNs;
++			r46hTimers[i].startNs = 0;
++			return;
++		}
++}
++
++void
++tbDisplay(void)
++{
++	uint64 now = r46hNowNs();
++	r46hFrameTotalNs += now - r46hFrameStartNs;
++	r46hFrameCount++;
++	if(now - r46hWindowStartNs < 1000000000ULL)
++		return;
++	fprintf(stderr, "R46H_FRAME_PROFILE frames=%u frame_us=%llu", r46hFrameCount,
++		(unsigned long long)(r46hFrameTotalNs/r46hFrameCount/1000));
++	for(uint32 i = 0; i < ARRAY_SIZE(r46hTimers); i++){
++		fprintf(stderr, " %s_us=%llu", r46hTimers[i].key,
++			(unsigned long long)(r46hTimers[i].totalNs/r46hFrameCount/1000));
++		r46hTimers[i].totalNs = 0;
++	}
++	fputc('\n', stderr);
++	fflush(stderr);
++	r46hFrameTotalNs = 0;
++	r46hFrameCount = 0;
++	r46hWindowStartNs = now;
++}
++#else
+ #include "Font.h"
+ #include "Frontend.h"
+ #include "Timer.h"
+@@ -118,4 +210,4 @@
+ #endif // !FINAL
+ 	}
+ }
+-#endif // !MASTER
+\ No newline at end of file
++#endif // MASTER
+--- a/src/core/main.cpp
++++ b/src/core/main.cpp
+@@ -1597,6 +1597,7 @@
+ 		RwCameraSetFogDistance(Scene.camera, CTimeCycle::GetFogStart());
+ #endif
+ 
++		tbStartTimer(0, "BeginFrame");
+ 		if(CWeather::LightningFlash && !CCullZones::CamNoRain()){
+ 			if(!DoRWStuffStartOfFrame_Horizon(255, 255, 255, 255, 255, 255, 255))
+ 				goto popret;
+@@ -1606,6 +1607,7 @@
+ 						255))
+ 				goto popret;
+ 		}
++		tbEndTimer("BeginFrame");
+ 
+ 		DefinedState();
+ 
+@@ -1617,13 +1619,14 @@
+ 		tbStartTimer(0, "RenderScene");
+ 		RenderScene();
+ 		tbEndTimer("RenderScene");
+-
++		tbStartTimer(0, "Effects");
+ #ifdef EXTENDED_PIPELINES
+ 		CustomPipes::EnvMapRender();
+ #endif
+ 
+ 		RenderDebugShit();
+ 		RenderEffects();
++		tbEndTimer("Effects");
+ 
+ 		if((TheCamera.m_BlurType == MOTION_BLUR_NONE || TheCamera.m_BlurType == MOTION_BLUR_LIGHT_SCENE) &&
+ 		   TheCamera.m_ScreenReductionPercentage > 0.0f)
+@@ -1676,10 +1679,10 @@
+ 	FrontEndMenuManager.DrawOverlays();
+ #endif
+ 
+-	if (gbShowTimebars)
+-		tbDisplay();
+-
++	tbStartTimer(0, "Swap");
+ 	DoRWStuffEndOfFrame();
++	tbEndTimer("Swap");
++	tbDisplay();
+ 
+ 	POP_MEMID();	// MEMID_RENDER
+ 
