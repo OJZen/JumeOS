@@ -76,10 +76,10 @@ cold/warm infra. LCD, USB, Moonlight and PSP remain open; v0.18 is still host-on
   still required after a new image write.
 - **Remote input — V0.16/V0.17 10 MS DEVICE PASS.** Self-test and exact
   screenshot-verified right/left single-step roundtrip passed; v0.15 uses 100 ms.
-- **[Jume Launcher](../../gaming-shell/DEVICE.md) — R17 CONTROLS + R35 STATUS + R56 GEOMETRY PASS.**
-  Remote controls/status/HUD, CPU restore, keyboard and dim/wake passed; physical LCD remains open.
+- **[Jume Launcher](../../gaming-shell/DEVICE.md) — R17 CONTROLS + R56 GEOMETRY + R64 GPU CLOCK PASS.**
+  R64 composed `GPU 200 MHz` matching target state; physical LCD remains open.
 - **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
-  Dynamic `schedutil`, both GTA engines, 77.692 C peak and zero cooling/faults passed; GPU unchanged.
+  Dynamic `schedutil` and both GTA engines passed. A later live GPU-min raise panicked; do not repeat it.
 - **Wayland/ports — R60 VICE CITY INTRO PHYSICAL PASS / R63 MACHINE CANDIDATE / BROADER PLAY OPEN.**
   R48 fixed D-pad Down; 640x480, first-config and [private Mesa](../../gaming-mesa/README.md)
   passed. R60 reached both cutscenes/clean relaunches; the operator accepted Vice

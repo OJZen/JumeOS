@@ -157,6 +157,9 @@ frozen v0.18 image; integrate it only in the next p2 successor.
 
 The performance HUD reuses the existing device sample to show current GPU MHz on
 the thermal/status line. It adds no sampler and does not claim GPU utilization.
+R64 target composition showed `GPU 200 MHz` matching the sampled 200000000 Hz.
+A subsequent live minimum-frequency raise caused a Panfrost power-domain panic;
+do not repeat it as a HUD test. The first capture remains valid machine evidence.
 
 ## Checks and evidence
 

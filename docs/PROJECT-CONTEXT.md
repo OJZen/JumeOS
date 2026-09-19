@@ -12,12 +12,12 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **powered on** on v0.17 after the 2026-09-19 R63 CPU/GPU follow-up.
-The 600--1008 MHz `schedutil` CPU default is enabled and passed a warm reboot;
-GPU devfreq remains 200--480 MHz `simple_ondemand`. ES-DE, input and volume
-services are healthy. R63 remains a machine-tested upload-ring candidate; R60
-is the accepted fallback until R63's LCD motion, audio and physical controls are
-attended. Exact evidence is under
+The device is **halted at a kernel panic** after a successful 2026-09-19 GPU-HUD
+capture and an unsafe live GPU minimum-frequency raise. A cold power cycle and
+temporary-access cleanup are required. Before the incident, the 600--1008 MHz
+`schedutil` CPU default had passed a warm reboot and all product services were
+healthy; the GPU policy was 200--480 MHz `simple_ondemand`. R63 remains a
+machine-tested upload-ring candidate and R60 the accepted fallback. Evidence is under
 `mainline/out/.cache/r46h-cpufreq-r63-device-20260919.oDoApN/`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
@@ -36,8 +36,8 @@ skipped, so content equality remains unverified. See
 ## Current feature evidence
 
 - Jume Launcher has machine proof for status values, storage/settings,
-  PortMaster and routed remote control. R56 aligns Wi-Fi, battery, clock and the
-  clipped game HUD in composed output; physical LCD confirmation remains open.
+  PortMaster and routed remote control. R56 aligns Wi-Fi, battery and clock; R64
+  captured the HUD's `GPU 200 MHz` matching target state. Physical LCD remains open.
   The `0.1.0-dev` name/version/About page passes host Qt tests and awaits target deployment.
 - Repaired GTA III/Vice City accept the Switch-layout controls and no longer
   reproduce the bounded-exit crash. GTA-only `noafbc`, first-config 640x480 and
@@ -87,9 +87,9 @@ runbooks.
 
 1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
    identity, new-password activation, unrelated-action denial and reboot persistence.
-2. Deploy the GPU-frequency HUD build, then reaccept R63 Vice City LCD motion,
-   audio and physical controls under the proven 600--1008 MHz policy. Keep R60
-   until that pass; broader GTA saves/gameplay and Stardew save-load stay separate.
+2. Cold-boot the device, verify default clocks/services and remove the temporary
+   access key. Then reaccept R63 Vice City LCD motion, audio and physical controls;
+   keep R60 until that pass. Do not repeat a live GPU minimum-frequency raise.
 3. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
    other hardware-gated work until requested or its evidence changes.
 

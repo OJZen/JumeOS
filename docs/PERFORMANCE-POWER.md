@@ -25,6 +25,8 @@ submission intervals. Its [producer contract](../mainline/gaming-wayland/HANDHEL
 distinguishes these from LCD presentation, GPU duration and video/audio drops.
 R31 displayed these values over Neo/Ozone on the device. Its game/panel snapshots
 included capture and control traffic, so they do not isolate normal overlay cost.
+R64 added current GPU MHz without another sampler; a composed target capture
+showed `GPU 200 MHz` while device state reported 200000000 Hz.
 The [device record](../mainline/gaming-wayland/HANDHELD.md#r31-device-follow-up-2026-09-11)
 owns the values, thermal abort and remaining gates.
 The [native streaming adapter](../mainline/gaming-shell/STREAMING.md#native-statistics)
@@ -204,6 +206,9 @@ readout is implemented.
    no startup or GUI policy until a real game demonstrates a measurable benefit.
 4. The HUD now reads system CPU, available RAM, temperature and current GPU MHz;
    settings show policies, swap/zram, GPU frequency and PSI where available.
+   A live 200→480 MHz minimum-frequency raise during the R64 session triggered a
+   Panfrost power-domain external abort and kernel panic. Do not repeat that
+   transition; verify future GPU policy changes only through a cold boot candidate.
    R32 measured HUD-on UI CPU near 8.6% of one core and panel-open near 24.1%
    during the short run. Actual streaming, GPU time and audio-device metrics
    remain separate producer/acceptance work.
