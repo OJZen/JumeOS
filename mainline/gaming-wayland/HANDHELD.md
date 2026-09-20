@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-20: **R74 VICE CITY SHORT ATTENDED PASS / R78 V0.18 PREFLIGHT FAIL / SUCCESSOR SOURCE CHECK PASS**.
+Status 2026-09-20: **R74 VICE CITY SHORT ATTENDED PASS / R78 V0.18 PREFLIGHT FAIL / R79 HOST PACKAGE PASS**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -272,8 +272,16 @@ plus exact v0.18 target archive/1,741-file manifest evidence. Its frozen
 v0.17-only UUID guard rejected the new root before runtime, so no R78 UI session
 started. The current source accepts only the exact v0.17 fallback or v0.18 root,
 reports the observed version, and passes the focused shell/lease tests and ARM64
-build. Rebuild a clean successor before continuing physical acceptance. Evidence
-is under `mainline/out/.cache/r46h-v018-device-20260920.FoS3wK/`.
+build. Clean source `c8cf4d9510bbaac6a7074fc368d45a846b1cb20a`
+produced R79 archive SHA-256
+`b20bdbed549dca3569025c15c34f6e8130fc98107480da6b62b3fb55ef3e0e6e`
+and 1,741-entry manifest SHA-256
+`a247a1e520407cdbe28c8a13f375019846daccbe3eed061b035b6f627ee90cf0`.
+The complete no-Moonlight host package suite passed. Nonstandard-rate UART
+transfers were unreliable and are rejected; reliable target transfer/preflight
+remain open. Evidence is under
+`mainline/out/.cache/r46h-v018-device-20260920.FoS3wK/` and
+`mainline/out/.cache/r46h-handheld-r79-receipt-20260920/`.
 
 R51 reuses the existing composed game layer, resident performance panel,
 frame-submission telemetry, capture authorization and routed remote gamepad for

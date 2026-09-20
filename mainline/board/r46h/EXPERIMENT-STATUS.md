@@ -81,8 +81,8 @@ Moonlight and PSP remain open.
 - **[Jume Launcher](../../gaming-shell/DEVICE.md) — R17 CONTROLS + R56 GEOMETRY + R64 GPU CLOCK PASS / R78 V0.18 PREFLIGHT FAIL.**
   R64 composed `GPU 200 MHz` matching target state. R78 passed exact archive and
   1,741-file target readback on v0.18, then its frozen v0.17-only UUID guard
-  rejected before launch. The dual-v0.17/v0.18 source fix passes focused and
-  ARM64 checks; successor packaging and physical LCD remain open.
+  rejected before launch. R79's exact dual-v0.17/v0.18 fix passes the complete
+  host package suite; reliable target transfer/preflight and physical LCD remain open.
 - **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
   Dynamic `schedutil` and both GTA engines passed; reset recovered a live GPU-min panic. Do not repeat it.
 - **Wayland/ports — R74 SHORT ATTENDED PASS / BROADER PLAY OPEN.**

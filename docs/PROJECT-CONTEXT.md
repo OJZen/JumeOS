@@ -44,8 +44,8 @@ skipped, so content equality remains unverified. See
   captured the HUD's `GPU 200 MHz` matching target state. Physical LCD remains open.
   The `0.1.0-dev` name/version/About page passes host Qt tests. The R78 full
   handheld package pins R74 and passed target readback, but its v0.17-only guard
-  rejected v0.18 before runtime. Current source accepts exact v0.17/v0.18
-  identities and passes focused plus ARM64 checks; a clean successor package is next.
+  rejected v0.18 before runtime. R79 accepts exact v0.17/v0.18 identities and
+  passes the complete host package suite; target transfer/preflight remain open.
 - Repaired GTA III/Vice City accept the Switch-layout controls and no longer
   reproduce the bounded-exit crash. GTA-only `noafbc`, first-config 640x480 and
   private Mesa 26.2.2 passed target integration. The R60 batch reached captured
@@ -110,8 +110,8 @@ runbooks.
 
 ## Immediate next work
 
-1. Commit the v0.17/v0.18 identity compatibility fix, rebuild the clean
-   no-Moonlight handheld package, then repeat target manifest/preflight on v0.18.
+1. Transfer the clean R79 no-Moonlight package over a reliable link, then repeat
+   target manifest/preflight on v0.18. Do not reuse the rejected high-speed UART path.
 2. Continue the [combined acceptance route](../mainline/gaming-shell/DEVICE.md#combined-acceptance-route):
    launcher/status/About/input ownership, PortMaster package lifecycle, Metal
    Slug state, R74 GTA save and broader-play lifecycle, then R45 direct and R78
