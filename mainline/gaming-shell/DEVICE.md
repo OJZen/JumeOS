@@ -1,7 +1,7 @@
 # Temporary R46H settings
 
-R56 status-bar geometry: **HOST + DEVICE COMPOSED PASS / PHYSICAL LCD OPEN**. R35 status values remain
-**HOST + DEVICE READBACK PASS**; revision 17 device controls remain
+R79 Launcher/status/About and recovery: **HOST + DEVICE COMPOSED PASS / PHYSICAL LCD + PROMOTION OPEN**.
+R35 status values remain **HOST + DEVICE READBACK PASS**; revision 17 device controls remain
 **HOST + DEVICE SCOPE PASS / FOCUS PACING OPEN**.
 The [project checkpoint](../../docs/PROJECT-CONTEXT.md) owns the next session;
 the [performance/power plan](../../docs/PERFORMANCE-POWER.md) owns product scope.
@@ -59,6 +59,10 @@ R56 gives both status icons one 18 px box and shared centerline, uses theme gaps
 and matches the clock to caption text. Its R46H Weston capture shows the Wi-Fi,
 battery and clock row aligned in composed output. This does not independently
 prove the physical LCD or revalidate the R35 status-value sources.
+R79 repeated that row on p2 v0.18 with live `97%` discharge state and captured the
+About page's `Jume Launcher`, `0.1.0-dev` and project URL. Normal expiry and forced
+input-router failure both restored ES-DE and removed transient leases. This is
+composed/machine evidence; physical readability, L3+R3 and promotion remain open.
 
 The hardware HUD now shows available/total RAM, `soc-thermal` chip temperature,
 current/effective upper CPU frequency and CPU/GPU cooling-device activity. Missing
@@ -248,18 +252,18 @@ following sequence; most navigation, capture and readback is agent-operated.
 The batch starts with the exact [p2 v0.18](../rootfs-debian13-gaming-v18/README.md)
 media write, so the TF card must be available before power-on. Rediscover media,
 serial and host-key identity first; keep external supply connected. Freeze the
-[R78 handheld package](../gaming-wayland/HANDHELD.md#resume-and-rebuild) and
+[R79 handheld package](../gaming-wayland/HANDHELD.md#resume-and-rebuild) and
 [R45 direct Stardew fallback](../gaming-ports/README.md#r45-stardew-gallium-preload),
 with p2 v0.17 and ES-DE ready for recovery.
 
 | Route | Agent checks | Operator observations |
 | --- | --- | --- |
 | v0.18 media and cold identity | Fixed-profile p2 write/readback, cold identity, exact package/rule hashes, service health and unrelated-action denial | Card handling and normal boot observation |
-| R78 transient desktop baseline | Full target manifest/preflight; Home, About/version/URL, 100%/120% fonts, aligned Wi-Fi/battery/clock/charge state, settings/storage, L3+R3 ownership and clean ES-DE return | LCD layout/motion, readability and physical shortcut feel |
-| PortMaster lifecycle | Refresh the catalog; install/update/remove one bounded test port; exercise cancellation/error recovery and prove retained user data | Confirm progress/error readability if requested |
-| Local lifecycle and retained state | Metal Slug launch/coin/start/panel/exit/relaunch and retained slot load; R74 GTA III/Vice City broader play, save/load, exit and relaunch with managed-save hashes | Picture, audio and physical controls; confirm expected loaded state |
-| Stardew direct then shared | R45 start/load/save/exit/relaunch with source/backup hashes preserved; then R78 process maps, window state, submissions and logs for the shared-Wayland stall | Direct-path picture, audio, controls and loaded farm; report whether a shared window appears |
-| Network, reboot and recovery | New private account password, Wi-Fi create/reconnect/forget, permission checks, warm reboot persistence, repeated R78 start/stop, forced-child recovery, bounded log/cache growth and ES-DE fallback | Enter secrets only on the handheld and confirm expected network choice |
+| R79 transient desktop baseline | Target manifest/preflight, Home/About/status and clean/forced recovery pass; finish 100%/120% fonts, settings/storage and physical L3+R3 | LCD layout/motion, readability and physical shortcut feel |
+| PortMaster lifecycle | Offline refresh recovery passes with zero entries; finish live refresh plus install/update/remove one bounded test port and prove retained user data | Confirm progress/error readability if requested |
+| Local lifecycle and retained state | Metal Slug launch/menu/exit and GTA III/Vice City startup/exit pass by remote control; finish retained slot load, broader GTA play and save/relaunch hashes | Picture, audio and physical controls; confirm expected loaded state |
+| Stardew direct then shared | R45 start/load/save/exit/relaunch with source/backup hashes preserved; revisit R79 shared state only with a new source hypothesis | Direct-path picture, audio, controls and loaded farm; report whether a changed shared path creates a window |
+| Network, reboot and recovery | Forced-child recovery, repeated transient expiry and ES-DE fallback pass; finish Wi-Fi create/reconnect/forget, warm-reboot persistence and bounded log/cache growth | Enter secrets only on the handheld and confirm expected network choice |
 
 Run each changed path once; repeat only after a relevant failure/fix. A denied
 permission, thermal/voltage warning or missing capability remains an explicit

@@ -27,43 +27,25 @@ Moonlight and PSP remain open.
 
 ## Capability ledger
 
-- **Full-card first-version release v0.1 — HOST + MEDIA + PHYSICAL PASS.** Its
-  v0.17/v0.15 and p2 v0.5 cold-booted; current p2/p3 later changed.
-- **Original-card EASYROMS — P3 WRITE/PHYSICAL PASS; READBACK UNVERIFIED.**
-  Write/sync/eject, read-only mounts, frontend and one game passed; checksums were skipped.
+- **Full-card first version v0.1 — HOST + MEDIA + PHYSICAL PASS.** Current p2/p3 later changed.
+- **Original-card EASYROMS — P3 WRITE/PHYSICAL PASS; READBACK UNVERIFIED.** Checksums were skipped.
 - **Cold MMC — V0.17 ONE-SHOT + TWO PERSISTENT PASS / RELIABILITY OPEN.**
   Three SDR104/150 MHz samples had no MMC/ext4 fault; v0.16 reproduced the fault
   and was rolled back. Do not loop unchanged boots.
-- **Debian 13 gaming p2 v0.7 — HOST + P2 MEDIA + PHYSICAL PASS.** Exact payload
-  v0.6, two readbacks, cold boot, product sample, health and poweroff passed.
+- **Debian 13 gaming p2 v0.7 — HOST + P2 MEDIA + PHYSICAL PASS.** Readbacks and cold product passed.
 - **Debian 13 gaming p2 v0.15 — HOST + P2 MEDIA + DEVICE AUTOMATION PASS /
-  ATTENDED OPEN / DREAMCAST FAIL.** Build/readback, boot, `/roms`, automated game
-  samples, reboot, health and poweroff passed; operator evidence stayed open.
+  ATTENDED OPEN / DREAMCAST FAIL.** Build/readback, game automation, reboot and health passed.
 - **Debian 13 gaming p2 v0.16 — HOST + P2 MEDIA + DEVICE INFRA PASS / PRODUCT
-  FAIL.** Infra passed, but ES-DE merged bundled Dreamcast and loaded 14 systems
-  instead of the intended 13.
+  FAIL.** ES-DE merged bundled Dreamcast and loaded 14 systems instead of 13.
 - **Debian 13 gaming p2 v0.17 exclusive systems — HOST + P2 MEDIA + DEVICE
-  INFRA + STICK SMOKE PASS / SAVE MENU FAIL / PSP DEFERRED.** Build/readback,
-  cold/warm identity, 13 systems, input/captures, health and poweroff passed.
-  Ozone save entries are absent because custom cores sit outside discovery;
-  both sticks passed direction/centering without a mapping change.
-- **Persistent v0.15 BOOT — PASS.** Versioned promotion kept v0.10/v0.8
-  fallbacks and U-Boot environment unchanged. Roll back only for a regression;
-  never use `saveenv`.
-- **Panel handoff — FIRST BOOT PASS / FULL INIT + KMS OPEN.** V0.8 preserved the
-  bootloader display; full DCS reset/init and general KMS page flips remain open.
-- **Panfrost — BASE PROBE PASS / FLYCAST GAMEPLAY FAIL.** Exact 64x64 FBO/readback
-  gates pass. Flycast `Capcom vs SNK 2` continuously faults in gameplay with
-  per-strip or per-triangle sorting; llvmpipe instead XRUNs at about 300% CPU.
-- **Combined gaming input — COMPOSITE PHYSICAL + V0.17 STICK SMOKE PASS.** V0.14
-  closed 16 keys and four axes; v0.17's unchanged product path passed attended
-  dual-stick direction/centering checks. Spent diagnostic batches remain removed.
-- **Inherited F5/GPIO2_A4 — PARTIAL / DT-HARDWARE MISMATCH.** The advertised
-  line stayed idle-high and no key was identified. Require schematic or
-  continuity evidence before documenting a key or deleting the node.
-- **Debian-native gaming MVP — PASS.** RetroArch/RGUI, Nestopia and the custom
-  smoke core passed. Imported `1944.zip` passed controls, audio and RGUI return;
-  `1943.zip` jammed in Nestopia. Broad ROM/core compatibility is open.
+  INFRA + STICK SMOKE PASS / SAVE MENU FAIL / PSP DEFERRED.** Identity, 13 systems,
+  controls, captures and health passed; custom cores lack Ozone save discovery.
+- **Persistent v0.15 BOOT — PASS.** Fallbacks and U-Boot environment stay unchanged; never use `saveenv`.
+- **Panel handoff — FIRST BOOT PASS / FULL INIT + KMS OPEN.** Full DCS/KMS remains open.
+- **Panfrost — BASE PROBE PASS / FLYCAST GAMEPLAY FAIL.** Flycast faults; llvmpipe XRUNs at ~300% CPU.
+- **Combined gaming input — COMPOSITE PHYSICAL + V0.17 STICK PASS.** Sixteen keys and four axes passed.
+- **Inherited F5/GPIO2_A4 — PARTIAL / DT-HARDWARE MISMATCH.** Require schematic or continuity evidence.
+- **Debian-native gaming MVP — PASS.** `1944.zip` passed; `1943.zip` jammed. Broad compatibility is open.
 - **Ozone + FBNeo/Metal Slug — HOST + TARGET + PHYSICAL PASS / MILD PACING OPEN.**
   Guarded install, clean UniBIOS frames and advancing frame 480 passed; the
   operator accepted clean LCD startup and gameplay. Mild pacing artifacts remain.
@@ -78,14 +60,15 @@ Moonlight and PSP remain open.
   still required after a new image write.
 - **Remote input — V0.16/V0.17 10 MS DEVICE PASS.** Self-test and exact
   screenshot-verified right/left single-step roundtrip passed; v0.15 uses 100 ms.
-- **[Jume Launcher](../../gaming-shell/DEVICE.md) — R17 CONTROLS + R56 GEOMETRY + R64 GPU CLOCK PASS / R78 V0.18 PREFLIGHT FAIL.**
-  R64 composed `GPU 200 MHz` matching target state. R78 passed exact archive and
-  1,741-file target readback on v0.18, then its frozen v0.17-only UUID guard
-  rejected before launch. R79's exact dual-v0.17/v0.18 fix passes the complete
-  host package suite; reliable target transfer/preflight and physical LCD remain open.
+- **[Jume Launcher](../../gaming-shell/DEVICE.md) — R79 DEVICE/RECOVERY PASS / PHYSICAL + PROMOTION OPEN.**
+  R79 passed exact archive/1,741-file target readback and preflight. Composed Home
+  and About captures show the aligned Wi-Fi/battery/clock row, live charge state,
+  version and project URL. Normal expiry and forced input-router failure restored
+  ES-DE and all transient leases. Physical LCD/readability, L3+R3 and persistent
+  replacement remain open.
 - **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
   Dynamic `schedutil` and both GTA engines passed; reset recovered a live GPU-min panic. Do not repeat it.
-- **Wayland/ports — R74 SHORT ATTENDED PASS / BROADER PLAY OPEN.**
+- **Wayland/ports — R74 SHORT ATTENDED + R79 TRANSIENT MACHINE PASS / BROADER PLAY OPEN.**
   R48 fixed D-pad Down; 640x480, first-config and [private Mesa](../../gaming-mesa/README.md)
   passed. R60's Vice City LCD/audio/controls passed at 816/300 MHz. R62 found
   15--20% wall time in tiny uploads; R63 raised the same-clock median 18.67→20.52/s.
@@ -96,6 +79,11 @@ Moonlight and PSP remain open.
   the intro, recorded nine complete samples at 28.93/s and 33.89 ms median interval,
   exited 0 after 121.06 seconds and peaked at 80.384 C. R75 accepted picture/motion,
   audio and controls; open-world play stayed below 30 FPS, and saves remain open.
+  R79 then routed two B presses into each accepted engine, captured distinct GTA III
+  and Vice City startup animations, sampled roughly 25--30 compositor submissions/s
+  below 81 C and returned to Jume Launcher with clean lease/service restoration.
+  Neo launch/menu/exit also passed. The offline PortMaster catalog was empty, so
+  live package lifecycle, broader GTA play/save and Stardew remain open.
   A 480x360 SGSR1 candidate failed Mesa compilation, then its fixed-mode variant
   exited -11 before the frontend. R63/R60 remain rollbacks.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**

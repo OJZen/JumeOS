@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-20: **R74 VICE CITY SHORT ATTENDED PASS / R78 V0.18 PREFLIGHT FAIL / R79 HOST PACKAGE PASS**.
+Status 2026-09-20: **R74 VICE CITY SHORT ATTENDED PASS / R79 V0.18 TRANSIENT DEVICE PASS / PHYSICAL LAUNCHER ACCEPTANCE OPEN**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -255,33 +255,55 @@ audio, physical-control, save or relaunch proof.
 
 ## Resume and rebuild
 
-R78 is the current no-Moonlight deployment candidate at
-`mainline/out/.cache/r46h-handheld-r78-receipt-20260920/`. Clean source
-`9c1238888496be3310dc2be42e01805de0108369` produced archive SHA-256
-`4d00cb3d7a7d5532b650a40ad04041ed30f814e5e11ad4fe8ef2617e55e2deea`
-with manifest SHA-256
-`845d24f15f2c9f9f027bf1b36083dd720a93d211fa2c8e211b5dc7294b3cb49a`.
-The full ARM64 shell, Wayland, session, PortMaster and remote checks passed; its
-receipt identifies the complete handheld host boundary, keeps R60 only as the
-Mesa runtime revision, and pins the accepted R74 re3/reVC hashes. Its packaged
-Mono shim SHA-256
+R79 is the current no-Moonlight deployment candidate. Its packaged Mono shim SHA-256
 `28164fe9af77f8b02e6f7caef18e48c5de146ac5351fb28a1d63fb60f140354e`
 also matches the R45 direct-display target pass, so another compatibility layer
-is not justified before diagnosing the shared-Wayland stall. R78 is host evidence
-plus exact v0.18 target archive/1,741-file manifest evidence. Its frozen
-v0.17-only UUID guard rejected the new root before runtime, so no R78 UI session
-started. The current source accepts only the exact v0.17 fallback or v0.18 root,
-reports the observed version, and passes the focused shell/lease tests and ARM64
-build. Clean source `c8cf4d9510bbaac6a7074fc368d45a846b1cb20a`
-produced R79 archive SHA-256
+is not justified before diagnosing the shared-Wayland stall. R78's frozen
+v0.17-only UUID guard rejected v0.18 before runtime; R79 accepts only the exact
+v0.17 fallback or v0.18 root and reports the observed version. Clean source
+`c8cf4d9510bbaac6a7074fc368d45a846b1cb20a` produced archive SHA-256
 `b20bdbed549dca3569025c15c34f6e8130fc98107480da6b62b3fb55ef3e0e6e`
 and 1,741-entry manifest SHA-256
 `a247a1e520407cdbe28c8a13f375019846daccbe3eed061b035b6f627ee90cf0`.
-The complete no-Moonlight host package suite passed. Nonstandard-rate UART
-transfers were unreliable and are rejected; reliable target transfer/preflight
-remain open. Evidence is under
+The complete no-Moonlight host package suite passed. Evidence is under
 `mainline/out/.cache/r46h-v018-device-20260920.FoS3wK/` and
 `mainline/out/.cache/r46h-handheld-r79-receipt-20260920/`.
+
+## R79 v0.18 device follow-up 2026-09-20
+
+A verified 1.5 Mbaud chunk protocol transferred all 186 256-KiB chunks with
+per-chunk SHA-256 before the full archive hash matched. This supersedes only the
+rejected unframed high-speed attempts; it does not make arbitrary raw UART copies
+reliable. All 1,741 packaged files rehashed on target, and plain plus
+device-control preflight passed against exact p2 v0.18.
+
+Transient DRM/Panfrost sessions then supplied machine/composed evidence:
+
+- Home and About captures show the aligned Wi-Fi, battery and clock row, live
+  `97%` discharge state, `Jume Launcher`, `0.1.0-dev` and the project URL.
+- Metal Slug reached real frame submissions, opened the RetroArch Quick Menu,
+  exited with Select+Start and returned to Launcher. An offline PortMaster refresh
+  recovered its UI but returned zero catalog entries; no package mutation passed.
+- Killing the exact input-router child made the session fail closed, restored the
+  device lease and all three product services, and left no seat/device/port path.
+- The first GTA III attempt used logical A and retained byte-identical menu
+  captures, so it proves no start. Corrected logical B twice produced a distinct
+  startup-animation capture; ten samples across 20 seconds ranged 25.03--29.85
+  submissions/s with 33.94--36.14 ms median intervals, mostly at 480 MHz GPU and
+  79.23 C maximum. Vice City repeated the B path; after its first transition
+  sample it held 29.35--30.33 submissions/s with 33.80--34.03 ms medians and
+  peaked at 80.384 C. Both exited through the panel and returned to Launcher.
+
+Repeated normal expiry ended `status=0 frontend_restore=0`, restored
+frontend/input/volume and removed all transient lease paths. These captures and
+telemetry do not prove physical LCD motion, audio, controls, saves or broader
+gameplay. Live PortMaster lifecycle, Wi-Fi persistence, operator Launcher
+acceptance and persistent promotion remain open. The unchanged Stardew shared
+path was not replayed because no new source-level hypothesis exists. Final health
+found zero failed units or matched kernel/storage/GPU faults with `/roms` read-only.
+Target scripts, evidence copies and 206 MiB of archive/runtime staging were removed;
+persistent game state was retained. Serial confirmed clean unmount, loop detach and
+`Powering off.` at uptime 5071.226045.
 
 R51 reuses the existing composed game layer, resident performance panel,
 frame-submission telemetry, capture authorization and routed remote gamepad for

@@ -12,16 +12,16 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **powered on** with exact p2 v0.18. Fixed-profile write/readback,
+The device is **powered off cleanly** with exact p2 v0.18. Fixed-profile write/readback,
 cold identity, service health, exact policy/package hashes, permission scope and
 the full base smoke pass. A reset after an unconfirmed serial staging attempt
-also recovered cleanly with zero ext4/kernel faults. R78 then passed target
-archive and 1,741-file manifest readback but correctly failed before launch
-because its frozen guard accepted only the v0.17 root UUID. No R78 session ran.
-R74 is the accepted and source-build-default GTA
+also recovered cleanly with zero ext4/kernel faults. R79 then passed exact
+archive and 1,741-file manifest readback, v0.18 preflight, transient Launcher,
+game lifecycle and forced-child recovery without replacing ES-DE. R74 is the
+accepted and source-build-default GTA
 candidate after attended picture/audio/control approval; R63 and R60 remain
 rollbacks. Latest experiment evidence is under
-`mainline/out/.cache/r46h-sgsr-r76-device-20260919.Ryx78e/`.
+`mainline/out/.cache/r46h-v018-device-20260920.FoS3wK/`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current card p2: [v0.18](../mainline/rootfs-debian13-gaming-v18/README.md)
@@ -41,11 +41,11 @@ skipped, so content equality remains unverified. See
 
 - Jume Launcher has machine proof for status values, storage/settings,
   PortMaster and routed remote control. R56 aligns Wi-Fi, battery and clock; R64
-  captured the HUD's `GPU 200 MHz` matching target state. Physical LCD remains open.
-  The `0.1.0-dev` name/version/About page passes host Qt tests. The R78 full
-  handheld package pins R74 and passed target readback, but its v0.17-only guard
-  rejected v0.18 before runtime. R79 accepts exact v0.17/v0.18 identities and
-  passes the complete host package suite; target transfer/preflight remain open.
+  captured the HUD's `GPU 200 MHz` matching target state. R79 composed Home and
+  About captures show the aligned status row, live battery/charge state,
+  `0.1.0-dev` and the project URL on v0.18. Repeated normal expiry and a forced
+  input-router failure restored all services and removed transient leases.
+  Physical LCD/readability, L3+R3 and persistent promotion remain open.
 - Repaired GTA III/Vice City accept the Switch-layout controls and no longer
   reproduce the bounded-exit crash. GTA-only `noafbc`, first-config 640x480 and
   private Mesa 26.2.2 passed target integration. The R60 batch reached captured
@@ -75,6 +75,11 @@ skipped, so content equality remains unverified. See
   A full-frame 480x360-to-640x480 SGSR1 experiment was rejected: the upstream
   shader failed Mesa/Panfrost GLSL compilation, and the fixed-mode specialization
   exited -11 before the frontend. No SGSR product code was retained.
+  R79 repeated both accepted engines through Jume Launcher: two routed B presses
+  reached distinct GTA III and Vice City startup-animation captures, 20-second
+  samples stayed near 25--30 compositor submissions/s, mostly at 480 MHz GPU and below
+  81 C, and both returned cleanly. This is machine/composed evidence, not broader
+  play, saves, physical LCD, audio or controls.
   [Ports](../mainline/gaming-ports/README.md) owns exact pacing and thermal data.
 - Stardew's source, managed copy and backup hashes match and overwrite is refused.
   R45's direct-display run crossed the SDL/GBM crash and stayed active for its
@@ -110,19 +115,22 @@ runbooks.
 
 ## Immediate next work
 
-1. Transfer the clean R79 no-Moonlight package over a reliable link, then repeat
-   target manifest/preflight on v0.18. Do not reuse the rejected high-speed UART path.
-2. Continue the [combined acceptance route](../mainline/gaming-shell/DEVICE.md#combined-acceptance-route):
-   launcher/status/About/input ownership, PortMaster package lifecycle, Metal
-   Slug state, R74 GTA save and broader-play lifecycle, then R45 direct and R78
-   shared Stardew paths.
-3. Finish the same batch with new Wi-Fi/reboot persistence, repeated launcher
-   start/stop, forced-child recovery, bounded cache/log growth and ES-DE fallback.
-   Make Launcher persistent only after these gates pass.
-4. Profile R74's below-30-FPS open-world phase only when a new software hypothesis
+1. Continue the [combined acceptance route](../mainline/gaming-shell/DEVICE.md#combined-acceptance-route)
+   with operator LCD/readability/L3+R3 checks, retained Metal Slug state and R74
+   GTA broader play/save/relaunch. Automated transient launch, exit and recovery
+   already pass; do not replay them unchanged.
+2. After private Wi-Fi credentials are entered on the handheld, finish profile
+   activation/reboot persistence and the live PortMaster install/update/remove
+   lifecycle while preserving user data. Offline refresh currently returns zero entries.
+3. Keep R45 direct Stardew as fallback. Revisit the shared-Wayland stall only
+   with a new source-level hypothesis; the unchanged R78/R79 Mono/Mesa path has
+   already failed before window creation at two clock profiles.
+4. Make Jume Launcher persistent and remove ES-DE only after the remaining
+   operator, network/package and save gates pass.
+5. Profile R74's below-30-FPS open-world phase only when a new software hypothesis
    exists. Keep R63/R60 available; do not repeat SGSR1 or a live GPU minimum-frequency
    raise unchanged.
-5. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
+6. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
    other hardware-gated work until requested or its evidence changes.
 
 ## Working rules

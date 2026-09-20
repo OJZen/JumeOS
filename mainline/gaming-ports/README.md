@@ -927,6 +927,17 @@ Exact R73/R74 evidence is in
 `mainline/out/.cache/r46h-simple-shadow-r73-device-20260919.dlSzrS/` and
 `mainline/out/.cache/r46h-simple-shadow-r74-device-20260919.jH33JR/`.
 
+R79 revalidated the accepted R74 engines through the transient Jume Launcher on
+p2 v0.18. A rejected logical-A attempt left byte-identical GTA III menu captures;
+two logical-B samples then produced distinct startup-animation captures for GTA III
+and Vice City. GTA III's ten samples across 20 seconds ranged 25.03--29.85 submissions/s
+with 33.94--36.14 ms median intervals and 79.23 C maximum. After one transition
+sample, Vice City held 29.35--30.33 submissions/s with 33.80--34.03 ms medians and
+80.384 C maximum. Both sampled mostly at 480 MHz GPU, exited through the shared panel
+and returned to Launcher with clean lease/service restoration. These are composed
+startup samples, not physical LCD FPS, audio, controls, broader play or save proof.
+Evidence is under `mainline/out/.cache/r46h-v018-device-20260920.FoS3wK/`.
+
 The later SGSR1 experiment rendered Vice City into a 480x360 offscreen target
 and attempted a full-frame upscale to the existing 640x480 output. The shader
 from upstream commit `d926f074bcb9d714e179f1ce0fcb9ee2eeb5074e` did not compile
