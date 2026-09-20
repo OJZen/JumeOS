@@ -49,9 +49,10 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
   R74's accepted GTA III/Vice City engines pin the ring-upload and simple-shadow
   source build; Vice City's short intro passed picture, audio and controls, while
   open-world performance, broader play and saves remain open. Stardew's source,
-  managed copy and backup remain hash-equal with overwrite refused, but both
-  120-second profiles still stop before SDL/Wayland. GTA III broader physical play
-  and Stardew shared-window save/load remain open. The
+  managed copy and backup remain hash-equal with overwrite refused. Its accepted
+  direct path crosses SDL/GBM and survives the 120-second bound, while both shared
+  Wayland clock profiles still stop before window creation. GTA III broader
+  physical play and Stardew shared-window diagnosis/save/load remain open. The
   separate SA Android-loader/direct-evdev findings do not establish a working port.
 - **U1:** shared controls, headers, icons, font/spacing/motion rules and frame
   diagnostics are implemented; R35 displayed actual battery/charge/Wi-Fi status,

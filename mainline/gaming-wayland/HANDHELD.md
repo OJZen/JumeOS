@@ -262,8 +262,11 @@ R77 is the current no-Moonlight deployment candidate at
 with manifest SHA-256
 `2e17f989a96b78c5b7ee3360bee2f7cafd7e4c9f41a60258c2d33edfcc443357`.
 The full ARM64 shell, Wayland, session, PortMaster and remote checks passed; its
-receipt pins the accepted R74 re3/reVC hashes. This is host evidence only and
-awaits exact target readback, preflight and physical acceptance.
+receipt pins the accepted R74 re3/reVC hashes. Its packaged Mono shim SHA-256
+`28164fe9af77f8b02e6f7caef18e48c5de146ac5351fb28a1d63fb60f140354e`
+also matches the R45 direct-display target pass, so another compatibility layer
+is not justified before diagnosing the shared-Wayland stall. R77 is host evidence
+only and awaits exact target readback, preflight and physical acceptance.
 
 R51 reuses the existing composed game layer, resident performance panel,
 frame-submission telemetry, capture authorization and routed remote gamepad for

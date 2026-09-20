@@ -71,8 +71,11 @@ skipped, so content equality remains unverified. See
   exited -11 before the frontend. No SGSR product code was retained.
   [Ports](../mainline/gaming-ports/README.md) owns exact pacing and thermal data.
 - Stardew's source, managed copy and backup hashes match and overwrite is refused.
-  Its 120-second runs still remain before SDL/Wayland at both tested clock profiles;
-  shared-window save selection/load and all attended gameplay evidence stay open.
+  R45's direct-display run crossed the SDL/GBM crash and stayed active for its
+  full 120-second bound. Later shared-Wayland runs at two clock profiles stayed
+  before window creation with no game submissions. R77 retains the exact accepted
+  Mono/Mesa isolation shim; shared-window diagnosis, save/load and physical
+  picture/audio/control evidence remain open.
 - ES-DE's transient 33 ms idle pacing roughly halved settled CPU use and reduced
   temperature while retaining immediate input. The original executable remains
   installed; persistent promotion and physical patched LCD motion are open.
@@ -102,8 +105,10 @@ runbooks.
 
 1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
    identity, new-password activation, unrelated-action denial and reboot persistence.
-2. Deploy Jume Launcher `0.1.0-dev`, make it the persistent default only after its
-   cold-boot, settings, game-return and recovery gates pass; retain ES-DE rollback.
+2. Deploy R77 Jume Launcher `0.1.0-dev`; in the same guarded session confirm the
+   retained R45 Stardew direct path and capture the shared-Wayland stall state.
+   Make Launcher persistent only after cold-boot, settings, game-return and
+   recovery gates pass; retain ES-DE rollback.
 3. Continue R74 broader gameplay/save proof and profile the below-30-FPS
    open-world phase only when a new software hypothesis exists. Keep R63/R60
    available; do not repeat SGSR1 or a live GPU minimum-frequency raise unchanged.

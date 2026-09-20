@@ -1,6 +1,6 @@
 # Independent tool applications
 
-Status 2026-09-13: **R45 STARDEW TARGET AUTOMATION PASS / R46 ATTENDED PORTS HOST PACKAGE PASS / TARGET OPEN**.
+Status 2026-09-20: **R45 STARDEW DIRECT TARGET PASS / R77 SHARED HOST PACKAGE PASS / TARGET OPEN**.
 The normal home/library has separate Neo, PortMaster and USB entries. Each uses
 [shared UI defaults](controls/README.md), its own route and the existing controller,
 modal, keyboard and remote-control paths. No persistent launcher was replaced.
@@ -10,7 +10,7 @@ modal, keyboard and remote-control paths. No persistent launcher was replaced.
 | Application | Available host work | Device gate |
 | --- | --- | --- |
 | Neo | Fixed Metal Slug resource/hash check, display options, private saves/backup, direct/shared adapters | R35 slot 0 save survived reboot and loaded; physical controls and longer gameplay remain open |
-| PortMaster | Original-game resources/saves plus catalog, search, install/update/rollback/uninstall and verified dependency runtimes | R42 source GTA frontends pass target automation; Stardew and attended gameplay/saves remain open |
+| PortMaster | Original-game resources/saves plus catalog, search, install/update/rollback/uninstall and verified dependency runtimes | R74 GTA and R45 direct Stardew automation pass; shared Stardew plus attended gameplay/saves remain open |
 | USB gamepad | AB/XY swap, right-Y inversion, 0–30% deadzone chooser, private config/descriptor export | External peripheral routing/UDC must be proven; the output switch stays disabled |
 
 `--scene neo|ports|usb` opens a tool directly. `--content-root /absolute/path`
