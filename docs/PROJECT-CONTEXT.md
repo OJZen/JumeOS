@@ -20,8 +20,9 @@ archive and 1,741-file manifest readback, v0.18 preflight, transient Launcher,
 game lifecycle and forced-child recovery without replacing ES-DE. R74 is the
 accepted and source-build-default GTA
 candidate after attended picture/audio/control approval; R63 and R60 remain
-rollbacks. Latest experiment evidence is under
-`mainline/out/.cache/r46h-v018-device-20260920.FoS3wK/`.
+rollbacks. Latest base-image evidence is under
+`mainline/out/.cache/r46h-v018-device-20260920.FoS3wK/`; launcher evidence is
+under `mainline/out/.cache/r46h-two-level-device-20260920/`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current card p2: [v0.18](../mainline/rootfs-debian13-gaming-v18/README.md)
@@ -45,6 +46,9 @@ skipped, so content equality remains unverified. See
   About captures show the aligned status row, live battery/charge state,
   `0.1.0-dev` and the project URL on v0.18. Repeated normal expiry and a forced
   input-router failure restored all services and removed transient leases.
+  The 2026-09-20 two-level candidate passed 39 target actions: focus motion left
+  Settings, Neo and PortMaster details unloaded; open/return and in-flight
+  PortMaster cancellation passed. ES-DE and all services recovered cleanly.
   Physical LCD/readability, L3+R3 and persistent promotion remain open.
 - Repaired GTA III/Vice City accept the Switch-layout controls and no longer
   reproduce the bounded-exit crash. GTA-only `noafbc`, first-config 640x480 and

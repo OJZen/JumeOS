@@ -60,12 +60,15 @@ Moonlight and PSP remain open.
   still required after a new image write.
 - **Remote input — V0.16/V0.17 10 MS DEVICE PASS.** Self-test and exact
   screenshot-verified right/left single-step roundtrip passed; v0.15 uses 100 ms.
-- **[Jume Launcher](../../gaming-shell/DEVICE.md) — R79 DEVICE/RECOVERY PASS / PHYSICAL + PROMOTION OPEN.**
+- **[Jume Launcher](../../gaming-shell/DEVICE.md) — R79 + TWO-LEVEL DEVICE/RECOVERY PASS /
+  PHYSICAL + PROMOTION OPEN.**
   R79 passed exact archive/1,741-file target readback and preflight. Composed Home
   and About captures show the aligned Wi-Fi/battery/clock row, live charge state,
   version and project URL. Normal expiry and forced input-router failure restored
-  ES-DE and all transient leases. Physical LCD/readability, L3+R3 and persistent
-  replacement remain open.
+  ES-DE and all transient leases. The 2026-09-20 candidate passed 39 target actions:
+  Settings, Neo and PortMaster focus left details unloaded; async open/return and
+  PortMaster in-flight cancellation passed. Services restored with zero failed
+  units/ext4 errors. Physical LCD/readability, L3+R3 and promotion remain open.
 - **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
   Dynamic `schedutil` and both GTA engines passed; reset recovered a live GPU-min panic. Do not repeat it.
 - **Wayland/ports — R74 SHORT ATTENDED + R79 TRANSIENT MACHINE PASS / BROADER PLAY OPEN.**

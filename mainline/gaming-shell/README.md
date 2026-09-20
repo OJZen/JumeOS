@@ -3,7 +3,7 @@
 Version **0.1.0-dev**. The internal executable and control-protocol identifier
 remain `r46h-shell` for compatibility.
 
-**R36 STATUS/NEO PERSISTENCE/PORTMASTER CATALOG DEVICE PASS / R17 FALLBACK.** This is a desktop prototype,
+**2026-09-20 TWO-LEVEL DEVICE PASS / ES-DE FALLBACK.** This is a desktop prototype,
 not the installed frontend. Its [shared R35/R36 path](../gaming-wayland/HANDHELD.md#r35r36-device-follow-up-2026-09-12)
 has composed-frame/remote-control proof; ordinary EGLFS previews have only a local panel. The [design and next gates](../../docs/DEVICE-SHELL.md)
 own the product direction. ES-DE and shared input mappings remain the fallback. Device writes require
@@ -205,6 +205,12 @@ editing/left-return, contextual actions, 120% font layout and HUD avoidance of
 active controls, actual switch clicks/state bindings, and interrupted page changes.
 The current two-level navigation regression additionally covers unloaded detail
 pages during rapid list movement and cancellation while asynchronous creation is in flight.
+The same ARM64 package then passed 39 application actions on exact v0.18 with
+binary SHA-256 `07758b8eda1a92fe59d58d9c4abad62c2b4c8114a26c378408c6ed01b7279fa4`.
+Captured list/detail states cover Settings, Neo and PortMaster; the transient
+session ended at status 0, restored ES-DE and left zero failed units/ext4 errors.
+Evidence is under `mainline/out/.cache/r46h-two-level-device-20260920/evidence/`.
+This is Qt/DRM machine evidence, not physical controls or LCD acceptance.
 `test-shell-control.py` separately drives a real shell process, verifies before/
 after PNGs, privacy refusals, stale-target rejection, socket cleanup and repeated
 navigation. The Linux builder runs it against the relocated package and checks
