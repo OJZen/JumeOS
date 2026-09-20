@@ -320,10 +320,10 @@ unprivileged session checks cover the explicit state location surviving composit
 failure. Fake-mount checks cover both unit families and release refusal; actual
 mounting, persistent gameplay saves and power-cycle retention remain unverified.
 
-Use the accepted [R36 shared candidate](../gaming-wayland/HANDHELD.md#resume-and-rebuild)
-for its proved status/Neo/catalog behavior.
-It retains private Python for the v0.17 base and binds HarbourMaster's HOME to
-private state. Direct refresh and the 1,396-entry Qt catalog passed on R46H;
+Use the current [R78 shared candidate](../gaming-wayland/HANDHELD.md#resume-and-rebuild).
+It retains private Python for the v0.17 base, binds HarbourMaster's HOME to
+private state and pins the accepted native-game runtimes. R36's direct refresh
+and 1,396-entry Qt catalog passed on R46H;
 package mutation, gameplay and save/load remain open. R39 is a retained diagnostic,
 not a promoted shared candidate: GTA III's guarded runtime path ran on-device but
 failed at the target GL loader before gameplay. The C++

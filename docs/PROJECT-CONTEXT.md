@@ -106,8 +106,9 @@ runbooks.
 1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
    identity, new-password activation, unrelated-action denial and reboot persistence.
 2. Run the [combined acceptance route](../mainline/gaming-shell/DEVICE.md#combined-acceptance-route):
-   R78 launcher/status/About/input ownership, Metal Slug state, R74 GTA save and
-   broader-play lifecycle, then R45 direct and R78 shared Stardew paths.
+   R78 launcher/status/About/input ownership, PortMaster package lifecycle, Metal
+   Slug state, R74 GTA save and broader-play lifecycle, then R45 direct and R78
+   shared Stardew paths.
 3. Finish the same batch with Wi-Fi/reboot persistence, repeated launcher
    start/stop, forced-child recovery, bounded cache/log growth and ES-DE fallback.
    Make Launcher persistent only after these gates pass.

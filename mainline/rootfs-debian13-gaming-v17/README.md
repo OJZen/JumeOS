@@ -171,4 +171,4 @@ before cold power-on, then:
 Keep operator LCD motion, audible output, physical controls and save/reboot
 observations in one attended batch. Machine captures and running PCM leave
 those claims open. Current priorities remain in
-[Project Context](../../docs/PROJECT-CONTEXT.md#immediate-next-gate).
+[Project Context](../../docs/PROJECT-CONTEXT.md#immediate-next-work).

@@ -89,13 +89,13 @@ implicitly enabled. Never replay the historical p2-v0.7 installer on v0.17.
 
 ## Current shared candidate
 
-Use [R36](../gaming-wayland/HANDHELD.md#resume-and-rebuild) for the next shared
-session. It retains the status area, guarded cleanup and Neo lifecycle, fixes the
-PortMaster backend's inherited home, and passed persistent Neo reboot-load plus
-the 1,396-entry target catalog. The
+Use [R78](../gaming-wayland/HANDHELD.md#resume-and-rebuild) for the next shared
+session. It retains the status area, guarded cleanup, Neo lifecycle and the
+PortMaster inherited-home fix, while pinning the accepted R74 GTA engines and R45
+Mono shim. The
 [R35/R36 device record](../gaming-wayland/HANDHELD.md#r35r36-device-follow-up-2026-09-12)
-owns exact evidence and thermal limits. Physical controls, catalog mutations and
-native-port acceptance remain open; the
+owns the persistent Neo reboot-load, 1,396-entry target catalog and thermal limits.
+Physical controls, catalog mutations and native-port acceptance remain open; the
 [R36-R39 GTA record](../gaming-wayland/HANDHELD.md#r36-r39-gta-iii-device-follow-up-2026-09-12)
 owns the failed target launch. Use the
 maintained wait after every launch and do not replay discarded session keys.
@@ -188,7 +188,7 @@ frozen source, ARM64 shell, combined Moonlight v4 package, checks and screenshot
 They remain a tools-only comparison point. No TF rewrite, permanent installation
 or service registration occurred.
 
-The [current context](../../docs/PROJECT-CONTEXT.md#immediate-next-gate) owns
+The [current context](../../docs/PROJECT-CONTEXT.md#immediate-next-work) owns
 the next device batch and selected streaming host. Port runtime and USB connector
 checks remain separate; disabled USB output is expected until hardware routing
 is established. Keep R17/v3 fallbacks and end bounded device runs with normal poweroff.

@@ -221,8 +221,9 @@ real host editors and pairing PINs always remain private.
 For repeatable navigation/100%/120% screenshots, create an external output
 directory and set `R46H_UI_CAPTURE_DIR` when running `run.sh --check`.
 
-The [current shared candidate](TOOLS.md#current-shared-candidate) links to R36's
-frozen source/packages/checks. Older `.cache/r46h-shell/receipt.json` and
+The [current shared candidate](TOOLS.md#current-shared-candidate) links to R78's
+frozen source, package and checks. R36 remains the accepted device proof for
+status, Neo persistence and the catalog. Older `.cache/r46h-shell/receipt.json` and
 closure logs describe their named historical revisions; they do not describe a
 new build automatically. The device preflight still checks dynamic-library closure
 before starting a candidate. The old Qt bundle's baseline
