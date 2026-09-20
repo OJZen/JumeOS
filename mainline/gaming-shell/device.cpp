@@ -34,7 +34,9 @@ bool identity(const QString &root) {
        || read(root,"sys/class/block/mmcblk0/size")!="122138624")return false;
     QProcess process;process.start("/usr/bin/findmnt",{"-rn","-o","UUID","/"});
     if(!process.waitForFinished(500)){process.kill();process.waitForFinished();return false;}
-    return process.exitCode()==0 && process.readAllStandardOutput().trimmed()=="d3130017-46a4-4d56-9001-000000000017";
+    const auto uuid=process.readAllStandardOutput().trimmed();
+    return process.exitCode()==0 && (uuid=="d3130017-46a4-4d56-9001-000000000017"
+                                    || uuid=="d3130018-46a4-4d56-9001-000000000018");
 #else
     Q_UNUSED(root);return false;
 #endif

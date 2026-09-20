@@ -21,7 +21,9 @@ full target checksum/readback was skipped, so equality remains unverified; see
 [P3 Content Migration](../../../docs/P3-CONTENT-MIGRATION.md).
 
 Fallbacks are p2 v0.7 attended and v0.15 automated; v0.17 passed readbacks/cold/warm infra.
-Exact p2 v0.18 passes fixed-profile write/full readback but has not booted; LCD, USB, Moonlight and PSP remain open.
+Exact p2 v0.18 passes fixed-profile write/full readback, cold identity, policy
+scope and full base smoke; new Wi-Fi activation/reboot persistence, LCD, USB,
+Moonlight and PSP remain open.
 
 ## Capability ledger
 
@@ -76,8 +78,11 @@ Exact p2 v0.18 passes fixed-profile write/full readback but has not booted; LCD,
   still required after a new image write.
 - **Remote input — V0.16/V0.17 10 MS DEVICE PASS.** Self-test and exact
   screenshot-verified right/left single-step roundtrip passed; v0.15 uses 100 ms.
-- **[Jume Launcher](../../gaming-shell/DEVICE.md) — R17 CONTROLS + R56 GEOMETRY + R64 GPU CLOCK PASS.**
-  R64 composed `GPU 200 MHz` matching target state; physical LCD remains open.
+- **[Jume Launcher](../../gaming-shell/DEVICE.md) — R17 CONTROLS + R56 GEOMETRY + R64 GPU CLOCK PASS / R78 V0.18 PREFLIGHT FAIL.**
+  R64 composed `GPU 200 MHz` matching target state. R78 passed exact archive and
+  1,741-file target readback on v0.18, then its frozen v0.17-only UUID guard
+  rejected before launch. The dual-v0.17/v0.18 source fix passes focused and
+  ARM64 checks; successor packaging and physical LCD remain open.
 - **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
   Dynamic `schedutil` and both GTA engines passed; reset recovered a live GPU-min panic. Do not repeat it.
 - **Wayland/ports — R74 SHORT ATTENDED PASS / BROADER PLAY OPEN.**
@@ -111,11 +116,12 @@ Exact p2 v0.18 passes fixed-profile write/full readback but has not booted; LCD,
 - **Wi-Fi / streaming — V0.17 PICTURE/AUDIO + 60 FPS SAMPLE PASS / SSH UNPAIRED.**
   Patched Sunshine removed alternating frame gaps; L1 + R1 exits, with transient black before ES-DE recovery.
   [Streaming](../../../docs/GAME-STREAMING.md): low-delay A/V pass; Qt ~60 FPS Hantro sample; product/gamepad open.
-- **Local Wi-Fi control — TEMPORARY POLICY DEVICE + V0.18 HOST + P2 MEDIA PASS / DEVICE OPEN.**
+- **Local Wi-Fi control — TEMPORARY POLICY DEVICE + V0.18 HOST + P2 MEDIA + COLD BASE PASS / PERSISTENCE OPEN.**
   The ark-only three-action rule passed scan, profile create/delete and saved
   reconnect; unrelated permissions stayed denied. Exact packages/rule pass
-  reproducible host validation and fixed-profile p2 write/full readback. Cold
-  identity, new-password activation and reboot persistence remain open.
+  reproducible host validation, fixed-profile p2 write/full readback, cold
+  identity, exact target hashes and intended/denied permission checks. New-profile
+  activation and reboot persistence remain open.
 - **Bluetooth — HARDWARE BLOCKED.** Boot reports `BT=0`; rfkill/sysfs/USB expose
   no controller and BlueZ is absent. Require controller/firmware before pairing.
 - **Zram — ONE-SHOT KERNEL + APPLY/DISABLE DEVICE PASS / PROMOTION OPEN.** The

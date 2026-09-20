@@ -12,11 +12,12 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **powered off** after ES-DE, services and default
-600--1008/200--480 MHz policies were restored following the 2026-09-19 Vice City
-SGSR1 experiment. Health checks and `sync` passed, and temporary target
-access/staging was removed. Its TF card now contains exact p2 v0.18 after a
-fixed-profile write, full readback and eject, but the device has not booted it.
+The device is **powered on** with exact p2 v0.18. Fixed-profile write/readback,
+cold identity, service health, exact policy/package hashes, permission scope and
+the full base smoke pass. A reset after an unconfirmed serial staging attempt
+also recovered cleanly with zero ext4/kernel faults. R78 then passed target
+archive and 1,741-file manifest readback but correctly failed before launch
+because its frozen guard accepted only the v0.17 root UUID. No R78 session ran.
 R74 is the accepted and source-build-default GTA
 candidate after attended picture/audio/control approval; R63 and R60 remain
 rollbacks. Latest experiment evidence is under
@@ -24,7 +25,7 @@ rollbacks. Latest experiment evidence is under
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current card p2: [v0.18](../mainline/rootfs-debian13-gaming-v18/README.md)
-  (media pass; device open). Last physical baseline: v0.17.
+  (cold base pass; network persistence and product acceptance open).
 - Kernel/modules: `6.12.99-r46h-mainline-v0.15-gaming-product`, selected by the
   v0.17 BOOT/power-settle DTB.
 - Accepted fallbacks: attended p2 v0.7, automated p2 v0.15, and the p2 v0.5
@@ -42,7 +43,9 @@ skipped, so content equality remains unverified. See
   PortMaster and routed remote control. R56 aligns Wi-Fi, battery and clock; R64
   captured the HUD's `GPU 200 MHz` matching target state. Physical LCD remains open.
   The `0.1.0-dev` name/version/About page passes host Qt tests. The R78 full
-  handheld package pins R74 and passes host checks; target deployment remains open.
+  handheld package pins R74 and passed target readback, but its v0.17-only guard
+  rejected v0.18 before runtime. Current source accepts exact v0.17/v0.18
+  identities and passes focused plus ARM64 checks; a clean successor package is next.
 - Repaired GTA III/Vice City accept the Switch-layout controls and no longer
   reproduce the bounded-exit crash. GTA-only `noafbc`, first-config 640x480 and
   private Mesa 26.2.2 passed target integration. The R60 batch reached captured
@@ -84,8 +87,9 @@ skipped, so content equality remains unverified. See
   installed; persistent promotion and physical patched LCD motion are open.
 - A temporary ark-only three-action polkit rule passed scan, profile create/delete
   and saved-profile reconnect. The exact six-package/rule successor is now the
-  byte-reproducible, independently validated v0.18 host artifact. Media deployment,
-  new-password activation and reboot persistence remain. Bluetooth is blocked by
+  byte-reproducible, independently validated v0.18 artifact. Media/cold base and
+  exact policy permission checks pass; new-profile activation and reboot
+  persistence remain. Bluetooth is blocked by
   absent controller/firmware and BlueZ.
 - The isolated v0.18 zram kernel passed one-shot boot and 256 MiB LZ4 apply,
   pressure, disable and unload. Normal v0.15/media were restored; promotion waits
@@ -106,13 +110,13 @@ runbooks.
 
 ## Immediate next work
 
-1. Reinstall the ejected TF card and cold-boot exact p2 v0.18, then verify identity,
-   new-password activation, unrelated-action denial and reboot persistence.
-2. Run the [combined acceptance route](../mainline/gaming-shell/DEVICE.md#combined-acceptance-route):
-   R78 launcher/status/About/input ownership, PortMaster package lifecycle, Metal
+1. Commit the v0.17/v0.18 identity compatibility fix, rebuild the clean
+   no-Moonlight handheld package, then repeat target manifest/preflight on v0.18.
+2. Continue the [combined acceptance route](../mainline/gaming-shell/DEVICE.md#combined-acceptance-route):
+   launcher/status/About/input ownership, PortMaster package lifecycle, Metal
    Slug state, R74 GTA save and broader-play lifecycle, then R45 direct and R78
    shared Stardew paths.
-3. Finish the same batch with Wi-Fi/reboot persistence, repeated launcher
+3. Finish the same batch with new Wi-Fi/reboot persistence, repeated launcher
    start/stop, forced-child recovery, bounded cache/log growth and ES-DE fallback.
    Make Launcher persistent only after these gates pass.
 4. Profile R74's below-30-FPS open-world phase only when a new software hypothesis

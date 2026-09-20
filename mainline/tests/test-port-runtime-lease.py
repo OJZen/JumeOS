@@ -32,7 +32,7 @@ stat() {
 sha256sum() { shasum -a 256 "$@"; }
 findmnt() {
  case "$*" in
-  *'UUID /') echo d3130017-46a4-4d56-9001-000000000017;;
+  *'UUID /') echo "${ROOT_UUID:-d3130017-46a4-4d56-9001-000000000017}";;
   *'OPTIONS /roms') echo ro;;
   *'-o ID') [[ ${MOUNT_ID_ERROR:-0} != 1 ]] || return 1; cat "$FIXTURE/mounted";;
   *'-o OPTIONS') echo ro,nodev,nosuid;;
@@ -62,6 +62,9 @@ umount() {
     assert run('--release').returncode != 0 and record.exists()
     (root / 'mounted').write_text('51')
     assert run('--release').returncode == 0 and not record.exists() and not (scope / 'mono').exists()
+    v18 = 'd3130018-46a4-4d56-9001-000000000018'
+    assert run('--acquire', ROOT_UUID=v18).returncode == 0
+    assert run('--release', ROOT_UUID=v18).returncode == 0
     for failure in ({'MOUNT_ERROR': '1'}, {'MOUNT_ID_ERROR': '1'}):
         assert run('--acquire', **failure).returncode != 0
         assert not record.exists() and not (scope / 'mono').exists() and not (root / 'mounted').exists()

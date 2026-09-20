@@ -11,7 +11,12 @@ profile=${3:-windows}
 [[ $profile == windows || $profile == handheld ]] || exit 2
 scope=/run/r46h-wayland-probe
 [[ $EUID == 0 && $(uname -r) == 6.12.99-r46h-mainline-v0.15-gaming-product ]]
-[[ $(findmnt -rn -o UUID /) == d3130017-46a4-4d56-9001-000000000017 ]]
+root_uuid=$(findmnt -rn -o UUID /)
+case $root_uuid in
+d3130017-46a4-4d56-9001-000000000017) rootfs=v0.17 ;;
+d3130018-46a4-4d56-9001-000000000018) rootfs=v0.18 ;;
+*) exit 1 ;;
+esac
 [[ $(cat /sys/class/block/mmcblk0/device/cid) == fe343253440000002000002d57019567 ]]
 [[ $(cat /sys/class/block/mmcblk0/size) == 122138624 ]]
 [[ $(findmnt -rn -o FSTYPE /run) == tmpfs && ,$(findmnt -rn -o OPTIONS /roms), == *,ro,* ]]
@@ -91,7 +96,7 @@ if [[ -f $scope/usr/share/r46h/ports/manager.py ]]; then
   /usr/bin/setpriv --reuid=ark --regid=ark --init-groups -- /usr/bin/env -u LD_LIBRARY_PATH -u PYTHONHOME -u PYTHONPATH \
     "$scope/usr/bin/python3.13" -I -B -c 'import bz2, ctypes, lzma, sqlite3, ssl, urllib.request, zipfile'
 fi
-printf 'WAYLAND_PREFLIGHT PASS kernel=v0.15 rootfs=v0.17 device_runtime=UNTESTED\n'
+printf 'WAYLAND_PREFLIGHT PASS kernel=v0.15 rootfs=%s device_runtime=UNTESTED\n' "$rootfs"
 [[ $mode != --check ]] || exit 0
 exec 9> "$scope/probe.lock"
 flock -n 9

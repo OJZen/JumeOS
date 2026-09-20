@@ -16,7 +16,12 @@ device_mode=0
 [[ $mode != --device && $mode != --remote-device ]] || device_mode=1
 scope=/run/r46h-shell-probe
 [[ $EUID == 0 && $(uname -r) == 6.12.99-r46h-mainline-v0.15-gaming-product ]]
-[[ $(findmnt -rn -o UUID /) == d3130017-46a4-4d56-9001-000000000017 ]]
+root_uuid=$(findmnt -rn -o UUID /)
+case $root_uuid in
+d3130017-46a4-4d56-9001-000000000017) rootfs=v0.17 ;;
+d3130018-46a4-4d56-9001-000000000018) rootfs=v0.18 ;;
+*) exit 1 ;;
+esac
 [[ $(cat /sys/class/block/mmcblk0/device/cid) == fe343253440000002000002d57019567 ]]
 [[ $(cat /sys/class/block/mmcblk0/size) == 122138624 ]]
 [[ ,$(findmnt -rn -o OPTIONS /roms), == *,ro,* ]]
@@ -85,7 +90,7 @@ if [[ $mode == --ports || $mode == --attended-ports || $mode == --remote-ports ]
   chmod 755 "$scope"
   install -d -o ark -g ark -m 700 "$scope/state"
 fi
-printf 'SHELL_PREFLIGHT PASS kernel=v0.15 rootfs=v0.17 scope=tmpfs binary=%s\n' "$expected"
+printf 'SHELL_PREFLIGHT PASS kernel=v0.15 rootfs=%s scope=tmpfs binary=%s\n' "$rootfs" "$expected"
 [[ $mode != --check ]] || exit 0
 unit=r46h-shell-probe-$$.service
 args=(--fullscreen --quit-after 290)

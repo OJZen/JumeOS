@@ -7,7 +7,9 @@ readonly lease=/run/r46h-device-lease
 readonly cpu=/sys/devices/system/cpu/cpufreq/policy0
 readonly light=/sys/class/backlight/backlight/brightness
 readonly -a nodes=("$light" "$cpu/scaling_min_freq" "$cpu/scaling_max_freq" "$cpu/scaling_governor")
-[[ $(uname -r) == 6.12.99-r46h-mainline-v0.15-gaming-product && $(findmnt -rn -o UUID /) == d3130017-46a4-4d56-9001-000000000017 ]]
+root_uuid=$(findmnt -rn -o UUID /)
+[[ $(uname -r) == 6.12.99-r46h-mainline-v0.15-gaming-product
+   && ( $root_uuid == d3130017-46a4-4d56-9001-000000000017 || $root_uuid == d3130018-46a4-4d56-9001-000000000018 ) ]]
 [[ $(cat /sys/class/block/mmcblk0/device/cid) == fe343253440000002000002d57019567 && $(cat /sys/class/block/mmcblk0/size) == 122138624 ]]
 
 restore() {

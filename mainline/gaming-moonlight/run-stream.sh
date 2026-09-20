@@ -14,7 +14,8 @@ server=$1
 scope=/run/r46h-moonlight-test
 if [[ $client == qt ]]; then scope=/run/r46h-moonlight-qt-test; fi
 [[ $EUID == 0 ]]
-[[ $(findmnt -rn -o UUID /) == d3130017-46a4-4d56-9001-000000000017 ]]
+root_uuid=$(findmnt -rn -o UUID /)
+[[ $root_uuid == d3130017-46a4-4d56-9001-000000000017 || $root_uuid == d3130018-46a4-4d56-9001-000000000018 ]]
 [[ $(uname -r) == 6.12.99-r46h-mainline-v0.15-gaming-product ]]
 [[ $(cat /sys/class/block/mmcblk0/device/cid) == fe343253440000002000002d57019567 ]]
 [[ $(stat -c %U:%a "$scope") == ark:700 ]]

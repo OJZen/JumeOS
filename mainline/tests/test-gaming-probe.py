@@ -64,6 +64,17 @@ for path in ("mainline/gaming-shell/probe-r46h.sh", "mainline/gaming-moonlight/r
     assert "trap 'exit 129' HUP" in source
 
 source = (repo / "mainline/gaming-shell/probe-r46h.sh").read_text()
+identity = source[source.index("root_uuid="):source.index("[[ $(cat /sys/class/block/mmcblk0/device/cid)")]
+for uuid, version in (("d3130017-46a4-4d56-9001-000000000017", "v0.17"),
+                      ("d3130018-46a4-4d56-9001-000000000018", "v0.18")):
+    result = bash('findmnt() { echo "$ROOT_UUID"; }\n' + identity + '\nprintf "%s\\n" "$rootfs"', ROOT_UUID=uuid)
+    assert result.returncode == 0 and result.stdout.strip() == version, result
+assert bash('findmnt() { echo unknown; }\n' + identity).returncode != 0
+for path in ("mainline/gaming-shell/device.cpp", "mainline/gaming-shell/device-lease.sh",
+             "mainline/gaming-shell/memory-control.sh", "mainline/gaming-moonlight/run-stream.sh"):
+    compatible = (repo / path).read_text()
+    assert "d3130017-46a4-4d56-9001-000000000017" in compatible
+    assert "d3130018-46a4-4d56-9001-000000000018" in compatible
 guard = source[source.index("if [[ $closure"):source.index("printf 'SHELL_PREFLIGHT")]
 for closure, expected in (("libQt6Quick.so.6 => /bundle/libQt6Quick.so.6", 0), ("libQt6Quick.so.6 => not found", 1)):
     assert bash(guard, closure=closure, mode="--check").returncode == expected

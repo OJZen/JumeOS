@@ -22,7 +22,8 @@ if [[ $1 == --release ]]; then
   exit 0
 fi
 [[ $(uname -r) == 6.12.99-r46h-mainline-v0.15-gaming-product ]] || exit 1
-[[ $(findmnt -rn -o UUID /) == d3130017-46a4-4d56-9001-000000000017 ]] || exit 1
+root_uuid=$(findmnt -rn -o UUID /)
+[[ $root_uuid == d3130017-46a4-4d56-9001-000000000017 || $root_uuid == d3130018-46a4-4d56-9001-000000000018 ]] || exit 1
 [[ $(cat /sys/class/block/mmcblk0/device/cid) == fe343253440000002000002d57019567 ]] || exit 1
 [[ $(cat /sys/class/block/mmcblk0/size) == 122138624 && ,$(findmnt -rn -o OPTIONS /roms), == *,ro,* ]] || exit 1
 [[ -d $scope && ! -L $scope && $(stat -c '%u:%a' "$scope") == 0:755 ]] || exit 1

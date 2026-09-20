@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-20: **R74 VICE CITY SHORT ATTENDED PASS / R78 HOST PACKAGE PASS / DEVICE OPEN**.
+Status 2026-09-20: **R74 VICE CITY SHORT ATTENDED PASS / R78 V0.18 PREFLIGHT FAIL / SUCCESSOR SOURCE CHECK PASS**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -268,7 +268,12 @@ Mono shim SHA-256
 `28164fe9af77f8b02e6f7caef18e48c5de146ac5351fb28a1d63fb60f140354e`
 also matches the R45 direct-display target pass, so another compatibility layer
 is not justified before diagnosing the shared-Wayland stall. R78 is host evidence
-only and awaits exact target readback, preflight and physical acceptance.
+plus exact v0.18 target archive/1,741-file manifest evidence. Its frozen
+v0.17-only UUID guard rejected the new root before runtime, so no R78 UI session
+started. The current source accepts only the exact v0.17 fallback or v0.18 root,
+reports the observed version, and passes the focused shell/lease tests and ARM64
+build. Rebuild a clean successor before continuing physical acceptance. Evidence
+is under `mainline/out/.cache/r46h-v018-device-20260920.FoS3wK/`.
 
 R51 reuses the existing composed game layer, resident performance panel,
 frame-submission telemetry, capture authorization and routed remote gamepad for

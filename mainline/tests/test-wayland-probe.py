@@ -20,6 +20,14 @@ def bash(code, **env):
                           env={**os.environ, **env}, text=True, capture_output=True, timeout=5)
 
 
+identity = source[source.index('root_uuid='):source.index('[[ $(cat /sys/class/block/mmcblk0/device/cid)')]
+for uuid, version in [('d3130017-46a4-4d56-9001-000000000017', 'v0.17'),
+                      ('d3130018-46a4-4d56-9001-000000000018', 'v0.18')]:
+    result = bash('findmnt() { echo "$ROOT_UUID"; }\n' + identity + '\nprintf "%s\\n" "$rootfs"', ROOT_UUID=uuid)
+    assert result.returncode == 0 and result.stdout.strip() == version, result
+assert bash('findmnt() { echo unknown; }\n' + identity).returncode != 0
+
+
 with tempfile.TemporaryDirectory(prefix='handheld-client-', dir=repo / 'mainline/out/.cache') as directory:
     root = Path(directory); output = root / 'output'; output.mkdir()
     (root / 'handheld-client.sh').write_text(handheld); (root / 'handheld-client.sh').chmod(0o755)

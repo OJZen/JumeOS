@@ -7,7 +7,8 @@ readonly swapfile=$state/swapfile
 readonly zram=/dev/zram0
 die() { echo "MEMORY_ERROR $*" >&2;exit 1; }
 [[ $# -ge 1 ]] || die 'Use --check | --disk MiB | --disk-off | --zram MiB lz4|zstd | --zram-off'
-[[ $(findmnt -rn -o UUID /) == d3130017-46a4-4d56-9001-000000000017 ]] || die identity
+root_uuid=$(findmnt -rn -o UUID /)
+[[ $root_uuid == d3130017-46a4-4d56-9001-000000000017 || $root_uuid == d3130018-46a4-4d56-9001-000000000018 ]] || die identity
 [[ $(cat /sys/class/block/mmcblk0/device/cid) == fe343253440000002000002d57019567 && $(cat /sys/class/block/mmcblk0/size) == 122138624 ]] || die identity
 kernel=$(uname -r)
 [[ $kernel == 6.12.99-r46h-mainline-v0.15-gaming-product || $kernel == 6.12.99-r46h-mainline-v0.18-zram-candidate ]] || die kernel
@@ -22,7 +23,7 @@ fi
 busy=0
 pgrep -u 1000 -f '(^|/)(retroarch|moonlight(-qt)?)([[:space:]]|$)' >/dev/null || busy=$?
 [[ $busy == 1 ]] || die game-active-or-process-check-failed
-[[ $(findmnt -rn -T /var/lib -o FSTYPE) == ext4 && $(findmnt -rn -T /var/lib -o UUID) == d3130017-46a4-4d56-9001-000000000017 ]] || die storage
+[[ $(findmnt -rn -T /var/lib -o FSTYPE) == ext4 && $(findmnt -rn -T /var/lib -o UUID) == "$root_uuid" ]] || die storage
 if [[ ! -e $state && ! -L $state ]]; then
     install -d -o root -g root -m 700 "$state"
     (umask 077;printf 'r46h-memory-v1\n' > "$state/owner")
