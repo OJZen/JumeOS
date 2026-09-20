@@ -55,7 +55,7 @@ def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 manifest = ''.join(f'{digest(f)}  {f.relative_to(root)}\n' for f in sorted(root.rglob('*'))
                    if f.is_file() and not f.is_symlink() and f != root / 'SHA256SUMS')
 (root / 'SHA256SUMS').write_text(manifest)
-record = {'revision': 60, 'status': 'MESA_26_RUNTIME_HOST_PASS_R46H_UNTESTED',
+record = {'mesa_runtime_revision': 60, 'status': 'HANDHELD_HOST_PASS_R46H_UNTESTED',
           'source_commit': sys.argv[2], 'base_runtime_sha256': digest(pathlib.Path('/wayland-runtime.tar.gz')),
           'mesa_runtime_sha256': digest(pathlib.Path('/mesa-runtime.tar.gz')),
           'manifest_sha256': digest(root / 'SHA256SUMS'),

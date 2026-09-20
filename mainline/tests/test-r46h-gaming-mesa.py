@@ -40,6 +40,7 @@ assert 'runtime.py" validate-runtime "$mesa"' in builder
 assert '--tmpfs /run:rw,nosuid,nodev,exec,size=192m,mode=755' in builder
 assert 'runtime.py install /mesa-runtime.tar.gz "$stage/usr"' in packager
 assert 'mktemp -d /out/r46h-handheld-package.' in packager
-assert "'revision': 60" in packager
+assert "'mesa_runtime_revision': 60" in packager
+assert "'status': 'HANDHELD_HOST_PASS_R46H_UNTESTED'" in packager
 
 print("R46H_GAMING_MESA_TEST_PASS")
