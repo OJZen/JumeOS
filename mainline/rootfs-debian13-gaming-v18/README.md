@@ -1,6 +1,6 @@
 # R46H Debian 13 gaming p2 v0.18
 
-Status: **HOST PASS / MEDIA + DEVICE OPEN**
+Status: **HOST + P2 MEDIA PASS / DEVICE OPEN**
 
 This is the exact v0.17 successor for local Wi-Fi control. It installs Debian
 13's exact `polkitd` dependency set and the target-tested ark-only three-action
@@ -39,6 +39,17 @@ Media write/readback and physical acceptance are separate. After a guarded p2
 write, verify cold identity, a newly changed ark password, scan/profile
 create-delete/reconnect, denial of unrelated polkit actions, warm-reboot
 persistence, product health, sync and controlled poweroff.
+
+The fixed-profile 2026-09-20 media transaction wrote only the 10,716,877,312-byte
+p2 on `/dev/disk16`. The pre-write SHA-256 was
+`194259d4df566662717815fca9575caa3cce55e13cbfd73ae987d855e4cda0eb`;
+the full readback matched the source at
+`461d47535870568c854b1edf7016629a6fa66a60da81915c14449ac8700c4cae`.
+The g92 prefix remained
+`3fe2feb9cc89ce5f01603199bfc8b715875708a9acc61bfc68b4821e1d8a5da3`,
+`safe_to_boot=yes`, and the whole disk was ejected. The receipt is under
+`mainline/out/r46h-card-agent-sessions/session-20260920T025026Z-85020-72aff066-d421-455d-aaaa-77e41d90b9b3/`.
+This proves the media bytes, not boot or device behavior.
 
 Only exact p2 v0.18 can use [`pair-remote-key.sh`](pair-remote-key.sh). Stage it
 and one approved ED25519 public key as root-owned mode-0600 files under

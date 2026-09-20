@@ -15,13 +15,16 @@ desktop, local gaming, streaming, and future USB HID support. The
 The device is **powered off** after ES-DE, services and default
 600--1008/200--480 MHz policies were restored following the 2026-09-19 Vice City
 SGSR1 experiment. Health checks and `sync` passed, and temporary target
-access/staging was removed. R74 is the accepted and source-build-default GTA
+access/staging was removed. Its TF card now contains exact p2 v0.18 after a
+fixed-profile write, full readback and eject, but the device has not booted it.
+R74 is the accepted and source-build-default GTA
 candidate after attended picture/audio/control approval; R63 and R60 remain
 rollbacks. Latest experiment evidence is under
 `mainline/out/.cache/r46h-sgsr-r76-device-20260919.Ryx78e/`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
-- Current p2: [v0.17](../mainline/rootfs-debian13-gaming-v17/README.md).
+- Current card p2: [v0.18](../mainline/rootfs-debian13-gaming-v18/README.md)
+  (media pass; device open). Last physical baseline: v0.17.
 - Kernel/modules: `6.12.99-r46h-mainline-v0.15-gaming-product`, selected by the
   v0.17 BOOT/power-settle DTB.
 - Accepted fallbacks: attended p2 v0.7, automated p2 v0.15, and the p2 v0.5
@@ -103,8 +106,8 @@ runbooks.
 
 ## Immediate next work
 
-1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
-   identity, new-password activation, unrelated-action denial and reboot persistence.
+1. Reinstall the ejected TF card and cold-boot exact p2 v0.18, then verify identity,
+   new-password activation, unrelated-action denial and reboot persistence.
 2. Run the [combined acceptance route](../mainline/gaming-shell/DEVICE.md#combined-acceptance-route):
    R78 launcher/status/About/input ownership, PortMaster package lifecycle, Metal
    Slug state, R74 GTA save and broader-play lifecycle, then R45 direct and R78

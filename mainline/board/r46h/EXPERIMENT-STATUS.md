@@ -20,8 +20,8 @@ The current card's EASYROMS p3 import passed write, eject and physical use; its
 full target checksum/readback was skipped, so equality remains unverified; see
 [P3 Content Migration](../../../docs/P3-CONTENT-MIGRATION.md).
 
-Fallbacks are p2 v0.7 attended and v0.15 automated; current v0.17 passed readbacks and
-cold/warm infra. LCD, USB, Moonlight and PSP remain open; v0.18 is still host-only.
+Fallbacks are p2 v0.7 attended and v0.15 automated; v0.17 passed readbacks/cold/warm infra.
+Exact p2 v0.18 passes fixed-profile write/full readback but has not booted; LCD, USB, Moonlight and PSP remain open.
 
 ## Capability ledger
 
@@ -111,11 +111,11 @@ cold/warm infra. LCD, USB, Moonlight and PSP remain open; v0.18 is still host-on
 - **Wi-Fi / streaming — V0.17 PICTURE/AUDIO + 60 FPS SAMPLE PASS / SSH UNPAIRED.**
   Patched Sunshine removed alternating frame gaps; L1 + R1 exits, with transient black before ES-DE recovery.
   [Streaming](../../../docs/GAME-STREAMING.md): low-delay A/V pass; Qt ~60 FPS Hantro sample; product/gamepad open.
-- **Local Wi-Fi control — TEMPORARY POLICY DEVICE + V0.18 HOST PASS / MEDIA + NEW PASSWORD OPEN.**
+- **Local Wi-Fi control — TEMPORARY POLICY DEVICE + V0.18 HOST + P2 MEDIA PASS / DEVICE OPEN.**
   The ark-only three-action rule passed scan, profile create/delete and saved
-  reconnect; unrelated permissions stayed denied. Exact packages/rule now pass
-  byte-reproducible host composition and independent validation. Fixed-profile
-  deployment, new-password activation and reboot persistence remain open.
+  reconnect; unrelated permissions stayed denied. Exact packages/rule pass
+  reproducible host validation and fixed-profile p2 write/full readback. Cold
+  identity, new-password activation and reboot persistence remain open.
 - **Bluetooth — HARDWARE BLOCKED.** Boot reports `BT=0`; rfkill/sysfs/USB expose
   no controller and BlueZ is absent. Require controller/firmware before pairing.
 - **Zram — ONE-SHOT KERNEL + APPLY/DISABLE DEVICE PASS / PROMOTION OPEN.** The
