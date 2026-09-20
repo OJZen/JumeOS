@@ -62,9 +62,12 @@ for the older SDK's obsolete link dependency on current macOS.
 | Change page | `[` / `]` | L1 / R1 individually |
 | Home | Home | Use panel's Home action |
 
-Entering Settings focuses the left category list, including entry by tabs,
-shoulder buttons or pointer. Right/A enters its items; Left returns to categories
-and saves pending values. For volume and brightness,
+Entering Settings shows only the category list, including entry by tabs,
+shoulder buttons or pointer. Right/A asynchronously opens the selected category
+as a second-level page; Left/B returns to the category list and unloads it after
+saving pending values. Moving through categories does not construct detail rows
+or refresh storage. Tool game lists follow the same rule; USB remains a deliberate
+single-level page. For volume and brightness,
 A/Enter starts adjustment, Up/Down increases/decreases, and A/Enter or B/Esc
 finishes; Left also saves and returns to categories. Save failure retains the
 editor and its pending value. Controller-test and text-entry modes keep their
@@ -200,6 +203,8 @@ the [network contract](DEVICE.md#wi-fi-management) for scope and target gates.
 Revision 7 adds left-first settings entry, interrupted focus movement, value
 editing/left-return, contextual actions, 120% font layout and HUD avoidance of
 active controls, actual switch clicks/state bindings, and interrupted page changes.
+The current two-level navigation regression additionally covers unloaded detail
+pages during rapid list movement and cancellation while asynchronous creation is in flight.
 `test-shell-control.py` separately drives a real shell process, verifies before/
 after PNGs, privacy refusals, stale-target rejection, socket cleanup and repeated
 navigation. The Linux builder runs it against the relocated package and checks

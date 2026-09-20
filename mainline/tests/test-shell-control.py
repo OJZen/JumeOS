@@ -110,6 +110,14 @@ def main():
                 else: control.checked_image(result)
                 trace.append({"request": sent, "result": result})
                 return latest["state"]
+            def wait_state(name, value=True):
+                nonlocal latest
+                deadline = time.monotonic() + 5
+                while True:
+                    latest = control.exchange(path, request())
+                    if latest["state"][name] == value: return latest["state"]
+                    assert time.monotonic() < deadline, f"timeout waiting for {name}={value}"
+                    time.sleep(.02)
             assert tap("right", True)["selected"] == 1
             assert latest["capture"]["sha256"] != initial
             prior = copy.deepcopy(latest)
@@ -150,9 +158,10 @@ def main():
             tap("back"); assert not tap("back")["toolOpen"]
             tap("nextTab"); assert tap("nextTab")["settingsSidebar"]
             assert not tap("right")["settingsSidebar"]
+            wait_state("settingsDetailReady")
             assert tap("left")["settingsSidebar"]
             for _ in range(9): tap("down")
-            tap("right"); assert tap("accept", True)["choicesOpen"]
+            tap("right"); wait_state("settingsDetailReady"); assert tap("accept", True)["choicesOpen"]
             assert tap("down")["fontPercent"] == 100
             assert tap("nextTab")["page"] == 2  # A choice owns input until confirm/cancel.
             assert not tap("back")["choicesOpen"]
@@ -231,7 +240,14 @@ def main():
             blocked = root / "blocked"; blocked.write_text("preserve")
             failed, failed_path = start("failed", state=blocked)
             state = control.exchange(failed_path, request())
-            for action in ["nextTab", "nextTab", "right", "accept", "up", "left"]:
+            for action in ["nextTab", "nextTab", "right"]:
+                state = control.exchange(failed_path, request("tap", action=action, session=state["session"], sequence=state["sequence"], binary_sha256=state["binary_sha256"]))
+            deadline = time.monotonic() + 5
+            while not state["state"]["settingsDetailReady"]:
+                assert time.monotonic() < deadline, "settings detail timeout"
+                state = control.exchange(failed_path, request())
+                time.sleep(.02)
+            for action in ["accept", "up", "left"]:
                 state = control.exchange(failed_path, request("tap", action=action, session=state["session"], sequence=state["sequence"], binary_sha256=state["binary_sha256"]))
             assert state["state"]["save_error"] and state["state"]["settingsAdjusting"] and not state["state"]["settingsSidebar"]
             assert blocked.read_text() == "preserve"

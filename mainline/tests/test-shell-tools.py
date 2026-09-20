@@ -32,22 +32,31 @@ with tempfile.TemporaryDirectory(prefix='tools-check-',dir=repo/'mainline/out/.c
      current=ask()
      if not current['state']['toolBusy']:return current['state']
      assert time.monotonic()<deadline,'tool operation timeout';time.sleep(.1)
+   def wait_detail():
+    global current
+    deadline=time.monotonic()+5
+    while True:
+     current=ask()
+     if current['state']['toolDetailReady']:return current['state']
+     assert time.monotonic()<deadline,'tool detail timeout';time.sleep(.02)
    def capture(label):
     response=ask(capture=True);control.save_result(evidence,response);(evidence/(label+'.json')).write_text(json.dumps(response,ensure_ascii=False,indent=2)+'\n')
    def config():return json.loads((state/'tools/settings.json').read_text())['settings']
    assert current['state']['selectedApplication']=='builtin.moonlight'
    tap('favorite');assert 'builtin.moonlight' in json.loads((state/'preview.json').read_text())['applicationFavorites'];tap('favorite')
-   tap('right');assert tap('accept')['toolRoute']=='neo';wait();capture('neo')
-   tap('accept');tap('accept');assert not ask()['state']['externalSession']
+   tap('right');assert tap('accept')['toolRoute']=='neo';assert not wait()['toolDetailReady']
+   tap('accept');tap('back');assert not ask()['state']['toolDetailReady']
+   tap('accept');wait_detail();capture('neo');tap('accept');assert not ask()['state']['externalSession']
    tap('down');tap('down');tap('accept');assert config()['neoIntegerScale'] is True
    tap('back');tap('back');assert not ask()['state']['toolOpen']
-   tap('right');tap('accept');assert wait()['toolRoute']=='ports';capture('ports')
-   tap('accept');tap('down');tap('down');tap('down');tap('down');tap('accept');wait()
+   tap('right');tap('accept');assert wait()['toolRoute']=='ports';assert not current['state']['toolDetailReady']
+   tap('down');tap('up');assert not ask()['state']['toolDetailReady']
+   tap('accept');wait_detail();capture('ports');tap('down');tap('down');tap('down');tap('down');tap('accept');wait()
    copied=state/'tools/ports/stardew/saves/Saves/farm/save';assert copied.read_text()=='original';copied.write_text('new progress')
    tap('accept');assert copied.read_text()=='new progress'
    tap('down');tap('down');tap('accept');wait();assert len(list((state/'tools/backups').iterdir()))==1
    assert (game/'savedata/Saves/farm/save').read_text()=='original'
-   tap('back');tap('back');tap('nextTab');tap('down');tap('accept');assert wait()['toolRoute']=='usb'
+   tap('back');tap('back');tap('nextTab');tap('down');tap('accept');assert wait()['toolRoute']=='usb';wait_detail()
    tap('accept');assert not (state/'tools/usb-profile.json').exists()
    tap('down');tap('accept');assert config()['usbSwapAB'] is True
    tap('down');tap('down');tap('down');assert tap('accept')['choicesOpen']
@@ -60,11 +69,15 @@ with tempfile.TemporaryDirectory(prefix='tools-check-',dir=repo/'mainline/out/.c
    tap('accept');assert ask()['state']['toolSaveError'];tap('home');assert ask()['state']['toolRoute']=='usb';assert other.read_text()=='keep'
    settings_file.unlink();tap('back');assert config()['usbSwapAB'] is False;tap('nextTab')
    for _ in range(9):tap('down')
-   tap('accept');tap('accept');tap('down');tap('down');tap('accept');assert ask()['state']['fontPercent']==120
-   tap('home');tap('nextTab');tap('down');tap('accept');wait();capture('usb-120')
+   tap('accept')
+   deadline=time.monotonic()+5
+   while not ask()['state']['settingsDetailReady']:
+    assert time.monotonic()<deadline,'settings detail timeout';time.sleep(.02)
+   tap('accept');tap('down');tap('down');tap('accept');assert ask()['state']['fontPercent']==120
+   tap('home');tap('nextTab');tap('down');tap('accept');wait();wait_detail();capture('usb-120')
    assert not ask()['state']['toolSaveError']
-   tap('back');tap('home');tap('right');tap('accept');wait();capture('neo-120')
-   tap('back');tap('right');tap('accept');wait();capture('ports-120')
+   tap('back');tap('home');tap('right');tap('accept');wait();tap('accept');wait_detail();capture('neo-120')
+   tap('back');tap('back');tap('right');tap('accept');wait();tap('accept');wait_detail();capture('ports-120')
    completed=True
    result={'status':'SHELL_TOOLS_PASS','actions':actions,'checks':['separate routes','stable favorites','save import without overwrite','backup','USB draft/export only','modal isolation','120% font capture'],'boundary':'host fixtures only; no game execution or USB device writes'}
   finally:

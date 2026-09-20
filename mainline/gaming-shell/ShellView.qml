@@ -25,6 +25,7 @@ Item {
     readonly property bool toolSaveError: tools !== null && tools.dirty && tools.error.length > 0
     readonly property int toolIndex: toolView.item ? toolView.item.selected : 0
     readonly property int toolRow: toolView.item ? toolView.item.row : 0
+    readonly property bool toolDetailReady: toolView.item !== null && toolView.item.detailReady
     readonly property bool hardware: device !== null && device.target
     property bool streamingOpen: false
     readonly property bool streamingBusy: streaming !== null && streaming.busy
@@ -64,6 +65,7 @@ Item {
     property alias settingsCategory: settingsView.category
     property alias settingsSidebar: settingsView.sidebar
     property alias settingsAdjusting: settingsView.adjustingValue
+    readonly property bool settingsDetailReady: settingsView.detailReady
     property alias testingController: settingsView.tester
     width: 1024; height: 768; focus: true
     property int page: 0
@@ -136,11 +138,11 @@ Item {
         session = name === "session"
         quickOpen = name === "quick"
         if (page === 2) settingsView.enter()
-        if (name === "about") settingsView.selectCategory(12)
+        if (name === "about") settingsView.openCategory(12)
         if (name === "performance" && !store.monitor) store.adjust("monitor", 1)
-        if (name === "controller") { settingsView.selectCategory(3); settingsView.tester = true }
-        if (name === "power") settingsView.selectCategory(8)
-        if (name === "input") { settingsView.selectCategory(9); openEditor() }
+        if (name === "controller") settingsView.openCategory(3)
+        if (name === "power") settingsView.openCategory(8)
+        if (name === "input") { settingsView.openCategory(9); openEditor() }
     }
     function changePage(value) {
         if (externalSession || choicesOpen) return
@@ -149,7 +151,7 @@ Item {
         if (page === 2 && !store.save()) return
         clearNotice()
         page = Math.max(0, Math.min(2, value)); selected = 0; tabsFocused = false
-        settingsView.enter(); metrics.refreshStorage()
+        settingsView.enter()
         root.forceActiveFocus()
     }
     function notify(text) { notice = text; noticeTimer.restart() }
@@ -430,7 +432,7 @@ Item {
                 id: toolView; objectName: "toolView"; x: Ui.Theme.pageMargin; y: Ui.Theme.toolTop; width: Ui.Theme.contentWidth; height: Ui.Theme.toolHeight
                 active: root.toolOpen && root.tools !== null; visible: active
                 sourceComponent: ToolPage {
-                    tools: root.tools; store: root.store; kind: root.toolRoute
+                    tools: root.tools; kind: root.toolRoute
                     navigationActive: root.windowVisible && !root.quickOpen && !root.dimmed
                     onBackRequested: root.closeTool()
                     onSearchRequested: function(value) { root.openTextEditor("搜索游戏", value, "portSearch") }

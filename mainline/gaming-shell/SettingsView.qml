@@ -15,6 +15,7 @@ Item {
     property string choiceKey: ""
     clip: true
     property int category: 0
+    property int openedCategory: 0
     property int rowIndex: 0
     property bool sidebar: true
     property bool adjustingValue: false
@@ -22,9 +23,11 @@ Item {
     property bool tester: false
     readonly property real fontScale: store.fontPercent / 100
     readonly property bool choiceOpen: choices.visible
+    readonly property bool detailReady: !sidebar && detailLoader.status === Loader.Ready
     readonly property var categories: ["常用", "网络与 Wi-Fi", "蓝牙", "摇杆测试", "声音", "屏幕", "存储", "系统信息", "电量与电源", "字体与输入", "CPU 频率", "内存与 Swap", "关于"]
     readonly property var categoryIcons: ["settings", "wifi", "bluetooth", "gamepad", "volume", "display", "storage", "info", "battery", "keyboard", "cpu", "memory", "info"]
     readonly property var hints: choices.visible ? choices.hints : sidebar ? [["↑↓", "选择分类"], ["A / ↵", "进入"], ["B / Esc", "主页"]]
+        : !detailReady ? [["← / B", "返回分类"]]
         : adjustingValue ? [["↑↓", "增减数值"], ["A / B", "完成调整"], ["←", "返回分类"]]
         : [["↑↓", "选择项目"], ["← / B", "返回分类"]].concat(rows[rowIndex] && canActivate(rows[rowIndex].key)
             ? [["A / ↵", valueIsAdjustable(rows[rowIndex].key) ? "调整" : ["motion", "monitor", "netRemember"].indexOf(rows[rowIndex].key) >= 0 ? "切换" : rows[rowIndex].key === "storage" ? "刷新" : "打开"]] : [])
@@ -32,7 +35,7 @@ Item {
         const volume = {name: "音量", detail: "", key: "volume"}
         const brightness = {name: "屏幕亮度", detail: "", key: "brightness"}
         const motion = {name: "减少动态效果", detail: "", key: "motion"}
-        switch (category) {
+        switch (openedCategory) {
         case 0: return [volume, brightness, motion, {name: "性能浮窗", detail: "", key: "monitor"}]
         case 1: return [{name: "添加 Wi-Fi", detail: "切换网络可能中断远控", key: "netScan"}, {name: "已保存的 Wi-Fi", key: "netProfiles"},
             {name: "记住新网络", detail: "保存密码，供下次自动连接", key: "netRemember"}, {name: "断开当前 Wi-Fi", key: "netDisconnect"},
@@ -114,11 +117,21 @@ Item {
         categoryList.positionViewAtIndex(category, ListView.Contain)
     }
     function selectCategory(index) {
-        if (adjustingValue && !store.save()) return
-        category = index; enter()
+        if (adjustingValue && !store.save()) return false
+        category = index; tester = false; adjustingValue = false; rowIndex = 0
+        categoryList.positionViewAtIndex(category, ListView.Contain)
+        activity()
+        return true
+    }
+    function openCategory(index) {
+        if (!selectCategory(index)) return false
+        openedCategory = category; sidebar = false; tester = category === 3
         if (category === 6) { metrics.refreshStorage(); if (hardware) device.refreshStorage() }
         activity()
+        return true
     }
+    function detailList() { return detailLoader.item ? detailLoader.item.rowsView : null }
+    function choiceAnchor() { const list = detailList(); return list && list.currentItem ? list.currentItem : settings }
     function focusRow(index) {
         if (rowIndex !== index && adjustingValue && !store.save()) return
         if (rowIndex !== index) adjustingValue = false
@@ -126,7 +139,8 @@ Item {
     }
     function returnToCategories() {
         if (!store.save()) return false
-        sidebar = true; adjustingValue = false
+        sidebar = true; tester = false; adjustingValue = false
+        categoryList.positionViewAtIndex(category, ListView.Contain)
         return true
     }
     function valueIsAdjustable(key) { return key === "volume" || key === "brightness" }
@@ -144,7 +158,7 @@ Item {
         store.adjust(row.key, direction * (row.key === "volume" || row.key === "brightness" ? 5 : 1))
     }
     function activate(repeated) {
-        if (repeated) return
+        if (repeated || !detailReady) return
         const row = rows[rowIndex]
         if (!row || !canActivate(row.key)) { notice("这项设备功能尚未接入"); return }
         choiceKey = row.key
@@ -155,12 +169,12 @@ Item {
             if (!network.profiles.length) { notice("没有可用的已保存 Wi-Fi 配置"); return }
             choiceValues = network.profiles.map(function(p){return p.id})
             const labels = network.profiles.map(function(p){return p.name + (p.active ? " · 已连接" : "")})
-            choices.present(settingRows.currentItem, labels, row.key === "netForget" ? -1 : network.profiles.findIndex(function(p){return p.active}), row.name)
+            choices.present(choiceAnchor(), labels, row.key === "netForget" ? -1 : network.profiles.findIndex(function(p){return p.active}), row.name)
         } else if (row.key === "netDisconnect") {
-            choices.present(settingRows.currentItem, ["取消", "断开 Wi-Fi"], 0, "断开后远控连接将中断")
+            choices.present(choiceAnchor(), ["取消", "断开 Wi-Fi"], 0, "断开后远控连接将中断")
         } else if (row.key === "poweroff" || row.key === "reboot") {
             choiceValues = ["", row.key]
-            choices.present(settingRows.currentItem, ["取消", row.name], 0, "确认" + row.name)
+            choices.present(choiceAnchor(), ["取消", row.name], 0, "确认" + row.name)
         } else if (row.key.indexOf("cpu") === 0) {
             const cpu = device.info.cpu
             let labels = []; let index = 0
@@ -172,11 +186,11 @@ Item {
             }
             else if (row.key === "cpuGovernor") { choiceValues = cpu.governors; labels = cpu.governors; index = labels.indexOf(cpu.governor) }
             else { choiceValues = cpu.frequencies; labels = choiceValues.map(function(v) { return (v / 1000).toFixed(0) + " MHz" }); index = choiceValues.indexOf(row.key === "cpuMin" ? cpu.scaling_min_freq : cpu.scaling_max_freq) }
-            choices.present(settingRows.currentItem, labels, Math.max(0,index), row.name)
+            choices.present(choiceAnchor(), labels, Math.max(0,index), row.name)
         } else if (row.key === "font" || row.key === "dim") {
             const labels = row.key === "font" ? ["100%", "110%", "120%"] : ["关闭", "30 秒", "60 秒", "120 秒"]
             const index = row.key === "font" ? (store.fontPercent - 100) / 10 : [0, 30, 60, 120].indexOf(store.dimSeconds)
-            choices.present(settingRows.currentItem, labels, index, row.name)
+            choices.present(choiceAnchor(), labels, index, row.name)
         } else if (row && valueIsAdjustable(row.key)) {
             if (adjustingValue && !store.save()) return
             adjustingValue = !adjustingValue
@@ -186,7 +200,7 @@ Item {
         if (!network.accessPoints.length) { notice("未发现可连接的 Wi-Fi，请稍后重试。"); return }
         choiceKey = "netScan"
         const labels = network.accessPoints.map(function(ap) { return ap.ssid + " · " + ap.signal + "% · " + (ap.security === "open" ? "开放" : ap.security === "psk" ? "WPA/WPA2" : "暂不支持") })
-        choices.present(settingRows.currentItem, labels.concat(["重新扫描"]), -1, "附近 Wi-Fi")
+        choices.present(choiceAnchor(), labels.concat(["重新扫描"]), -1, "附近 Wi-Fi")
     }
     Connections {
         target: settings.network
@@ -195,6 +209,10 @@ Item {
     function dispatch(action, repeated) {
         if (choices.dispatch(action, repeated)) return true
         if (tester) return true
+        if (!sidebar && !detailReady) {
+            if (action === "back" || action === "left") returnToCategories()
+            return true
+        }
         if (!sidebar && action === "left") { returnToCategories(); return true }
         if (action === "back") {
             if (adjustingValue) { if (store.save()) adjustingValue = false; return true }
@@ -204,7 +222,7 @@ Item {
         if (sidebar) {
             if (action === "up") selectCategory(Math.max(0, category - 1))
             else if (action === "down") selectCategory(Math.min(categories.length - 1, category + 1))
-            else if ((action === "right" || action === "accept") && !repeated) { sidebar = false; tester = category === 3 }
+            else if ((action === "right" || action === "accept") && !repeated) openCategory(category)
         } else if (adjustingValue) {
             if (action === "up" || action === "down") adjust(action === "up" ? 1 : -1, repeated)
             else if (action === "accept") activate(repeated)
@@ -215,88 +233,114 @@ Item {
         }
         return true
     }
-    Ui.PageHeader { width: parent.width; title: "设置"; subtitle: settings.categories[settings.category]; iconName: "settings" }
-    Ui.ListView {
-        id: categoryList; objectName: "settingsCategories"; y: Ui.Theme.contentY; width: Ui.Theme.sidebarWidth; height: parent.height - y
-        currentIndex: settings.category
-        layer.enabled: true
-        model: settings.categories
-        delegate: SettingRow {
-            required property string modelData; required property int index
-            width: categoryList.rowWidth; title: modelData; iconName: settings.categoryIcons[index]
-            selected: settings.category === index; focusOutline: false
-            Accessible.role: Accessible.PageTab
-            onActivated: settings.selectCategory(index)
-        }
-    }
+    onCategoryChanged: if (!sidebar) openedCategory = category
     Item {
-        // Cache stable labels while the independent focus outline moves.
-        layer.enabled: settings.category !== 3
-        x: Ui.Theme.detailX; width: parent.width - x; height: parent.height
+        anchors.fill: parent
+        Ui.PageHeader {
+            width: parent.width
+            title: settings.sidebar ? "设置" : settings.categories[settings.category]
+            subtitle: settings.sidebar ? "选择分类" : "设置"
+            iconName: settings.sidebar ? "settings" : settings.categoryIcons[settings.category]
+            backVisible: !settings.sidebar
+            onBackRequested: settings.returnToCategories()
+        }
         Ui.ListView {
-            id: settingRows; objectName: "settingsItems"
-            y: Ui.Theme.contentY; width: parent.width; height: parent.height - y
-            model: settings.rows; currentIndex: settings.rowIndex
+            id: categoryList; objectName: "settingsCategories"
+            y: Ui.Theme.contentY; width: Ui.Theme.sidebarWidth * 2; height: parent.height - y
+            visible: settings.sidebar; currentIndex: settings.category
+            model: settings.categories
             delegate: SettingRow {
-                    required property var modelData; required property int index
-                    width: settingRows.rowWidth; fontScale: settings.fontScale
-                    title: modelData.name
-                    description: {
-                        if (settings.hardware && modelData.key && modelData.key.indexOf("storage") === 0) {
-                            const value = settings.device.storage[Number(modelData.key.slice(-1))]
-                            return value && value.available ? value.filesystem + " · " + (value.readOnly ? "只读" : "可写") : ""
-                        }
-                        return modelData.info === "storage" ? settings.metrics.storage : modelData.info === "system" ? settings.metrics.system : modelData.detail || ""
-                    }
-                    value: settings.adjustingValue && selected ? "↑  " + settings.rowValue(modelData) + "  ↓" : settings.rowValue(modelData)
-                    actionable: settings.canActivate(modelData.key)
-                    choice: modelData.key === "font" || modelData.key === "dim" || ["netProfiles", "netScan", "netForget"].indexOf(modelData.key) >= 0 || (!!modelData.key && modelData.key.indexOf("cpu") === 0 && modelData.key !== "cpuCurrent")
-                    reducedMotion: settings.store.reducedMotion
-                    toggleState: modelData.key === "motion" ? Number(settings.store.reducedMotion) : modelData.key === "monitor" ? Number(settings.store.monitor) : modelData.key === "netRemember" ? Number(settings.network && settings.network.remember) : -1
-                    progress: modelData.key === "volume" && !settings.hardware ? settings.store.volume / 100 : modelData.key === "brightness" ? (settings.hardware ? settings.device.info.brightnessPercent : settings.store.brightness) / 100 : -1
-                    focusOutline: false
-                    selected: !settings.sidebar && settings.rowIndex === index
-                    onFocused: settings.focusRow(index)
-                    onActivated: if (!settings.sidebar && settings.rowIndex === index) settings.activate(false)
+                required property string modelData; required property int index
+                width: categoryList.rowWidth; title: modelData; iconName: settings.categoryIcons[index]
+                selected: settings.category === index; focusOutline: false
+                Accessible.role: Accessible.PageTab
+                onFocused: settings.selectCategory(index)
+                onActivated: settings.openCategory(index)
             }
         }
-        Item {
-            y: Ui.Theme.contentY; width: parent.width; height: parent.height - y; visible: settings.category === 3
-            Ui.Label { width: parent.width; elide: Text.ElideRight; text: settings.controller.deviceName || "未检测到手柄"; color: "#cfdee8"; fontScale: settings.fontScale }
-            Row {
-                y: 55; spacing: 72
-                Repeater {
-                    model: 2
-                    Rectangle {
-                        required property int index
-                        width: 220; height: 220; radius: 110; color: "#1d3442"; border.color: "#43616e"
-                        Rectangle { x: 109; y: 0; width: 1; height: 220; color: "#45616d" }
-                        Rectangle { x: 0; y: 109; width: 220; height: 1; color: "#45616d" }
-                        Rectangle {
-                            x: 98 + Number(settings.controller.axes[parent.index * 2]) * 95
-                            y: 98 + Number(settings.controller.axes[parent.index * 2 + 1]) * 95
-                            width: 24; height: 24; radius: 12; color: parent.index === 0 ? Ui.Theme.accent : "#cbb8f5"
+        Ui.FocusFrame {
+            id: focusOutline; objectName: "settingsFocus"
+            x: 0
+            y: categoryList.y + (categoryList.currentItem ? categoryList.currentItem.y - categoryList.contentY : 0)
+            width: categoryList.rowWidth
+            height: categoryList.currentItem ? categoryList.currentItem.height : Ui.Theme.rowHeight
+            visible: settings.sidebar && (!categoryList.currentItem || categoryList.currentItem.y >= categoryList.contentY)
+            active: settings.navigationActive && settings.sidebar && !choices.visible
+            reducedMotion: settings.store.reducedMotion
+        }
+        Loader {
+            id: detailLoader; anchors.fill: parent
+            active: !settings.sidebar; visible: status === Loader.Ready
+            asynchronous: true; sourceComponent: detailComponent
+        }
+        Component {
+            id: detailComponent
+            Item {
+                property alias rowsView: settingRows
+                Ui.ListView {
+                    id: settingRows; objectName: "settingsItems"
+                    y: Ui.Theme.contentY; width: parent.width; height: parent.height - y
+                    visible: settings.category !== 3
+                    model: settings.rows; currentIndex: settings.rowIndex
+                    delegate: SettingRow {
+                        required property var modelData; required property int index
+                        width: settingRows.rowWidth; fontScale: settings.fontScale
+                        title: modelData.name
+                        description: {
+                            if (settings.hardware && modelData.key && modelData.key.indexOf("storage") === 0) {
+                                const value = settings.device.storage[Number(modelData.key.slice(-1))]
+                                return value && value.available ? value.filesystem + " · " + (value.readOnly ? "只读" : "可写") : ""
+                            }
+                            return modelData.info === "storage" ? settings.metrics.storage : modelData.info === "system" ? settings.metrics.system : modelData.detail || ""
                         }
-                        Ui.Label { anchors.horizontalCenter: parent.horizontalCenter; y: 233; text: (parent.index === 0 ? "左" : "右") + "  X " + Number(settings.controller.axes[parent.index * 2]).toFixed(2) + " / Y " + Number(settings.controller.axes[parent.index * 2 + 1]).toFixed(2); color: "#b4c8d4"; role: "caption" }
+                        value: settings.adjustingValue && selected ? "↑  " + settings.rowValue(modelData) + "  ↓" : settings.rowValue(modelData)
+                        actionable: settings.canActivate(modelData.key)
+                        choice: modelData.key === "font" || modelData.key === "dim" || ["netProfiles", "netScan", "netForget"].indexOf(modelData.key) >= 0 || (!!modelData.key && modelData.key.indexOf("cpu") === 0 && modelData.key !== "cpuCurrent")
+                        reducedMotion: settings.store.reducedMotion
+                        toggleState: modelData.key === "motion" ? Number(settings.store.reducedMotion) : modelData.key === "monitor" ? Number(settings.store.monitor) : modelData.key === "netRemember" ? Number(settings.network && settings.network.remember) : -1
+                        progress: modelData.key === "volume" && !settings.hardware ? settings.store.volume / 100 : modelData.key === "brightness" ? (settings.hardware ? settings.device.info.brightnessPercent : settings.store.brightness) / 100 : -1
+                        focusOutline: false; selected: settings.rowIndex === index
+                        onFocused: settings.focusRow(index)
+                        onActivated: if (settings.rowIndex === index) settings.activate(false)
                     }
                 }
+                Item {
+                    y: Ui.Theme.contentY; width: parent.width; height: parent.height - y; visible: settings.category === 3
+                    Ui.Label { width: parent.width; elide: Text.ElideRight; text: settings.controller.deviceName || "未检测到手柄"; color: "#cfdee8"; fontScale: settings.fontScale }
+                    Row {
+                        y: 55; spacing: 72
+                        Repeater {
+                            model: 2
+                            Rectangle {
+                                required property int index
+                                width: 220; height: 220; radius: 110; color: "#1d3442"; border.color: "#43616e"
+                                Rectangle { x: 109; y: 0; width: 1; height: 220; color: "#45616d" }
+                                Rectangle { x: 0; y: 109; width: 220; height: 1; color: "#45616d" }
+                                Rectangle {
+                                    x: 98 + Number(settings.controller.axes[parent.index * 2]) * 95
+                                    y: 98 + Number(settings.controller.axes[parent.index * 2 + 1]) * 95
+                                    width: 24; height: 24; radius: 12; color: parent.index === 0 ? Ui.Theme.accent : "#cbb8f5"
+                                }
+                                Ui.Label { anchors.horizontalCenter: parent.horizontalCenter; y: 233; text: (parent.index === 0 ? "左" : "右") + "  X " + Number(settings.controller.axes[parent.index * 2]).toFixed(2) + " / Y " + Number(settings.controller.axes[parent.index * 2 + 1]).toFixed(2); color: "#b4c8d4"; role: "caption" }
+                            }
+                        }
+                    }
+                    Ui.Label { y: 323; width: parent.width; elide: Text.ElideRight; text: "按键  " + (settings.controller.buttons || "—") + "     LT " + Number(settings.controller.axes[4]).toFixed(2) + " / RT " + Number(settings.controller.axes[5]).toFixed(2); color: "#cfdee8"; role: "caption" }
+                    MouseArea { anchors.fill: parent; onClicked: { settings.tester = true; settings.activity() } }
+                }
+                Ui.FocusFrame {
+                    objectName: "settingsDetailFocus"
+                    x: 0
+                    y: settingRows.y + (settingRows.currentItem ? settingRows.currentItem.y - settingRows.contentY : 0)
+                    width: settingRows.rowWidth
+                    height: settingRows.currentItem ? settingRows.currentItem.height : Ui.Theme.rowHeight
+                    visible: settings.category !== 3 && (!settingRows.currentItem || settingRows.currentItem.y >= settingRows.contentY)
+                    adjusting: settings.adjustingValue
+                    active: settings.navigationActive && settings.detailReady && !choices.visible
+                    reducedMotion: settings.store.reducedMotion
+                }
             }
-            Ui.Label { y: 323; width: parent.width; elide: Text.ElideRight; text: "按键  " + (settings.controller.buttons || "—") + "     LT " + Number(settings.controller.axes[4]).toFixed(2) + " / RT " + Number(settings.controller.axes[5]).toFixed(2); color: "#cfdee8"; role: "caption" }
-            MouseArea { anchors.fill: parent; onClicked: { settings.tester = true; settings.sidebar = false; settings.activity() } }
         }
-    }
-    Ui.FocusFrame {
-        id: focusOutline; objectName: "settingsFocus"
-        animationName: "settingsFocusMoveX"
-        readonly property bool primary: settings.sidebar || settings.rows.length === 0
-        x: primary ? 0 : Ui.Theme.detailX
-        y: primary ? categoryList.y + (categoryList.currentItem ? categoryList.currentItem.y - categoryList.contentY : 0) : settingRows.y + (settingRows.currentItem ? settingRows.currentItem.y - settingRows.contentY : 0)
-        width: primary ? categoryList.rowWidth : settingRows.rowWidth
-        height: primary ? Ui.Theme.rowHeight : (settingRows.currentItem ? settingRows.currentItem.height : Ui.Theme.rowHeight)
-        visible: primary || !settingRows.currentItem || settingRows.currentItem.y >= settingRows.contentY
-        adjusting: settings.adjustingValue
-        active: settings.navigationActive && !settings.tester && !choices.visible
-        reducedMotion: settings.store.reducedMotion
     }
     Ui.ChoicePopup {
         id: choices; objectName: "settingsChoices"; parent: settings
@@ -313,7 +357,7 @@ Item {
             } else if (key === "netForget") {
                 const uuid = settings.choiceValues[index]
                 settings.choiceKey = "netForgetConfirm"; settings.choiceValues = [uuid]
-                present(settingRows.currentItem, ["取消", "忘记网络"], 0, "移除配置并断开连接？")
+                present(settings.choiceAnchor(), ["取消", "忘记网络"], 0, "移除配置并断开连接？")
                 return
             } else if (key === "netForgetConfirm") {
                 if (index === 0) { close(); return }

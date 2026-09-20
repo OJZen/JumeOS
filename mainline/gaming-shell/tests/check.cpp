@@ -122,7 +122,8 @@ private slots:
         key(Qt::Key_Up); QVERIFY(root->property("tabsFocused").toBool());
         key(Qt::Key_Right); QCOMPARE(root->property("page").toInt(), 2);
         QVERIFY(root->property("settingsSidebar").toBool()); QVERIFY(!root->property("tabsFocused").toBool());
-        key(Qt::Key_Right); key(Qt::Key_Return); key(Qt::Key_Up); key(Qt::Key_Return); QCOMPARE(state.volume(), 65);
+        key(Qt::Key_Right); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        key(Qt::Key_Return); key(Qt::Key_Up); key(Qt::Key_Return); QCOMPARE(state.volume(), 65);
         key(Qt::Key_Escape); key(Qt::Key_Escape); QCOMPARE(root->property("page").toInt(), 0); QVERIFY(!state.dirty());
         view.resize(640, 480); QTest::qWait(40);
         QVERIFY(!view.grabWindow().isNull());
@@ -142,7 +143,8 @@ private slots:
         auto action = [&](const QString &value, bool repeat = false) {
             QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, value), Q_ARG(QVariant, repeat)));
         };
-        action("nextTab"); action("nextTab"); action("right"); action("accept"); action("up"); action("left");
+        action("nextTab"); action("nextTab"); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        action("accept"); action("up"); action("left");
         QVERIFY(!root->property("settingsSidebar").toBool()); QVERIFY(root->property("settingsAdjusting").toBool());
         action("back");
         QCOMPARE(root->property("page").toInt(), 2); QVERIFY(state.dirty());
@@ -175,24 +177,31 @@ private slots:
         QTest::qWait(200);
         auto *outline = root->findChild<QQuickItem *>("settingsFocus"); QVERIFY(outline);
         QVERIFY(root->property("settingsSidebar").toBool()); QCOMPARE(outline->x(), 0.);
+        auto *settings = root->findChild<QObject *>("settingsView"); QVERIFY(settings);
+        QVERIFY(!root->findChild<QQuickItem *>("settingsItems"));
+        for (int i = 0; i < 8; ++i) action("down");
+        QCOMPARE(root->property("settingsCategory").toInt(), 8);
+        QCOMPARE(settings->property("openedCategory").toInt(), 0);
+        QVERIFY(!root->findChild<QQuickItem *>("settingsItems"));
+        for (int i = 0; i < 8; ++i) action("up");
         capture("settings-primary");
-        action("right"); QVERIFY(!root->property("settingsSidebar").toBool()); QCOMPARE(state.volume(), 55);
-        auto *animation = root->findChild<QObject *>("settingsFocusMoveX"); QVERIFY(animation);
-        QVERIFY(animation->property("running").toBool());
-        QTest::qWait(40); capture("settings-transition");
-        action("left"); // A new input retargets the in-flight visual transition.
+        action("right"); QVERIFY(!root->property("settingsSidebar").toBool());
+        action("left"); // Leaving during asynchronous creation cancels the detail page.
         QVERIFY(root->property("settingsSidebar").toBool());
+        QTRY_VERIFY(!root->findChild<QQuickItem *>("settingsItems"));
         auto *categories = root->findChild<QQuickItem *>("settingsCategories"); QVERIFY(categories);
-        auto *rows = root->findChild<QQuickItem *>("settingsItems"); QVERIFY(rows);
         auto row = [](QQuickItem *list) { return qobject_cast<QQuickItem *>(list->property("currentItem").value<QObject *>()); };
         QTRY_COMPARE(outline->x(), 0.); QTRY_COMPARE(outline->width(), row(categories)->width());
         action("right");
-        QTRY_COMPARE(outline->x(), rows->mapToItem(outline->parentItem(), QPointF()).x());
-        QTRY_COMPARE(outline->width(), row(rows)->width());
+        QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        auto *rows = root->findChild<QQuickItem *>("settingsItems"); QVERIFY(rows);
+        auto *detailOutline = root->findChild<QQuickItem *>("settingsDetailFocus"); QVERIFY(detailOutline);
+        QTRY_COMPARE(detailOutline->x(), 0.);
+        QTRY_COMPARE(detailOutline->width(), row(rows)->width());
         capture("settings-secondary");
         action("down"); QCOMPARE(root->property("settingsIndex").toInt(), 1);
-        QTRY_COMPARE(outline->y(), row(rows)->mapToItem(outline->parentItem(), QPointF()).y());
-        QCOMPARE(outline->height(), row(rows)->height());
+        QTRY_COMPARE(detailOutline->y(), row(rows)->mapToItem(detailOutline->parentItem(), QPointF()).y());
+        QCOMPARE(detailOutline->height(), row(rows)->height());
         action("up"); action("accept"); QVERIFY(root->property("settingsAdjusting").toBool());
         action("up"); QCOMPARE(state.volume(), 60);
         action("down"); action("down"); QCOMPARE(state.volume(), 50);
@@ -202,22 +211,21 @@ private slots:
         Preferences saved(directory.path()); QCOMPARE(saved.volume(), 50);
         action("right"); action("previousTab"); action("nextTab");
         QVERIFY(root->property("settingsSidebar").toBool());
-        action("right");
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, QPoint(330, 121));
-        QVERIFY(root->property("settingsSidebar").toBool());
         // Accessibility preference keeps logical navigation but skips spatial motion.
         state.adjust("motion", 1); action("right");
-        QCOMPARE(outline->x(), rows->mapToItem(outline->parentItem(), QPointF()).x()); QCOMPARE(outline->width(), row(rows)->width());
-        QVERIFY(!animation->property("running").toBool());
-        action("quick"); QCOMPARE(outline->opacity(), 0.);
-        action("back"); QCOMPARE(outline->opacity(), 1.);
+        QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        rows = root->findChild<QQuickItem *>("settingsItems"); QVERIFY(rows);
+        detailOutline = root->findChild<QQuickItem *>("settingsDetailFocus"); QVERIFY(detailOutline);
+        QCOMPARE(detailOutline->x(), 0.); QCOMPARE(detailOutline->width(), row(rows)->width());
+        action("quick"); QTRY_COMPARE(detailOutline->opacity(), 0.);
+        action("back"); QTRY_COMPARE(detailOutline->opacity(), 1.);
         action("left");
         for (int i = 0; i < 11; ++i) action("down");
         QCOMPARE(root->property("settingsCategory").toInt(), 11);
         QVERIFY(outline->y() >= 0 && outline->y() + outline->height() <= 493);
         QTest::qWait(300);
         QSignalSpy idle(&view, &QQuickWindow::frameSwapped); QTest::qWait(500);
-        QVERIFY2(idle.size() <= 3, "Settled settings must not repaint continuously");
+        QVERIFY2(idle.size() <= 3, qPrintable(QString("Settled settings repainted %1 times").arg(idle.size())));
     }
     void navigationGuidanceAndHudLayout() {
         QTemporaryDir directory;
@@ -274,7 +282,8 @@ private slots:
         action("down"); action("right"); QTest::qWait(200);
         QVERIFY(!labels().contains("打开")); QVERIFY(!labels().contains("调整"));
         action("accept"); QVERIFY(root->property("notice").toString().contains("尚未接入"));
-        action("left"); root->setProperty("settingsCategory", 0); action("right"); action("accept"); QTest::qWait(200);
+        action("left"); root->setProperty("settingsCategory", 0); action("right");
+        QTRY_VERIFY(root->property("settingsDetailReady").toBool()); action("accept"); QTest::qWait(200);
         QVERIFY(labels().contains("增减数值")); QVERIFY(footer->width() <= 952);
         action("quick"); QTest::qWait(200);
         QVERIFY(labels().contains("关闭面板")); QVERIFY(!labels().contains("收藏"));
@@ -310,7 +319,7 @@ private slots:
         QVERIFY(pageContent->property("reveal").toReal() >= current);
         state.adjust("motion", 1);
         QVERIFY(!pageAnimation->property("running").toBool()); QCOMPARE(pageContent->property("reveal").toReal(), 1.);
-        root->setProperty("settingsCategory", 0); QTest::qWait(200);
+        root->setProperty("settingsCategory", 0); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
         QPointer<QQuickItem> settingsSwitch;
         controls = {root};
         while (!controls.isEmpty()) {
@@ -453,7 +462,8 @@ private slots:
         QVERIFY(root->property("settingsSidebar").toBool());
         for (int i = 0; i < 9; ++i) action("down");
         QCOMPARE(root->property("settingsCategory").toInt(), 9);
-        action("right"); action("accept"); action("down"); action("accept"); QCOMPARE(state.fontPercent(), 110);
+        action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        action("accept"); action("down"); action("accept"); QCOMPARE(state.fontPercent(), 110);
         action("down"); action("accept"); QVERIFY(root->property("editing").toBool());
         state.adjust("monitor", 1);
         auto *hud = root->findChild<QQuickItem *>("performancePanel"); QVERIFY(hud);
@@ -720,7 +730,8 @@ private slots:
         QVERIFY(QTest::qWaitForWindowExposed(&view)); auto *root = view.rootObject();
         auto action = [&](const char *value) { QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, QString(value)), Q_ARG(QVariant, false))); };
         QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString("power"))));
-        action("right"); action("accept"); QVERIFY(root->property("choicesOpen").toBool());
+        QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        action("accept"); QVERIFY(root->property("choicesOpen").toBool());
         action("down"); action("nextTab"); action("home");
         QCOMPARE(root->property("page").toInt(), 2); QCOMPARE(state.dimSeconds(), 0);
         action("back"); QVERIFY(!root->property("choicesOpen").toBool()); QCOMPARE(state.dimSeconds(), 0);
@@ -737,7 +748,7 @@ private slots:
         action("left"); QVERIFY(root->property("settingsSidebar").toBool());
         Preferences saved(directory.path()); QCOMPARE(saved.dimSeconds(), 60);
         QVERIFY(!state.choose("font", 3)); QVERIFY(!state.choose("unknown", 0));
-        action("right"); action("accept"); QTest::qWait(200);
+        action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); action("accept"); QTest::qWait(200);
         if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/settings-choices.png"));
         action("back");
     }
@@ -771,6 +782,7 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(root,"closeEditor"));
         tap("left");tap("back");
         QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("settings"))));
+        tap("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
         auto *brightness=row(QStringLiteral("屏幕亮度")); QVERIFY(brightness);
         QVERIFY(QMetaObject::invokeMethod(brightness,"click"));
         QCOMPARE(root->property("settingsIndex").toInt(),1); QVERIFY(root->property("settingsAdjusting").toBool());
@@ -896,7 +908,8 @@ private slots:
         const auto centerY=[](QQuickItem *item){return item->mapToScene(QPointF(0,item->height()/2)).y();};
         QCOMPARE(centerY(clock),centerY(wifiIcon));QCOMPARE(centerY(clock),centerY(batteryIcon));
         if(!qEnvironmentVariable("R46H_UI_CAPTURE_DIR").isEmpty())QVERIFY(view.grabWindow().save(qEnvironmentVariable("R46H_UI_CAPTURE_DIR")+"/device-status.png"));
-        QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("power"))));tap("right");tap("down");tap("down");tap("accept");
+        QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("power"))));QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        tap("down");tap("down");tap("accept");
         QVERIFY(root->property("choicesOpen").toBool());tap("accept");QCOMPARE(power.size(),1); // Default is cancel.
         tap("accept");tap("down");tap("accept");QCOMPARE(power.size(),2); // Confirmation emits only a test signal.
         root->setProperty("settingsCategory",10);root->setProperty("settingsIndex",0);tap("accept");tap("down");tap("down");tap("accept");
@@ -960,7 +973,8 @@ private slots:
         view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));QCOMPARE(view.status(),QQuickView::Ready);
         view.resize(1024,768);view.show();QVERIFY(QTest::qWaitForWindowExposed(&view));auto *root=view.rootObject();
         auto tap=[&](const char *key){QVERIFY(QMetaObject::invokeMethod(root,"dispatch",Q_ARG(QVariant,QString(key)),Q_ARG(QVariant,false)));};
-        QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("settings"))));tap("down");tap("right");tap("accept");
+        QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("settings"))));tap("down");tap("right");
+        QTRY_VERIFY(root->property("settingsDetailReady").toBool());tap("accept");
         QTRY_VERIFY(root->property("choicesOpen").toBool());QCOMPARE(network.accessPoints().size(),1);
         const auto captures=qEnvironmentVariable("R46H_UI_CAPTURE_DIR");QTest::qWait(200);
         if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+"/wifi-chooser.png"));

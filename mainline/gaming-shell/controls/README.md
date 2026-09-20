@@ -44,11 +44,14 @@ colors and interaction feedback still use these tokens where applicable.
 Do not hide unavailable actions behind enabled-looking controls, replace switches
 with “已开启/已关闭”, or use a progress track for a value with unknown bounds.
 
-Use `PageHeader` on tool pages, followed by side/detail `Ui.ListView` instances.
+Use `PageHeader` on tool pages, followed by the smallest required `Ui.ListView`.
 Use the list's `rowWidth` for delegates and the selected delegate's actual
 position/height for `FocusFrame`; do not multiply a hard-coded row stride.
-The shell owns outer navigation; each page starts on its sidebar, A/right enters,
-left/B returns. USB's single list is the deliberate one-column variant.
+The shell owns outer navigation. Category or game lists must not instantiate
+their detail page while focus moves: A/right activates one asynchronous `Loader`,
+and left/B deactivates it and returns to the preserved list selection. USB's
+single list is the deliberate one-level variant. Do not debounce directional
+input; cancellation belongs to the detail loader, not focus movement.
 
 ```qml
 Ui.PageHeader { width: parent.width; title: "工具名称"; iconName: "gamepad" }
@@ -183,6 +186,8 @@ accessibility row activation, Tab/Space isolation, outside clicks, scaled popup
 bounds, failed confirmation/retry and hide/minimize/restore animation lifecycle.
 Application-list coverage also checks that a nonzero initial selection survives
 model creation: selection and the focus outline must name the same row on open.
+Shell coverage also checks that rapid category/game selection creates no detail
+page, entry loads exactly one detail page, and immediate return cancels creation.
 `test-shell-control.py` additionally drives actual popup
 navigation and PNG validation through the remote-control protocol. New-tool IPC checks cover 100% tool interactions and 120% snapshots of all three
 pages, verify modal routing and exercise disposable save import/backup; screenshots do not

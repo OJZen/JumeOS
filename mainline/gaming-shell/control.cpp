@@ -252,8 +252,8 @@ void ControlServer::observeAndReply(QLocalSocket *socket, const QString &id, boo
 QJsonObject ControlServer::observe(bool screenshot) {
     const auto *root = m_view->rootObject();
     QJsonObject state;
-    for (const auto *name : {"sharedDisplay", "sharedReady", "keyboardReady", "gameOverlay", "panelVisible", "monitorVisible", "page", "selected", "settingsCategory", "settingsIndex", "settingsSidebar", "settingsAdjusting",
-                            "remoteTextAllowed", "portCatalogTotal", "portCatalogOpen", "portCatalogIndex", "portCatalogSidebar", "toolRoute", "toolOpen", "toolBusy", "toolIndex", "toolRow", "toolSaveError", "tabsFocused", "quickOpen", "quickIndex", "session", "sessionMoves", "testingController", "editing", "dimmed", "choicesOpen", "externalSession", "activeApplication", "applicationError", "applicationExitCode", "selectedApplication", "selectedFavorite", "streamingOpen", "streamingBusy", "sensitiveVisible", "testInputCapture", "testInputVisible"})
+    for (const auto *name : {"sharedDisplay", "sharedReady", "keyboardReady", "gameOverlay", "panelVisible", "monitorVisible", "page", "selected", "settingsCategory", "settingsIndex", "settingsSidebar", "settingsAdjusting", "settingsDetailReady",
+                            "remoteTextAllowed", "portCatalogTotal", "portCatalogOpen", "portCatalogIndex", "portCatalogSidebar", "toolRoute", "toolOpen", "toolBusy", "toolIndex", "toolRow", "toolDetailReady", "toolSaveError", "tabsFocused", "quickOpen", "quickIndex", "session", "sessionMoves", "testingController", "editing", "dimmed", "choicesOpen", "externalSession", "activeApplication", "applicationError", "applicationExitCode", "selectedApplication", "selectedFavorite", "streamingOpen", "streamingBusy", "sensitiveVisible", "testInputCapture", "testInputVisible"})
         state[QString::fromLatin1(name)] = QJsonValue::fromVariant(root->property(name));
     state["monitor"] = m_preferences->monitor(); state["reducedMotion"] = m_preferences->reducedMotion();
     state["gameInputAvailable"] = m_handheld && m_handheld->gameInputAvailable();
