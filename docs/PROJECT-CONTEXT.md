@@ -38,7 +38,7 @@ skipped, so content equality remains unverified. See
 - Jume Launcher has machine proof for status values, storage/settings,
   PortMaster and routed remote control. R56 aligns Wi-Fi, battery and clock; R64
   captured the HUD's `GPU 200 MHz` matching target state. Physical LCD remains open.
-  The `0.1.0-dev` name/version/About page passes host Qt tests. The R77 full
+  The `0.1.0-dev` name/version/About page passes host Qt tests. The R78 full
   handheld package pins R74 and passes host checks; target deployment remains open.
 - Repaired GTA III/Vice City accept the Switch-layout controls and no longer
   reproduce the bounded-exit crash. GTA-only `noafbc`, first-config 640x480 and
@@ -73,7 +73,7 @@ skipped, so content equality remains unverified. See
 - Stardew's source, managed copy and backup hashes match and overwrite is refused.
   R45's direct-display run crossed the SDL/GBM crash and stayed active for its
   full 120-second bound. Later shared-Wayland runs at two clock profiles stayed
-  before window creation with no game submissions. R77 retains the exact accepted
+  before window creation with no game submissions. R78 retains the exact accepted
   Mono/Mesa isolation shim; shared-window diagnosis, save/load and physical
   picture/audio/control evidence remain open.
 - ES-DE's transient 33 ms idle pacing roughly halved settled CPU use and reduced
@@ -105,7 +105,7 @@ runbooks.
 
 1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
    identity, new-password activation, unrelated-action denial and reboot persistence.
-2. Deploy R77 Jume Launcher `0.1.0-dev`; in the same guarded session confirm the
+2. Deploy R78 Jume Launcher `0.1.0-dev`; in the same guarded session confirm the
    retained R45 Stardew direct path and capture the shared-Wayland stall state.
    Make Launcher persistent only after cold-boot, settings, game-return and
    recovery gates pass; retain ES-DE rollback.

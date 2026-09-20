@@ -1,6 +1,6 @@
 # Independent tool applications
 
-Status 2026-09-20: **R45 STARDEW DIRECT TARGET PASS / R77 SHARED HOST PACKAGE PASS / TARGET OPEN**.
+Status 2026-09-20: **R45 STARDEW DIRECT TARGET PASS / R78 SHARED HOST PACKAGE PASS / TARGET OPEN**.
 The normal home/library has separate Neo, PortMaster and USB entries. Each uses
 [shared UI defaults](controls/README.md), its own route and the existing controller,
 modal, keyboard and remote-control paths. No persistent launcher was replaced.

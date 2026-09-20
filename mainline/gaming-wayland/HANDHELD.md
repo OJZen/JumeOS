@@ -1,6 +1,6 @@
 # Handheld compositor policy
 
-Status 2026-09-20: **R74 VICE CITY SHORT ATTENDED PASS / R77 HOST PACKAGE PASS / DEVICE OPEN**.
+Status 2026-09-20: **R74 VICE CITY SHORT ATTENDED PASS / R78 HOST PACKAGE PASS / DEVICE OPEN**.
 This is a separately named candidate over the retained Weston 14.0.2 backend;
 it does not replace the device's accepted desktop-shell probe or ES-DE.
 
@@ -255,17 +255,19 @@ audio, physical-control, save or relaunch proof.
 
 ## Resume and rebuild
 
-R77 is the current no-Moonlight deployment candidate at
-`mainline/out/.cache/r46h-handheld-r77-r74-default-20260920/`. Clean source
-`228497c8a0e7c95a310f225b7b41c7de26b6ecb2` produced archive SHA-256
-`12c7d1543532e017dfb5758c20253386e60cda85983d7c9c758beb7522841aa8`
+R78 is the current no-Moonlight deployment candidate at
+`mainline/out/.cache/r46h-handheld-r78-receipt-20260920/`. Clean source
+`9c1238888496be3310dc2be42e01805de0108369` produced archive SHA-256
+`4d00cb3d7a7d5532b650a40ad04041ed30f814e5e11ad4fe8ef2617e55e2deea`
 with manifest SHA-256
-`2e17f989a96b78c5b7ee3360bee2f7cafd7e4c9f41a60258c2d33edfcc443357`.
+`845d24f15f2c9f9f027bf1b36083dd720a93d211fa2c8e211b5dc7294b3cb49a`.
 The full ARM64 shell, Wayland, session, PortMaster and remote checks passed; its
-receipt pins the accepted R74 re3/reVC hashes. Its packaged Mono shim SHA-256
+receipt identifies the complete handheld host boundary, keeps R60 only as the
+Mesa runtime revision, and pins the accepted R74 re3/reVC hashes. Its packaged
+Mono shim SHA-256
 `28164fe9af77f8b02e6f7caef18e48c5de146ac5351fb28a1d63fb60f140354e`
 also matches the R45 direct-display target pass, so another compatibility layer
-is not justified before diagnosing the shared-Wayland stall. R77 is host evidence
+is not justified before diagnosing the shared-Wayland stall. R78 is host evidence
 only and awaits exact target readback, preflight and physical acceptance.
 
 R51 reuses the existing composed game layer, resident performance panel,
