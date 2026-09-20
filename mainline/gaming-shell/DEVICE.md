@@ -244,23 +244,27 @@ Qt adapter intentionally still accepts only the accepted kernel.
 ## Combined acceptance route
 
 Keep the device off during host preparation. One attended batch can cover the
-following sequence; most navigation/capture and readback is agent-operated.
-Rediscover identity, serial and host keys first; keep external supply connected.
-Freeze the current shell and Moonlight v3 hashes, with R15/v2/Embedded fallbacks ready.
+following sequence; most navigation, capture and readback is agent-operated.
+The batch starts with the exact [p2 v0.18](../rootfs-debian13-gaming-v18/README.md)
+media write, so the TF card must be available before power-on. Rediscover media,
+serial and host-key identity first; keep external supply connected. Freeze the
+[R78 handheld package](../gaming-wayland/HANDHELD.md#resume-and-rebuild) and
+[R45 direct Stardew fallback](../gaming-ports/README.md#r45-stardew-gallium-preload),
+with p2 v0.17 and ES-DE ready for recovery.
 
 | Route | Agent checks | Operator observations |
 | --- | --- | --- |
-| Remote device preview: home → settings → storage/CPU | SSH actions/captures, left-first focus, choices, real capacity/flags, bounded CPU apply/readback/restore; record hidden/visible HUD samples | Layout, focus motion and physical Y/START/Select semantics |
-| Same preview: keyboard/tester → power page | Private-input capture refusal, test-page input, tester exit, 30-second real dim and wake, lease cleanup | LCD brightness changes, first wake does not move selection, keyboard motion |
-| Remote streaming: pair → application list → default stream | List retrieval/selection, cancellation/manual fallback, stream args, decoder/renderer identity, fresh IPC generation after exit | One PIN entry, native HUD/pacing, same quiet A/V cues, individual L1/R1 then combined exit |
-| Same streaming session: host loss → reconnect | Stop/restart the isolated Sunshine process; check safe error return and reconnection | Actual LCD return; compare local/streamed audio if roughness remains |
-| Network/power checkpoint | Scan/new connection, saved-Wi-Fi switch/forget, recovery via serial, actual permissions, normal/forced cleanup and requested reboot | Password entry on the handheld; supply/boot observation; agent records other results |
-| Separate candidate-kernel step, if health permits | One-shot Image/modules with accepted DTB/fallback, module/algorithm checks, bounded swap/zram apply/disable and memory-reserve refusal | Observe boot/recovery; do not combine this kernel change with renderer comparison |
+| v0.18 media and cold identity | Fixed-profile p2 write/readback, cold identity, exact package/rule hashes, service health and unrelated-action denial | Card handling and normal boot observation |
+| R78 transient desktop baseline | Full target manifest/preflight; Home, About/version/URL, 100%/120% fonts, aligned Wi-Fi/battery/clock/charge state, settings/storage, L3+R3 ownership and clean ES-DE return | LCD layout/motion, readability and physical shortcut feel |
+| Local lifecycle and retained state | Metal Slug launch/coin/start/panel/exit/relaunch and retained slot load; R74 GTA III/Vice City broader play, save/load, exit and relaunch with managed-save hashes | Picture, audio and physical controls; confirm expected loaded state |
+| Stardew direct then shared | R45 start/load/save/exit/relaunch with source/backup hashes preserved; then R78 process maps, window state, submissions and logs for the shared-Wayland stall | Direct-path picture, audio, controls and loaded farm; report whether a shared window appears |
+| Network, reboot and recovery | New private account password, Wi-Fi create/reconnect/forget, permission checks, warm reboot persistence, repeated R78 start/stop, forced-child recovery, bounded log/cache growth and ES-DE fallback | Enter secrets only on the handheld and confirm expected network choice |
 
 Run each changed path once; repeat only after a relevant failure/fix. A denied
 permission, thermal/voltage warning or missing capability remains an explicit
-open item, not an excuse to bypass the guard. Long streaming acceptance follows
-clean short A/V results. The actual gamepad-host gate still needs a supported
-Windows/Linux Sunshine machine; this Mac remains the A/V host.
+open item, not an excuse to bypass the guard. Cool between game bounds and stop
+at the existing 85 C external abort. Moonlight, zram-kernel promotion, USB HID,
+Bluetooth and suspend/resume are intentionally outside this batch: each is
+deferred or lacks a changed hypothesis.
 Keep machine receipts separate from the operator's LCD/audio observations.
 End with restored settings, health checks, sync and serial-confirmed poweroff.

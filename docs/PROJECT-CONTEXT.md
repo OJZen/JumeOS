@@ -105,14 +105,16 @@ runbooks.
 
 1. Deploy exact p2 v0.18 through a fixed-profile write/readback, then verify cold
    identity, new-password activation, unrelated-action denial and reboot persistence.
-2. Deploy R78 Jume Launcher `0.1.0-dev`; in the same guarded session confirm the
-   retained R45 Stardew direct path and capture the shared-Wayland stall state.
-   Make Launcher persistent only after cold-boot, settings, game-return and
-   recovery gates pass; retain ES-DE rollback.
-3. Continue R74 broader gameplay/save proof and profile the below-30-FPS
-   open-world phase only when a new software hypothesis exists. Keep R63/R60
-   available; do not repeat SGSR1 or a live GPU minimum-frequency raise unchanged.
-4. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
+2. Run the [combined acceptance route](../mainline/gaming-shell/DEVICE.md#combined-acceptance-route):
+   R78 launcher/status/About/input ownership, Metal Slug state, R74 GTA save and
+   broader-play lifecycle, then R45 direct and R78 shared Stardew paths.
+3. Finish the same batch with Wi-Fi/reboot persistence, repeated launcher
+   start/stop, forced-child recovery, bounded cache/log growth and ES-DE fallback.
+   Make Launcher persistent only after these gates pass.
+4. Profile R74's below-30-FPS open-world phase only when a new software hypothesis
+   exists. Keep R63/R60 available; do not repeat SGSR1 or a live GPU minimum-frequency
+   raise unchanged.
+5. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
    other hardware-gated work until requested or its evidence changes.
 
 ## Working rules
