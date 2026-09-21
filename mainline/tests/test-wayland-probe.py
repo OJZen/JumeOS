@@ -36,6 +36,13 @@ with tempfile.TemporaryDirectory(prefix='handheld-client-', dir=repo / 'mainline
     record = root / 'args'
     result = bash(f'CALL_RECORD={record} R46H_ROUTED_SOURCE=/dev/input/test R46H_SHARED_PORTS=1 {root}/handheld-client.sh ui {output}')
     assert result.returncode == 0 and '--applications' not in record.read_text().splitlines(), result
+    browser = root / 'browser/browser-client.sh'
+    browser.parent.mkdir(); browser.write_text('#!/bin/sh\nexit 0\n')
+    for mode, diagnostic in [(0o644, True), (0o755, False)]:
+        browser.chmod(mode)
+        result = bash(f'CALL_RECORD={record} R46H_ROUTED_SOURCE=/dev/input/test R46H_SHARED_PORTS=0 {root}/handheld-client.sh ui {output}')
+        assert result.returncode == 0, result
+        assert ('--applications' in record.read_text().splitlines()) == diagnostic
 
 
 # Execute the actual batched header/closure check without loading fixture ELFs.

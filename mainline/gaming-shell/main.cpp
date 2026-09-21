@@ -13,6 +13,8 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QQuickItem>
 #include <QGuiApplication>
 #include <QQuickView>
@@ -175,6 +177,11 @@ int main(int argc, char **argv) {
     window.setSource(QUrl("qrc:/qt/qml/R46H/Shell/ShellView.qml"));
     if (window.status() != QQuickView::Ready) return 1;
     const QPointer<QQuickItem> root(window.rootObject());
+    const auto browserClient = QDir::cleanPath(QCoreApplication::applicationDirPath() + "/../../browser/browser-client.sh");
+    root->setProperty("browserAvailable", QFileInfo(browserClient).isExecutable());
+    QFile browserVersions(QFileInfo(browserClient).absolutePath() + "/engine-versions.json");
+    if (QFileInfo(browserClient).isExecutable() && browserVersions.open(QIODevice::ReadOnly))
+        root->setProperty("browserVersions", QJsonDocument::fromJson(browserVersions.read(4096)).object().toVariantMap());
     int fatalStatus = 0;
     std::unique_ptr<HandheldSession> handheld;
     if (handheldMode) {
@@ -196,6 +203,21 @@ int main(int argc, char **argv) {
     }
     QObject::connect(&tools, &ToolState::notice, &window, [root](const QString &message) { if (root) QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, message)); });
     QString sharedNativeGame;
+    QObject::connect(root, SIGNAL(browserRequested()), &applications, SIGNAL(browserRequested()));
+    QObject::connect(&applications, &Applications::browserRequested, &app, [&] {
+        if (!handheldMode || !handheld->ready()) {
+            QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, QStringLiteral("浏览器需要共享 Wayland 会话"))); return;
+        }
+        if (applications.running() || !preferences.save()) return;
+        const auto browserState = state + "/browser";
+        if (QFileInfo(browserState).isSymLink() || !QDir().mkpath(browserState)) {
+            QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, QStringLiteral("无法创建浏览器私有目录"))); return;
+        }
+        auto environment = QProcessEnvironment::systemEnvironment();
+        environment.insert("QT_QPA_PLATFORM", "wayland");
+        environment.remove("R46H_SHELL_LOG");
+        applications.launchPrepared("builtin.browser", browserClient, {"--state-dir", browserState}, browserState, environment);
+    });
     QObject::connect(&tools, &ToolState::nativeRequested, &app, [&](const QString &game) {
         if (!preferences.save()) return;
         if (!handheldMode) { QCoreApplication::exit(79); return; }

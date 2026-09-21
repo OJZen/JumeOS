@@ -11,7 +11,7 @@ mainline/gaming-shell/run.sh --applications /absolute/external/applications.json
 ```
 
 Without the option, the built-in Moonlight, Neo, PortMaster, USB gamepad, controller
-test and settings entries are shown. Their tools use stable `builtin.*` favorite
+test, settings and optional [Jume Browser](../gaming-browser/README.md) entries are shown. Their tools use stable `builtin.*` favorite
 IDs and internal routes; see [Tools](TOOLS.md). The explicit manifest replaces
 that default list; the old labelled demos remain only in focused QML fixtures. The manifest is
 read once at startup: up to 512 entries in a 512 KiB JSON file, owned by the user

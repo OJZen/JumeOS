@@ -15,7 +15,9 @@ R35's identified-device candidate showed actual Wi-Fi link quality,
 battery percentage and charge/discharge state beside the clock. Host previews keep
 their explicit preview label instead of inventing device values.
 Settings now includes an About page with the launcher name, version and
-`https://github.com/OJZen/JumeOS`.
+`https://github.com/OJZen/JumeOS`. It also displays installed
+[Jume Browser](../gaming-browser/README.md) engine and security-patch versions
+from the runtime's generated metadata; absent metadata is explicitly unknown.
 The 2026-09-17 native build passed all three Qt test targets; reviewed 100% and
 120% host captures are under `mainline/out/.cache/jume-launcher-about-20260917/`.
 This is host-window evidence, not an R46H LCD result.

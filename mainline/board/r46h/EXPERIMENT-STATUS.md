@@ -22,7 +22,7 @@ full target checksum/readback was skipped, so equality remains unverified; see
 
 Fallbacks are p2 v0.7 attended and v0.15 automated; v0.17 passed readbacks/cold/warm infra.
 Exact p2 v0.18 passes fixed-profile write/full readback, cold identity, policy
-scope and full base smoke; new Wi-Fi activation/reboot persistence, LCD, USB,
+scope and full base smoke; launcher-created Wi-Fi activation/reboot persistence, LCD, USB,
 Moonlight and PSP remain open.
 
 ## Capability ledger
@@ -71,6 +71,10 @@ Moonlight and PSP remain open.
   two Settings focus runs from about 29.5 to 57.2--57.5 submissions/s and HUD
   runs from 29.9 to 58.5--59.0; p50 was 16.64--16.71 ms. Services restored with
   zero failed units/kernel/ext4/OOM errors; LCD/readability, L3+R3 and promotion remain open.
+- **[Jume Browser](../../gaming-browser/README.md) — TARGET GPU/SANDBOX PASS / HEAVY-SITE OOM + SECURITY OPEN.**
+  Offline input/IME/tabs/About, WebGL 2, sandbox and lifecycle/privacy pass; mi.com policy/OOM failures remain.
+  A 128 MiB tile budget passed bounded pressure/target regression; discard failed form retention and was withdrawn.
+  Device cleanly powered off; the browser runbook owns exact scope and remaining gates.
 - **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
   Dynamic `schedutil` and both GTA engines passed; reset recovered a live GPU-min panic. Do not repeat it.
 - **Wayland/ports — R74 SHORT ATTENDED + R79 TRANSIENT MACHINE PASS / BROADER PLAY OPEN.**
@@ -114,14 +118,12 @@ Moonlight and PSP remain open.
   reconnect; unrelated permissions stayed denied. Exact packages/rule pass
   reproducible host validation, fixed-profile p2 write/full readback, cold
   identity, exact target hashes and intended/denied permission checks. A root:600
-  autoconnect profile is installed, but the target AP was not visible on 2026-09-21;
-  activation and reboot persistence remain open.
-- **Onboard Bluetooth — NOT PRESENT / UI REMOVED.** Boot reports `BT=0`; rfkill,
-  sysfs, USB and the board DTS expose no controller. Launcher settings were removed.
+  autoconnect profile's truncated SSID was corrected on 2026-09-21; activation and Wi-Fi file transfer passed.
+  Next cold boot autoconnected; launcher-created activation/persistence remain open. Credentials stay ignored.
+- **Onboard Bluetooth — NOT PRESENT / UI REMOVED.** Boot `BT=0`, rfkill/sysfs/USB/DTS show no controller.
 - **Zram — ONE-SHOT KERNEL + APPLY/DISABLE DEVICE PASS / PRODUCT BUILD + PROMOTION OPEN.**
-  The v0.18 candidate used 43.5 MiB of 256 MiB LZ4 swap under bounded pressure,
-  then reset/unloaded cleanly. v0.19 product source now carries the same fixed
-  startup policy; normal v0.15/media remain the accepted fallback.
+  The v0.18 candidate used 43.5/256 MiB LZ4 under bounded pressure, then reset/unloaded cleanly.
+  v0.19 source carries the same startup policy; normal v0.15/media remain the accepted fallback.
 - **Hantro media — QT V3 SHORT HUD/A/V/RETURN PASS / LONG SESSION OPEN.**
   Default-preset native HUD, picture/audio, shoulders, host-loss return and reconnect
   were accepted; 59.25 rendered FPS reported. Application-list retrieval failed to
@@ -129,11 +131,9 @@ Moonlight and PSP remain open.
 - **External USB — SINGLE HOST BOUNDED-READ PASS / CURRENT HID GADGET PATH FAIL.**
   A known disk's bounded hashes matched. R41 found DWC2 Host, `dr_mode=host` and no
   UDC/gadget/role entry; wiring evidence plus a recoverable kernel/DT candidate are required.
-- **Rumble — DIRECT MOTOR PASS / APP ROUTING OPEN.** Two bounded `FF_RUMBLE`
-  pulses were felt. Emulator routing, magnitude and suspend interaction are open.
+- **Rumble — DIRECT MOTOR PASS / APP ROUTING OPEN.** Two pulses felt; routing, magnitude and suspend are open.
 - **Charger ONLINE + net charging — SHORT ATTENDED PASS / LIMITS OPEN.** GPIO
-  ONLINE and meter/current direction proved short-run net charging. Do not
-  repeat unchanged; limits remain open. V0.12 RK817 150 mA is host-only/unbooted.
+  ONLINE and meter proved short-run net charging; limits open. V0.12 RK817 150 mA is host-only/unbooted.
 - **A2 media — READ-ONLY PASS / CQE OPEN.** Tested p2 works; comparative performance remains open.
 - **Second card slot — UNAVAILABLE.** V0.17 disables it; dual-card needs isolation.
 - **Suspend/resume — OPEN / HIGH RISK.** Require bounded wake/recovery before retesting.
@@ -146,6 +146,5 @@ Moonlight and PSP remain open.
   [promotion](../../gaming-product-boot-promotion/README.md), [p3](../../../docs/P3-CONTENT-MIGRATION.md).
 - Product: [rootfs](../../rootfs-debian13-gaming-v17/README.md), [MVP](../../bringup-tests/GAMING-MVP.md),
   [input/audio](../../bringup-tests/ATTENDED-INPUT-AUDIO-COMPLETION.md).
-- Hardware: [audio](../../bringup-tests/AUDIO-ROUTE-PROBE.md),
-  [charging](../../bringup-tests/V12-CHARGE-TERM-POLICY.md),
+- Hardware: [audio](../../bringup-tests/AUDIO-ROUTE-PROBE.md), [charge](../../bringup-tests/V12-CHARGE-TERM-POLICY.md),
   [Hantro](../../bringup-tests/HANTRO-CODEC-DECODE-PROBE.md), [USB](../../bringup-tests/USB-STORAGE-READ-PROBE.md).

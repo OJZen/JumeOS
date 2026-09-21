@@ -1,0 +1,26 @@
+cmake_minimum_required(VERSION 3.21)
+project(JumeBrowser VERSION 0.1.0 LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Quick WebEngineQuick Test)
+find_package(SDL2 REQUIRED)
+qt_standard_project_setup(REQUIRES 6.8)
+set(shell "${CMAKE_CURRENT_SOURCE_DIR}/../gaming-shell")
+qt_add_executable(jume-browser main.cpp browserinput.cpp browserinput.h ${shell}/input.cpp)
+target_include_directories(jume-browser PRIVATE ${shell})
+target_link_libraries(jume-browser PRIVATE Qt6::Quick Qt6::WebEngineQuick SDL2::SDL2)
+target_compile_definitions(jume-browser PRIVATE JUME_BROWSER_VERSION="${PROJECT_VERSION}-dev")
+qt_add_resources(jume-browser browser PREFIX "/browser" FILES Browser.qml)
+# Reuse the launcher's controls and real IME, including its tested arrow navigation.
+qt_add_resources(jume-browser controls PREFIX "/browser" BASE "${shell}" FILES
+    ${shell}/KeyboardPanel.qml ${shell}/controls/qmldir ${shell}/controls/Theme.qml
+    ${shell}/controls/Button.qml ${shell}/controls/Label.qml ${shell}/controls/Icon.qml
+    ${shell}/controls/Motion.qml ${shell}/controls/TextField.qml)
+include(CTest)
+if(BUILD_TESTING)
+    qt_add_executable(browser-check check.cpp browserinput.cpp browserinput.h ${shell}/input.cpp)
+    target_include_directories(browser-check PRIVATE ${shell})
+    target_link_libraries(browser-check PRIVATE Qt6::Quick Qt6::Test SDL2::SDL2)
+    add_test(NAME browser-check COMMAND browser-check)
+endif()
+install(TARGETS jume-browser RUNTIME DESTINATION bin)

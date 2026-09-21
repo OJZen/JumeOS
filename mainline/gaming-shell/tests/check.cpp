@@ -5,6 +5,7 @@
 #include "streaming.h"
 #include "device.h"
 #include "network.h"
+#include "tools.h"
 #include <QCryptographicHash>
 #include <QJsonArray>
 #include <QFile>
@@ -270,10 +271,16 @@ private slots:
         QCOMPARE(root->property("settingsCategory").toInt(), 11);
         QCOMPARE(root->findChild<QObject *>("brandName")->property("text").toString(), QStringLiteral("Jume"));
         const auto about = root->findChild<QObject *>("settingsView")->property("rows").toList();
-        QCOMPARE(about.size(), 3);
+        QCOMPARE(about.size(), 6);
         QCOMPARE(about[0].toMap().value("value").toString(), QStringLiteral(JUME_LAUNCHER_NAME));
         QCOMPARE(about[1].toMap().value("value").toString(), QStringLiteral(JUME_LAUNCHER_VERSION));
         QCOMPARE(about[2].toMap().value("value").toString(), QStringLiteral("https://github.com/OJZen/JumeOS"));
+        QCOMPARE(about[3].toMap().value("value").toString(), QStringLiteral("未安装 / 版本未知"));
+        root->setProperty("browserVersions", QVariantMap{{"webEngine", "6.10.2"}, {"chromium", "134.0.6998.208"}, {"securityPatch", "144.0.7559.96"}});
+        const auto versions = root->findChild<QObject *>("settingsView")->property("rows").toList();
+        QCOMPARE(versions[3].toMap().value("value").toString(), QStringLiteral("6.10.2"));
+        QCOMPARE(versions[4].toMap().value("value").toString(), QStringLiteral("134.0.6998.208"));
+        QCOMPARE(versions[5].toMap().value("value").toString(), QStringLiteral("144.0.7559.96"));
         action("home"); QVERIFY(labels().contains("收藏"));
         action("nextTab"); action("nextTab"); QTest::qWait(200);
         QVERIFY(!labels().contains("收藏")); QVERIFY(labels().contains("选择分类"));
@@ -534,6 +541,25 @@ private slots:
         Preferences loaded(directory.path()); QVERIFY(loaded.isFavorite(2)); QVERIFY(loaded.applicationFavorites().contains("game-a"));
         QVERIFY(loaded.toggleApplicationFavorite("game-a")); QVERIFY(loaded.save());
         Preferences removed(directory.path()); QVERIFY(removed.applicationFavorites().isEmpty()); QVERIFY(removed.isFavorite(2));
+    }
+    void browserEntryAndPrivacy() {
+        QTemporaryDir directory;
+        Preferences state(directory.path()); Telemetry metrics(directory.path()); ControllerInput controller;
+        ToolState tools(directory.path(), directory.path(), false); Applications applications; QQuickView view;
+        view.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(&metrics)},
+            {"controller", QVariant::fromValue(&controller)}, {"tools", QVariant::fromValue(&tools)}, {"applications", QVariant::fromValue(&applications)}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready);
+        auto *root = view.rootObject(); QSignalSpy request(root, SIGNAL(browserRequested()));
+        root->setProperty("selected", 6);
+        QVERIFY(QMetaObject::invokeMethod(root, "activateSelected")); QCOMPARE(request.size(), 0);
+        root->setProperty("browserAvailable", true);
+        QVERIFY(QMetaObject::invokeMethod(root, "activateSelected")); QCOMPARE(request.size(), 1);
+        QVERIFY(!root->property("sensitiveVisible").toBool());
+        QVERIFY(applications.launchPrepared("builtin.browser", "/bin/sleep", {"2"}, directory.path(), QProcessEnvironment::systemEnvironment()));
+        QTRY_VERIFY(root->property("sensitiveVisible").toBool());
+        applications.stop(); QTRY_VERIFY(!applications.running());
+        QVERIFY(!root->property("sensitiveVisible").toBool());
     }
     void streamingStatistics() {
         QTemporaryDir directory; Streaming stream(directory.path());

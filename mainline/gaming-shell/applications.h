@@ -32,6 +32,7 @@ public:
     Q_INVOKABLE bool launch(int index);
     Q_INVOKABLE void stop();
 signals:
+    void browserRequested();
     void changed();
     void started();
     void finished();

@@ -16,6 +16,9 @@ Item {
     property var tools: null
     property bool sharedDisplay: false
     property bool sharedReady: true
+    property bool browserAvailable: false
+    property var browserVersions: ({})
+    signal browserRequested()
     readonly property bool gameOverlay: sharedDisplay && externalSession
     readonly property bool panelVisible: quickOpen || quickPanel.x < 1024
     readonly property bool monitorVisible: store.monitor
@@ -36,7 +39,7 @@ Item {
     readonly property bool remoteTextAllowed: editing && !quickOpen && !choicesOpen && !dimmed && !externalSession && (editPurpose === "portSearch" || testInputVisible)
     readonly property int portCatalogIndex: toolView.item ? toolView.item.catalogIndex : 0
     readonly property bool portCatalogSidebar: !toolView.item || toolView.item.catalogSidebar
-    readonly property bool sensitiveVisible: (editing && !testInputVisible) || (streaming !== null && streaming.pin.length > 0)
+    readonly property bool sensitiveVisible: (externalSession && activeApplication === "builtin.browser") || (editing && !testInputVisible) || (streaming !== null && streaming.pin.length > 0)
     property string editPurpose: "test"
     property string editLabel: "文字输入测试"
     readonly property bool externalSession: applications !== null && applications.running
@@ -108,7 +111,8 @@ Item {
         {id: "builtin.ports", title: "PortMaster", detail: "移植游戏与存档", color: "#386c72", route: "ports", icon: "ports"},
         {id: "builtin.usb", title: "USB 手柄", detail: "手柄映射与配置", color: "#667948", route: "usb", icon: "usb"},
         {id: "builtin.controller", title: "摇杆测试", detail: "查看按键与摇杆", color: "#805779", route: "controller", icon: "gamepad"},
-        {id: "builtin.settings", title: "设置", detail: "设备与界面", color: "#397d91", route: "settings", icon: "settings"}
+        {id: "builtin.settings", title: "设置", detail: "设备与界面", color: "#397d91", route: "settings", icon: "settings"},
+        {id: "builtin.browser", title: "Jume Browser", detail: browserAvailable ? "Chromium 掌机浏览器 · 开发预览" : "浏览器运行时尚未安装", color: "#3159a2", route: "browser", icon: "monitor"}
     ]
     function openTool(kind) {
         if (!tools || !["neo", "ports", "usb"].includes(kind) || !tools.save()) return
@@ -219,6 +223,10 @@ Item {
         if (!games[selected]) return
         if (tools && games[selected].route) {
             const route = games[selected].route
+            if (route === "browser") {
+                if (!browserAvailable) { notify("请先安装 Jume Browser 预览运行时"); return }
+                browserRequested(); return
+            }
             if (["neo", "ports", "usb"].includes(route)) openTool(route)
             else showScene(route)
             return
@@ -443,6 +451,7 @@ Item {
                 navigationActive: root.windowVisible && !root.quickOpen && !root.tabsFocused && !root.editing && !root.dimmed
                 visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page === 2
                 store: root.store; metrics: root.metrics; controller: root.controller; device: root.device; network: root.network
+                browserVersions: root.browserVersions
                 onNotice: function(text) { root.notify(text) }
                 onActivity: { root.activity(); root.forceActiveFocus() }
                 onEditRequested: root.openEditor()

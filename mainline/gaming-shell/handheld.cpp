@@ -299,6 +299,11 @@ void HandheldSession::readPolicy() {
     }
     if (!response.value("ok").toBool() || response.value("session").toString().isEmpty()
         || response.value("uiPid").toInteger() != QCoreApplication::applicationPid() || !response.value("privacy").isBool()) {
+        // Protocol metadata only: never log page contents, URLs or full replies.
+        qWarning("HANDHELD_POLICY_REJECT op=%s error=%s retries=%d ok=%d session_present=%d ui_matches=%d privacy_boolean=%d",
+            qPrintable(m_request.value("op").toString()), qPrintable(response.value("error").toString().left(64)), m_retries,
+            response.value("ok").toBool(), !response.value("session").toString().isEmpty(),
+            response.value("uiPid").toInteger() == QCoreApplication::applicationPid(), response.value("privacy").isBool());
         fail(QStringLiteral("合成器归属或隐私状态无效。")); return;
     }
     if (m_request.value("op") != QJsonValue("hello")) m_retries = 0;

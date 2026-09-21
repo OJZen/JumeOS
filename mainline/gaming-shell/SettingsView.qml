@@ -10,6 +10,7 @@ Item {
     required property var controller
     property var device: null
     property var network: null
+    property var browserVersions: ({})
     readonly property bool hardware: device !== null && device.target
     property var choiceValues: []
     property string choiceKey: ""
@@ -51,7 +52,10 @@ Item {
         case 9: return [{name: "频率预设", detail: "本次测试会话生效", key: "cpuPreset"}, {name: "调速器", detail: "", key: "cpuGovernor"}, {name: "最低频率", detail: "", key: "cpuMin"}, {name: "最高频率", detail: "", key: "cpuMax"}, {name: "当前频率", detail: "", key: "cpuCurrent"}]
         case 10: return [{name: "Swap 使用", detail: "", key: "swap"}, {name: "zram 内存压缩", detail: "", key: "zram"}, {name: "压缩算法", detail: "", key: "zramAlgorithms"}, {name: "压缩内存占用", detail: "", key: "zramMemory"}]
         default: return [{name: "启动器", value: Qt.application.displayName}, {name: "版本", value: Qt.application.version},
-            {name: "项目地址", value: "https://github.com/OJZen/JumeOS"}]
+            {name: "项目地址", value: "https://github.com/OJZen/JumeOS"},
+            {name: "浏览器 Qt WebEngine", value: browserVersions.webEngine || "未安装 / 版本未知"},
+            {name: "Chromium 内核", value: browserVersions.chromium || "—"},
+            {name: "Chromium 安全补丁基线", value: browserVersions.securityPatch || "—"}]
         }
     }
     signal notice(string text)

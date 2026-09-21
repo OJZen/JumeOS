@@ -16,12 +16,13 @@ if [ "$role" = game ]; then
     exec "$base/shell-client.sh" --scene controller --fullscreen --quit-after 240
 fi
 [ "$role" = ui ] || exit 2
+set --
 if [ -f "$base/MOONLIGHT_SHA256" ]; then
     client_hash=$(cat "$base/MOONLIGHT_SHA256")
     [ "${#client_hash}" = 64 ] && [ "$(sha256sum "$base/usr/bin/moonlight-qt" | cut -d ' ' -f 1)" = "$client_hash" ]
     export R46H_VIRTUAL_KEYBOARD=1
     set -- --scene streaming --moonlight-client "$base/usr/bin/moonlight-qt" --moonlight-sha256 "$client_hash"
-elif [ "${R46H_SHARED_PORTS:-0}" != 1 ]; then
+elif [ "${R46H_SHARED_PORTS:-0}" != 1 ] && [ ! -x "$base/browser/browser-client.sh" ]; then
 cat > "$output/applications.json" <<JSON
 {"version":1,"applications":[{"id":"diagnostic.controller","title":"独立摇杆测试","program":"$base/handheld-client.sh","arguments":["game","$output"]}]}
 JSON

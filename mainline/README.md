@@ -15,6 +15,7 @@ candidate.
 | [`rootfs-debian13-gaming-v18/`](rootfs-debian13-gaming-v18/) | Current gaming rootfs entry point |
 | [`gaming-es-de/`](gaming-es-de/) | ES-DE runtime and frontend integration |
 | [`gaming-shell/`](gaming-shell/) | Qt Quick handheld desktop |
+| [`gaming-browser/`](gaming-browser/) | Optional Chromium-based handheld browser preview |
 | [`gaming-wayland/`](gaming-wayland/) | Shared Wayland session and routed input |
 | [`gaming-ports/`](gaming-ports/) | PortMaster and native game support |
 | [`gaming-moonlight/`](gaming-moonlight/) | Moonlight client work |

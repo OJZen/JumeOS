@@ -25,6 +25,7 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
 | S1 / P1 | Network and basic settings | Wi-Fi authorization, password privacy, connect/disconnect/remember/forget and recovery; add audio-output operations only after detecting actual capabilities |
 | S2 / P1 | CPU and memory profiles | Retain accepted CPU controls; ship the fixed 256 MiB LZ4 zram policy only after the product artifact and rollback-safe persistent boot pass; keep disk swap manual |
 | S3 / P1 | Power management | Retain real dim/wake and supervised reboot/poweroff; measure charging/battery reporting and low-voltage policy, then design bounded suspend/wake recovery |
+| B1 / P1 | [Jume Browser](../mainline/gaming-browser/README.md) | Dual-stick scrolling/cursor, B/Y/A/X, tabs/address/IME; maintained Chromium security baseline, sandbox, Panfrost composition/WebGL and separately measured video decode; memory/thermal and foreground recovery on device |
 | Q1 / P1→P2 | Product installation and endurance | Make Jume Launcher the persistent default after settings/pairing/saves, bounded logs/caches, repeated launches and sustained gameplay pass; remove ES-DE only after cold-boot, crash recovery and upgrade/rollback no longer depend on it |
 
 ## Current evidence by workstream — 2026-09-20
