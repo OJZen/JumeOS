@@ -283,6 +283,8 @@ On the same v0.17 cold boot, Qt 6.8.2 used OpenGL ES 3.1/Mesa 25.0.7 Panfrost,
 | Opening/closing quick panel | 18.0 | 59.4 |
 | Alternating keyboard navigation | 20.3 | 60.0 |
 | Same keyboard navigation with compact HUD | — | 60.1 |
+| Two-level Settings category focus (v0.18, two runs) | 29.5–29.6 | 57.2–57.5 |
+| Same Settings focus with HUD (v0.18, two runs) | 29.9 | 58.5–59.0 |
 
 Cards' static artwork/text, the HUD, quick panel and keyboard key layout use
 Qt's item layer cache. The input page hides the covered desktop; the window clear supplies its opaque
@@ -315,9 +317,12 @@ QSG_RENDER_TIMING=1 /run/r46h-shell-probe/probe-r46h.sh --profile BINARY_SHA256
 The revision 7 HUD is a horizontal panel above the main content, retaining its
 CPU history. During text entry it becomes compact above the input field;
 opening the quick panel moves it into the inactive left area. Metric definitions
-and the toggle are unchanged. Settings labels are cached independently of the
-moving outline. `--profile-ui` now includes settings focus with/without the HUD;
-these host checks do not extend the revision 5 device throughput results above.
+and the toggle are unchanged. The two-level Settings category list is cached
+independently of its moving outline. On v0.18 this reduced Qt's measured average
+render time from 20.53 to 7.46 ms without HUD and 18.91 to 1.03 ms with HUD;
+two repeat runs produced the table ranges above. Evidence is under
+`mainline/out/.cache/r46h-profile-device-20260921/evidence/`; physical LCD motion
+and handheld input latency remain open.
 
 The keyboard adapter uses Qt 6.8.2's internal `keyboardLayoutLoader` cache,
 default-style `navigationHighlightColor`, and `noAnimations` binding. The packaged

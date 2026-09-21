@@ -247,6 +247,7 @@ Item {
         Ui.ListView {
             id: categoryList; objectName: "settingsCategories"
             y: Ui.Theme.contentY; width: Ui.Theme.sidebarWidth * 2; height: parent.height - y
+            layer.enabled: true
             visible: settings.sidebar; currentIndex: settings.category
             model: settings.categories
             delegate: SettingRow {
