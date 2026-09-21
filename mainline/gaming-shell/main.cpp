@@ -360,7 +360,7 @@ int main(int argc, char **argv) {
                 beginPhase("settings-focus-hud");
             }
             if (profileTick >= 330 && profileTick < 530)
-                QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, profileTick % 2 ? QStringLiteral("left") : QStringLiteral("right")), Q_ARG(QVariant, false));
+                QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, profileTick % 2 ? QStringLiteral("up") : QStringLiteral("down")), Q_ARG(QVariant, false));
             if (profileTick == 530) {
                 preferences.adjust("monitor", 1);
                 if (!virtualKeyboard) { finishProfile(); return; }
