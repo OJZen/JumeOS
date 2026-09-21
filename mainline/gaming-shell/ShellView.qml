@@ -138,11 +138,11 @@ Item {
         session = name === "session"
         quickOpen = name === "quick"
         if (page === 2) settingsView.enter()
-        if (name === "about") settingsView.openCategory(12)
+        if (name === "about") settingsView.openCategory(11)
         if (name === "performance" && !store.monitor) store.adjust("monitor", 1)
-        if (name === "controller") settingsView.openCategory(3)
-        if (name === "power") settingsView.openCategory(8)
-        if (name === "input") { settingsView.openCategory(9); openEditor() }
+        if (name === "controller") settingsView.openCategory(2)
+        if (name === "power") settingsView.openCategory(7)
+        if (name === "input") { settingsView.openCategory(8); openEditor() }
     }
     function changePage(value) {
         if (externalSession || choicesOpen) return

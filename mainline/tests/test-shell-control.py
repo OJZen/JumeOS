@@ -160,7 +160,7 @@ def main():
             assert not tap("right")["settingsSidebar"]
             wait_state("settingsDetailReady")
             assert tap("left")["settingsSidebar"]
-            for _ in range(9): tap("down")
+            for _ in range(8): tap("down")
             tap("right"); wait_state("settingsDetailReady"); assert tap("accept", True)["choicesOpen"]
             assert tap("down")["fontPercent"] == 100
             assert tap("nextTab")["page"] == 2  # A choice owns input until confirm/cancel.

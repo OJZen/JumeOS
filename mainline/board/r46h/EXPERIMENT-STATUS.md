@@ -116,8 +116,8 @@ Moonlight and PSP remain open.
   identity, exact target hashes and intended/denied permission checks. A root:600
   autoconnect profile is installed, but the target AP was not visible on 2026-09-21;
   activation and reboot persistence remain open.
-- **Bluetooth — HARDWARE BLOCKED.** Boot reports `BT=0`; rfkill/sysfs/USB expose
-  no controller and BlueZ is absent. Require controller/firmware before pairing.
+- **Onboard Bluetooth — NOT PRESENT / UI REMOVED.** Boot reports `BT=0`; rfkill,
+  sysfs, USB and the board DTS expose no controller. Launcher settings were removed.
 - **Zram — ONE-SHOT KERNEL + APPLY/DISABLE DEVICE PASS / PROMOTION OPEN.** The
   v0.18 candidate used 43.5 MiB of 256 MiB LZ4 swap under bounded pressure, then
   reset/unloaded cleanly. Normal v0.15/media were restored; benefit remains open.

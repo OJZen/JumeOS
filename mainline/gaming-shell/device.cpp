@@ -108,7 +108,6 @@ QVariantMap DeviceState::snapshot(const QString &root) {
     for(const auto &name:QDir(QDir(root).filePath("sys/class/devfreq")).entryList(QDir::Dirs|QDir::NoDotAndDotDot))
         if(name.contains("gpu",Qt::CaseInsensitive))gpuFrequencies.append(number(read(root,"sys/class/devfreq/"+name+"/cur_freq")));
     result["gpuFrequencyHz"]=gpuFrequencies.size()==1 ? gpuFrequencies.first() : QVariant(-1);
-    result["bluetoothControllers"]=QDir(QDir(root).filePath("sys/class/bluetooth")).entryList({"hci*"},QDir::Dirs|QDir::NoDotAndDotDot);
     const auto levelSaved=number(read(root,"var/lib/r46h-volume/level"));
     result["volumeSaved"]=levelSaved>=0 && levelSaved<=201 ? qRound(levelSaved*100./201) : -1;
     QVariantList swaps;

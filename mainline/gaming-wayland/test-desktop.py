@@ -294,9 +294,9 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
         # remains live, so opening a private editor must cancel the in-flight frame.
         observe(action='nextTab'); observe(action='nextTab')
         category = observe()['state']['settingsCategory']
-        for _ in range(abs(9 - category)): observe(action='down' if category < 9 else 'up')
+        for _ in range(abs(8 - category)): observe(action='down' if category < 8 else 'up')
         observe(action='accept'); observe(action='down')
-        assert observe()['state']['settingsCategory'] == 9 and observe()['state']['settingsIndex'] == 1
+        assert observe()['state']['settingsCategory'] == 8 and observe()['state']['settingsIndex'] == 1
         time.sleep(.15); wait_for(ready, 'Settings not ready for privacy race')
         compositor = int(os.environ['R46H_TEST_WESTON_PID'])
         assert b'--shell=/out/handheld-shell.so' in Path(f'/proc/{compositor}/cmdline').read_bytes()

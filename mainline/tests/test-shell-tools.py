@@ -68,7 +68,7 @@ with tempfile.TemporaryDirectory(prefix='tools-check-',dir=repo/'mainline/out/.c
    for _ in range(4):tap('up')
    tap('accept');assert ask()['state']['toolSaveError'];tap('home');assert ask()['state']['toolRoute']=='usb';assert other.read_text()=='keep'
    settings_file.unlink();tap('back');assert config()['usbSwapAB'] is False;tap('nextTab')
-   for _ in range(9):tap('down')
+   for _ in range(8):tap('down')
    tap('accept')
    deadline=time.monotonic()+5
    while not ask()['state']['settingsDetailReady']:

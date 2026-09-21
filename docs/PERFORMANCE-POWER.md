@@ -33,8 +33,8 @@ The [native streaming adapter](../mainline/gaming-shell/STREAMING.md#native-stat
 adds Moonlight's own video rates, drop counters and queue/timing data. Host checks
 cover the protocol and UI path; actual stream values and overlay cost remain open.
 
-Settings provide categories for network/Wi-Fi, Bluetooth, controller testing,
-sound, display, storage, system information, battery/power, font/input, CPU
+Settings provide categories for network/Wi-Fi, controller testing, sound,
+display, storage, system information, battery/power, font/input, CPU
 frequency and memory/swap. Real host reads are labelled as the current runtime
 or preview volume. On identified R46H, the [device adapter](../mainline/gaming-shell/DEVICE.md)
 reads actual state; ordinary previews disable writes. An explicit temporary lease
@@ -52,7 +52,8 @@ Font size and idle timing now use the [shared choice list](../mainline/gaming-sh
 preview with Up/Down, confirm with A, cancel with B. CPU choices and saved Wi-Fi
 reuse the same control. A minimal target polkit candidate passed saved-profile
 control and reconnect, but new-password entry and image integration remain open.
-Bluetooth pairing is blocked by absent controller/firmware and BlueZ.
+The exact board has no onboard Bluetooth controller; the launcher exposes no
+Bluetooth category or pairing placeholder.
 
 Idle dimming offers off/30/60/120 seconds. The host preview uses a visual mask;
 the leased target adapter changes actual backlight and restores its saved value.
@@ -210,8 +211,7 @@ readout is implemented.
 2. Package `polkitd` and the proven three-action ark-only NetworkManager rule in a
    future image, then verify new-password AddAndActivateConnection2 and reboot
    persistence. The installed hardware-key service already owns RK817 volume;
-   add no second writer unless the product explicitly needs a slider. Bluetooth
-   waits for controller/firmware evidence before BlueZ or pairing work.
+   add no second writer unless the product explicitly needs a slider.
 3. The isolated zram boot, bounded pressure and apply/disable gate pass. Promote
    no startup or GUI policy until a real game demonstrates a measurable benefit.
 4. The HUD now reads system CPU, available RAM, temperature and current GPU MHz;

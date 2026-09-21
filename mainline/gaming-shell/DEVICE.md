@@ -13,8 +13,8 @@ The frozen package, source and checks live in
 `DeviceState` enables Linux reads only after checking the accepted kernel,
 root UUID, card CID and geometry. It samples every two seconds: aggregate CPU,
 CPU policies, available memory/swap, PSI, temperature, GPU frequency when
-unambiguous, backlight, battery percentage/status, NetworkManager's cached active-AP signal,
-voltage/supply and detected Bluetooth controllers. R35's desktop status area shows
+unambiguous, backlight, battery percentage/status, NetworkManager's cached active-AP signal
+and voltage/supply. R35's desktop status area shows
 Wi-Fi quality as 0–100% plus battery percentage and charging/discharging state.
 Missing metrics stay unavailable. This small health sampler continues while the
 HUD is hidden; the existing process/HUD sampler retains its visibility lifecycle.
@@ -200,10 +200,10 @@ Switching/disconnecting Wi-Fi can cut the remote session. Keep serial available
 and perform that step after navigation/capture checks; reconnect through the
 physical UI or serial. Never disable SSH host-key verification to recover.
 
-Bluetooth is not a software-only follow-up on the current unit: the boot reports
-`BT=0`, rfkill exposes only Wi-Fi, `/sys/class/bluetooth` is empty, no controller
-appears on USB and BlueZ is absent. Discovery/pairing stays blocked until a
-controller route, firmware and BlueZ are supplied.
+The exact board has no onboard Bluetooth controller: boot reports `BT=0`, rfkill
+exposes only Wi-Fi, `/sys/class/bluetooth` is empty, USB has no controller and the
+board DTS has no Bluetooth node. The launcher therefore exposes no Bluetooth
+category or pairing placeholder.
 
 ## Memory experiment CLI
 
@@ -268,8 +268,8 @@ with p2 v0.17 and ES-DE ready for recovery.
 Run each changed path once; repeat only after a relevant failure/fix. A denied
 permission, thermal/voltage warning or missing capability remains an explicit
 open item, not an excuse to bypass the guard. Cool between game bounds and stop
-at the existing 85 C external abort. Moonlight, zram-kernel promotion, USB HID,
-Bluetooth and suspend/resume are intentionally outside this batch: each is
-deferred or lacks a changed hypothesis.
+at the existing 85 C external abort. Moonlight, zram-kernel promotion, USB HID
+and suspend/resume are intentionally outside this batch: each is deferred or
+lacks a changed hypothesis.
 Keep machine receipts separate from the operator's LCD/audio observations.
 End with restored settings, health checks, sync and serial-confirmed poweroff.

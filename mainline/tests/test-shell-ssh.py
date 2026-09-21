@@ -85,7 +85,7 @@ if args.keyboard:
                                  binary_sha256=args.binary, screenshot=screenshot))
         return current['state']
     tap('nextTab'); tap('nextTab')
-    for _ in range(9): tap('down')
+    for _ in range(8): tap('down')
     tap('right'); tap('down'); tap('accept')
     assert current['state']['testInputVisible']
     tap('down'); tap('accept',True)

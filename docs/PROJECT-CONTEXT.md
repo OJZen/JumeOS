@@ -99,8 +99,8 @@ skipped, so content equality remains unverified. See
   and saved-profile reconnect. The exact six-package/rule successor is now the
   byte-reproducible, independently validated v0.18 artifact. Media/cold base and
   exact policy permission checks pass; new-profile activation and reboot
-  persistence remain. Bluetooth is blocked by
-  absent controller/firmware and BlueZ.
+  persistence remain. The exact board has no onboard Bluetooth controller, and
+  the corresponding launcher category has been removed.
 - The isolated v0.18 zram kernel passed one-shot boot and 256 MiB LZ4 apply,
   pressure, disable and unload. Normal v0.15/media were restored; promotion waits
   for measurable real-game benefit.
@@ -135,8 +135,8 @@ runbooks.
 5. Profile R74's below-30-FPS open-world phase only when a new software hypothesis
    exists. Keep R63/R60 available; do not repeat SGSR1 or a live GPU minimum-frequency
    raise unchanged.
-6. Deferred: Bluetooth hardware, zram promotion/benefit, Moonlight, USB HID and
-   other hardware-gated work until requested or its evidence changes.
+6. Deferred: zram promotion/benefit, Moonlight, USB HID and other hardware-gated
+   work until requested or its evidence changes.
 
 ## Working rules
 
