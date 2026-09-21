@@ -25,7 +25,7 @@ CONFIG = MAINLINE / "config/r46h.fragment"
 BUILD = MAINLINE / "scripts/build-kernel.sh"
 CONTAINER_BUILD = MAINLINE / "scripts/build-in-container.sh"
 RUNBOOK = MAINLINE / "bringup-tests/V13-MMC-INIT-ONE-SHOT.md"
-BUILD_ID = "v0.15-gaming-product"
+BUILD_ID = "v0.19-zram-product"
 
 
 def file_sha256(path: Path) -> str:

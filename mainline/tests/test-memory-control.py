@@ -4,6 +4,8 @@ from pathlib import Path
 import os,subprocess,tempfile
 repo=Path(__file__).resolve().parents[2]
 source=(repo/'mainline/gaming-shell/memory-control.sh').read_text()
+unit=(repo/'mainline/gaming-shell/r46h-zram.service').read_text()
+config=(repo/'mainline/config/r46h.fragment').read_text()
 subprocess.run(['/bin/bash','-n',str(repo/'mainline/gaming-shell/memory-control.sh')],check=True)
 functions=source[source.index('size_bytes() {'):source.index('owned_file() {')]
 mock='''awk() { if [[ $1 == *MemAvailable* ]]; then echo "$AVAILABLE"; else echo "$TOTAL"; fi; }
@@ -25,4 +27,14 @@ with tempfile.TemporaryDirectory(prefix='memory-owned-',dir=repo/'mainline/out/.
     assert result.returncode==3 and target.read_text()=='preserve',result
 assert '/etc/fstab' not in source
 assert 'zram-generation' in source and 'disk-owner' in source
-print('MEMORY_CONTROL_CHECK PASS: sizes, memory reserve and ownership contracts; no swapon/swapoff performed')
+assert source.count('external-power-required') == 2
+assert '6.12.99-r46h-mainline-v0.19-zram-product' in source
+assert 'MEMORY_OK zram-already-active' in source and 'zram-policy' in source
+assert 'ConditionKernelVersion==6.12.99-r46h-mainline-v0.19-zram-product' in unit
+assert 'ExecStart=/usr/local/sbin/r46h-memory-control --zram 256 lz4' in unit
+assert 'ExecStop=' not in unit and 'WantedBy=multi-user.target' in unit
+for setting in ('CONFIG_SWAP=y', 'CONFIG_ZRAM=m', 'CONFIG_ZRAM_BACKEND_LZ4=y',
+                'CONFIG_ZRAM_DEF_COMP_LZ4=y', '# CONFIG_ZRAM_WRITEBACK is not set',
+                '# CONFIG_ZSWAP is not set'):
+    assert config.count(setting) == 1, setting
+print('MEMORY_CONTROL_CHECK PASS: sizes, reserve, ownership and fixed product zram policy; no swapon/swapoff performed')

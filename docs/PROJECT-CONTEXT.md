@@ -102,8 +102,9 @@ skipped, so content equality remains unverified. See
   persistence remain. The exact board has no onboard Bluetooth controller, and
   the corresponding launcher category has been removed.
 - The isolated v0.18 zram kernel passed one-shot boot and 256 MiB LZ4 apply,
-  pressure, disable and unload. Normal v0.15/media were restored; promotion waits
-  for measurable real-game benefit.
+  pressure, disable and unload. The requested v0.19 product source now carries
+  the same module configuration and an exact-kernel 256 MiB LZ4 startup service.
+  Normal v0.15/media remain the accepted fallback; build and persistent proof are open.
 - The CPU default keeps dynamic `schedutil` scaling but caps policy0 at the
   hardware's nearest 1 GHz OPP, 600--1008 MHz. Target apply/readback, game/thermal
   and warm-reboot persistence passed on the current v0.17 device. GPU devfreq and
@@ -135,8 +136,10 @@ runbooks.
 5. Profile R74's below-30-FPS open-world phase only when a new software hypothesis
    exists. Keep R63/R60 available; do not repeat SGSR1 or a live GPU minimum-frequency
    raise unchanged.
-6. Deferred: zram promotion/benefit, Moonlight, USB HID and other hardware-gated
-   work until requested or its evidence changes.
+6. Build the v0.19 zram product artifact and prepare a rollback-safe persistent
+   successor using the accepted v0.17 DTB; physical deployment remains a separate gate.
+7. Deferred: Moonlight, USB HID and other hardware-gated work until requested or
+   its evidence changes.
 
 ## Working rules
 

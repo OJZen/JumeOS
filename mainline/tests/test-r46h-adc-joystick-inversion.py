@@ -35,7 +35,7 @@ BUILDER = REPO_ROOT / "mainline/scripts/build-in-container.sh"
 BUILD_ENTRYPOINT = REPO_ROOT / "mainline/scripts/build-kernel.sh"
 MANIFEST = REPO_ROOT / "mainline/manifest.env"
 CONFIG = REPO_ROOT / "mainline/config/r46h.fragment"
-BUILD_ID = "v0.15-gaming-product"
+BUILD_ID = "v0.19-zram-product"
 KERNEL_RELEASE = f"6.12.99-r46h-mainline-{BUILD_ID}"
 
 
@@ -185,7 +185,7 @@ class R46HAdcJoystickInversionTests(unittest.TestCase):
         self.assertEqual(self.build_entrypoint.count(f"默认 {BUILD_ID}"), 1)
         self.assertEqual(
             KERNEL_RELEASE,
-            "6.12.99-r46h-mainline-v0.15-gaming-product",
+            "6.12.99-r46h-mainline-v0.19-zram-product",
         )
 
 

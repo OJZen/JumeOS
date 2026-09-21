@@ -1,0 +1,13 @@
+[Unit]
+Description=R46H 256 MiB LZ4 compressed swap
+After=local-fs.target systemd-modules-load.service
+Before=r46h-gaming-frontend.service
+ConditionKernelVersion==6.12.99-r46h-mainline-v0.19-zram-product
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/r46h-memory-control --zram 256 lz4
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

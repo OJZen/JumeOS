@@ -19,7 +19,7 @@ CONFIG = REPO / "mainline/config/r46h.fragment"
 BUILD = REPO / "mainline/scripts/build-kernel.sh"
 BOARD_NOTES = REPO / "docs/R46H-BOARD.md"
 PROBE_RUNBOOK = REPO / "mainline/bringup-tests/CHARGER-DC-DETECT-PROBE.md"
-BUILD_ID = "v0.15-gaming-product"
+BUILD_ID = "v0.19-zram-product"
 RELEASE = f"6.12.99-r46h-mainline-{BUILD_ID}"
 
 
@@ -136,7 +136,7 @@ class R46HChargerDcDetectTests(unittest.TestCase):
             re.findall(r'^BUILD_ID="(.+)"$', self.build, re.M), [BUILD_ID]
         )
         self.assertEqual(self.build.count(f"默认 {BUILD_ID}"), 1)
-        self.assertEqual(RELEASE, "6.12.99-r46h-mainline-v0.15-gaming-product")
+        self.assertEqual(RELEASE, "6.12.99-r46h-mainline-v0.19-zram-product")
         self.assertEqual(
             re.findall(r"^KERNEL_PATCH_LAST=(.+)$", self.manifest, re.M),
             ["0008"],

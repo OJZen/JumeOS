@@ -1,5 +1,5 @@
 #!/bin/bash
-# Operator/agent CLI for the first memory experiment; no fstab or startup changes.
+# Guarded memory control used by the product zram service and operator experiments.
 set -Eeuo pipefail
 export LC_ALL=C
 readonly state=/var/lib/r46h-memory
@@ -11,7 +11,7 @@ root_uuid=$(findmnt -rn -o UUID /)
 [[ $root_uuid == d3130017-46a4-4d56-9001-000000000017 || $root_uuid == d3130018-46a4-4d56-9001-000000000018 ]] || die identity
 [[ $(cat /sys/class/block/mmcblk0/device/cid) == fe343253440000002000002d57019567 && $(cat /sys/class/block/mmcblk0/size) == 122138624 ]] || die identity
 kernel=$(uname -r)
-[[ $kernel == 6.12.99-r46h-mainline-v0.15-gaming-product || $kernel == 6.12.99-r46h-mainline-v0.18-zram-candidate ]] || die kernel
+[[ $kernel == 6.12.99-r46h-mainline-v0.15-gaming-product || $kernel == 6.12.99-r46h-mainline-v0.18-zram-candidate || $kernel == 6.12.99-r46h-mainline-v0.19-zram-product ]] || die kernel
 if [[ $1 == --check && $# == 1 ]]; then
     cat /proc/swaps
     awk '/^(MemTotal|MemAvailable|SwapTotal|SwapFree):/{print}' /proc/meminfo
@@ -19,7 +19,6 @@ if [[ $1 == --check && $# == 1 ]]; then
     exit 0
 fi
 [[ $EUID == 0 ]] || die root-required
-[[ $(cat /sys/class/power_supply/rk817-charger/online) == 1 ]] || die external-power-required
 busy=0
 pgrep -u 1000 -f '(^|/)(retroarch|moonlight(-qt)?)([[:space:]]|$)' >/dev/null || busy=$?
 [[ $busy == 1 ]] || die game-active-or-process-check-failed
@@ -59,6 +58,7 @@ owned_file() {
 case $1 in
 --disk)
     [[ $# == 2 ]] || die arguments
+    [[ $(cat /sys/class/power_supply/rk817-charger/online) == 1 ]] || die external-power-required
     bytes=$(size_bytes "$2") || die size-range
     if [[ -e $swapfile || -L $swapfile ]]; then
         owned_file || die swapfile-identity
@@ -81,6 +81,7 @@ case $1 in
     ;;
 --disk-off)
     [[ $# == 1 ]] || die arguments
+    [[ $(cat /sys/class/power_supply/rk817-charger/online) == 1 ]] || die external-power-required
     [[ -e $swapfile || -L $swapfile ]] || { echo 'MEMORY_OK disk-absent';exit 0; }
     owned_file || die swapfile-identity
     used=$(active_used "$swapfile")
@@ -91,10 +92,18 @@ case $1 in
     ;;
 --zram)
     [[ $# == 3 && ( $3 == lz4 || $3 == zstd ) ]] || die arguments
-    [[ $kernel == 6.12.99-r46h-mainline-v0.18-zram-candidate ]] || die zram-kernel-required
+    [[ $kernel == 6.12.99-r46h-mainline-v0.18-zram-candidate || $kernel == 6.12.99-r46h-mainline-v0.19-zram-product ]] || die zram-kernel-required
     bytes=$(size_bytes "$2") || die size-range
     [[ -e /sys/block/zram0/disksize ]] || modprobe zram num_devices=1
-    [[ -b $zram && $(active_used "$zram") == -1 && $(cat /sys/block/zram0/disksize) == 0 ]] || die 'zram must be inactive and uninitialized'
+    [[ -b $zram ]] || die zram-device
+    if [[ $(active_used "$zram") != -1 ]]; then
+        [[ -f $state/zram-owner && ! -L $state/zram-owner ]] || die zram-ownership
+        [[ $(cat "$state/zram-owner") == "$(cat /proc/sys/kernel/random/boot_id) $(stat -Lc %d:%i /sys/block/zram0)" ]] || die zram-generation
+        [[ $(cat /sys/block/zram0/disksize) == "$bytes" && $(sed -n 's/.*\[\([^]]*\)\].*/\1/p' /sys/block/zram0/comp_algorithm) == "$3" ]] || die zram-policy
+        echo 'MEMORY_OK zram-already-active'
+        exit 0
+    fi
+    [[ $(cat /sys/block/zram0/disksize) == 0 ]] || die 'zram must be inactive and uninitialized'
     algorithms=" $(tr -d '[]' < /sys/block/zram0/comp_algorithm) "
     [[ $algorithms == *" $3 "* ]] || die algorithm
     printf '%s %s\n' "$(cat /proc/sys/kernel/random/boot_id)" "$(stat -Lc %d:%i /sys/block/zram0)" > "$state/zram-owner"
@@ -116,4 +125,4 @@ case $1 in
     ;;
 *) die arguments ;;
 esac
-echo 'MEMORY_OK session-only; verify /proc/swaps and retain the receipt'
+echo 'MEMORY_OK; verify /proc/swaps and retain the receipt'

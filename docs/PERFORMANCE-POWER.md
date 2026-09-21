@@ -4,8 +4,9 @@ This owns the incremental feature plan for the [Qt shell](DEVICE-SHELL.md).
 The [shell runbook](../mainline/gaming-shell/README.md) owns host commands and
 evidence. R17 passed temporary CPU/backlight changes and supervised power actions;
 the [device record](../mainline/gaming-shell/DEVICE.md) owns that scope. Persistent
-settings installation and zram promotion remain open; the isolated zram boot and
-guarded apply/disable gate now pass.
+settings installation remains open. The isolated zram boot and guarded
+apply/disable gate pass, and the next product-kernel source now carries the same
+bounded policy; artifact and persistent-device proof remain open.
 
 ## First host version
 
@@ -108,13 +109,13 @@ so the next p2 integration remains open.
 
 ## Compressed memory and disk swap
 
-The retained v0.15 config has `CONFIG_SWAP=y`, **ZRAM and ZSWAP disabled**.
-An optional [zram candidate fragment](../mainline/config/r46h-zram-candidate.fragment)
-selects a modular zram device, LZ4 and Zstd, initially LZ4, without disk writeback
-or zswap. A clean isolated branch now builds the v0.18 candidate Image/modules;
-its package hashes passed. The accepted main-branch kernel fragment is unchanged.
-The [candidate contract](../mainline/gaming-shell/DEVICE.md#memory-experiment-cli)
-owns source/provenance and the passing one-shot boot/module gate. Retain the v0.17 DTB.
+The deployed v0.15 config has `CONFIG_SWAP=y`, **ZRAM and ZSWAP disabled**.
+The next `v0.19-zram-product` fragment promotes the device-tested modular zram,
+LZ4/Zstd configuration without disk writeback or zswap. The fixed startup policy
+is 256 MiB LZ4 at priority 100; disk swap remains off. The
+[device contract](../mainline/gaming-shell/DEVICE.md#memory-control) owns the
+passing isolated boot/module gate and the remaining persistent-device proof.
+Retain the accepted v0.17 DTB.
 
 zram stores compressed pages in RAM. A disk swap file consumes storage and I/O;
 zswap is a compressed cache in front of backing swap, not a synonym for zram.
@@ -128,9 +129,10 @@ checks device/storage identity, file ownership, available-space reserve, algorit
 and sizes before apply. Active-file resize is refused; disable checks the RAM
 needed to reclaim used swap. On the isolated kernel, 256 MiB LZ4 zram reached
 43.5 MiB swap use under bounded pressure, then disabled, reset and unloaded
-cleanly. The accepted v0.15 boot and unchanged media files were restored. GUI or
-startup activation waits for measurable real-workload benefit; memory/swap/pressure
-readout is implemented.
+cleanly. The accepted v0.15 boot and unchanged media files were restored. The
+product startup service reuses that guarded CLI and is enabled only for the exact
+v0.19 kernel. Its host artifact and persistent-device result are not yet proved;
+memory/swap/pressure readout is implemented.
 
 ## Next implementation order
 

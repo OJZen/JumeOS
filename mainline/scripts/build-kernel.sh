@@ -17,7 +17,7 @@ readonly TRUSTED_GIT=/usr/bin/git
 readonly TRUSTED_PYTHON=/usr/bin/python3
 readonly SNAPSHOT_FD=9
 
-BUILD_ID="v0.15-gaming-product"
+BUILD_ID="v0.19-zram-product"
 JOBS=4
 ROOT_SPEC="/dev/mmcblk0p2"
 REBUILD_BUILDER=0
@@ -55,7 +55,7 @@ usage() {
   mainline/scripts/build-kernel.sh [选项]
 
 选项:
-  --build-id ID          测试包标识，默认 v0.15-gaming-product；必须与内核 LOCALVERSION 一致
+  --build-id ID          测试包标识，默认 v0.19-zram-product；必须与内核 LOCALVERSION 一致
   --jobs N               并行编译任务数，默认 4（适合 Docker Desktop 4 GiB）
   --root-spec SPEC       boot.ini.test 的 root=，默认 /dev/mmcblk0p2
   --rebuild-builder      不使用 Docker 层缓存重建 Debian 构建镜像

@@ -19,7 +19,7 @@ BUILD = REPO / "mainline/scripts/build-kernel.sh"
 CONTAINER_BUILD = REPO / "mainline/scripts/build-in-container.sh"
 RUNBOOK = REPO / "mainline/bringup-tests/V12-CHARGE-TERM-POLICY.md"
 LEDGER = REPO / "mainline/board/r46h/EXPERIMENT-STATUS.md"
-BUILD_ID = "v0.15-gaming-product"
+BUILD_ID = "v0.19-zram-product"
 
 
 def downstream_analog_selection_ma(configured_ma: int) -> int:

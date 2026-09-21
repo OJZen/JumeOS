@@ -23,7 +23,7 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
 | P4 / P2 | GTA San Andreas Chinese migration | Separate loader/library/data/translation audit for the found gtasa/libGTASA.so package; do not infer compatibility from GTA III/VC |
 | I1 / early feasibility, then P2 | [USB gamepad mode](../mainline/gaming-usb-gamepad/README.md) | Prove an externally reachable peripheral/UDC path and safe VBUS roles first; then standard HID reports, neutral on exit/unplug, and restoration of normal USB/Wi-Fi operation |
 | S1 / P1 | Network and basic settings | Wi-Fi authorization, password privacy, connect/disconnect/remember/forget and recovery; add audio-output operations only after detecting actual capabilities |
-| S2 / P1 | CPU and memory profiles | Retain accepted CPU controls; exercise guarded disk swap and zram apply/disable/reserve checks with a separate candidate-kernel boot before GUI writes |
+| S2 / P1 | CPU and memory profiles | Retain accepted CPU controls; ship the fixed 256 MiB LZ4 zram policy only after the product artifact and rollback-safe persistent boot pass; keep disk swap manual |
 | S3 / P1 | Power management | Retain real dim/wake and supervised reboot/poweroff; measure charging/battery reporting and low-voltage policy, then design bounded suspend/wake recovery |
 | Q1 / P1→P2 | Product installation and endurance | Make Jume Launcher the persistent default after settings/pairing/saves, bounded logs/caches, repeated launches and sustained gameplay pass; remove ES-DE only after cold-boot, crash recovery and upgrade/rollback no longer depend on it |
 
@@ -66,8 +66,9 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
 - **S1/S2/S3/Q1:** the temporary ark-only Wi-Fi policy passed its exact three
   actions and denied unrelated permissions. Its byte-reproducible v0.18 successor
   passes host validation; media deployment, a new password and reboot persistence
-  remain open. The isolated zram kernel passed one-shot apply/pressure/disable,
-  but promotion waits for measurable game benefit. The exact board has no onboard
+  remain open. The isolated zram kernel passed one-shot apply/pressure/disable;
+  v0.19 product source now fixes that policy at 256 MiB LZ4, with build and
+  persistent-device proof open. The exact board has no onboard
   Bluetooth controller, so its launcher surface was removed; suspend and product
   installation remain open.
 

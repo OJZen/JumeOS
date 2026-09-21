@@ -118,9 +118,10 @@ Moonlight and PSP remain open.
   activation and reboot persistence remain open.
 - **Onboard Bluetooth — NOT PRESENT / UI REMOVED.** Boot reports `BT=0`; rfkill,
   sysfs, USB and the board DTS expose no controller. Launcher settings were removed.
-- **Zram — ONE-SHOT KERNEL + APPLY/DISABLE DEVICE PASS / PROMOTION OPEN.** The
-  v0.18 candidate used 43.5 MiB of 256 MiB LZ4 swap under bounded pressure, then
-  reset/unloaded cleanly. Normal v0.15/media were restored; benefit remains open.
+- **Zram — ONE-SHOT KERNEL + APPLY/DISABLE DEVICE PASS / PRODUCT BUILD + PROMOTION OPEN.**
+  The v0.18 candidate used 43.5 MiB of 256 MiB LZ4 swap under bounded pressure,
+  then reset/unloaded cleanly. v0.19 product source now carries the same fixed
+  startup policy; normal v0.15/media remain the accepted fallback.
 - **Hantro media — QT V3 SHORT HUD/A/V/RETURN PASS / LONG SESSION OPEN.**
   Default-preset native HUD, picture/audio, shoulders, host-loss return and reconnect
   were accepted; 59.25 rendered FPS reported. Application-list retrieval failed to

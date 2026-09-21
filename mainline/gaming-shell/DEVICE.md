@@ -205,17 +205,17 @@ exposes only Wi-Fi, `/sys/class/bluetooth` is empty, USB has no controller and t
 board DTS has no Bluetooth node. The launcher therefore exposes no Bluetooth
 category or pairing placeholder.
 
-## Memory experiment CLI
+## Memory control
 
-`memory-control.sh` is an agent/operator tool, not a GUI apply service. The UI
-currently reports memory state. `--check` only reads; other modes require root,
-exact device/storage identity, external supply and no active game/stream.
+`memory-control.sh` is the single guarded implementation for the product zram
+service and operator experiments. The UI reports memory state. `--check` only
+reads; other modes require root, exact device/storage identity and no active
+game/stream. Disk-swap changes additionally require external power.
 
 ```sh
 /run/r46h-shell-probe/memory-control.sh --check
 /run/r46h-shell-probe/memory-control.sh --disk 256
 /run/r46h-shell-probe/memory-control.sh --disk-off
-# Only after the separately built candidate kernel passes its boot/module gate:
 /run/r46h-shell-probe/memory-control.sh --zram 256 lz4
 /run/r46h-shell-probe/memory-control.sh --zram-off
 ```
@@ -226,9 +226,11 @@ inode/size/permissions before reuse or deletion. Resize requires explicit off.
 zram uses only an inactive, uninitialized zram0 and available LZ4/Zstd; its owner
 record is bound to the boot/device generation. Swapoff requires available RAM
 above used swap plus max(128 MiB, RAM/8); failure retains the active configuration.
-Disk priority is 10, zram 100. There is no fstab, startup service or automatic
-activation. Disk-off removes the owned file; temporary settings must be disabled
-and checked before cleanup.
+Disk priority is 10, zram 100. There is no fstab or automatic disk swap.
+`r46h-zram.service` enables exactly 256 MiB LZ4 only on the exact v0.19 product
+kernel and treats an already-owned matching device as success. It has no automatic
+stop path because shutdown-time swapoff can fail under pressure. Disk-off removes
+the owned file; temporary settings must be disabled and checked before cleanup.
 
 The isolated `codex/r46h-zram-candidate-v1` commit `2b89c5d` built
 `6.12.99-r46h-mainline-v0.18-zram-candidate`; its source/config/metadata and verified
@@ -239,8 +241,9 @@ environment. A guarded 256 MiB LZ4 device reached 43.5 MiB swap use under bounde
 650 MiB zero plus 32 MiB random pressure, then `--zram-off` reset its size and the
 module unloaded. The run peaked at 72.083 C and logged no OOM, ext4, data-invalid
 or GPU fault. Normal v0.15 boot, services and boot-file hashes were restored and
-candidate target files were removed. Persistent activation and measurable
-real-game benefit remain open. **Use only its Image/modules with the
+candidate target files were removed. The same bounded configuration now lives
+in the v0.19 product source; its build, persistent activation and real-game
+benefit remain open. **Use only its Image/modules with the
 accepted v0.17 DTB and existing boot fallback.** The generic archive's boot.ini
 and DTB are not the accepted card configuration; do not rewrite the TF base. This
 Qt adapter intentionally still accepts only the accepted kernel.

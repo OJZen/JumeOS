@@ -91,7 +91,7 @@ class GamingInputBridgeTests(unittest.TestCase):
     def test_product_kernel_retains_the_physically_proved_uinput_capability(self) -> None:
         fragment = FRAGMENT.read_text(encoding="utf-8")
         manifest = MANIFEST.read_text(encoding="utf-8")
-        expected = "-r46h-mainline-v0.15-gaming-product"
+        expected = "-r46h-mainline-v0.19-zram-product"
         self.assertEqual(fragment.count(f'CONFIG_LOCALVERSION="{expected}"'), 1)
         self.assertEqual(manifest.count(f"KERNEL_LOCALVERSION={expected}"), 1)
         self.assertEqual(manifest.count("KERNEL_PATCH_LAST=0008"), 1)

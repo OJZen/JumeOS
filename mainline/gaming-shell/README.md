@@ -434,8 +434,9 @@ LCD recovery and corrected hardware input now have the device evidence above.
 
 Keep the existing v0.17 TF rootfs for this test: the private userspace payload's
 dependency closure matches it. Do not rewrite BOOT, p2 or p3 for a preview.
-The [zram kernel candidate](DEVICE.md#memory-experiment-cli) is built separately;
-its fallback/boot gate remains open and it is not a replacement base image.
+The [zram product path](DEVICE.md#memory-control) retains the accepted v0.17 DTB
+and v0.15 fallback; until its v0.19 artifact and persistent boot pass, it is not a
+replacement base image.
 
 ## Tool applications
 

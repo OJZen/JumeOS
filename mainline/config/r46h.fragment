@@ -5,7 +5,7 @@
 # devices stay modular where unloading/blacklisting is valuable.
 
 # Reproducible test release identity
-CONFIG_LOCALVERSION="-r46h-mainline-v0.15-gaming-product"
+CONFIG_LOCALVERSION="-r46h-mainline-v0.19-zram-product"
 # CONFIG_LOCALVERSION_AUTO is not set
 CONFIG_MODULES=y
 
@@ -203,3 +203,13 @@ CONFIG_PSTORE_CONSOLE=y
 CONFIG_PSTORE_PMSG=y
 CONFIG_PSTORE_RAM=y
 CONFIG_DEBUG_INFO_NONE=y
+
+# Product compressed swap: 256 MiB LZ4 is activated by r46h-zram.service.
+CONFIG_SWAP=y
+CONFIG_ZRAM=m
+CONFIG_ZRAM_BACKEND_LZ4=y
+CONFIG_ZRAM_BACKEND_ZSTD=y
+CONFIG_ZRAM_DEF_COMP_LZ4=y
+# CONFIG_ZRAM_WRITEBACK is not set
+# CONFIG_ZRAM_MULTI_COMP is not set
+# CONFIG_ZSWAP is not set

@@ -1,8 +1,10 @@
 # R46H kernel configuration
 
 `r46h.fragment` is merged on top of the arm64 `defconfig` from the exact
-Linux `v6.12.99` release. The current product candidate is
-`6.12.99-r46h-mainline-v0.15-gaming-product`. `manifest.env` selects the
+Linux `v6.12.99` release. The next product candidate is
+`6.12.99-r46h-mainline-v0.19-zram-product`. It keeps the accepted v0.15
+hardware configuration and adds the already device-tested modular zram/LZ4
+configuration. `manifest.env` selects the
 contiguous patch prefix through `0008`, so this release keeps the physically
 accepted v0.8 display handoff, v0.10 ADC behavior and v0.11 GPIO-backed ONLINE
 report, then adds the already proved built-in `INPUT_UINPUT` configuration.
@@ -44,10 +46,8 @@ must provide `rtlwifi/rtl8188eufw.bin`; the config does not embed firmware.
 
 ## Reproduce the Kconfig check
 
-`r46h-zram-candidate.fragment` is an optional, unbooted memory-compression
-experiment. It is **not** included by the accepted product fragment or builder.
 The [performance/power plan](../../docs/PERFORMANCE-POWER.md#compressed-memory-and-disk-swap)
-owns its host-only Kconfig result and remaining build/boot/load gates.
+owns the 256 MiB LZ4 policy and its remaining persistent deployment gate.
 
 Apply the R46H kernel patch first, because `CONFIG_DRM_PANEL_R46H` is a local
 bring-up symbol and does not exist in pristine v6.12.99.  Then run from the
@@ -67,7 +67,7 @@ failure rather than a warning.
 
 This sequence was run in a case-sensitive Linux filesystem against tag
 `v6.12.99` (commit `720e8bcaa674dfa40b989207d6cdb44b3aaa8db6`) after applying the R46H patch.
-The product fragment currently contains 172 explicit requests. The canonical
+The product fragment currently contains 180 explicit requests. The canonical
 build must prove that all survive `olddefconfig`; the same check on a pristine
 tree is expected to fail at least on the not-yet-applied `DRM_PANEL_R46H`
 symbol.
