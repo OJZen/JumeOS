@@ -1,6 +1,6 @@
 # R46H project context
 
-> Current checkpoint: 2026-09-20. Read the
+> Current checkpoint: 2026-09-21. Read the
 > [experiment ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) before
 > hardware work; it owns physical evidence and limitations.
 
@@ -20,9 +20,8 @@ archive and 1,741-file manifest readback, v0.18 preflight, transient Launcher,
 game lifecycle and forced-child recovery without replacing ES-DE. R74 is the
 accepted and source-build-default GTA
 candidate after attended picture/audio/control approval; R63 and R60 remain
-rollbacks. Latest base-image evidence is under
-`mainline/out/.cache/r46h-v018-device-20260920.FoS3wK/`; launcher evidence is
-under `mainline/out/.cache/r46h-two-level-device-20260920/`.
+rollbacks. Latest base-image evidence is under `mainline/out/.cache/r46h-v018-device-20260920.FoS3wK/`;
+latest launcher evidence is under `mainline/out/.cache/r46h-profile-device-20260921/evidence/`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current card p2: [v0.18](../mainline/rootfs-debian13-gaming-v18/README.md)
@@ -48,8 +47,10 @@ skipped, so content equality remains unverified. See
   input-router failure restored all services and removed transient leases.
   The 2026-09-20 two-level candidate passed 39 target actions: focus motion left
   Settings, Neo and PortMaster details unloaded; open/return and in-flight
-  PortMaster cancellation passed. ES-DE and all services recovered cleanly.
-  Physical LCD/readability, L3+R3 and persistent promotion remain open.
+  PortMaster cancellation passed. On v0.18, caching the category list separately
+  raised two Settings focus runs from about 29.5 to 57.2--57.5 submissions/s;
+  HUD runs rose from 29.9 to 58.5--59.0, with p50 near 16.7 ms.
+  ES-DE/services recovered with zero failed units or kernel/ext4/OOM errors; physical LCD/readability, L3+R3 and persistent promotion remain open.
 - Repaired GTA III/Vice City accept the Switch-layout controls and no longer
   reproduce the bounded-exit crash. GTA-only `noafbc`, first-config 640x480 and
   private Mesa 26.2.2 passed target integration. The R60 batch reached captured
@@ -123,9 +124,9 @@ runbooks.
    with operator LCD/readability/L3+R3 checks, retained Metal Slug state and R74
    GTA broader play/save/relaunch. Automated transient launch, exit and recovery
    already pass; do not replay them unchanged.
-2. After private Wi-Fi credentials are entered on the handheld, finish profile
-   activation/reboot persistence and the live PortMaster install/update/remove
-   lifecycle while preserving user data. Offline refresh currently returns zero entries.
+2. When the target 2.4 GHz Wi-Fi AP is visible, activate the installed autoconnect
+   profile and prove reboot persistence; then run live PortMaster install/update/remove
+   while preserving user data. Offline refresh currently returns zero entries.
 3. Keep R45 direct Stardew as fallback. Revisit the shared-Wayland stall only
    with a new source-level hypothesis; the unchanged R78/R79 Mono/Mesa path has
    already failed before window creation at two clock profiles.

@@ -51,3 +51,5 @@ Keep changing baselines and the next gate in Project Context, not this file.
 - End unattended hardware work with health checks, `sync`, controlled poweroff
   and serial confirmation. Never put credentials/private keys in Git or captured
   logs, and keep SSH host-key checking enabled.
+- R46H Wi-Fi credentials live only in ignored `mainline/out/private/r46h-wifi.json`.
+  Read them without echoing values; never include that file in Git or evidence.

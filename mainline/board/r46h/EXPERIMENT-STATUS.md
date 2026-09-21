@@ -1,6 +1,6 @@
 # R46H experiment status ledger
 
-> Current checkpoint: 2026-09-20. This is the authoritative index of accepted
+> Current checkpoint: 2026-09-21. This is the authoritative index of accepted
 > physical evidence and open hardware gates. Exact commands, hashes and raw
 > receipts stay in the linked owning runbooks.
 
@@ -60,15 +60,17 @@ Moonlight and PSP remain open.
   still required after a new image write.
 - **Remote input — V0.16/V0.17 10 MS DEVICE PASS.** Self-test and exact
   screenshot-verified right/left single-step roundtrip passed; v0.15 uses 100 ms.
-- **[Jume Launcher](../../gaming-shell/DEVICE.md) — R79 + TWO-LEVEL DEVICE/RECOVERY PASS /
+- **[Jume Launcher](../../gaming-shell/DEVICE.md) — R79 + TWO-LEVEL DEVICE/RECOVERY/PERFORMANCE PASS /
   PHYSICAL + PROMOTION OPEN.**
   R79 passed exact archive/1,741-file target readback and preflight. Composed Home
   and About captures show the aligned Wi-Fi/battery/clock row, live charge state,
   version and project URL. Normal expiry and forced input-router failure restored
   ES-DE and all transient leases. The 2026-09-20 candidate passed 39 target actions:
   Settings, Neo and PortMaster focus left details unloaded; async open/return and
-  PortMaster in-flight cancellation passed. Services restored with zero failed
-  units/ext4 errors. Physical LCD/readability, L3+R3 and promotion remain open.
+  PortMaster in-flight cancellation passed. A v0.18 same-device A/B then raised
+  two Settings focus runs from about 29.5 to 57.2--57.5 submissions/s and HUD
+  runs from 29.9 to 58.5--59.0; p50 was 16.64--16.71 ms. Services restored with
+  zero failed units/kernel/ext4/OOM errors; LCD/readability, L3+R3 and promotion remain open.
 - **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
   Dynamic `schedutil` and both GTA engines passed; reset recovered a live GPU-min panic. Do not repeat it.
 - **Wayland/ports — R74 SHORT ATTENDED + R79 TRANSIENT MACHINE PASS / BROADER PLAY OPEN.**
@@ -111,7 +113,8 @@ Moonlight and PSP remain open.
   The ark-only three-action rule passed scan, profile create/delete and saved
   reconnect; unrelated permissions stayed denied. Exact packages/rule pass
   reproducible host validation, fixed-profile p2 write/full readback, cold
-  identity, exact target hashes and intended/denied permission checks. New-profile
+  identity, exact target hashes and intended/denied permission checks. A root:600
+  autoconnect profile is installed, but the target AP was not visible on 2026-09-21;
   activation and reboot persistence remain open.
 - **Bluetooth — HARDWARE BLOCKED.** Boot reports `BT=0`; rfkill/sysfs/USB expose
   no controller and BlueZ is absent. Require controller/firmware before pairing.
