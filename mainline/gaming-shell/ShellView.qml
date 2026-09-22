@@ -19,9 +19,16 @@ Item {
     property bool browserAvailable: false
     property var browserVersions: ({})
     signal browserRequested()
+    property bool terminalAvailable: false
+    signal terminalRequested()
+    property bool filesAvailable: false
+    signal filesRequested(bool editor)
+    signal transferRequested()
     readonly property bool gameOverlay: sharedDisplay && externalSession
     readonly property bool panelVisible: quickOpen || quickPanel.x < 1024
     readonly property bool monitorVisible: store.monitor
+    property bool volumeVisible: false
+    property int volumePercent: 0
     property string toolRoute: ""
     readonly property bool toolOpen: toolRoute !== ""
     readonly property bool toolBusy: tools !== null && tools.busy
@@ -39,7 +46,7 @@ Item {
     readonly property bool remoteTextAllowed: editing && !quickOpen && !choicesOpen && !dimmed && !externalSession && (editPurpose === "portSearch" || testInputVisible)
     readonly property int portCatalogIndex: toolView.item ? toolView.item.catalogIndex : 0
     readonly property bool portCatalogSidebar: !toolView.item || toolView.item.catalogSidebar
-    readonly property bool sensitiveVisible: (externalSession && activeApplication === "builtin.browser") || (editing && !testInputVisible) || (streaming !== null && streaming.pin.length > 0)
+    readonly property bool sensitiveVisible: (externalSession && ["builtin.browser", "builtin.terminal", "builtin.files", "builtin.text", "builtin.transfer"].includes(activeApplication)) || (editing && !testInputVisible) || (streaming !== null && streaming.pin.length > 0)
     property string editPurpose: "test"
     property string editLabel: "文字输入测试"
     readonly property bool externalSession: applications !== null && applications.running
@@ -104,7 +111,9 @@ Item {
         : page === 2 ? (settingsView.choiceOpen ? settingsView.hints : settingsView.hints.concat([["L1 / R1", "切页"], ["Select / Q", "快捷面板"]]))
         : games.length === 0 ? [["L1 / R1", "切页"], ["Select / Q", "快捷面板"]]
         : [["A / ↵", customApplications ? "启动" : tools ? "打开" : streaming && selected === 0 ? "主机管理" : "打开演示"], ["B / Esc", page === 0 ? "顶部导航" : "主页"], ["X", "收藏"], ["L1 / R1", "切页"], ["Select / Q", "快捷面板"]]
-    readonly property var games: customApplications ? applications.items : tools ? builtinGames : demoGames
+    readonly property var games: customApplications ? applications.items.concat(builtinGames.filter(function(entry) {
+        return (["files", "text", "transfer"].includes(entry.route) && root.filesAvailable) || (entry.route === "terminal" && root.terminalAvailable)
+    })) : tools ? builtinGames : demoGames
     readonly property var builtinGames: [
         {id: "builtin.moonlight", title: "Moonlight", detail: "电脑游戏串流", color: "#3159a2", route: "streaming", icon: "monitor"},
         {id: "builtin.neo", title: "Neo 模拟器", detail: "Neo Geo 游戏与配置", color: "#9c573e", route: "neo", icon: "cartridge"},
@@ -112,7 +121,11 @@ Item {
         {id: "builtin.usb", title: "USB 手柄", detail: "手柄映射与配置", color: "#667948", route: "usb", icon: "usb"},
         {id: "builtin.controller", title: "摇杆测试", detail: "查看按键与摇杆", color: "#805779", route: "controller", icon: "gamepad"},
         {id: "builtin.settings", title: "设置", detail: "设备与界面", color: "#397d91", route: "settings", icon: "settings"},
-        {id: "builtin.browser", title: "Jume Browser", detail: browserAvailable ? "Chromium 掌机浏览器 · 开发预览" : "浏览器运行时尚未安装", color: "#3159a2", route: "browser", icon: "monitor"}
+        {id: "builtin.browser", title: "Jume Browser", detail: browserAvailable ? "Chromium 掌机浏览器 · 开发预览" : "浏览器运行时尚未安装", color: "#3159a2", route: "browser", icon: "monitor"},
+        {id: "builtin.terminal", title: "终端", detail: terminalAvailable ? "Bash · 请连接 USB 键盘" : "终端运行时尚未安装", color: "#34575c", route: "terminal", icon: "terminal"},
+        {id: "builtin.files", title: "文件管理器", detail: filesAvailable ? "分区 · U 盘 · 文件预览" : "文件运行时尚未安装", color: "#46635a", route: "files", icon: "folder"},
+        {id: "builtin.text", title: "文本编辑器", detail: filesAvailable ? "UTF-8 · 原子保存 · USB 键盘" : "文件运行时尚未安装", color: "#536478", route: "text", icon: "document"},
+        {id: "builtin.transfer", title: "文件传输", detail: filesAvailable ? "Wi-Fi · 扫码上传与下载" : "文件运行时尚未安装", color: "#386c72", route: "transfer", icon: "folder"}
     ]
     function openTool(kind) {
         if (!tools || !["neo", "ports", "usb"].includes(kind) || !tools.save()) return
@@ -199,6 +212,15 @@ Item {
         inputMethod.hide(); editing = false; inputField.text = ""; root.forceActiveFocus()
     }
     Connections {
+        target: root.device
+        function onVolumeChanged(percent) {
+            root.volumePercent = percent
+            root.volumeVisible = true
+            volumeTimer.restart()
+            root.activity()
+        }
+    }
+    Connections {
         target: root.inputMethod
         function onVisibleChanged() {
             if (root.keyboardEnabled && root.editing && !root.inputMethod.visible) {
@@ -223,6 +245,16 @@ Item {
         if (!games[selected]) return
         if (tools && games[selected].route) {
             const route = games[selected].route
+            if (["files", "text", "transfer"].includes(route)) {
+                if (!filesAvailable) { notify("请先安装 Jume Files 运行时"); return }
+                if (route === "transfer") transferRequested()
+                else filesRequested(route === "text")
+                return
+            }
+            if (route === "terminal") {
+                if (!terminalAvailable) { notify("请先安装终端运行时"); return }
+                terminalRequested(); return
+            }
             if (route === "browser") {
                 if (!browserAvailable) { notify("请先安装 Jume Browser 预览运行时"); return }
                 browserRequested(); return
@@ -329,6 +361,7 @@ Item {
     }
     Keys.onPressed: function(event) {
         if (editing) return
+        if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return
         const actions = ({[Qt.Key_Left]: "left", [Qt.Key_Right]: "right", [Qt.Key_Up]: "up", [Qt.Key_Down]: "down",
             [Qt.Key_Return]: "accept", [Qt.Key_Enter]: "accept", [Qt.Key_Escape]: "back", [Qt.Key_Backspace]: "back",
             [Qt.Key_Q]: "quick", [Qt.Key_X]: "favorite", [Qt.Key_Home]: "home", [Qt.Key_BracketLeft]: "previousTab", [Qt.Key_BracketRight]: "nextTab"})
@@ -361,6 +394,7 @@ Item {
     TapHandler { onPressedChanged: if (pressed) root.activity() }
     Timer { interval: 60000; running: true; repeat: true; onTriggered: root.clockText = Qt.formatTime(new Date(), "hh:mm") }
     Timer { id: noticeTimer; interval: 2600; onTriggered: root.notice = "" }
+    Timer { id: volumeTimer; interval: 1800; onTriggered: root.volumeVisible = false }
     Item {
         id: canvas
         width: 1024; height: 768; anchors.centerIn: parent
@@ -579,6 +613,26 @@ Item {
             width: Math.min(root.quickOpen ? 530 : 936, message.implicitWidth + 48); height: Math.max(48, message.implicitHeight + 24); radius: 14
             visible: root.notice !== "" || root.store.error !== ""; color: root.store.error ? "#8a413b" : "#d9eee7"
             Ui.Label { id: message; x: 24; y: 12; width: parent.width - 48; text: root.store.error || root.notice; color: root.store.error ? "white" : "#18352d"; font.pixelSize: 15 * root.fontScale; wrapMode: Text.Wrap }
+        }
+        Rectangle {
+            id: volumeHud; objectName: "volumeHud"
+            anchors.horizontalCenter: parent.horizontalCenter; y: Ui.Theme.padding
+            width: 224; height: Ui.Theme.fieldHeight; radius: height / 2
+            visible: root.volumeVisible; color: Ui.Theme.surface; border.color: Ui.Theme.outline
+            Accessible.role: Accessible.Indicator
+            Accessible.name: root.volumePercent === 0 ? "静音" : "音量 " + root.volumePercent + "%"
+            Ui.Icon {
+                x: Ui.Theme.labelGap; anchors.verticalCenter: parent.verticalCenter
+                name: root.volumePercent === 0 ? "volume-muted" : "volume"; color: Ui.Theme.text
+            }
+            Ui.ProgressBar {
+                objectName: "volumeProgress"; x: 48; width: 76; anchors.verticalCenter: parent.verticalCenter
+                value: root.volumePercent / 100; Accessible.ignored: true
+            }
+            Ui.Label {
+                objectName: "volumeLabel"; x: 136; width: 76; anchors.verticalCenter: parent.verticalCenter
+                role: "value"; horizontalAlignment: Text.AlignHCenter; text: root.volumePercent + "%"
+            }
         }
     }
 }

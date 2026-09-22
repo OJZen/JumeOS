@@ -1,11 +1,10 @@
 # R46H experiment status ledger
 
-> Current checkpoint: 2026-09-21. This is the authoritative index of accepted
+> Current checkpoint: 2026-09-22. This is the authoritative index of accepted
 > physical evidence and open hardware gates. Exact commands, hashes and raw
 > receipts stay in the linked owning runbooks.
 
 ## How to read this ledger
-
 **PASS** is accepted only for its stated boundary; **FAIL** needs a new hypothesis,
 **REVOKED** cannot authorize later work, and **OPEN** has not passed. Host, media,
 machine and operator evidence remain distinct.
@@ -24,9 +23,7 @@ Fallbacks are p2 v0.7 attended and v0.15 automated; v0.17 passed readbacks/cold/
 Exact p2 v0.18 passes fixed-profile write/full readback, cold identity, policy
 scope and full base smoke; launcher-created Wi-Fi activation/reboot persistence, LCD, USB,
 Moonlight and PSP remain open.
-
 ## Capability ledger
-
 - **Full-card first version v0.1 — HOST + MEDIA + PHYSICAL PASS.** Current p2/p3 later changed.
 - **Original-card EASYROMS — P3 WRITE/PHYSICAL PASS; READBACK UNVERIFIED.** Checksums were skipped.
 - **Cold MMC — V0.17 ONE-SHOT + TWO PERSISTENT PASS / RELIABILITY OPEN.**
@@ -77,6 +74,9 @@ Moonlight and PSP remain open.
   Device cleanly powered off; the browser runbook owns exact scope and remaining gates.
 - **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
   Dynamic `schedutil` and both GTA engines passed; reset recovered a live GPU-min panic. Do not repeat it.
+- **[Files/Transfer](../../gaming-files/TRANSFER.md) — TRANSIENT TARGET MACHINE PASS / PHYSICAL UX OPEN.**
+  16 MiB Wi-Fi hash roundtrip, cancellation, readonly ROMs, link-loss revocation and app lifecycle/privacy passed.
+  Eight Python dependencies added without upgrades; services restored and clean poweroff. QR/USB/LCD remain open.
 - **Wayland/ports — R74 SHORT ATTENDED + R79 TRANSIENT MACHINE PASS / BROADER PLAY OPEN.**
   R48 fixed D-pad Down; 640x480, first-config and [private Mesa](../../gaming-mesa/README.md)
   passed. R60's Vice City LCD/audio/controls passed at 816/300 MHz. R62 found

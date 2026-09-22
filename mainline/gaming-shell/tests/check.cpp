@@ -9,6 +9,7 @@
 #include <QCryptographicHash>
 #include <QJsonArray>
 #include <QFile>
+#include <QSaveFile>
 #include <QFontDatabase>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -561,6 +562,66 @@ private slots:
         applications.stop(); QTRY_VERIFY(!applications.running());
         QVERIFY(!root->property("sensitiveVisible").toBool());
     }
+    void terminalEntryKeyboardMouseAndPrivacy() {
+        QTemporaryDir directory;
+        Preferences state(directory.path()); Telemetry metrics(directory.path()); ControllerInput controller;
+        ToolState tools(directory.path(),directory.path(),false); Applications applications; QQuickView view;
+        view.setInitialProperties({{"store",QVariant::fromValue(&state)},{"metrics",QVariant::fromValue(&metrics)},
+            {"controller",QVariant::fromValue(&controller)},{"tools",QVariant::fromValue(&tools)},{"applications",QVariant::fromValue(&applications)}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
+        QCOMPARE(view.status(),QQuickView::Ready); view.show(); QVERIFY(QTest::qWaitForWindowExposed(&view));
+        auto *root=view.rootObject(); QSignalSpy request(root,SIGNAL(terminalRequested()));
+        QTest::keyClick(&view,Qt::Key_BracketRight); QCOMPARE(root->property("page").toInt(),1);
+        root->setProperty("selected",7); QTest::keyClick(&view,Qt::Key_Return); QCOMPARE(request.size(),0);
+        root->setProperty("terminalAvailable",true); QTest::keyClick(&view,Qt::Key_Return); QCOMPARE(request.size(),1);
+        QTest::keyClick(&view,Qt::Key_Q,Qt::ControlModifier); QVERIFY(!root->property("quickOpen").toBool());
+        QQuickItem *card=nullptr; QList<QQuickItem *> pending{root};
+        while(!pending.isEmpty()) {
+            auto *item=pending.takeLast(); pending.append(item->childItems());
+            if(item->property("title").toString()==QStringLiteral("终端"))card=item;
+        }
+        QVERIFY(card); QTest::qWait(150);
+        QTest::mouseClick(&view,Qt::LeftButton,Qt::NoModifier,card->mapToScene(card->boundingRect().center()).toPoint());
+        QCOMPARE(request.size(),2);
+        QVERIFY(applications.launchPrepared("builtin.terminal","/bin/sleep",{"10"},directory.path(),QProcessEnvironment::systemEnvironment()));
+        QTRY_VERIFY(root->property("sensitiveVisible").toBool());
+        applications.stop(); QTRY_VERIFY(!applications.running()); QVERIFY(!root->property("sensitiveVisible").toBool());
+    }
+    void filesEntriesAndPrivacy() {
+        QTemporaryDir directory;
+        Preferences state(directory.path()); Telemetry metrics(directory.path()); ControllerInput controller;
+        ToolState tools(directory.path(),directory.path(),false); Applications applications; QQuickView view;
+        view.setInitialProperties({{"store",QVariant::fromValue(&state)},{"metrics",QVariant::fromValue(&metrics)},
+            {"controller",QVariant::fromValue(&controller)},{"tools",QVariant::fromValue(&tools)},{"applications",QVariant::fromValue(&applications)}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
+        QCOMPARE(view.status(),QQuickView::Ready);
+        auto *root=view.rootObject();QSignalSpy request(root,SIGNAL(filesRequested(bool)));
+        root->setProperty("selected",8);QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));QCOMPARE(request.size(),0);
+        root->setProperty("filesAvailable",true);
+        for(int i=0;i<2;++i) {
+            root->setProperty("selected",8+i);QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));
+            QCOMPARE(request.size(),i+1);QCOMPARE(request.last().first().toBool(),bool(i));
+            QVERIFY(applications.launchPrepared(i?"builtin.text":"builtin.files","/bin/sleep",{"10"},directory.path(),QProcessEnvironment::systemEnvironment()));
+            QTRY_VERIFY(root->property("sensitiveVisible").toBool());
+            root->setProperty("quickOpen",true);QVERIFY(root->property("sensitiveVisible").toBool());root->setProperty("quickOpen",false);
+            applications.stop();QTRY_VERIFY(!applications.running());QVERIFY(!root->property("sensitiveVisible").toBool());
+        }
+        QSignalSpy transferRequest(root,SIGNAL(transferRequested()));root->setProperty("selected",10);
+        QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));QCOMPARE(transferRequest.size(),1);
+        QVERIFY(applications.launchPrepared("builtin.transfer","/bin/sleep",{"10"},directory.path(),QProcessEnvironment::systemEnvironment()));
+        QTRY_VERIFY(root->property("sensitiveVisible").toBool());applications.stop();QTRY_VERIFY(!applications.running());
+        QFile manifest(directory.filePath("applications.json"));QVERIFY(manifest.open(QIODevice::WriteOnly));
+        manifest.write(R"({"version":1,"applications":[{"id":"fixture","title":"Fixture","program":"/bin/true","arguments":[]}]})");manifest.close();
+        QVERIFY(applications.load(manifest.fileName()));
+        // Manifest properties are deliberately CONSTANT: production loads before QML.
+        QQuickView custom;custom.setInitialProperties({{"store",QVariant::fromValue(&state)},{"metrics",QVariant::fromValue(&metrics)},
+            {"controller",QVariant::fromValue(&controller)},{"tools",QVariant::fromValue(&tools)},{"applications",QVariant::fromValue(&applications)},{"filesAvailable",true}});
+        custom.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));QCOMPARE(custom.status(),QQuickView::Ready);
+        root=custom.rootObject();QSignalSpy customRequest(root,SIGNAL(filesRequested(bool)));QVERIFY(root->property("customApplications").toBool());
+        root->setProperty("selected",1);QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));QCOMPARE(customRequest.size(),1);QVERIFY(!customRequest.last().first().toBool());
+        root->setProperty("selected",2);QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));QCOMPARE(customRequest.size(),2);QVERIFY(customRequest.last().first().toBool());
+        QSignalSpy customTransfer(root,SIGNAL(transferRequested()));root->setProperty("selected",3);QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));QCOMPARE(customTransfer.size(),1);
+    }
     void streamingStatistics() {
         QTemporaryDir directory; Streaming stream(directory.path());
         const QByteArray report = R"(R46H_STATS {"version":1,"receivedFps":60,"decodedFps":59,"renderedFps":58.5,"networkDropPercent":0.1,"pacingDropPercent":0.2,"decodeMs":2,"queueMs":4,"renderCallMs":3,"rttMs":8,"hostProcessingMs":5,"audioNetworkQueueMs":10})" + QByteArray("\n");
@@ -876,6 +937,64 @@ private slots:
         view.showMinimized();QTest::qWait(50);changes.clear();QTest::qWait(150);QCOMPARE(changes.size(),0);
         view.showNormal();QTRY_VERIFY(changes.size()>0);
         progress->setVisible(false);QTest::qWait(50);changes.clear();QTest::qWait(100);QCOMPARE(changes.size(),0);
+    }
+    void volumeHudAndAtomicUpdates() {
+        QTemporaryDir directory; QVERIFY(directory.isValid());
+        const auto stateDir=directory.filePath("var/lib/r46h-volume"), level=stateDir+"/level";
+        QVERIFY(QDir().mkpath(stateDir));
+        auto save=[&](const QByteArray &value) {
+            QSaveFile file(level); QVERIFY(file.open(QIODevice::WriteOnly));
+            QCOMPARE(file.write(value),value.size()); QVERIFY(file.commit());
+        };
+        save("169\n");
+        DeviceState device(directory.path(),false,true); QSignalSpy changes(&device,&DeviceState::volumeChanged);
+        DeviceState untrusted(directory.path()); QSignalSpy ignored(&untrusted,&DeviceState::volumeChanged);
+        Preferences state(directory.path()); Telemetry metrics(directory.path()); ControllerInput controller;
+        QQuickView view; view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.setInitialProperties({{"store",QVariant::fromValue(&state)},{"metrics",QVariant::fromValue(&metrics)},
+            {"controller",QVariant::fromValue(&controller)},{"device",QVariant::fromValue(&device)}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
+        QCOMPARE(view.status(),QQuickView::Ready); view.resize(640,480); view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view)); auto *root=view.rootObject();
+        QSignalSpy visibility(root,SIGNAL(volumeVisibleChanged()));
+        auto *hud=root->findChild<QQuickItem *>("volumeHud"); QVERIFY(hud);
+        QVERIFY(!hud->isVisible()); QVERIFY(changes.isEmpty());
+        QVERIFY(QMetaObject::invokeMethod(root,"openEditor"));
+        auto *focus=view.activeFocusItem(); QVERIFY(focus);
+        save("201\n"); QTRY_VERIFY(!changes.isEmpty());
+        QCOMPARE(changes.last().at(0).toInt(),100); QCOMPARE(device.info().value("volumeSaved").toInt(),100);
+        QVERIFY(hud->isVisible()); QCOMPARE(view.activeFocusItem(),focus); QVERIFY(!root->property("quickOpen").toBool());
+        const auto bounds=hud->mapRectToScene(hud->boundingRect());
+        QCOMPARE(bounds.center().x(),320.); QCOMPARE(bounds.top(),12.5);
+        const auto captures=qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
+        QVERIFY(QMetaObject::invokeMethod(root,"closeEditor"));
+        for(int scale:{100,120}) {
+            if(scale==120){state.adjust("font",1);state.adjust("font",1);}
+            save("201\n"); QTest::qWait(100);
+            auto *label=root->findChild<QQuickItem *>("volumeLabel"); QVERIFY(label);
+            QVERIFY(label->property("contentWidth").toReal()<=label->width());
+            QVERIFY(!label->property("truncated").toBool());
+            state.adjust("monitor",1); QTest::qWait(100);
+            auto *performance=root->findChild<QQuickItem *>("performancePanel"); QVERIFY(performance);
+            QVERIFY(!hud->mapRectToScene(hud->boundingRect()).intersects(performance->mapRectToScene(performance->boundingRect())));
+            if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+QString("/volume-%1.png").arg(scale)));
+            state.adjust("monitor",1);
+        }
+        QTest::qWait(1000); changes.clear(); save("201\n"); // Repeat at the limit must renew the timeout.
+        QTRY_VERIFY(!changes.isEmpty()); QTest::qWait(1000); QVERIFY(hud->isVisible());
+        QCOMPARE(visibility.size(),1); // Timer renewal must not toggle compositor visibility.
+        QTRY_VERIFY_WITH_TIMEOUT(!hud->isVisible(),1500);
+        changes.clear(); save("0\n"); QTRY_VERIFY(!changes.isEmpty());
+        QCOMPARE(changes.last().at(0).toInt(),0); QCOMPARE(root->property("volumePercent").toInt(),0);
+        QTest::qWait(50); changes.clear(); save("202\n"); QTest::qWait(100); QVERIFY(changes.isEmpty());
+        save("invalid\n"); QTest::qWait(100); QVERIFY(changes.isEmpty());
+        QVERIFY(QFile::remove(level)); QTest::qWait(100); QVERIFY(changes.isEmpty());
+        save("85\n"); QTRY_VERIFY(!changes.isEmpty()); QCOMPARE(changes.last().at(0).toInt(),42);
+        // Service temporary files are not volume events, and unverified hosts never watch.
+        QTest::qWait(100); changes.clear();
+        QFile temporary(stateDir+"/.level.temporary"); QVERIFY(temporary.open(QIODevice::WriteOnly)); temporary.close();
+        QTest::qWait(100); QVERIFY(changes.isEmpty()); QVERIFY(ignored.isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(!hud->isVisible(),2200);
     }
     void deviceSettingsReadbackAndGuards() {
         QTemporaryDir directory;

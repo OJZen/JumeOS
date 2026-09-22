@@ -12,6 +12,10 @@ claiming process may change game/panel/overlay/privacy state; commands carry a s
 and sequence and reject stale state. The local socket is owner-only inside the
 private runtime directory; there is no TCP service or arbitrary command execution.
 
+[USB keyboard/mouse and Terminal](PERIPHERALS.md) use native seat input, restore
+focus on hotplug and make read-only HUDs pointer-transparent. Their acceptance
+is separate from USB gadget mode; no controller routing or kernel role is changed.
+
 `capture.cpp` uses Weston's version-locked output-capture protocol to obtain the
 actual composed framebuffer through bounded shared memory. It accepts only bounded
 32-bit formats and has a poll deadline. Capture authorization admits only the
@@ -355,6 +359,13 @@ capability retain the previous full-surface behavior. Pixman, software GL and th
 real Qt/router/SDL desktop checks passed, including composed HUD and panel pixels.
 Evidence is `mainline/out/.cache/r46h-hud-mask-r55-host-20260914/`. This is host
 proof only; the R46H pacing, colors, controls and thermal gate remain open.
+
+The 2026-09-22 [volume capsule](../gaming-shell/DEVICE.md) extends `overlay`
+requests with an optional boolean `volume` (default false). While true, the
+clip includes the top-center capsule; dismissal restores R55's narrow mask even
+if the performance HUD stays enabled. This never changes panel/input ownership
+or capture privacy. Launcher and compositor must be deployed as one candidate.
+Pixman and software-GL pixel checks pass; R46H display/pacing remain untested.
 
 R56's no-Moonlight candidate is
 `mainline/out/.cache/r46h-gta-shared-20260914/r56/`, source

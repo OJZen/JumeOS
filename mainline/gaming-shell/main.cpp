@@ -179,6 +179,11 @@ int main(int argc, char **argv) {
     const QPointer<QQuickItem> root(window.rootObject());
     const auto browserClient = QDir::cleanPath(QCoreApplication::applicationDirPath() + "/../../browser/browser-client.sh");
     root->setProperty("browserAvailable", QFileInfo(browserClient).isExecutable());
+    const auto terminalClient = QCoreApplication::applicationDirPath() + "/foot";
+    const auto terminalShell = QDir::cleanPath(QCoreApplication::applicationDirPath() + "/../../terminal-shell.sh");
+    root->setProperty("terminalAvailable", QFileInfo(terminalClient).isExecutable() && QFileInfo(terminalShell).isExecutable());
+    const auto filesClient=QDir::cleanPath(QCoreApplication::applicationDirPath()+"/../../files/files-client.sh");
+    root->setProperty("filesAvailable",QFileInfo(filesClient).isExecutable());
     QFile browserVersions(QFileInfo(browserClient).absolutePath() + "/engine-versions.json");
     if (QFileInfo(browserClient).isExecutable() && browserVersions.open(QIODevice::ReadOnly))
         root->setProperty("browserVersions", QJsonDocument::fromJson(browserVersions.read(4096)).object().toVariantMap());
@@ -195,6 +200,7 @@ int main(int argc, char **argv) {
         QObject::connect(root, SIGNAL(quickOpenChanged()), handheld.get(), SLOT(sceneChanged()));
         QObject::connect(root, SIGNAL(panelVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
         QObject::connect(root, SIGNAL(monitorVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
+        QObject::connect(root, SIGNAL(volumeVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
         QObject::connect(root, SIGNAL(sensitiveVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
         QString error;
         if (!handheld->start(parser.value("handheld-router"), parser.value("input-device"), &error, uinputFd)) {
@@ -203,6 +209,33 @@ int main(int argc, char **argv) {
     }
     QObject::connect(&tools, &ToolState::notice, &window, [root](const QString &message) { if (root) QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, message)); });
     QString sharedNativeGame;
+    QObject::connect(root,SIGNAL(filesRequested(bool)),&applications,SIGNAL(filesRequested(bool)));
+    QObject::connect(root,SIGNAL(transferRequested()),&applications,SIGNAL(transferRequested()));
+    const auto launchFiles=[&](const QString &mode) {
+        if(!handheldMode||!handheld->ready()) {QMetaObject::invokeMethod(root,"notify",Q_ARG(QVariant,QStringLiteral("文件应用需要共享 Wayland 会话")));return;}
+        if(applications.running()||!preferences.save())return;
+        const auto directory=state+(mode=="transfer"?"/apps/transfer":"/apps/files");
+        if(QFileInfo(state+"/apps").isSymLink()||QFileInfo(directory).isSymLink()||!QDir().mkpath(directory))return;
+        QFile::setPermissions(state+"/apps",QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner);
+        QFile::setPermissions(directory,QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner);
+        QStringList arguments{"--state-dir",directory};if(mode=="text")arguments<<"--editor";if(mode=="transfer")arguments<<"--transfer";
+        applications.launchPrepared("builtin."+mode,filesClient,arguments,QDir::homePath(),QProcessEnvironment::systemEnvironment());
+    };
+    QObject::connect(&applications,&Applications::filesRequested,&app,[launchFiles](bool editor){launchFiles(editor?"text":"files");});
+    QObject::connect(&applications,&Applications::transferRequested,&app,[launchFiles]{launchFiles("transfer");});
+    QObject::connect(root, SIGNAL(terminalRequested()), &applications, SIGNAL(terminalRequested()));
+    QObject::connect(&applications, &Applications::terminalRequested, &app, [&] {
+        if (!handheldMode || !handheld->ready()) {
+            QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, QStringLiteral("终端需要共享 Wayland 会话"))); return;
+        }
+        if (applications.running() || !preferences.save()) return;
+        auto environment = QProcessEnvironment::systemEnvironment();
+        environment.remove("R46H_SHELL_LOG");
+        environment.insert("FONTCONFIG_FILE", QFileInfo(terminalShell).absolutePath() + "/terminal-fonts.conf");
+        applications.launchPrepared("builtin.terminal", terminalClient,
+            {"--config=/dev/null", "--fullscreen", "--title=Jume Terminal", "--app-id=jume-terminal",
+             "--font=monospace:size=10", "--term=xterm-256color", terminalShell}, QDir::homePath(), environment);
+    });
     QObject::connect(root, SIGNAL(browserRequested()), &applications, SIGNAL(browserRequested()));
     QObject::connect(&applications, &Applications::browserRequested, &app, [&] {
         if (!handheldMode || !handheld->ready()) {

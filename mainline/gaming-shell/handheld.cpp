@@ -181,6 +181,10 @@ void HandheldSession::synchronize() {
     requestPolicy();
 }
 void HandheldSession::sceneChanged() {
+    // A visible telemetry/volume overlay is not an input surface. USB pointer
+    // events must reach the foreground app until the quick panel explicitly opens.
+    m_view->setFlag(Qt::WindowTransparentForInput, m_applications->running()
+        && !m_view->rootObject()->property("quickOpen").toBool());
     // A low-priority sample must never delay an input/privacy transition.
     if (m_pending && m_request.value("op") == QJsonValue("observe")) {
         m_pending = false; m_deadline.stop(); m_policy.abort();
@@ -262,14 +266,17 @@ void HandheldSession::requestPolicy() {
     if (!root) return;
     const qint64 game = m_applications->processId();
     const bool panel = game && root->property("quickOpen").toBool();
-    const bool overlay = game && (root->property("panelVisible").toBool() || root->property("monitorVisible").toBool());
+    const bool volume = game && root->property("volumeVisible").toBool();
+    const bool overlay = game && (root->property("panelVisible").toBool() || root->property("monitorVisible").toBool() || volume);
     const bool privacy = m_capturePhase != Permit && m_capturePhase != Reading;
     QJsonObject request{{"version", 1}};
     if (m_state.isEmpty()) request["op"] = "hello";
     else if (m_state.value("privacy").toBool() != privacy) { request["op"] = "privacy"; request["active"] = privacy; }
     else if (m_state.value("gamePid").toInteger() != game) { request["op"] = "game"; request["pid"] = game; }
     else if (m_state.value("panel").toBool() != panel) { request["op"] = "panel"; request["active"] = panel; }
-    else if (m_state.value("overlay").toBool() != overlay) { request["op"] = "overlay"; request["active"] = overlay; }
+    else if (m_state.value("overlay").toBool() != overlay || m_state.value("volume").toBool() != volume) {
+        request["op"] = "overlay"; request["active"] = overlay; request["volume"] = volume;
+    }
     else if (m_frameSampleDue && m_ready && m_capturePhase == Idle) { request["op"] = "observe"; m_frameSampleDue = false; }
     else {
         if (m_capturePhase == Permit) readCapture();

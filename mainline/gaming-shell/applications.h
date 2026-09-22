@@ -33,6 +33,9 @@ public:
     Q_INVOKABLE void stop();
 signals:
     void browserRequested();
+    void terminalRequested();
+    void filesRequested(bool editor);
+    void transferRequested();
     void changed();
     void started();
     void finished();

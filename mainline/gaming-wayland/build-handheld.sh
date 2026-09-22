@@ -25,6 +25,15 @@ mesa=${R46H_MESA_RUNTIME:-$cache/r46h-mesa-26.2.2/r60/mesa-26.2.2-r46h-runtime.t
 python3 -B "$repo/mainline/gaming-ports/prepare-native.py" "$native" --check
 [[ -f $gta/BUILD-INFO && -f $gta/SHA256SUMS ]] && (cd "$gta" && sha256sum --check --quiet SHA256SUMS)
 PYTHONDONTWRITEBYTECODE=1 python3 -B "$repo/mainline/gaming-mesa/runtime.py" validate-runtime "$mesa"
+peripherals="$cache/r46h-peripherals"
+PYTHONDONTWRITEBYTECODE=1 python3 -B "$source_dir/prepare-peripherals.py" "$peripherals"
+files_bindings=()
+files_runtime=${R46H_FILES_RUNTIME:-$cache/jume-files/jume-files-arm64.tar.gz}
+if [[ -f $files_runtime ]]; then
+    files_hash=$(shasum -a 256 "$files_runtime" | cut -d ' ' -f 1)
+    [[ $files_hash == "$(cat "$(dirname "$files_runtime")/runtime.sha256")" ]]
+    files_bindings=(-v "$files_runtime:/files-runtime.tar.gz:ro" -e "JUME_FILES_SHA=$files_hash")
+fi
 # Retained font/client plugins are test inputs; the candidate itself uses the hashed runtime.
 mkdir -p "$output/share/fonts/truetype/droid" "$output/qt-wayland"
 cp "$cache/r46h-compositor-20260910/share/fonts/truetype/droid/DroidSansFallbackFull.ttf" "$output/share/fonts/truetype/droid/"
@@ -43,7 +52,9 @@ docker run --rm --init --network none --memory 1536m --cpus 3 --pids-limit 256 -
   -v "$cache/r46h-shell/linux-build:/out/linux-build" \
   -v "$cache/r46h-ports-backend-20260910/game-debs:/debs:ro" -v "$cache/r46h-wayland/deb-cache:/wayland-debs:ro" \
   -v "$cache/r46h-wayland/r46h-wayland-preview-arm64.tar.gz:/wayland-runtime.tar.gz:ro" \
+  -v "$peripherals:/peripheral-debs:ro" \
   ${client_bindings[@]+"${client_bindings[@]}"} \
+  ${files_bindings[@]+"${files_bindings[@]}"} \
   "$image" -c 'set -Eeuo pipefail
     timeout 240 bash /wayland/check-desktop.sh > /out/desktop-check.log 2>&1
     rm /dev/uinput

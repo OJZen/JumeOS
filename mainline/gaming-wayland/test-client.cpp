@@ -30,6 +30,8 @@ int main(int argc, char **argv)
             && panel.alpha() == 255 && panel != game ? 0 : 4;
     }
     QQuickView view;
+    if (QByteArray(argv[1])=="ui" && qEnvironmentVariableIntValue("R46H_TEST_PASS_THROUGH")==1)
+        QTimer::singleShot(200, &view, [&] { view.setFlag(Qt::WindowTransparentForInput); });
     view.setColor(Qt::transparent);
     view.setResizeMode(QQuickView::SizeRootObjectToView);
     QQmlComponent component(view.engine());
@@ -37,7 +39,9 @@ int main(int argc, char **argv)
     const QByteArray qml = QByteArray("import QtQuick\nItem { id: root; property int frameTick: 0; property bool animate: false; property bool serverMode: false; property bool inputA: false; property real axisX: 0; property real axisY: 0; width: 640; height: 480; Rectangle { anchors.right: parent.right; height: parent.height; width: ")
         + (QByteArray(argv[1]) == "ui" ? "200; color: '#ffe000'" : "parent.width; color: root.serverMode && root.inputA ? '#204ddb' : '#168b42'")
         + " } Rectangle { visible: root.animate; width: 2; height: 2; x: root.frameTick; color: '#123456' } Text { visible: root.serverMode; x: 40; y: 40; color: 'white'; font.pixelSize: 24; text: 'Sunshine input loopback' } Rectangle { visible: root.serverMode; x: 300 + root.axisX * 180; y: 340 + root.axisY * 70; width: 40; height: 40; radius: 6; color: 'white' } }";
-    component.setData(qml, QUrl());
+    QByteArray scene=qml;
+    if(QByteArray(argv[1])=="ui")scene.insert(scene.lastIndexOf('}'),"Rectangle { x: 250; y: 12; width: 140; height: 35; color: '#e030aa' } ");
+    component.setData(scene, QUrl());
     auto *item = qobject_cast<QQuickItem *>(component.create());
     if (!item) return 2;
     item->setProperty("serverMode", server);

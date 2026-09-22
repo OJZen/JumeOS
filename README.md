@@ -18,6 +18,9 @@ stable image or upgrade path yet.
 
 ## Still in development
 
+Jume Browser, Files/Text, Wi-Fi Transfer and the USB-keyboard terminal are experimental apps;
+Target smoke checks pass for Files/Text/Transfer; physical UX acceptance remains open.
+
 Moonlight streaming on the R46H, Stardew Valley, USB gamepad mode,
 suspend/resume, attended GTA gameplay, and a supported installation image are
 not complete.

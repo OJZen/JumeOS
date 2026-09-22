@@ -24,6 +24,7 @@
 
 struct Shell;
 struct Watch { wl_listener listener; Shell *shell; };
+struct SeatWatch { wl_listener caps, destroy; Shell *shell; };
 struct View {
     weston_desktop_surface *desktop;
     weston_view *view;
@@ -45,7 +46,8 @@ struct Shell {
     weston_compositor *compositor;
     weston_desktop *desktop = nullptr;
     weston_layer hidden, game, ui;
-    Watch destroy, output, capture;
+    Watch destroy, output, capture, seatCreated;
+    QList<SeatWatch *> seats;
     QList<View *> views;
     QList<Request *> requests;
     int listener = -1;
@@ -54,7 +56,7 @@ struct Shell {
     dev_t socketDevice = 0;
     ino_t socketInode = 0;
     pid_t uiPid = 0, controlPid = 0, gamePid = 0;
-    bool panel = false, overlay = false, privacy = true, destroying = false;
+    bool panel = false, overlay = false, volume = false, privacy = true, destroying = false;
     int64_t captureUntil = 0;
     qint64 sequence = 0;
     quint64 nextViewId = 1;
@@ -104,9 +106,11 @@ static void arrange(Shell *shell)
         weston_view_set_position(item->view, output->pos);
         if (isUi && hasGame && shell->overlay && !shell->panel
             && (shell->compositor->capabilities & WESTON_CAP_VIEW_CLIP_MASK)) {
-            // The Qt game HUD occupies this canvas region; clipping avoids a full-screen transparent blend.
-            weston_view_set_mask(item->view, output->width * 624 / 1024, output->height * 16 / 768,
-                (output->width * 368 + 1023) / 1024, (output->height * 260 + 767) / 768);
+            // Include the top-center volume capsule only while it is visible.
+            // Otherwise retain the accepted narrow performance-HUD blend region.
+            const int left = shell->volume ? 396 : 624;
+            weston_view_set_mask(item->view, output->width * left / 1024, output->height * 16 / 768,
+                (output->width * (992 - left) + 1023) / 1024, (output->height * 260 + 767) / 768);
         } else if (isUi) weston_view_set_mask_infinite(item->view);
         weston_view_update_transform(item->view);
         const bool active = isUi ? (!hasGame || shell->panel) : isGame && !shell->panel;
@@ -120,6 +124,29 @@ static void arrange(Shell *shell)
     }
     weston_compositor_schedule_repaint(shell->compositor);
 }
+
+static void seatRemoved(wl_listener *listener, void *)
+{
+    auto *watch = wl_container_of(listener, static_cast<SeatWatch *>(nullptr), destroy);
+    wl_list_remove(&watch->caps.link); wl_list_remove(&watch->destroy.link);
+    watch->shell->seats.removeOne(watch); delete watch;
+}
+static void seatCapabilities(wl_listener *listener, void *)
+{
+    auto *watch = wl_container_of(listener, static_cast<SeatWatch *>(nullptr), caps);
+    // A keyboard first connected after the UI mapped has no previous focus.
+    arrange(watch->shell);
+}
+static void watchSeat(Shell *shell, weston_seat *seat)
+{
+    auto *watch = new SeatWatch{}; watch->shell = shell;
+    watch->caps.notify = seatCapabilities; watch->destroy.notify = seatRemoved;
+    wl_signal_add(&seat->updated_caps_signal, &watch->caps);
+    wl_signal_add(&seat->destroy_signal, &watch->destroy);
+    shell->seats.append(watch); arrange(shell);
+}
+static void seatCreated(wl_listener *listener, void *data)
+{ watchSeat(reinterpret_cast<Watch *>(listener)->shell, static_cast<weston_seat *>(data)); }
 
 static void sizeSurface(Shell *shell, weston_desktop_surface *surface)
 {
@@ -228,7 +255,7 @@ static QJsonObject status(Shell *shell)
             {"outputRefreshHz", output && output->current_mode ? output->current_mode->refresh / 1000. : -1}};
     }
     return {{"version", 1}, {"session", shell->session}, {"sequence", shell->sequence}, {"uiPid", int(shell->uiPid)},
-            {"gamePid", int(shell->gamePid)}, {"panel", shell->panel}, {"overlay", shell->overlay}, {"privacy", shell->privacy}, {"surfaces", views}, {"frameStats", frames}};
+            {"gamePid", int(shell->gamePid)}, {"panel", shell->panel}, {"overlay", shell->overlay}, {"volume", shell->volume}, {"privacy", shell->privacy}, {"surfaces", views}, {"frameStats", frames}};
 }
 static void finish(Request *request, const QJsonObject &response)
 {
@@ -258,6 +285,7 @@ static int receive(int fd, uint32_t, void *data)
     auto fail = [&](const char *message) { finish(request, {{"ok", false}, {"error", message}}); };
     QStringList fields {"version", "op"};
     if (operation == "hello") fields.append("uiPid");
+    if (operation == "overlay") fields.append("volume");
     if (operation != "observe" && operation != "hello") fields.append({"session", "sequence", operation == "game" ? "pid" : "active"});
     if (!document.isObject() || object.value("version") != QJsonValue(1)) { fail("invalid_request"); return 0; }
     for (auto it = object.begin(); it != object.end(); ++it) if (!fields.contains(it.key())) { fail("unknown_field"); return 0; }
@@ -281,7 +309,11 @@ static int receive(int fd, uint32_t, void *data)
         } else {
             if (!object.value("active").isBool()) { fail("invalid_state"); return 0; }
             if (operation == "panel") shell->panel = object.value("active").toBool();
-            else if (operation == "overlay") shell->overlay = object.value("active").toBool();
+            else if (operation == "overlay") {
+                if (object.contains("volume") && !object.value("volume").isBool()) { fail("invalid_state"); return 0; }
+                shell->overlay = object.value("active").toBool();
+                shell->volume = shell->overlay && object.value("volume").toBool();
+            }
             else {
                 shell->privacy = object.value("active").toBool();
                 shell->captureUntil = shell->privacy ? 0 : std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -315,6 +347,8 @@ static void destroy(wl_listener *listener, void *)
     wl_list_remove(&shell->destroy.listener.link);
     wl_list_remove(&shell->output.listener.link);
     wl_list_remove(&shell->capture.listener.link);
+    wl_list_remove(&shell->seatCreated.listener.link);
+    while (!shell->seats.isEmpty()) seatRemoved(&shell->seats.first()->destroy, nullptr);
     while (!shell->requests.isEmpty()) finish(shell->requests.first(), {{"ok", false}, {"error", "shutdown"}});
     if (shell->source) wl_event_source_remove(shell->source);
     if (shell->listener >= 0) close(shell->listener);
@@ -353,6 +387,10 @@ extern "C" __attribute__((visibility("default"))) int wet_shell_init(weston_comp
     shell->destroy.shell = shell; shell->destroy.listener.notify = destroy; wl_signal_add(&compositor->destroy_signal, &shell->destroy.listener);
     shell->output.shell = shell; shell->output.listener.notify = outputChanged; wl_signal_add(&compositor->output_created_signal, &shell->output.listener);
     shell->capture.shell = shell; weston_compositor_add_screenshot_authority(compositor, &shell->capture.listener, captureAllowed);
+    shell->seatCreated.shell = shell; shell->seatCreated.listener.notify = seatCreated;
+    wl_signal_add(&compositor->seat_created_signal, &shell->seatCreated.listener);
+    weston_seat *seat;
+    wl_list_for_each(seat, &compositor->seat_list, link) watchSeat(shell, seat);
     shell->source = wl_event_loop_add_fd(wl_display_get_event_loop(compositor->wl_display), fd, WL_EVENT_READABLE, acceptRequest, shell);
     if (!shell->source) { destroy(&shell->destroy.listener, nullptr); return -1; }
     weston_log("R46H handheld shell: fullscreen policy, private control, capture ownership\n");

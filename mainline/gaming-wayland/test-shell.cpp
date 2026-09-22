@@ -30,11 +30,13 @@ static QJsonObject call(QJsonObject request)
     require(result.isObject(), "control JSON");
     return result.object();
 }
-static QJsonObject set(const char *operation, const char *key, QJsonValue value)
+static QJsonObject set(const char *operation, const char *key, QJsonValue value, bool volume = false)
 {
     for (int retry = 0; retry < 2; ++retry) {
         const auto state = call({{"op", "observe"}});
-        auto response = call({{"op", operation}, {key, value}, {"session", state.value("session")}, {"sequence", state.value("sequence")}});
+        QJsonObject request{{"op", operation}, {key, value}, {"session", state.value("session")}, {"sequence", state.value("sequence")}};
+        if(QByteArray(operation)=="overlay")request["volume"]=volume;
+        auto response = call(request);
         if (response.value("error") == QJsonValue("stale_state")) continue;
         require(response.value("ok").toBool(), "control mutation"); return response;
     }
@@ -83,6 +85,17 @@ int main(int argc, char **argv)
         require(frame.image.pixelColor(20, 20) == QColor("#168b42") && frame.image.pixelColor(600, 20) == QColor("#ffe000")
             && frame.image.pixelColor(600, 300) == QColor("#168b42"), "overlay mask limits the transparent UI surface");
         frame.image.save(QDir(argv[2]).filePath("overlay.png"));
+        require(frame.image.pixelColor(320, 25) == QColor("#168b42"), "volume region excluded while idle");
+        set("overlay", "active", true, true);
+        frame = captureOutput(); require(frame.error.isEmpty(), "volume overlay capture");
+        require(frame.image.pixelColor(320, 25) == QColor("#e030aa")
+            && frame.image.pixelColor(20, 20) == QColor("#168b42")
+            && frame.image.pixelColor(600, 300) == QColor("#168b42"), "top-center volume and unobstructed game");
+        require(!call({{"op", "observe"}}).value("panel").toBool(), "volume must not open the input panel");
+        frame.image.save(QDir(argv[2]).filePath("volume.png"));
+        set("overlay", "active", true);
+        frame = captureOutput(); require(frame.error.isEmpty(), "restored narrow HUD capture");
+        require(frame.image.pixelColor(320, 25) == QColor("#168b42"), "volume dismissal restores narrow mask");
         set("overlay", "active", false);
         QThread::msleep(2600);
         auto expired = captureOutput(); require(expired.image.isNull() && !expired.error.isEmpty(), "capture permission expires without client cleanup");

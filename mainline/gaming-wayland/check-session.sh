@@ -11,6 +11,13 @@ chmod 755 "$stage"
 tar -xzf /wayland-runtime.tar.gz -C "$stage"
 install -m 755 /out/linux-build/r46h-shell "$stage/usr/bin/"
 install -m 755 /out/input-router "$stage/usr/bin/"
+bash /wayland/install-peripherals.sh "$stage" /peripheral-debs
+if [[ -n ${JUME_FILES_SHA:-} ]]; then
+    [[ $JUME_FILES_SHA =~ ^[0-9a-f]{64}$ && $(sha256sum /files-runtime.tar.gz | cut -d ' ' -f 1) == "$JUME_FILES_SHA" ]]
+    mkdir "$stage/files"
+    tar -xzf /files-runtime.tar.gz -C "$stage/files"
+    (cd "$stage/files" && sha256sum --check --quiet SHA256SUMS)
+fi
 install -m 755 /out/handheld-shell.so "$stage/usr/lib/aarch64-linux-gnu/weston/"
 install -m 755 /wayland/session.sh /wayland/session-leases.sh /wayland/clients.sh /wayland/handheld-client.sh /wayland/probe-r46h.sh /src/shell-client.sh /src/remote-session.sh /src/device-lease.sh "$stage/"
 python3 -B /mesa/runtime.py install /mesa-runtime.tar.gz "$stage/usr"
@@ -60,7 +67,7 @@ record = {'mesa_runtime_revision': 60, 'status': 'HANDHELD_HOST_PASS_R46H_UNTEST
           'mesa_runtime_sha256': digest(pathlib.Path('/mesa-runtime.tar.gz')),
           'manifest_sha256': digest(root / 'SHA256SUMS'),
           'binaries': {str(f.relative_to(root)): digest(f) for f in [root / 'usr/bin/r46h-shell', root / 'usr/bin/input-router',
-                       root / 'usr/lib/r46h-ports/re3', root / 'usr/lib/r46h-ports/reVC',
+                       root / 'usr/bin/foot', root / 'usr/lib/r46h-ports/re3', root / 'usr/lib/r46h-ports/reVC',
                        root / 'usr/lib/aarch64-linux-gnu/weston/handheld-shell.so']},
           'moonlight_sha256': (root / 'MOONLIGHT_SHA256').read_text().strip() if (root / 'MOONLIGHT_SHA256').exists() else None,
           'boundary': 'Headless diagnostic and optional management UI; shared stream uses a fake transport. No R46H DRM/input/audio, target cgroup/seatd or actual Moonlight stream acceptance.'}

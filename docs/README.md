@@ -30,6 +30,8 @@ The root [README](../README.md) is the public project introduction.
 | EASYROMS migration | [P3 Content Migration](P3-CONTENT-MIGRATION.md) |
 | Streaming | [Game Streaming](GAME-STREAMING.md) |
 | Qt desktop | [Device Shell](DEVICE-SHELL.md) |
+| Files, previews, editor and application data | [Jume Files/Text](../mainline/gaming-files/README.md), [File layout](FILESYSTEM-LAYOUT.md) |
+| Wi-Fi file transfer | [Jume Transfer](../mainline/gaming-files/TRANSFER.md) |
 | Performance and power | [Performance and Power](PERFORMANCE-POWER.md) |
 | Remote UI control | [Remote Control](REMOTE-CONTROL.md) |
 

@@ -30,6 +30,21 @@ require the explicit lease below; a black UI mask is only a host preview.
 Volume uses the accepted physical keys, avoiding a second writer competing with
 the installed volume service. No mixer policy changes here.
 
+The top-center volume capsule listens to atomic updates of
+`/var/lib/r46h-volume/level` through `QFileSystemWatcher`; it does not wait for
+the two-second health sampler. It shows the safe 0–201 range as a percentage,
+with a mute icon at zero, then hides 1.8 seconds after the last update. Repeated
+presses at either limit renew the timeout without hiding/reopening the overlay.
+Startup readback and unrelated temporary files are silent. The capsule does not
+take focus or open the quick panel. Games/browser use the shared compositor's
+overlay path; deploy the launcher and compositor together, not a launcher-only
+replacement. ES-DE and standalone applications outside Jume are not covered.
+2026-09-22 ARM64 host checks cover atomic replacement/recreation, invalid values,
+timeout renewal, editor focus, 100%/120% font layout and Pixman/GL composed
+clipping. Evidence: `mainline/out/.cache/r46h-volume-hud-20260922/`.
+The paired binaries ran during the Transfer batch; physical volume-key/LCD and
+in-game overlay acceptance remain open (not exercised by that batch).
+
 With a lease, brightness writes the fixed backlight node and reads it back.
 Idle dimming saves the current raw value, quarters it, and restores it on the
 first wake action. CPU presets preserve the original limits; custom governor,

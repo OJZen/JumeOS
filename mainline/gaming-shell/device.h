@@ -4,6 +4,7 @@
 #include <QTimer>
 #include <QElapsedTimer>
 #include <QStorageInfo>
+#include <QFileSystemWatcher>
 
 // Linux device adapter. Writes require both the fixed R46H identity and a probe lease.
 // The fixture root is constructor-only: the application exposes no arbitrary sysfs path.
@@ -36,7 +37,10 @@ signals:
     void changed();
     void warning(const QString &message);
     void powerRequested(int exitCode);
+    void volumeChanged(int percent);
 private:
+    void watchVolume();
+    void volumeFileChanged(const QString &name);
     QString path(const QString &relative) const;
     bool fail(const QString &text);
     bool writeValue(const QString &relative, const QString &value);
@@ -46,6 +50,7 @@ private:
     QVariantList m_storage;
     QElapsedTimer m_sampleClock;
     QTimer m_timer;
+    QFileSystemWatcher m_volumeWatcher;
     bool m_target = false, m_controls = false, m_warned = false;
     int m_beforeDim = -1;
     qulonglong m_ticks = 0, m_idle = 0;

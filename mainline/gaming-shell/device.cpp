@@ -125,6 +125,8 @@ QVariantMap DeviceState::snapshot(const QString &root) {
 }
 
 DeviceState::DeviceState(QString root, bool allowControls, bool fixture):m_root(QDir(root).absolutePath()) {
+    connect(&m_volumeWatcher,&QFileSystemWatcher::fileChanged,this,&DeviceState::volumeFileChanged);
+    connect(&m_volumeWatcher,&QFileSystemWatcher::directoryChanged,this,&DeviceState::volumeFileChanged);
     m_target=(fixture && m_root!="/") || identity(m_root);m_controls=allowControls && m_target;
     refresh();refreshStorage();m_originalCpu=m_info.value("cpu").toMap();m_warned=false;
     m_timer.setInterval(2000);connect(&m_timer,&QTimer::timeout,this,&DeviceState::refresh);
@@ -133,8 +135,26 @@ DeviceState::DeviceState(QString root, bool allowControls, bool fixture):m_root(
 DeviceState::~DeviceState(){if(m_beforeDim>=0)setDimmed(false);}
 QString DeviceState::path(const QString &relative) const {return QDir(m_root).filePath(relative);}
 bool DeviceState::fail(const QString &text){m_error=text;emit changed();return false;}
+void DeviceState::watchVolume() {
+    const auto directory=path("var/lib/r46h-volume"), file=directory+"/level";
+    if(QFileInfo::exists(directory) && !m_volumeWatcher.directories().contains(directory))m_volumeWatcher.addPath(directory);
+    if(QFileInfo::exists(file) && !m_volumeWatcher.files().contains(file))m_volumeWatcher.addPath(file);
+}
+void DeviceState::volumeFileChanged(const QString &name) {
+    const auto file=path("var/lib/r46h-volume/level");
+    // Ignore the service's temporary files. Its atomic rename drops the file watch;
+    // rearm it, including after removal/recreation. Equal values still mean a key press.
+    if(name!=file && m_volumeWatcher.files().contains(file))return;
+    watchVolume();
+    const auto raw=number(read(m_root,"var/lib/r46h-volume/level"));
+    if(raw<0 || raw>201)return;
+    const int percent=qRound(raw*100./201);
+    if(m_info.value("volumeSaved").toInt()!=percent){m_info["volumeSaved"]=percent;emit changed();}
+    emit volumeChanged(percent);
+}
 void DeviceState::refresh() {
     if(!m_target)return;
+    watchVolume();
     auto next=snapshot(m_root);
     m_sampleClock.start();
     const auto fields=words(read(m_root,"proc/stat").section('\n',0,0));

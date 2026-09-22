@@ -7,7 +7,7 @@ renderer=${R46H_TEST_RENDERER:-pixman}
 dpkg -i /debs/*.deb /wayland-debs/libqt6waylandclient6_*.deb /wayland-debs/weston_*.deb > /out/desktop-setup.log 2>&1
 cmake -S /src -B /out/linux-build -DCMAKE_BUILD_TYPE=Release
 cmake --build /out/linux-build -j 3
-QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /out/linux-build/shell-check virtualControllerEvents virtualControllerHandover routedControllerEvents applicationManifestAndForegroundLifecycle streamingProfilesAndWorker streamingNavigation
+QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /out/linux-build/shell-check virtualControllerEvents virtualControllerHandover routedControllerEvents applicationManifestAndForegroundLifecycle streamingProfilesAndWorker streamingNavigation terminalEntryKeyboardMouseAndPrivacy browserEntryAndPrivacy filesEntriesAndPrivacy volumeHudAndAtomicUpdates
 g++ -std=c++17 -Wall -Wextra -Werror -O2 /wayland/input-router.cpp -o /out/input-router
 g++ -shared -fPIC -std=gnu++17 -O2 -Wall -Wextra -Werror /wayland/handheld-shell.cpp -o /out/handheld-shell.so $(pkg-config --cflags --libs libweston-14 Qt6Core)
 g++ -fPIC -std=gnu++17 -O2 -Wall -Wextra -Werror /wayland/test-client.cpp -o /out/test-client $(pkg-config --cflags --libs Qt6Quick sdl2)

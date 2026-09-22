@@ -1,6 +1,6 @@
 # R46H project context
 
-> Current checkpoint: 2026-09-21. Read the
+> Current checkpoint: 2026-09-22. Read the
 > [experiment ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) before
 > hardware work; it owns physical evidence and limitations.
 
@@ -12,16 +12,14 @@ desktop, local gaming, streaming, and future USB HID support. The
 
 ## Current baseline
 
-The device is **off after browser memory testing and clean shutdown** with exact p2 v0.18. Fixed-profile write/readback,
-cold identity, service health, exact policy/package hashes, permission scope and
-the full base smoke pass. A reset after an unconfirmed serial staging attempt
-also recovered cleanly with zero ext4/kernel faults. R79 then passed exact
-archive and 1,741-file manifest readback, v0.18 preflight, transient Launcher,
-game lifecycle and forced-child recovery without replacing ES-DE. R74 is the
-accepted and source-build-default GTA
+The device is **off after Transfer testing and clean shutdown**, on p2 v0.18 plus its eight Python dependencies.
+Fixed-profile write/readback, cold identity, service health, policy/package hashes,
+permission scope and base smoke pass. R79 passed archive/1,741-file manifest
+readback, v0.18 preflight, transient Launcher, game lifecycle and forced-child
+recovery without replacing ES-DE. R74 is the accepted and source-build-default GTA
 candidate after attended picture/audio/control approval; R63 and R60 remain
 rollbacks. Latest base-image evidence is under `mainline/out/.cache/r46h-v018-device-20260920.FoS3wK/`;
-latest launcher evidence is under `mainline/out/.cache/r46h-profile-device-20260921/evidence/`.
+latest Files/Transfer evidence is under `mainline/out/.cache/r46h-transfer-device-20260922/`.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current card p2: [v0.18](../mainline/rootfs-debian13-gaming-v18/README.md)
@@ -51,6 +49,8 @@ skipped, so content equality remains unverified. See
   raised two Settings focus runs from about 29.5 to 57.2--57.5 submissions/s;
   HUD runs rose from 29.9 to 58.5--59.0, with p50 near 16.7 ms.
   ES-DE/services recovered with zero failed units or kernel/ext4/OOM errors; physical LCD/readability, L3+R3 and persistent promotion remain open.
+  The [top-center volume capsule](../mainline/gaming-shell/DEVICE.md) passes ARM64 UI/event and Pixman/GL clipping checks;
+  paired binaries ran during Transfer testing; physical volume-key/in-game acceptance remains open.
 - Repaired GTA III/Vice City accept the Switch-layout controls and no longer
   reproduce the bounded-exit crash. GTA-only `noafbc`, first-config 640x480 and
   private Mesa 26.2.2 passed target integration. The R60 batch reached captured
@@ -99,9 +99,9 @@ skipped, so content equality remains unverified. See
   the frozen v0.18 image remain unchanged; next-image integration is open.
 - Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
   streaming is deferred by the user and remains open.
-- The current image exposes DWC2 as host-only with no UDC, gadget, or role
-  switch. USB HID needs hardware-route evidence and a separate recoverable
-  kernel/DT candidate.
+- [USB keyboard/mouse and Terminal](../mainline/gaming-wayland/PERIPHERALS.md) are host-side candidates; physical hotplug is open.
+  DWC2 is host-only; USB **gadget** mode still needs hardware-route evidence and a recoverable kernel/DT candidate.
+- [Jume Files/Text](../mainline/gaming-files/README.md) passes host functionality and target launch/privacy/exit smoke. [Transfer](../mainline/gaming-files/TRANSFER.md) passes real Wi-Fi 16 MiB hash roundtrip, cancellation, readonly ROMs and disconnect revocation. Phone QR, physical controls/USB/A/V and promotion remain open; [file layout](FILESYSTEM-LAYOUT.md) preserves legacy data.
 - [Jume Browser](../mainline/gaming-browser/README.md) is an optional Chromium/
   Qt WebEngine preview with dual-stick control, tabs/address/IME and launcher
   lifecycle/privacy integration. WebEngine 6.10.2 retains base Qt 6.8.2; both About

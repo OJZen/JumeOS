@@ -8,7 +8,7 @@ not the installed frontend. Its [shared R35/R36 path](../gaming-wayland/HANDHELD
 has composed-frame/remote-control proof; ordinary EGLFS previews have only a local panel. The [design and next gates](../../docs/DEVICE-SHELL.md)
 own the product direction. ES-DE and shared input mappings remain the fallback. Device writes require
 the explicit temporary lease. An explicit application list enables foreground process launch on
-shared-window platforms; the default list exposes six real built-in tool routes. No host
+shared-window platforms; the default list exposes built-in tools and optional applications. No host
 settings or Sunshine service are installed by this preview.
 
 R35's identified-device candidate showed actual Wi-Fi link quality,
@@ -36,6 +36,13 @@ failure restore the selected entry; returning waits for neutral controller input
 presets and the separate, bounded desktop-exit/stream/restart experiment.
 Its attended record also tracks the current rendering, input-UX and backlight gaps.
 The generic example application list is not activated automatically.
+
+[Jume Files/Text](../gaming-files/README.md) adds optional file-manager and editor
+entries, including with a custom application list. Its file content is excluded
+from remote screenshots like Browser and Terminal. Target launch/exit smoke passes;
+[file layout](../../docs/FILESYSTEM-LAYOUT.md) preserves existing saves/profiles.
+[Jume Transfer](../gaming-files/TRANSFER.md) adds a Wi-Fi-gated, temporary HTTP/QR
+sharing entry with the same foreground lifecycle and capture privacy boundary.
 
 The runner builds with CMake and Qt 6.8.2 under
 `mainline/out/.cache/r46h-shell/`. It uses the existing host SDL2 installation.
@@ -83,6 +90,10 @@ independent moving focus frame. Page navigation, field editing and buttons use
 the same primitives. Input stays live during transitions; reduced motion removes
 spatial effects. The footer shows only current actions. Read-only rows remain
 legible with no native activation, and scrollbars show additional content.
+
+[USB peripherals and Jume Terminal](../gaming-wayland/PERIPHERALS.md) add native
+keyboard/mouse input and a non-root Foot/Bash entry. Physical hotplug remains
+unverified; ordinary terminal output is private to the local display.
 
 The controller opens without grabbing system input; only the active preview
 window consumes its actions. The global controller bridge is not modified.
