@@ -99,8 +99,6 @@ int main(int argc, char **argv)
     if (view.status() != QQuickView::Ready) return 1;
     view.resize(1024, 768);
     if (options.isSet("windowed")) view.show(); else view.showFullScreen();
-    // This software cursor belongs to this window only; no global host pointer warping.
-    QGuiApplication::setOverrideCursor(Qt::BlankCursor);
     if (options.isSet("self-test")) QTimer::singleShot(60000, &app, [&] {
         qCritical("BROWSER_SMOKE_TIMEOUT step=%d", view.rootObject()->property("testStep").toInt());
         view.grabWindow().save(state + "/timeout.png");

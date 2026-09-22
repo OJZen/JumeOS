@@ -39,6 +39,13 @@ quadratic response reduce drift. `--pointer-speed` (240–1400 px/s) and
 `--scroll-speed` (200–1800 px/s) retain hardware calibration. No global mouse
 injection, `/dev/uinput` access or compositor policy change is added.
 
+USB mouse movement switches to the native cursor (including text/link shapes);
+fresh stick input switches back at the last pointer position. Held pad input must
+return to neutral after mouse takeover. Native click, wheel and keyboard events
+continue through Qt; Ctrl+L/T/W, Ctrl+R/F5 and Alt+Left/Right are supported.
+See [USB peripherals](../gaming-wayland/PERIPHERALS.md) for the shared input and
+physical acceptance boundary.
+
 ## Build and integration
 
 Run `mainline/gaming-browser/build.sh`. It uses the pinned ARM64 SDK and retained

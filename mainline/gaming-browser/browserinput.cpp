@@ -3,12 +3,15 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QUrlQuery>
+#include <QScopedValueRollback>
 #include <algorithm>
 #include <cmath>
 
 BrowserInput::BrowserInput(QQuickWindow *window, ControllerInput *controller)
     : m_window(window), m_controller(controller)
 {
+    window->installEventFilter(this);
+    QGuiApplication::setOverrideCursor(Qt::BlankCursor);
     connect(controller, &ControllerInput::action, this, [this](const QString &name, bool) {
         if (m_window->isActive() && !m_waitNeutral && m_keyboard
             && QStringList{"left", "right", "up", "down"}.contains(name)) emit action(name);
@@ -23,6 +26,31 @@ BrowserInput::BrowserInput(QQuickWindow *window, ControllerInput *controller)
     m_clock.start(); m_timer.start(16);
 }
 
+BrowserInput::~BrowserInput() {
+    if(m_controllerPointer)QGuiApplication::restoreOverrideCursor();
+}
+
+void BrowserInput::useControllerPointer(bool enabled) {
+    if(m_controllerPointer==enabled)return;
+    m_controllerPointer=enabled;
+    if(enabled)QGuiApplication::setOverrideCursor(Qt::BlankCursor); else QGuiApplication::restoreOverrideCursor();
+    emit pointerModeChanged();
+}
+
+bool BrowserInput::eventFilter(QObject *object, QEvent *event) {
+    if(object==m_window && !m_sending && (event->type()==QEvent::MouseMove
+        || event->type()==QEvent::MouseButtonPress || event->type()==QEvent::Wheel)) {
+        if(m_down) {
+            const auto saved=m_position; m_position={-100,-100};
+            mouse(QEvent::MouseButtonRelease,false); m_position=saved;
+        }
+        m_position=static_cast<QSinglePointEvent *>(event)->position();
+        m_waitNeutral=true; m_scroll={};
+        useControllerPointer(false); emit moved();
+    }
+    return QObject::eventFilter(object,event);
+}
+
 double BrowserInput::speed(double value)
 {
     if (!std::isfinite(value)) return 0;
@@ -33,6 +61,7 @@ double BrowserInput::speed(double value)
 
 void BrowserInput::mouse(QEvent::Type type, bool down)
 {
+    QScopedValueRollback<bool> sending(m_sending,true);
     m_down = down;
     QMouseEvent event(type, m_position, m_window->mapToGlobal(m_position),
         type == QEvent::MouseMove ? Qt::NoButton : Qt::LeftButton,
@@ -71,6 +100,7 @@ void BrowserInput::sample(const QVariantList &axes, const QStringList &buttons, 
     if (!m_keyboard) {
         const double dt = std::isfinite(seconds) ? std::clamp(seconds, 0., .05) : 0;
         auto axis = [&](int index) { return speed(axes.value(index).toDouble()); };
+        if(axis(0)!=0 || axis(1)!=0 || axis(2)!=0 || axis(3)!=0 || b)useControllerPointer(true);
         const QPointF old = m_position;
         m_position = {std::clamp(m_position.x() + axis(2) * m_pointerSpeed * dt, 0., double(std::max(0, m_window->width() - 1))),
                       std::clamp(m_position.y() + axis(3) * m_pointerSpeed * dt, 0., double(std::max(0, m_window->height() - 1)))};
@@ -83,6 +113,7 @@ void BrowserInput::sample(const QVariantList &axes, const QStringList &buttons, 
             // Native wheel delivery: scrolls nested frames/elements under the cursor too.
             QWheelEvent event(m_position, m_window->mapToGlobal(m_position), pixels, pixels * 3,
                               m_down ? Qt::LeftButton : Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+            QScopedValueRollback<bool> sending(m_sending,true);
             QGuiApplication::sendEvent(m_window, &event);
         }
     } else if (pressed("b")) emit action("accept");

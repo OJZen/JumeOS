@@ -36,6 +36,13 @@ Rectangle {
         menuOpen = false; address.text = current.url.toString() === "about:blank" ? "" : current.url.toString()
         address.forceActiveFocus(); address.selectAll(); Qt.inputMethod.show()
     }
+    Shortcut { sequence: "Ctrl+L"; onActivated: root.focusAddress() }
+    Shortcut { sequence: "Ctrl+T"; onActivated: root.addTab() }
+    Shortcut { sequence: "Ctrl+W"; onActivated: root.closeTab() }
+    Shortcut { sequence: "Alt+Left"; enabled: !!root.current; onActivated: root.current.goBack() }
+    Shortcut { sequence: "Alt+Right"; enabled: !!root.current; onActivated: root.current.goForward() }
+    Shortcut { sequence: "Ctrl+R"; enabled: !!root.current; onActivated: root.current.reload() }
+    Shortcut { sequence: "F5"; enabled: !!root.current; onActivated: root.current.reload() }
     function navigate() {
         const url = pad.address(address.text)
         if (!url.toString()) { tell("请输入网址或搜索内容；不允许本地文件和外部协议"); return }
@@ -196,7 +203,7 @@ Rectangle {
     }
     Shape {
         x: pad ? pad.position.x : 0; y: pad ? pad.position.y : 0; width: 24; height: 32
-        visible: !root.editing; enabled: false; z: 100
+        visible: !root.editing && pad && pad.controllerPointer; enabled: false; z: 100
         preferredRendererType: Shape.GeometryRenderer
         ShapePath { strokeColor: "#111a24"; strokeWidth: 2; fillColor: "white"; PathSvg { path: "M1 1L1 26L8 20L14 31L19 28L13 18L23 17Z" } }
     }

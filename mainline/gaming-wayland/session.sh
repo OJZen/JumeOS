@@ -52,6 +52,7 @@ export GBM_BACKENDS_PATH="$lib/gbm" GBM_BACKEND=dri
 export __EGL_VENDOR_LIBRARY_FILENAMES="$base/usr/share/glvnd/egl_vendor.d/50_mesa.json"
 export WAYLAND_DISPLAY=r46h-wayland-probe
 export WESTON_DATA_DIR="$base/usr/share/weston"
+export XCURSOR_PATH="$base/usr/share/icons:/usr/share/icons" XCURSOR_THEME=DMZ-White XCURSOR_SIZE=24
 WESTON_MODULE_MAP=''
 for module in "$lib"/libweston-14/*.so "$lib"/weston/*.so*; do
     WESTON_MODULE_MAP="$WESTON_MODULE_MAP$(basename "$module")=$module;"

@@ -62,6 +62,21 @@ private slots:
         QVERIFY(input.address("file:///etc/passwd").isEmpty());
         QVERIFY(input.address(" ").isEmpty());
     }
+    void physicalMouseAndStickHandover() {
+        Window window; window.resize(1024,768);
+        ControllerInput controller(nullptr,true); BrowserInput input(&window,&controller);
+        const QVariantList zero{0.,0.,0.,0.}; input.sample(zero,{},.016,true);
+        QMouseEvent move(QEvent::MouseMove,{120,90},{120,90},Qt::NoButton,Qt::NoButton,Qt::NoModifier);
+        QGuiApplication::sendEvent(&window,&move);
+        QVERIFY(!input.controllerPointer()); QCOMPARE(input.position(),QPointF(120,90));
+        input.sample(zero,{},.016,true); QVERIFY(!input.controllerPointer()); // Idle pad never steals the mouse.
+        input.sample({0.,0.,1.,0.},{},.016,true);
+        QVERIFY(input.controllerPointer()); QVERIFY(input.position().x()>120); QCOMPARE(input.position().y(),90.);
+        input.sample(zero,{"b"},.016,true); QCOMPARE(window.presses,1);
+        QGuiApplication::sendEvent(&window,&move); QVERIFY(!input.controllerPointer());
+        QCOMPARE(window.releases,1); QVERIFY(window.releasePosition.x()<0);
+        input.sample(zero,{"b"},.016,true); QVERIFY(!input.controllerPointer()); QCOMPARE(window.presses,1);
+    }
 };
 QTEST_MAIN(Check)
 #include "check.moc"
