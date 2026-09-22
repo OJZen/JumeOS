@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jume Transfer</title><link rel="stylesheet" href="/app.css"><script src="/app.js" defer></script></head>
+<body>
+<header><div><span class="eyebrow">JUME / LOCAL TRANSFER</span><h1>文件传输</h1></div><span id="connection" class="badge">等待连接</span></header>
+<main>
+<p class="notice">仅限可信 Wi-Fi · HTTP 明文传输 · 掌机关闭共享后，链接与连接码立即失效。</p>
+<section id="pairing" class="card">
+  <h2>连接你的掌机</h2><p>扫描掌机二维码，或输入屏幕上的 8 位连接码。</p>
+  <form id="pairForm"><label for="code">连接码</label><div class="inputRow"><input id="code" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]{8}" required placeholder="8 位数字"><button type="submit" class="primary">连接</button></div></form>
+</section>
+<section id="workspace" hidden>
+  <section id="dropzone" class="card upload">
+    <div><h2>发送到掌机</h2><p>拖放文件到这里，或选择文件。支持批量上传，不覆盖同名文件。</p></div>
+    <label class="button primary" for="files">选择文件</label><input id="files" type="file" multiple class="fileInput">
+    <p id="limits" class="meta"></p>
+  </section>
+  <section id="task" class="card" hidden><div class="taskHeading"><strong id="taskTitle"></strong><button id="cancel" type="button">取消队列</button></div><progress id="progress" max="100" value="0"></progress><p id="taskStatus" class="meta" aria-live="polite"></p></section>
+  <section class="card listing">
+    <div class="listHeader"><div><span class="eyebrow">共享目录</span><h2 id="rootName">文件</h2></div><button id="refresh" type="button">刷新</button></div>
+    <nav id="breadcrumbs" aria-label="目录路径"></nav>
+    <div id="entries" role="list"></div>
+    <div class="pagination"><button id="previous" type="button">上一页</button><span id="pageInfo" class="meta"></span><button id="next" type="button">下一页</button></div>
+  </section>
+</section>
+<p id="message" role="status" aria-live="polite"></p>
+</main><footer>Jume Transfer · 文件保留在掌机上，不经过云服务。只共享掌机当前选中的目录。</footer>
+</body></html>

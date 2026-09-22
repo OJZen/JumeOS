@@ -1,0 +1,7 @@
+// Optional R46H system policy: no system/fstab mounts, formatting or ownership changes.
+polkit.addRule(function(action, subject) {
+    if (subject.user != "ark" || action.lookup("drive.removable.bus") != "usb") return;
+    if (action.id == "org.freedesktop.udisks2.filesystem-mount" ||
+        action.id == "org.freedesktop.udisks2.filesystem-mount-other-seat")
+        return polkit.Result.YES;
+});
