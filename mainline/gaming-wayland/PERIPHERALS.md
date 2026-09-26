@@ -40,6 +40,10 @@ font and licenses are added. No Foot server or systemd service is installed.
 The existing runtime supplies the rest of the ELF closure; target preflight
 must resolve it. The terminal clears the launcher's private Qt/Mesa/font settings
 before starting Bash, while preserving the real home and Wayland session.
+The shared session derives HOME/USER/LOGNAME from its effective desktop account,
+not the root supervisor's environment. This fixes the attended 2026-09-26
+missing-HOME startup failure without granting extra permissions. Session tests
+cover both missing values and inherited root values.
 
 Focused checks: `shell-check terminalEntryKeyboardMouseAndPrivacy`,
 `browser-check physicalMouseAndStickHandover`, and `test-peripherals.py`.

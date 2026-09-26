@@ -38,6 +38,12 @@ if [ "$mode" = seat ]; then
 fi
 case "$base:$output" in *[[:space:]\;=]*) echo 'Paths must not contain whitespace, semicolon or equals.' >&2; exit 2;; esac
 case "$output" in /*) ;; *) exit 2;; esac
+# setpriv preserves the supervisor's environment, which may omit HOME or name root.
+# Establish the actual desktop account before any client inherits its environment.
+session_user=$(id -un)
+session_home=$(getent passwd "$(id -u)" | cut -d: -f6)
+case "$session_home" in /*) ;; *) echo 'Desktop account has no absolute home.' >&2; exit 1;; esac
+export HOME="$session_home" USER="$session_user" LOGNAME="$session_user"
 umask 077
 mkdir -p "$output"
 export XDG_RUNTIME_DIR

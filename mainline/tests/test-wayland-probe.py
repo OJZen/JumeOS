@@ -258,6 +258,17 @@ assert '-p RuntimeMaxSec=360 -p TimeoutStopSec=10 -p KillMode=control-group' in 
 assert "trap 'exit 129' HUP" in source
 assert 'sha256sum --check --quiet SHA256SUMS' in source
 session = repo / 'mainline/gaming-wayland/session.sh'
+login_environment = session.read_text().split('session_user=', 1)[1].split('umask 077', 1)[0]
+login_environment = 'session_user=' + login_environment
+for inherited in ('unset', '/root'):
+    prefix = 'unset HOME USER LOGNAME\n' if inherited == 'unset' else 'export HOME=/root USER=root LOGNAME=root\n'
+    account = 'id() { case "$1" in -u) echo 1000;; -un) echo ark;; *) return 1;; esac; }\n'
+    for home in ('/home/ark', '/home/user space', '', 'relative'):
+        result = bash(prefix + account + 'getent() { printf "ark:x:1000:1000::%s:/bin/bash\\n" "$ACCOUNT_HOME"; }\n' +
+                      login_environment + '\nprintf "%s\\n" "$HOME" "$USER" "$LOGNAME" "$R46H_DEVICE_CONTROLS"',
+                      ACCOUNT_HOME=home, R46H_DEVICE_CONTROLS='1')
+        assert (result.returncode == 0) == home.startswith('/'), result
+        if result.returncode == 0: assert result.stdout.splitlines() == [home, 'ark', 'ark', '1'], result
 for mode, output in [('invalid', '/unused'), ('headless', str(cache / 'not allowed'))]:
     result = subprocess.run(['/bin/sh', str(session), mode, output], capture_output=True, timeout=5)
     assert result.returncode == 2
