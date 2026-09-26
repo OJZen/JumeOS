@@ -4,6 +4,8 @@ set -Eeuo pipefail
 [[ ( $# == 2 && ( $1 == --acquire || $1 == --restore ) && $2 =~ ^r46h-(shell|wayland)-probe-[0-9]+\.service$ || $# == 1 && $1 == --restore ) && $EUID == 0 ]] || exit 2
 readonly unit=${2:-}
 readonly lease=/run/r46h-device-lease
+readonly control=/run/r46h-cpu-control
+readonly base=$(cd -- "$(dirname -- "$0")" && pwd -P)
 readonly cpu=/sys/devices/system/cpu/cpufreq/policy0
 readonly light=/sys/class/backlight/backlight/brightness
 readonly -a nodes=("$light" "$cpu/scaling_min_freq" "$cpu/scaling_max_freq" "$cpu/scaling_governor")
@@ -19,6 +21,24 @@ restore() {
     [[ -z $unit || -f $lease/unit && ! -L $lease/unit && $(cat "$lease/unit") == "$unit" ]] || return 1
     [[ -f $lease/ready && ! -L $lease/ready ]] || return 1
     [[ $(cat "$lease/boot") == "$(cat /proc/sys/kernel/random/boot_id)" ]] || return 1
+    if [[ -e $lease/helper.unit ]]; then
+        [[ -f $lease/helper.unit && ! -L $lease/helper.unit ]] || return 1
+        local helper_unit
+        helper_unit=$(cat "$lease/helper.unit")
+        [[ $helper_unit =~ ^r46h-(shell|wayland)-probe-[0-9]+-cpu\.service$ ]] || return 1
+        systemctl stop "$helper_unit" || [[ $(systemctl show -p LoadState --value "$helper_unit") == not-found ]] || return 1
+        if [[ -e $control || -L $control ]]; then
+            [[ -d $control && ! -L $control ]] || return 1
+            local control_meta
+            control_meta=$(stat -c %u:%g:%a "$control")
+            [[ $control_meta == "0:$(id -g ark):750" || $control_meta == 0:0:750 ]] || return 1
+            if [[ -e $control/control.sock || -L $control/control.sock ]]; then
+                [[ -S $control/control.sock && ! -L $control/control.sock && $(stat -c %u:%g:%a "$control/control.sock") == "0:$(id -g ark):660" ]] || return 1
+                rm -- "$control/control.sock" || return 1
+            fi
+            rmdir -- "$control" || return 1
+        fi
+    fi
     local i meta value status=0 current minimum maximum attempt
     local -a values=() metadata=()
     for i in 0 1 2 3; do
@@ -57,8 +77,8 @@ restore() {
 }
 if [[ $1 == --restore ]]; then restore; exit; fi
 
-[[ ! -e $lease && ! -L $lease && $(id -u ark) == 1000 ]]
-[[ $(cat /sys/class/power_supply/rk817-charger/online) == 1 ]]
+[[ ! -e $lease && ! -L $lease && ! -e $control && ! -L $control && $(id -u ark) == 1000 ]]
+[[ -f $base/cpu-control.py && ! -L $base/cpu-control.py && $(stat -c %u:%a "$base/cpu-control.py") == 0:755 ]]
 [[ $(find /sys/devices/system/cpu/cpufreq -mindepth 1 -maxdepth 1 -name 'policy*' | wc -l) == 1 ]]
 umask 077
 mkdir -m 700 "$lease"
@@ -81,5 +101,15 @@ for i in 0 1 2 3; do
     [[ $(cat "$lease/$i.value") =~ ^[a-z0-9_]+$ ]]
 done
 touch "$lease/ready";complete=1
-for node in "${nodes[@]}"; do chown 1000:1000 "$node";chmod 0600 "$node";done
-printf 'DEVICE_LEASE_READY nodes=4 lifetime=transient-unit\n'
+chown 1000:$(id -g ark) "$light";chmod 0600 "$light"
+for node in "${nodes[@]:1}"; do chown root:root "$node";chmod 0644 "$node";done
+helper_unit="${unit%.service}-cpu.service"
+printf '%s\n' "$helper_unit" > "$lease/helper.unit"
+mkdir -m 750 "$control";chown root:ark "$control"
+systemd-run --quiet --collect --unit="$helper_unit" -p RuntimeMaxSec=7200 -p TimeoutStopSec=2 -- /usr/bin/python3 "$base/cpu-control.py" "$unit"
+for attempt in {1..50}; do
+    [[ ! -S $control/control.sock ]] || break
+    sleep .02
+done
+[[ -S $control/control.sock && $(stat -c %u:%g:%a "$control/control.sock") == "0:$(id -g ark):660" ]]
+printf 'DEVICE_LEASE_READY backlight=ark cpu=root helper=ready lifetime=transient-unit\n'

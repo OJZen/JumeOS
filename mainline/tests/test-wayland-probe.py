@@ -187,16 +187,16 @@ for status in (0, 1):
 device_guard = source[source.index('device_mode='):source.index('for service in r46h-gaming-input')]
 for mode, profile, online, installed, busy, expected in [
     ('0', 'windows', '0', False, False, 0), ('yes', 'handheld', '1', True, False, 2),
-    ('1', 'windows', '1', True, False, 1), ('1', 'handheld', '0', True, False, 1),
+    ('1', 'windows', '1', True, False, 1), ('1', 'handheld', '0', True, False, 0),
     ('1', 'handheld', '1', False, False, 1), ('1', 'handheld', '1', True, True, 1),
     ('1', 'handheld', '1', True, False, 0),
 ]:
     with tempfile.TemporaryDirectory(prefix='device.', dir=cache) as directory:
         folder = Path(directory)
         if installed:
-            (folder / 'device-lease.sh').touch(); (folder / 'session-leases.sh').touch()
+            (folder / 'device-lease.sh').touch(); (folder / 'cpu-control.py').touch(); (folder / 'session-leases.sh').touch()
         if busy: (folder / 'lease').mkdir()
-        code = device_guard.replace('/run/r46h-device-lease', str(folder / 'lease'))
+        code = device_guard.replace('/run/r46h-device-lease', str(folder / 'lease')).replace('/run/r46h-cpu-control', str(folder / 'control'))
         result = bash('cat() { echo "$ONLINE"; }; stat() { echo 0:0:755; }\n' + code,
                       R46H_DEVICE_CONTROLS=mode, profile=profile, ONLINE=online, scope=str(folder), ports_mode='0')
         assert result.returncode == expected, (mode, profile, online, installed, busy, result)

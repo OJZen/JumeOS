@@ -223,6 +223,7 @@ int main(int argc, char **argv) {
     });
     if(handheldMode) {
         QObject::connect(handheld.get(),&HandheldSession::systemAction,&window,[&](const QString &action){
+            if(root->property("screenOff").toBool()){QMetaObject::invokeMethod(root,"activity");return;}
             if(action=="tasks"||action=="desktop")QTimer::singleShot(0,&window,[&,action]{emit applications.backgroundRequested(action=="tasks");});
             else if(action=="close") {if(root->property("tasksVisible").toBool())QMetaObject::invokeMethod(root,"closeSelectedTask");else {root->setProperty("quickOpen",false);applications.requestClose();}}
             else if(action=="kill")applications.forceKill();

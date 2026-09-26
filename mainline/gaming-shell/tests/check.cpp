@@ -432,13 +432,14 @@ private slots:
         file.write(R"({"version":1,"volume":42,"brightness":70,"favorites":[2],"reducedMotion":false,"fontPercent":999})"); file.close();
         Preferences state(directory.path()); QVERIFY(state.error().isEmpty());
         QCOMPARE(state.volume(), 42); QVERIFY(state.isFavorite(2));
-        QCOMPARE(state.fontPercent(), 100); QCOMPARE(state.dimSeconds(), 0); QVERIFY(!state.monitor());
+        QCOMPARE(state.fontPercent(), 100); QCOMPARE(state.dimSeconds(), 0); QCOMPARE(state.screenOffSeconds(), 300); QVERIFY(!state.monitor());
         state.adjust("font", 1); state.adjust("font", 1); state.adjust("font", 1);
         QCOMPARE(state.fontPercent(), 120);
         for (int i = 0; i < 4; ++i) state.adjust("dim", 1);
         QCOMPARE(state.dimSeconds(), 120); state.adjust("monitor", 1); QVERIFY(state.save());
         Preferences loaded(directory.path()); QCOMPARE(loaded.fontPercent(), 120); QVERIFY(loaded.monitor());
         QCOMPARE(loaded.dimSeconds(), 120); QCOMPARE(loaded.volume(), 42);
+        QVERIFY(loaded.choose("screenOff", 1)); QCOMPARE(loaded.screenOffSeconds(), 60);
         // A malformed v2 field must not turn into an apparently valid default.
         QVERIFY(file.open(QIODevice::ReadOnly)); auto data = QJsonDocument::fromJson(file.readAll()).object(); file.close();
         data["dimSeconds"] = 31;
@@ -490,11 +491,16 @@ private slots:
         QVERIFY(field->property("text").toString().isEmpty());
         action("home"); state.adjust("dim", 1);
         auto *timer = root->findChild<QObject *>("idleTimer"); QVERIFY(timer); timer->setProperty("interval", 40);
+        auto *offTimer = root->findChild<QObject *>("offTimer"); QVERIFY(offTimer); offTimer->setProperty("interval", 400);
         QTRY_VERIFY_WITH_TIMEOUT(root->property("dimmed").toBool(), 1000);
         action("accept"); QVERIFY(!root->property("dimmed").toBool()); QVERIFY(!root->property("session").toBool());
         action("accept"); QVERIFY(root->property("session").toBool());
         QTest::qWait(100); QVERIFY(!root->property("dimmed").toBool());
         action("home"); state.adjust("dim", -1); QTest::qWait(100); QVERIFY(!root->property("dimmed").toBool());
+        offTimer->setProperty("interval", 40);
+        QTRY_VERIFY_WITH_TIMEOUT(root->property("screenOff").toBool(), 1000);
+        action("accept"); QVERIFY(!root->property("screenOff").toBool()); QVERIFY(!root->property("session").toBool());
+        QVERIFY(state.choose("screenOff",0));
         action("nextTab"); action("nextTab"); root->setProperty("settingsCategory", 2); root->setProperty("testingController", true);
         action("back"); action("nextTab"); action("right"); action("left"); QCOMPARE(root->property("page").toInt(), 2);
         QVERIFY(root->property("testingController").toBool());
@@ -1083,7 +1089,26 @@ private slots:
         QVERIFY(!device.setBrightness(0));QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("159"));
         QVERIFY(device.setDimmed(true));QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("39"));
         QVERIFY(device.setDimmed(false));QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("159"));
+        QVERIFY(device.automaticCpu());
+        QVERIFY(device.setPowerScene("desktop"));QCOMPARE(get(cpu+"scaling_max_freq"),QByteArray("816000"));
+        QVERIFY(device.setPowerScene("game"));QCOMPARE(get(cpu+"scaling_max_freq"),QByteArray("1008000"));
+        QVERIFY(device.setPowerScene("off"));QCOMPARE(get(cpu+"scaling_max_freq"),QByteArray("600000"));
+        QVERIFY(device.setScreenOff(true));QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("0"));
+        QVERIFY(!device.setBrightness(70));
+        QVERIFY(device.setScreenOff(false));QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("159"));
+        QVERIFY(device.setDimmed(true));QVERIFY(device.setScreenOff(true));
+        QVERIFY(device.setScreenOff(false));QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("159"));
+        put("sys/class/power_supply/rk817-charger/online","0");
+        QVERIFY(device.setPowerScene("desktop"));QCOMPARE(get(cpu+"scaling_max_freq"),QByteArray("816000"));
+        QVERIFY(!device.applyCpu("performance",600000,1008000));
+        put("sys/class/power_supply/rk817-battery/voltage_avg","3200000");
+        QVERIFY(!device.setPowerScene("game"));QCOMPARE(get(cpu+"scaling_max_freq"),QByteArray("816000"));
+        put("sys/class/power_supply/rk817-battery/voltage_avg","3800000");
+        put("sys/class/power_supply/rk817-charger/online","1");
+        QVERIFY(device.setAutomaticCpu(false));QVERIFY(!device.automaticCpu());
+        QVERIFY(device.setAutomaticCpu(true));QVERIFY(device.automaticCpu());
         QVERIFY(device.applyCpu("performance",816000,1200000));QCOMPARE(get(cpu+"scaling_governor"),QByteArray("performance"));
+        QVERIFY(!device.automaticCpu());
         QVERIFY(!device.applyCpu("powersave",600000,1296000));QVERIFY(!device.applyCpu("schedutil",1200000,816000));
         QVERIFY(!device.applyCpu("schedutil",500000,1296000));QVERIFY(!device.applyCpu("schedutil",600000,1500000));
         QVERIFY(device.cpuPreset("original"));QCOMPARE(get(cpu+"scaling_governor"),QByteArray("schedutil"));
@@ -1107,10 +1132,14 @@ private slots:
         QCOMPARE(centerY(clock),centerY(wifiIcon));QCOMPARE(centerY(clock),centerY(batteryIcon));
         if(!qEnvironmentVariable("R46H_UI_CAPTURE_DIR").isEmpty())QVERIFY(view.grabWindow().save(qEnvironmentVariable("R46H_UI_CAPTURE_DIR")+"/device-status.png"));
         QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("power"))));QTRY_VERIFY(root->property("settingsDetailReady").toBool());
-        tap("down");tap("down");tap("accept");
+        for(int i=0;i<4;++i)tap("down");tap("accept");
         QVERIFY(root->property("choicesOpen").toBool());tap("accept");QCOMPARE(power.size(),1); // Default is cancel.
         tap("accept");tap("down");tap("accept");QCOMPARE(power.size(),2); // Confirmation emits only a test signal.
-        root->setProperty("settingsCategory",9);root->setProperty("settingsIndex",0);tap("accept");tap("down");tap("down");tap("accept");
+        root->setProperty("settingsIndex",2);tap("accept");QVERIFY(root->property("screenOff").toBool());
+        QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("0"));
+        tap("accept");QVERIFY(!root->property("screenOff").toBool());
+        QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("159"));
+        root->setProperty("settingsCategory",9);root->setProperty("settingsIndex",1);tap("accept");tap("down");tap("down");tap("accept");
         QCOMPARE(get(cpu+"scaling_governor"),QByteArray("performance"));
         const auto captures=qEnvironmentVariable("R46H_UI_CAPTURE_DIR");QTest::qWait(200);
         if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+"/device-cpu.png"));

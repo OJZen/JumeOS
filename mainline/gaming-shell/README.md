@@ -112,8 +112,8 @@ No device endpoint/key was installed. Real editor/PIN captures remain blocked;
 Control captures and performance profiling remain separate runs.
 
 On a host, volume and brightness are preview values. Favorites, those values, reduced
-motion, font size, HUD visibility and idle dim timing are saved atomically to
-`state/preview.json`. Versions 1/2 migrate to schema 3 on the next write; stable
+motion, font size, HUD visibility, idle dim and automatic screen-off timing are saved atomically to
+`state/preview.json`. Versions 1/2/3 migrate to schema 4 on the next write; stable
 application favorites are separate from the old demo indexes.
 Save failure retains the
 in-memory change, displays an error and blocks the attempted settings/panel or

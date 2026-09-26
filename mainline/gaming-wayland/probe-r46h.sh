@@ -66,8 +66,9 @@ fi
 device_mode=${R46H_DEVICE_CONTROLS:-0}
 [[ $device_mode == 0 || $device_mode == 1 ]] || exit 2
 if (( device_mode )); then
-  [[ $profile == handheld && -f $scope/device-lease.sh && ! -L $scope/device-lease.sh && $(stat -c %u:%g:%a "$scope/device-lease.sh") == 0:0:755 ]] || exit 1
-  [[ ! -e /run/r46h-device-lease && ! -L /run/r46h-device-lease && $(cat /sys/class/power_supply/rk817-charger/online) == 1 ]] || exit 1
+  [[ $profile == handheld && -f $scope/device-lease.sh && ! -L $scope/device-lease.sh && $(stat -c %u:%g:%a "$scope/device-lease.sh") == 0:0:755
+     && -f $scope/cpu-control.py && ! -L $scope/cpu-control.py && $(stat -c %u:%g:%a "$scope/cpu-control.py") == 0:0:755 ]] || exit 1
+  [[ ! -e /run/r46h-device-lease && ! -L /run/r46h-device-lease && ! -e /run/r46h-cpu-control && ! -L /run/r46h-cpu-control ]] || exit 1
 fi
 if (( device_mode || ports_mode )); then
   [[ -f $scope/session-leases.sh && ! -L $scope/session-leases.sh && $(stat -c %u:%g:%a "$scope/session-leases.sh") == 0:0:755 ]] || exit 1

@@ -3,6 +3,7 @@
 R79 Launcher/status/About and recovery: **HOST + DEVICE COMPOSED PASS / PHYSICAL LCD + PROMOTION OPEN**.
 R35 status values remain **HOST + DEVICE READBACK PASS**; revision 17 device controls remain
 **HOST + DEVICE SCOPE PASS / FOCUS PACING OPEN**.
+The scene/auto-screen-off policy is **TARGET + ATTENDED WAKE PASS / POWER DRAW + STANDBY OPEN**.
 The [project checkpoint](../../docs/PROJECT-CONTEXT.md) owns the next session;
 the [performance/power plan](../../docs/PERFORMANCE-POWER.md) owns product scope.
 The frozen package, source and checks live in
@@ -50,9 +51,42 @@ Idle dimming saves the current raw value, quarters it, and restores it on the
 first wake action. CPU presets preserve the original limits; custom governor,
 minimum and maximum use the sampled supported values. Writes preserve min ≤ max,
 read back, and attempt rollback on failure. Failed rollback disables controls.
-CPU changes require external supply, known voltage/temperature and no low-voltage
+Manual CPU changes require external supply, known voltage/temperature and no low-voltage
 or thermal warning. The backend warns near kernel protection limits; automatic
 low-battery shutdown and calibrated battery percentage remain unimplemented.
+
+The transient power candidate adds automatic `schedutil` scene caps:
+desktop 816, foreground app 1008 and screen-off 600 MHz, always bounded by the
+original session maximum. Battery operation is permitted for these downward
+caps only when voltage, supply and temperature are known and safe; manual CPU
+tuning retains its AC gate in a root-owned helper. CPU sysfs nodes remain
+root-owned and readable by ark, but writable only by root; the temporary socket accepts only fixed scenes or validated AC
+manual requests. A failed scene change disables automatic mode and reports an error.
+The leased backlight can be set to zero and restores
+the pre-dim value on the first wake input. The automatic timeout defaults to
+five minutes, is configurable/off, and is inhibited while a foreground app,
+text entry, simulated session or controller test is active. It does not suspend
+the kernel or stop background transfers. The 2026-09-23 temporary v0.18 device
+run read back desktop/off caps (816/600 MHz), a helper-requested game cap
+(1008 MHz), and backlight 80 -> 0 -> 80 for both immediate and one-minute
+automatic screen-off. The first routed Down only woke the screen; Settings
+focus stayed on the same row. Ark could read CPU frequency but its direct
+sysfs write was denied. The initial root:0600 CPU lease blocked the launcher
+read and was corrected to root:0644 before these checks. Stopping the transient
+unit restored the original 600--1296 MHz range, backlight and permissions;
+ES-DE/input/volume services resumed with no failed units or kernel errors. The
+staged runtime was removed and UART confirmed clean poweroff. Evidence:
+`mainline/out/.cache/r46h-power-device-20260923.1DqmS3/`.
+On 2026-09-26 the operator accepted one-minute physical screen-off, immediate
+first-Down wake and unchanged Settings focus on both AC and battery. Volume+
+woke the screen; both volume keys showed an unclipped top-center HUD with timed
+dismissal. Battery samples confirmed online=0, backlight 80 -> 0 -> 80 and caps
+816 -> 600 -> 816 MHz; a manual CPU request was rejected as `unsafe_supply`.
+Charging was reconnected and first-stage exit restored all leases and services.
+Evidence: `mainline/out/.cache/r46h-attended-20260926.3Iyp3b/session.md`.
+These short battery samples do not prove calibrated power savings, sustained
+residency or long standby. Kernel suspend stays disabled; shared-app acceptance
+and persistent integration remain separate gates.
 
 The 2026-09-09 R16 device run proved remote navigation/captures, storage readback,
 performance governor and a 1200 MHz custom upper limit. The operator confirmed
@@ -97,9 +131,12 @@ and the receipt's shell executable hash, then choose one mode:
 
 These are placeholders, not known device addresses. Follow the
 [remote transport procedure](../../docs/REMOTE-CONTROL.md#temporary-r46h-ssh-session).
-Both modes require external supply and the exact accepted identity. The probe
+The remote mode requires external supply; local device controls can run on
+battery for the guarded automatic policy. Both require the exact accepted identity. The probe
 seals executable files as root-owned, leaves only private state writable by ark,
-and grants ark access to four fixed backlight/CPU nodes through `device-lease.sh`.
+and grants ark access only to the fixed backlight node through `device-lease.sh`.
+The root-only CPU helper checks each requested operation and is stopped before
+lease restoration; the launcher and other `ark` processes cannot write CPU sysfs directly.
 An existing lease is refused. Values, ownership and permissions are recorded in
 root-only `/run/r46h-device-lease`, bound to the current boot. The newer helper also
 records its transient unit; automatic acquire/restore passes that unit and refuses
@@ -139,7 +176,8 @@ R46H_DEVICE_CONTROLS=1 /run/r46h-wayland-probe/probe-r46h.sh --run MANIFEST_SHA2
 # The same environment also applies to the documented --remote form.
 ```
 
-External power and the existing identity/file/lease guards are required. Omit the
+The existing identity/file/lease guards are required; manual CPU tuning and
+remote-shell probes still require external power. Omit the
 opt-in for read-only settings. The existing persistent-state option can enable
 native ports simultaneously. One `session-leases.sh` hook acquires device and port
 leases; restoration attempts both even if one fails. Only successful cleanup and

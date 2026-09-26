@@ -54,7 +54,7 @@ tar -xzf /out/keyboard/qtvirtualkeyboard-runtime-arm64.tar.gz -C "$stage"
 rm "$stage/qt-client.sh" "$stage/usr/bin/moonlight-qt"
 install -m 755 /out/linux-build/r46h-shell "$stage/usr/bin/r46h-shell"
 strip --strip-unneeded "$stage/usr/bin/r46h-shell"
-install -m 755 /src/shell-client.sh /src/probe-r46h.sh /src/desktop-session.sh /src/remote-session.sh /src/device-lease.sh /src/memory-control.sh "$stage/"
+install -m 755 /src/shell-client.sh /src/probe-r46h.sh /src/desktop-session.sh /src/remote-session.sh /src/device-lease.sh /src/cpu-control.py /src/memory-control.sh "$stage/"
 install -m 644 /src/applications.example.json "$stage/"
 bash /project/mainline/gaming-ports/install-runtime.sh "$stage"
 lib=usr/lib/aarch64-linux-gnu

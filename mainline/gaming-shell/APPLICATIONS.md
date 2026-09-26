@@ -56,8 +56,8 @@ Home shows the first three configured entries. The library uses a virtualized,
 scrolling three-column grid. Missing runtime files fail on activation and leave
 the desktop visible. Names render as plain text. Application favorites use stable
 IDs, so reordering the file does not move a favorite to another application.
-Preference schema 3 keeps old demo favorites and migrates versions 1/2 on the next
-write. Older previews reject schema 3 and preserve it; use their separate state
+Preference schema 4 keeps old demo favorites and migrates versions 1/2/3 on the next
+write. Older previews reject schema 4 and preserve it; use their separate state
 when reverting. Up to 256 application favorites are retained, including IDs whose
 entries were temporarily removed from the list.
 

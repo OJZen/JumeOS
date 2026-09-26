@@ -47,9 +47,13 @@ Item {
         case 5: return hardware ? [{name: "系统分区", key: "storage0"}, {name: "游戏分区", key: "storage1"}, {name: "启动分区", key: "storage2"}]
             : [{name: "预览文件所在卷", detail: "", info: "storage", value: "刷新", key: "storage"}]
         case 6: return [{name: "当前运行环境", detail: "", info: "system", value: "本机"}, {name: "系统 CPU", detail: "", key: "systemCpu"}, {name: "系统内存", detail: "", key: "memory"}, {name: "处理器温度", detail: "", key: "temperature"}, {name: "GPU 频率", detail: "", key: "gpuFrequency"}, {name: "内存压力（10 秒）", detail: "", key: "pressure"}]
-        case 7: return [{name: "空闲变暗", detail: "", key: "dim"}, {name: "电池与供电", detail: "", key: "battery"}, {name: "关机", detail: "", key: "poweroff"}, {name: "重启", detail: "", key: "reboot"}]
+        case 7: return [{name: "空闲变暗", detail: "", key: "dim"}, {name: "自动熄屏", detail: "按键立即唤醒", key: "screenOff"},
+            {name: "立即熄屏", detail: "首个按键仅唤醒", key: "screenOffNow"}, {name: "电池与供电", detail: "", key: "battery"},
+            {name: "关机", detail: "", key: "poweroff"}, {name: "重启", detail: "", key: "reboot"}]
         case 8: return [{name: "界面字体大小", detail: "", key: "font"}, {name: "文字输入测试", detail: "退出后清空", value: "打开", key: "input"}]
-        case 9: return [{name: "频率预设", detail: "本次测试会话生效", key: "cpuPreset"}, {name: "调速器", detail: "", key: "cpuGovernor"}, {name: "最低频率", detail: "", key: "cpuMin"}, {name: "最高频率", detail: "", key: "cpuMax"}, {name: "当前频率", detail: "", key: "cpuCurrent"}]
+        case 9: return [{name: "自动调频", detail: "桌面 816 · 游戏 1008 · 熄屏 600 MHz", key: "cpuAuto"},
+            {name: "频率预设", detail: "手动选择会关闭自动调频", key: "cpuPreset"}, {name: "调速器", detail: "", key: "cpuGovernor"},
+            {name: "最低频率", detail: "", key: "cpuMin"}, {name: "最高频率", detail: "", key: "cpuMax"}, {name: "当前频率", detail: "", key: "cpuCurrent"}]
         case 10: return [{name: "Swap 使用", detail: "", key: "swap"}, {name: "zram 内存压缩", detail: "", key: "zram"}, {name: "压缩算法", detail: "", key: "zramAlgorithms"}, {name: "压缩内存占用", detail: "", key: "zramMemory"}]
         default: return [{name: "启动器", value: Qt.application.displayName}, {name: "版本", value: Qt.application.version},
             {name: "项目地址", value: "https://github.com/OJZen/JumeOS"},
@@ -60,6 +64,7 @@ Item {
     }
     signal notice(string text)
     signal activity()
+    signal screenOffRequested()
     signal editRequested()
     signal wifiPasswordRequested(string name)
     function metric(key, suffix, divisor) {
@@ -69,9 +74,9 @@ Item {
     function canActivate(key) {
         if (!key || ["systemCpu", "memory", "temperature", "gpuFrequency", "pressure", "battery", "cpuCurrent", "swap", "zram", "zramAlgorithms", "zramMemory"].indexOf(key) >= 0) return false
         if (key.indexOf("net") === 0) return network !== null && network.available && !network.busy && (key === "netRefresh" || (hardware && device.controls && network.controls && (key !== "netDisconnect" || network.profiles.filter(function(p){return p.active}).length === 1)))
-        if (["poweroff", "reboot", "cpuPreset", "cpuGovernor", "cpuMin", "cpuMax"].indexOf(key) >= 0) return hardware && device.controls
+        if (["poweroff", "reboot", "cpuAuto", "cpuPreset", "cpuGovernor", "cpuMin", "cpuMax", "screenOffNow"].indexOf(key) >= 0) return !hardware ? key === "screenOffNow" : device.controls
         if (hardware && key === "volume") return false
-        if (hardware && key === "dim") return device.controls
+        if (hardware && (key === "dim" || key === "screenOff")) return device.controls
         if (hardware && key === "brightness") return device.controls && device.info.brightnessPercent >= 0
         return true
     }
@@ -85,6 +90,8 @@ Item {
         case "brightness": return hardware ? metric("brightnessPercent", "%") : store.brightness + "%"
         case "font": return store.fontPercent + "%"
         case "dim": return store.dimSeconds ? store.dimSeconds + " 秒" : "关闭"
+        case "screenOff": return store.screenOffSeconds ? store.screenOffSeconds / 60 + " 分钟" : "关闭"
+        case "screenOffNow": return "熄屏"
         case "motion": return store.reducedMotion ? "开启" : "关闭"
         case "monitor": return store.monitor ? "开启" : "关闭"
         case "systemCpu": return metric("systemCpu", "%", 1)
@@ -101,6 +108,7 @@ Item {
         case "battery": return hardware ? metric("voltageUv", " V", 1000000) + " · " + (device.info.online === 1 ? "外部供电" : device.info.online === 0 ? "电池供电" : "供电未知") : "—"
         case "poweroff": case "reboot": return hardware && device.controls ? "确认…" : "不可用"
         case "cpuPreset": return hardware && device.controls ? "选择…" : "不可用"
+        case "cpuAuto": return hardware && device.controls ? (device.automaticCpu ? "开启" : "关闭") : "不可用"
         case "cpuGovernor": return hardware ? device.info.cpu.governor || "—" : "—"
         case "cpuMin": case "cpuMax": case "cpuCurrent": {
             const field = row.key === "cpuMin" ? "scaling_min_freq" : row.key === "cpuMax" ? "scaling_max_freq" : "scaling_cur_freq"
@@ -165,6 +173,8 @@ Item {
         if (!row || !canActivate(row.key)) { notice("这项设备功能尚未接入"); return }
         choiceKey = row.key
         if (row.key === "netRefresh") { network.refresh(); return }
+        if (row.key === "screenOffNow") { screenOffRequested(); return }
+        if (row.key === "cpuAuto") { if (!device.setAutomaticCpu(!device.automaticCpu)) notice(device.error); return }
         if (row.key === "netScan") {
             if (network.accessPoints.length) showNetworks(); else network.scan()
         } else if (row.key === "netProfiles" || row.key === "netForget") {
@@ -189,9 +199,9 @@ Item {
             else if (row.key === "cpuGovernor") { choiceValues = cpu.governors; labels = cpu.governors; index = labels.indexOf(cpu.governor) }
             else { choiceValues = cpu.frequencies; labels = choiceValues.map(function(v) { return (v / 1000).toFixed(0) + " MHz" }); index = choiceValues.indexOf(row.key === "cpuMin" ? cpu.scaling_min_freq : cpu.scaling_max_freq) }
             choices.present(choiceAnchor(), labels, Math.max(0,index), row.name)
-        } else if (row.key === "font" || row.key === "dim") {
-            const labels = row.key === "font" ? ["100%", "110%", "120%"] : ["关闭", "30 秒", "60 秒", "120 秒"]
-            const index = row.key === "font" ? (store.fontPercent - 100) / 10 : [0, 30, 60, 120].indexOf(store.dimSeconds)
+        } else if (row.key === "font" || row.key === "dim" || row.key === "screenOff") {
+            const labels = row.key === "font" ? ["100%", "110%", "120%"] : row.key === "dim" ? ["关闭", "30 秒", "60 秒", "120 秒"] : ["关闭", "1 分钟", "3 分钟", "5 分钟", "10 分钟", "15 分钟"]
+            const index = row.key === "font" ? (store.fontPercent - 100) / 10 : row.key === "dim" ? [0, 30, 60, 120].indexOf(store.dimSeconds) : [0, 60, 180, 300, 600, 900].indexOf(store.screenOffSeconds)
             choices.present(choiceAnchor(), labels, index, row.name)
         } else if (row && valueIsAdjustable(row.key)) {
             if (adjustingValue && !store.save()) return
@@ -298,7 +308,7 @@ Item {
                         }
                         value: settings.adjustingValue && selected ? "↑  " + settings.rowValue(modelData) + "  ↓" : settings.rowValue(modelData)
                         actionable: settings.canActivate(modelData.key)
-                        choice: modelData.key === "font" || modelData.key === "dim" || ["netProfiles", "netScan", "netForget"].indexOf(modelData.key) >= 0 || (!!modelData.key && modelData.key.indexOf("cpu") === 0 && modelData.key !== "cpuCurrent")
+                        choice: modelData.key === "font" || modelData.key === "dim" || modelData.key === "screenOff" || ["netProfiles", "netScan", "netForget"].indexOf(modelData.key) >= 0 || (!!modelData.key && modelData.key.indexOf("cpu") === 0 && modelData.key !== "cpuCurrent" && modelData.key !== "cpuAuto")
                         reducedMotion: settings.store.reducedMotion
                         toggleState: modelData.key === "motion" ? Number(settings.store.reducedMotion) : modelData.key === "monitor" ? Number(settings.store.monitor) : modelData.key === "netRemember" ? Number(settings.network && settings.network.remember) : -1
                         progress: modelData.key === "volume" && !settings.hardware ? settings.store.volume / 100 : modelData.key === "brightness" ? (settings.hardware ? settings.device.info.brightnessPercent : settings.store.brightness) / 100 : -1

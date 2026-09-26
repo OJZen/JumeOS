@@ -65,10 +65,10 @@ if [[ $mode == --remote || $mode == --remote-device || $mode == --remote-streami
   [[ -z $remote_listeners ]] || { echo 'Remote control port is already occupied.' >&2; exit 1; }
 fi
 if (( ${device_mode:-0} )); then
-  [[ -x $scope/device-lease.sh && ! -L $scope/device-lease.sh && ! -e /run/r46h-device-lease && ! -L /run/r46h-device-lease ]]
+  [[ -x $scope/device-lease.sh && ! -L $scope/device-lease.sh && -f $scope/cpu-control.py && ! -L $scope/cpu-control.py
+     && ! -e /run/r46h-device-lease && ! -L /run/r46h-device-lease && ! -e /run/r46h-cpu-control && ! -L /run/r46h-cpu-control ]]
   [[ ! -L $scope/state && ( ! -e $scope/state || $(stat -c %U:%a "$scope/state") == ark:700 ) ]]
   [[ -z $(find "$scope" -path "$scope/state" -prune -o -type f -links +1 -print -quit) ]]
-  [[ $(cat /sys/class/power_supply/rk817-charger/online) == 1 ]] || { echo 'Device controls require external power.' >&2; exit 1; }
   # Code used by root ExecStartPre/ExecStopPost must be protected from the GUI user.
   find "$scope" -path "$scope/state" -prune -o -exec chown -h root:root {} +
   find "$scope" -path "$scope/state" -prune -o ! -type l -exec chmod go-w {} +

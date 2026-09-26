@@ -19,7 +19,7 @@ if [[ -n ${JUME_FILES_SHA:-} ]]; then
     (cd "$stage/files" && sha256sum --check --quiet SHA256SUMS)
 fi
 install -m 755 /out/handheld-shell.so "$stage/usr/lib/aarch64-linux-gnu/weston/"
-install -m 755 /wayland/session.sh /wayland/session-leases.sh /wayland/clients.sh /wayland/handheld-client.sh /wayland/probe-r46h.sh /src/shell-client.sh /src/remote-session.sh /src/device-lease.sh "$stage/"
+install -m 755 /wayland/session.sh /wayland/session-leases.sh /wayland/clients.sh /wayland/handheld-client.sh /wayland/probe-r46h.sh /src/shell-client.sh /src/remote-session.sh /src/device-lease.sh /src/cpu-control.py "$stage/"
 python3 -B /mesa/runtime.py install /mesa-runtime.tar.gz "$stage/usr"
 bash /project/mainline/gaming-ports/install-runtime.sh "$stage"
 QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software timeout 45 python3 -B /project/mainline/tests/test-portmaster-ui.py \

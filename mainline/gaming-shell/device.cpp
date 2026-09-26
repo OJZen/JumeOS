@@ -2,6 +2,9 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QLocalSocket>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QSysInfo>
@@ -129,10 +132,11 @@ DeviceState::DeviceState(QString root, bool allowControls, bool fixture):m_root(
     connect(&m_volumeWatcher,&QFileSystemWatcher::directoryChanged,this,&DeviceState::volumeFileChanged);
     m_target=(fixture && m_root!="/") || identity(m_root);m_controls=allowControls && m_target;
     refresh();refreshStorage();m_originalCpu=m_info.value("cpu").toMap();m_warned=false;
+    m_automaticCpu=controls() && m_originalCpu.value("governor")=="schedutil";
     m_timer.setInterval(2000);connect(&m_timer,&QTimer::timeout,this,&DeviceState::refresh);
     if(m_target)m_timer.start();
 }
-DeviceState::~DeviceState(){if(m_beforeDim>=0)setDimmed(false);}
+DeviceState::~DeviceState(){if(m_beforeOff>=0)setScreenOff(false);if(m_beforeDim>=0)setDimmed(false);}
 QString DeviceState::path(const QString &relative) const {return QDir(m_root).filePath(relative);}
 bool DeviceState::fail(const QString &text){m_error=text;emit changed();return false;}
 void DeviceState::watchVolume() {
@@ -212,7 +216,7 @@ bool DeviceState::writeValue(const QString &relative,const QString &value) {
     return true;
 }
 bool DeviceState::setBrightness(int percent) {
-    if(!controls() || percent<10 || percent>100)return fail(QStringLiteral("亮度控制尚不可用。"));
+    if(!controls() || m_beforeOff>=0 || percent<10 || percent>100)return fail(QStringLiteral("亮度控制尚不可用。"));
     refresh();const int maximum=m_info.value("brightnessMax").toInt();const int old=m_info.value("brightnessRaw").toInt();
     if(maximum<=0 || maximum>65535 || old<0 || old>maximum)return fail(QStringLiteral("无法读取背光范围。"));
     const int level=qMax(1,qRound(maximum*percent/100.));
@@ -223,7 +227,7 @@ bool DeviceState::setBrightness(int percent) {
     m_beforeDim=-1;m_error.clear();refresh();emit changed();return true;
 }
 bool DeviceState::setDimmed(bool dimmed) {
-    if(!controls())return false;
+    if(!controls() || m_beforeOff>=0)return false;
     if(dimmed && m_beforeDim<0){
         const int old=int(number(read(m_root,"sys/class/backlight/backlight/brightness")));
         if(old<1)return fail(QStringLiteral("无法读取当前背光。"));
@@ -239,7 +243,85 @@ bool DeviceState::setDimmed(bool dimmed) {
     }
     refresh();return true;
 }
+bool DeviceState::setScreenOff(bool off) {
+    if(!controls())return false;
+    const QString node="sys/class/backlight/backlight/brightness";
+    if(off && m_beforeOff<0){
+        const int current=int(number(read(m_root,node)));
+        const int maximum=int(number(read(m_root,"sys/class/backlight/backlight/max_brightness")));
+        if(current<1 || maximum<1 || current>maximum)return fail(QStringLiteral("无法保存背光状态。"));
+        const int restore=m_beforeDim>=0?m_beforeDim:current;
+        if(!writeValue(node,"0")){
+            if(!writeValue(node,QString::number(current)))m_controls=false;
+            return fail(QStringLiteral("熄屏失败，已尝试恢复背光。"));
+        }
+        m_beforeOff=restore;m_beforeDim=-1;
+    }else if(!off && m_beforeOff>=0){
+        if(!writeValue(node,QString::number(m_beforeOff)))return fail(QStringLiteral("背光唤醒失败，请通过串口恢复。"));
+        m_beforeOff=-1;
+    }
+    m_error.clear();refresh();return true;
+}
+bool DeviceState::setPowerScene(const QString &scene) {
+    if(scene!="desktop" && scene!="game" && scene!="off")return false;
+    m_powerScene=scene;
+    if(!m_automaticCpu)return true;
+    if(!controls()){m_automaticCpu=false;return fail(QStringLiteral("自动调频控制不可用。"));}
+    refresh();
+    const auto cpu=m_info.value("cpu").toMap();
+    const auto frequencies=cpu.value("frequencies").toList();
+    const int minimum=m_originalCpu.value("scaling_min_freq").toInt();
+    const int ceiling=qMin(m_originalCpu.value("scaling_max_freq").toInt(),
+        scene=="game"?1008000:scene=="desktop"?816000:600000);
+    if(cpu.value("name")!="policy0" || cpu.value("governor")!="schedutil" || minimum<=0 || ceiling<minimum
+       || !frequencies.contains(QVariant::fromValue<qlonglong>(ceiling))
+       || !frequencies.contains(QVariant::fromValue<qlonglong>(minimum))
+       || m_info.value("voltageUv").toLongLong()<=m_info.value("minimumVoltageUv").toLongLong()
+       || m_info.value("minimumVoltageUv").toLongLong()<=0 || m_info.value("temperatureC").toDouble()<0
+       || m_info.value("hot").toBool() || (m_info.value("online").toInt()!=0 && m_info.value("online").toInt()!=1)) {
+        m_automaticCpu=false;
+        return fail(QStringLiteral("自动调频已停用：设备状态不完整或不安全。"));
+    }
+    if(cpu.value("scaling_min_freq").toInt()==minimum && cpu.value("scaling_max_freq").toInt()==ceiling)return true;
+    if(!(m_root=="/" ? requestCpu("scene",scene) : writeCpu(cpu,"schedutil",minimum,ceiling))){
+        const bool restored=m_root=="/" ? m_controls : writeCpu(cpu,cpu.value("governor").toString(),cpu.value("scaling_min_freq").toInt(),cpu.value("scaling_max_freq").toInt());
+        if(!restored)m_controls=false;
+        m_automaticCpu=false;refresh();return fail(restored?QStringLiteral("自动调频失败，已停用自动模式。"):QStringLiteral("CPU 恢复失败，已禁用写入。"));
+    }
+    m_error.clear();refresh();emit changed();return true;
+}
+bool DeviceState::setAutomaticCpu(bool enabled) {
+    if(!controls())return fail(QStringLiteral("CPU 控制尚不可用。"));
+    if(!enabled){m_automaticCpu=false;emit changed();return true;}
+    if(m_originalCpu.value("governor")!="schedutil")return fail(QStringLiteral("原始调速器不支持自动模式。"));
+    if(m_info.value("cpu").toMap().value("governor")!="schedutil"){
+        if(!applyCpu("schedutil",m_originalCpu.value("scaling_min_freq").toInt(),m_originalCpu.value("scaling_max_freq").toInt()))return false;
+    }
+    m_automaticCpu=true;emit changed();
+    if(setPowerScene(m_powerScene))return true;
+    m_automaticCpu=false;emit changed();return false;
+}
+bool DeviceState::requestCpu(const QString &operation,const QString &value,int minimum,int maximum) {
+    QLocalSocket socket;
+    socket.connectToServer(QStringLiteral("/run/r46h-cpu-control/control.sock"));
+    if(!socket.waitForConnected(150))return false;
+    QJsonObject request{{"op",operation}};
+    if(operation=="scene")request["scene"]=value;
+    else {request["governor"]=value;request["minimum"]=minimum;request["maximum"]=maximum;}
+    if(socket.write(QJsonDocument(request).toJson(QJsonDocument::Compact)+'\n')<0 || !socket.waitForBytesWritten(150))return false;
+    QByteArray reply;
+    QElapsedTimer deadline;deadline.start();
+    while(!reply.endsWith('\n') && reply.size()<=256 && deadline.elapsed()<500){
+        if(socket.bytesAvailable()==0 && !socket.waitForReadyRead(qMax(1,500-int(deadline.elapsed()))))break;
+        reply+=socket.read(257-reply.size());
+    }
+    if(!reply.endsWith('\n') || reply.size()>256)return false;
+    const auto response=QJsonDocument::fromJson(reply).object();
+    if(response.value("error").toString()=="rollback_failed")m_controls=false;
+    return response.value("ok").toBool();
+}
 bool DeviceState::writeCpu(const QVariantMap &policy,const QString &governor,int minimum,int maximum) {
+    if(m_root=="/")return requestCpu("manual",governor,minimum,maximum);
     const QString prefix="sys/devices/system/cpu/cpufreq/"+policy.value("name").toString()+"/";
     const auto currentMin=number(read(m_root,prefix+"scaling_min_freq"));
     // Widen before narrowing, preserving min <= max at every write.
@@ -258,10 +340,10 @@ bool DeviceState::applyCpu(QString governor,int minimum,int maximum) {
        || (!frequencies.isEmpty() && (!frequencies.contains(QVariant::fromValue<qlonglong>(minimum)) || !frequencies.contains(QVariant::fromValue<qlonglong>(maximum)))))
         return fail(QStringLiteral("CPU 配置不在设备支持范围内。"));
     if(!writeCpu(cpu,governor,minimum,maximum)) {
-        const bool restored=writeCpu(cpu,cpu.value("governor").toString(),cpu.value("scaling_min_freq").toInt(),cpu.value("scaling_max_freq").toInt());
+        const bool restored=m_root=="/" ? m_controls : writeCpu(cpu,cpu.value("governor").toString(),cpu.value("scaling_min_freq").toInt(),cpu.value("scaling_max_freq").toInt());
         if(!restored)m_controls=false;refresh();return fail(restored?QStringLiteral("CPU 调整失败，已恢复原配置。"):QStringLiteral("CPU 恢复失败，已禁用写入，请通过串口检查。"));
     }
-    m_error.clear();refresh();emit changed();return true;
+    m_automaticCpu=false;m_error.clear();refresh();emit changed();return true;
 }
 bool DeviceState::cpuPreset(const QString &name) {
     if(m_originalCpu.isEmpty())return fail(QStringLiteral("原始 CPU 配置不可用。"));

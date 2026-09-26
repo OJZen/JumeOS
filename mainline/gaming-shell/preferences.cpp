@@ -37,11 +37,11 @@ Preferences::Preferences(QString directory, QObject *parent)
             && number >= low && number <= high;
     };
     bool valid = parse.error == QJsonParseError::NoError && document.isObject()
-        && QList<QJsonValue>{1, 2, 3}.contains(data.value("version"))
+        && QList<QJsonValue>{1, 2, 3, 4}.contains(data.value("version"))
         && validInteger(data.value("volume"), 0, 100)
         && validInteger(data.value("brightness"), 10, 100)
         && data.value("reducedMotion").isBool() && data.value("favorites").isArray();
-    if (data.value("version") == QJsonValue(2) || data.value("version") == QJsonValue(3)) {
+    if (data.value("version").toInt() >= 2) {
         valid = valid && data.value("monitor").isBool()
             && validInteger(data.value("fontPercent"), 100, 120)
             && data.value("fontPercent").toInt() % 10 == 0
@@ -53,7 +53,7 @@ Preferences::Preferences(QString directory, QObject *parent)
         if (!validInteger(value, 0, 5) || seen.contains(value.toInt())) valid = false;
         seen.insert(value.toInt());
     }
-    if (data.value("version") == QJsonValue(3)) {
+    if (data.value("version").toInt() >= 3) {
         const auto values = data.value("applicationFavorites"); QSet<QString> applicationIds;
         valid = valid && values.isArray() && values.toArray().size() <= 256;
         for (const auto &value : values.toArray()) {
@@ -62,6 +62,9 @@ Preferences::Preferences(QString directory, QObject *parent)
             applicationIds.insert(id);
         }
     }
+    if (data.value("version") == QJsonValue(4))
+        valid = valid && validInteger(data.value("screenOffSeconds"), 0, 900)
+            && QList<int>{0, 60, 180, 300, 600, 900}.contains(data.value("screenOffSeconds").toInt());
     if (!valid) {
         m_loadFailed = true;
         setError(QStringLiteral("预览设置格式异常；请保留原文件，移开后再重试。"));
@@ -71,13 +74,14 @@ Preferences::Preferences(QString directory, QObject *parent)
     m_brightness = data.value("brightness").toInt();
     m_reducedMotion = data.value("reducedMotion").toBool();
     m_favorites = data.value("favorites").toArray().toVariantList();
-    if (data.value("version") == QJsonValue(3))
+    if (data.value("version").toInt() >= 3)
         m_applicationFavorites = data.value("applicationFavorites").toArray().toVariantList();
-    if (data.value("version") == QJsonValue(2) || data.value("version") == QJsonValue(3)) {
+    if (data.value("version").toInt() >= 2) {
         m_monitor = data.value("monitor").toBool();
         m_fontPercent = data.value("fontPercent").toInt();
         m_dimSeconds = data.value("dimSeconds").toInt();
     }
+    if (data.value("version") == QJsonValue(4)) m_screenOffSeconds = data.value("screenOffSeconds").toInt();
 }
 
 void Preferences::setError(const QString &message) {
@@ -96,6 +100,10 @@ void Preferences::adjust(const QString &name, int step) {
         const QList<int> choices{0, 30, 60, 120};
         m_dimSeconds = choices[qBound(0, choices.indexOf(m_dimSeconds) + (step < 0 ? -1 : 1), 3)];
     }
+    else if (name == "screenOff") {
+        const QList<int> choices{0, 60, 180, 300, 600, 900};
+        m_screenOffSeconds = choices[qBound(0, choices.indexOf(m_screenOffSeconds) + (step < 0 ? -1 : 1), 5)];
+    }
     else return;
     m_dirty = true;
     emit changed();
@@ -105,9 +113,10 @@ bool Preferences::isFavorite(int index) const { return m_favorites.contains(inde
 
 bool Preferences::choose(const QString &name, int index) {
     const QList<int> values = name == "font" ? QList<int>{100, 110, 120}
-        : name == "dim" ? QList<int>{0, 30, 60, 120} : QList<int>{};
+        : name == "dim" ? QList<int>{0, 30, 60, 120}
+        : name == "screenOff" ? QList<int>{0, 60, 180, 300, 600, 900} : QList<int>{};
     if (index < 0 || index >= values.size()) return false;
-    if (name == "font") m_fontPercent = values[index]; else m_dimSeconds = values[index];
+    if (name == "font") m_fontPercent = values[index]; else if (name == "dim") m_dimSeconds = values[index]; else m_screenOffSeconds = values[index];
     m_dirty = true; emit changed();
     return save();
 }
@@ -135,8 +144,8 @@ bool Preferences::save() {
     }
     QSaveFile file(directory.filePath("preview.json"));
     const auto bytes = QJsonDocument(QJsonObject{
-        {"version", 3}, {"volume", m_volume}, {"brightness", m_brightness},
-        {"monitor", m_monitor}, {"fontPercent", m_fontPercent}, {"dimSeconds", m_dimSeconds},
+        {"version", 4}, {"volume", m_volume}, {"brightness", m_brightness},
+        {"monitor", m_monitor}, {"fontPercent", m_fontPercent}, {"dimSeconds", m_dimSeconds}, {"screenOffSeconds", m_screenOffSeconds},
         {"reducedMotion", m_reducedMotion}, {"favorites", QJsonArray::fromVariantList(m_favorites)},
         {"applicationFavorites", QJsonArray::fromVariantList(m_applicationFavorites)}
     }).toJson();

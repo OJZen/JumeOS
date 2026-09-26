@@ -11,6 +11,7 @@ class Preferences final : public QObject {
     Q_PROPERTY(bool monitor READ monitor NOTIFY changed)
     Q_PROPERTY(int fontPercent READ fontPercent NOTIFY changed)
     Q_PROPERTY(int dimSeconds READ dimSeconds NOTIFY changed)
+    Q_PROPERTY(int screenOffSeconds READ screenOffSeconds NOTIFY changed)
     Q_PROPERTY(QVariantList favorites READ favorites NOTIFY changed)
     Q_PROPERTY(QVariantList applicationFavorites READ applicationFavorites NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
@@ -23,6 +24,7 @@ public:
     bool monitor() const { return m_monitor; }
     int fontPercent() const { return m_fontPercent; }
     int dimSeconds() const { return m_dimSeconds; }
+    int screenOffSeconds() const { return m_screenOffSeconds; }
     QVariantList favorites() const { return m_favorites; }
     QVariantList applicationFavorites() const { return m_applicationFavorites; }
     QString error() const { return m_error; }
@@ -40,7 +42,7 @@ private:
     void setError(const QString &message);
     QString m_directory, m_error;
     int m_volume = 55, m_brightness = 70;
-    int m_fontPercent = 100, m_dimSeconds = 0;
+    int m_fontPercent = 100, m_dimSeconds = 0, m_screenOffSeconds = 300;
     bool m_monitor = false;
     bool m_reducedMotion = false, m_dirty = false, m_loadFailed = false;
     QVariantList m_favorites;

@@ -56,13 +56,18 @@ control and reconnect, but new-password entry and image integration remain open.
 The exact board has no onboard Bluetooth controller; the launcher exposes no
 Bluetooth category or pairing placeholder.
 
-Idle dimming offers off/30/60/120 seconds. The host preview uses a visual mask;
-the leased target adapter changes actual backlight and restores its saved value.
-Interaction wakes it, and an initial wake key does not activate a card.
-The simulated session, text entry and controller tester inhibit dimming.
+Idle dimming offers off/30/60/120 seconds. Automatic screen-off offers off or
+1/3/5/10/15 minutes (5 minutes by default); Settings also has immediate
+screen-off. The host preview uses a visual mask; the leased target adapter
+writes backlight level zero, saving the pre-dim level for the first-key wake.
+The simulated session, foreground application, text entry and controller tester
+inhibit both idle timers. Background transfers are not killed. This is
+backlight-off standby, **not kernel suspend**: Wi-Fi, applications and the
+compositor remain running. Attended R46H screen-off and immediate first-input
+wake passed on AC and battery; calibrated power savings and long standby remain open.
 R17 passed actual brightness/dim/wake and restore, attended GUI reboot and
 agent-tested GUI poweroff; [Device settings](../mainline/gaming-shell/DEVICE.md)
-owns evidence. Suspend, low-battery policy and broader power limits remain open.
+owns evidence. Kernel suspend/resume and low-battery policy remain open.
 
 The optional Linux Qt Virtual Keyboard uses one application `InputPanel`,
 English and simplified-Chinese layouts, and Qt's built-in arrow navigation.
@@ -106,6 +111,22 @@ protection unchanged. Host fixtures cover supported-OPP validation, write order
 and readback. The current v0.17 device passed dynamic residency, GTA/thermal use
 and a warm reboot with the oneshot enabled; the frozen v0.18 image is unchanged,
 so the next p2 integration remains open.
+
+The new transient Jume scene policy keeps `schedutil` and the original lower
+bound, limiting the upper bound to at most 1008 MHz for a foreground app,
+816 MHz for the desktop and 600 MHz while the screen is off. It only selects
+exported OPPs and refuses unknown supply/voltage/temperature or thermal danger.
+Manual CPU settings disable the automatic policy for that session; the CPU page
+can re-enable it. The temporary lease permits battery-powered screen-off while
+a root-only helper checks automatic scene caps and AC-only manual requests;
+CPU sysfs remains root-owned. Failed scene changes stop automatic mode and alert
+the user. The lease restores the original governor, limits, backlight
+and root-only write permissions on exit. Host ARM64 tests cover scene transitions,
+battery fixture, settings migration, wake and rollback. A temporary v0.18 R46H
+session passed desktop/off caps, helper game cap, one-minute auto-off and exact
+lease restoration. Attended AC/battery screen-off, first-input wake and volume
+HUD passed on 2026-09-26; calibrated power draw, long standby and persistent/default-launcher
+integration remain open. See the [device record](../mainline/gaming-shell/DEVICE.md).
 
 ## Compressed memory and disk swap
 

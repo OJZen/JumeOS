@@ -12,6 +12,7 @@ class DeviceState final : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool target READ target CONSTANT)
     Q_PROPERTY(bool controls READ controls NOTIFY changed)
+    Q_PROPERTY(bool automaticCpu READ automaticCpu NOTIFY changed)
     Q_PROPERTY(QVariantMap info READ info NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
     Q_PROPERTY(QVariantList storage READ storage NOTIFY changed)
@@ -20,6 +21,7 @@ public:
     ~DeviceState() override;
     bool target() const { return m_target; }
     bool controls() const { return m_target && m_controls; }
+    bool automaticCpu() const { return m_automaticCpu; }
     QVariantMap info() const { return m_info; }
     QString error() const { return m_error; }
     QVariantList storage() const { return m_storage; }
@@ -28,6 +30,9 @@ public:
     Q_INVOKABLE void refreshStorage();
     Q_INVOKABLE bool setBrightness(int percent);
     Q_INVOKABLE bool setDimmed(bool dimmed);
+    Q_INVOKABLE bool setScreenOff(bool off);
+    Q_INVOKABLE bool setPowerScene(const QString &scene);
+    Q_INVOKABLE bool setAutomaticCpu(bool enabled);
     Q_INVOKABLE bool applyCpu(QString governor, int minimum, int maximum);
     Q_INVOKABLE bool cpuPreset(const QString &name);
     Q_INVOKABLE bool requestPower(const QString &action);
@@ -44,6 +49,7 @@ private:
     QString path(const QString &relative) const;
     bool fail(const QString &text);
     bool writeValue(const QString &relative, const QString &value);
+    bool requestCpu(const QString &operation, const QString &value, int minimum = 0, int maximum = 0);
     bool writeCpu(const QVariantMap &policy, const QString &governor, int minimum, int maximum);
     QString m_root, m_error;
     QVariantMap m_info, m_originalCpu;
@@ -51,7 +57,8 @@ private:
     QElapsedTimer m_sampleClock;
     QTimer m_timer;
     QFileSystemWatcher m_volumeWatcher;
-    bool m_target = false, m_controls = false, m_warned = false;
-    int m_beforeDim = -1;
+    bool m_target = false, m_controls = false, m_warned = false, m_automaticCpu = false;
+    int m_beforeDim = -1, m_beforeOff = -1;
+    QString m_powerScene = "desktop";
     qulonglong m_ticks = 0, m_idle = 0;
 };

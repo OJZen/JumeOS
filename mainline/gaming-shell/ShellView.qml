@@ -54,7 +54,7 @@ Item {
     readonly property bool testInputVisible: editing && testInputCapture && editPurpose === "test"
     readonly property bool portCatalogOpen: toolView.item !== null && toolView.item.catalogOpen
     readonly property int portCatalogTotal: tools ? Number(tools.catalogInfo.total || 0) : 0
-    readonly property bool remoteTextAllowed: editing && !quickOpen && !choicesOpen && !dimmed && !externalSession && (editPurpose === "portSearch" || testInputVisible)
+    readonly property bool remoteTextAllowed: editing && !quickOpen && !choicesOpen && !dimmed && !screenOff && !externalSession && (editPurpose === "portSearch" || testInputVisible)
     readonly property int portCatalogIndex: toolView.item ? toolView.item.catalogIndex : 0
     readonly property bool portCatalogSidebar: !toolView.item || toolView.item.catalogSidebar
     readonly property bool sensitiveVisible: tasksVisible || (externalSession && ["builtin.browser", "builtin.terminal", "builtin.files", "builtin.text", "builtin.transfer"].includes(activeApplication)) || (editing && !testInputVisible) || (streaming !== null && streaming.pin.length > 0)
@@ -73,6 +73,9 @@ Item {
     readonly property var inputMethod: Qt.inputMethod
     property bool editing: false
     property bool dimmed: false
+    property bool screenOff: false
+    readonly property bool idleEligible: (!hardware || device.controls) && !session && !externalSession && !streamingBusy && !editing && !testingController && !choicesOpen
+    readonly property string powerScene: screenOff ? "off" : externalSession ? "game" : "desktop"
     property bool windowVisible: true
     readonly property real fontScale: store.fontPercent / 100
     readonly property bool motionReduced: store.reducedMotion
@@ -189,13 +192,27 @@ Item {
         quickOpen = false; return true
     }
     function activity() {
-        const wasDimmed = dimmed
+        const wasDimmed = dimmed || screenOff
+        if (screenOff) {
+            if (hardware && device.controls && !device.setScreenOff(false)) { notify(device.error); return true }
+            screenOff = false
+        }
         if (wasDimmed && hardware && device.controls && !device.setDimmed(false)) { notify(device.error); return true }
         dimmed = false
-        if (store.dimSeconds > 0 && (!hardware || device.controls) && !session && !externalSession && !streamingBusy && !editing && !testingController && !choicesOpen) idleTimer.restart()
+        if (store.dimSeconds > 0 && idleEligible) idleTimer.restart()
         else idleTimer.stop()
+        if (store.screenOffSeconds > 0 && idleEligible) offTimer.restart()
+        else offTimer.stop()
         return wasDimmed
     }
+    function blankScreen() {
+        if (!idleEligible || screenOff) return false
+        if (hardware && !device.setScreenOff(true)) { notify(device.error); return false }
+        screenOff = true; dimmed = false
+        return true
+    }
+    onPowerSceneChanged: if (hardware && device.controls && !device.setPowerScene(powerScene)) notify(device.error)
+    Component.onCompleted: if (hardware && device.controls && !device.setPowerScene(powerScene)) notify(device.error)
     function openEditor() { openTextEditor("文字输入测试", "", "test") }
     function openTextEditor(label, value, purpose) {
         editPurpose = purpose || "test"; editLabel = label || "文字输入测试"
@@ -280,6 +297,7 @@ Item {
         notify(selected === 0 ? "串流演示 · 尚未连接电脑" : "交互演示 · 未启动模拟器")
     }
     function dispatch(action, repeated) {
+        if (screenOff) { activity(); return }
         if(tasksVisible && taskPage.item) { if (!activity()) taskPage.item.dispatch(action,repeated);return }
         if (repeated && ["accept", "back", "quick", "favorite", "home"].indexOf(action) >= 0) return
         if (externalSession && (!sharedDisplay || (!quickOpen && action !== "quick"))) return
@@ -372,6 +390,7 @@ Item {
         }
     }
     Keys.onPressed: function(event) {
+        if (screenOff) { activity(); event.accepted = true; return }
         if (editing) return
         if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return
         const actions = ({[Qt.Key_Left]: "left", [Qt.Key_Right]: "right", [Qt.Key_Up]: "up", [Qt.Key_Down]: "down",
@@ -393,22 +412,29 @@ Item {
         target: root.applications
         function onChanged() { if (root.applications.error) root.notify(root.applications.error) }
     }
-    Binding { target: root.metrics; property: "active"; value: root.windowVisible && root.visible && root.store.monitor && !root.dimmed }
+    Binding { target: root.metrics; property: "active"; value: root.windowVisible && root.visible && root.store.monitor && !root.dimmed && !root.screenOff }
     Timer {
         id: idleTimer; objectName: "idleTimer"
         interval: Math.max(1, root.store.dimSeconds) * 1000
-        running: root.store.dimSeconds > 0 && (!root.hardware || root.device.controls) && !root.session && !root.externalSession && !root.streamingBusy && !root.editing && !root.testingController && !root.choicesOpen && !root.dimmed
+        running: root.store.dimSeconds > 0 && root.idleEligible && !root.dimmed && !root.screenOff
         onTriggered: {
             if (root.hardware && root.device.controls && !root.device.setDimmed(true)) { root.notify(root.device.error); return }
             root.dimmed = true
         }
     }
+    Timer {
+        id: offTimer; objectName: "offTimer"
+        interval: Math.max(1, root.store.screenOffSeconds) * 1000
+        running: root.store.screenOffSeconds > 0 && root.idleEligible && !root.screenOff
+        onTriggered: root.blankScreen()
+    }
     TapHandler { onPressedChanged: if (pressed) root.activity() }
-    Timer { interval: 60000; running: true; repeat: true; onTriggered: root.clockText = Qt.formatTime(new Date(), "hh:mm") }
+    Timer { interval: 60000; running: !root.screenOff; repeat: true; onTriggered: root.clockText = Qt.formatTime(new Date(), "hh:mm") }
+    onScreenOffChanged: if (!screenOff) clockText = Qt.formatTime(new Date(), "hh:mm")
     Timer { id: noticeTimer; interval: 2600; onTriggered: root.notice = "" }
     Timer { id: volumeTimer; interval: 1800; onTriggered: root.volumeVisible = false }
-    Shortcut { sequence: "Ctrl+Tab"; onActivated: root.backgroundRequested(true) }
-    Shortcut { sequence: "Meta+D"; onActivated: root.backgroundRequested(false) }
+    Shortcut { sequence: "Ctrl+Tab"; onActivated: if (root.screenOff) root.activity(); else root.backgroundRequested(true) }
+    Shortcut { sequence: "Meta+D"; onActivated: if (root.screenOff) root.activity(); else root.backgroundRequested(false) }
     Item {
         id: canvas
         width: 1024; height: 768; anchors.centerIn: parent
@@ -518,6 +544,7 @@ Item {
                 browserVersions: root.browserVersions
                 onNotice: function(text) { root.notify(text) }
                 onActivity: { root.activity(); root.forceActiveFocus() }
+                onScreenOffRequested: root.blankScreen()
                 onEditRequested: root.openEditor()
                 onWifiPasswordRequested: function(name) { root.openTextEditor("Wi-Fi 密码 · " + name, "", "wifiPassword") }
             }
@@ -635,6 +662,13 @@ Item {
         Rectangle {
             anchors.fill: parent; visible: root.dimmed; color: root.hardware && root.device.controls ? "transparent" : "#b3000000"
             Ui.Label { anchors.centerIn: parent; visible: !root.hardware || !root.device.controls; text: "界面已变暗 · 按键或点击恢复"; color: "#d8e8ee"; font.pixelSize: 21 }
+            MouseArea { anchors.fill: parent; onPressed: root.activity() }
+        }
+        Rectangle {
+            anchors.fill: parent; z: 200; visible: root.screenOff
+            color: root.hardware && root.device.controls ? "transparent" : "black"
+            Accessible.role: Accessible.Pane
+            Accessible.name: "屏幕已关闭，按任意键唤醒"
             MouseArea { anchors.fill: parent; onPressed: root.activity() }
         }
         Rectangle {
