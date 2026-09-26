@@ -1,13 +1,11 @@
 # R46H experiment status ledger
 
-> Current checkpoint: 2026-09-22. This is the authoritative index of accepted
-> physical evidence and open hardware gates. Exact commands, hashes and raw
-> receipts stay in the linked owning runbooks.
+> Current checkpoint: 2026-09-26. This ledger owns physical evidence and open
+> hardware gates; commands, hashes and receipts stay in linked runbooks.
 
 ## How to read this ledger
-**PASS** is accepted only for its stated boundary; **FAIL** needs a new hypothesis,
-**REVOKED** cannot authorize later work, and **OPEN** has not passed. Host, media,
-machine and operator evidence remain distinct.
+**PASS** applies only to its stated boundary; **FAIL** needs a new hypothesis;
+**REVOKED** cannot authorize later work; **OPEN** has not passed. Keep evidence levels distinct.
 
 ## Current accepted first version and next gate
 
@@ -15,14 +13,12 @@ The last fully read-back full-card release is `build-2e0d33a53f11-e1e8d9edb2f8`
 for `hl-r46h-v22-g92-62534975488-v1`: v0.17 BOOT/power settle selects the exact
 v0.15 Image/modules and Debian 13 gaming p2 v0.5. Cold boot and identity passed.
 
-The current card's EASYROMS p3 import passed write, eject and physical use; its
-full target checksum/readback was skipped, so equality remains unverified; see
-[P3 Content Migration](../../../docs/P3-CONTENT-MIGRATION.md).
+The current card's EASYROMS p3 passed write, eject and physical use, but its full target checksum/readback was skipped;
+content equality remains unverified. See [P3 Content Migration](../../../docs/P3-CONTENT-MIGRATION.md).
 
-Fallbacks are p2 v0.7 attended and v0.15 automated; v0.17 passed readbacks/cold/warm infra.
-Exact p2 v0.18 passes fixed-profile write/full readback, cold identity, policy
-scope and full base smoke; launcher-created Wi-Fi activation/reboot persistence, LCD, USB,
-Moonlight and PSP remain open.
+Fallbacks: p2 v0.7 attended, v0.15 automated; v0.17 readback/cold/warm infrastructure passed.
+p2 v0.18 passed profile write/full readback, cold identity, policy scope and base smoke; Wi-Fi persistence,
+broader LCD/USB coverage, Moonlight and PSP remain open.
 ## Capability ledger
 - **Full-card first version v0.1 — HOST + MEDIA + PHYSICAL PASS.** Current p2/p3 later changed.
 - **Original-card EASYROMS — P3 WRITE/PHYSICAL PASS; READBACK UNVERIFIED.** Checksums were skipped.
@@ -57,8 +53,7 @@ Moonlight and PSP remain open.
   still required after a new image write.
 - **Remote input — V0.16/V0.17 10 MS DEVICE PASS.** Self-test and exact
   screenshot-verified right/left single-step roundtrip passed; v0.15 uses 100 ms.
-- **[Jume Launcher](../../gaming-shell/DEVICE.md) — R79 + TWO-LEVEL DEVICE/RECOVERY/PERFORMANCE PASS /
-  PHYSICAL + PROMOTION OPEN.**
+- **[Jume Launcher](../../gaming-shell/DEVICE.md) — DEVICE/PERFORMANCE PASS / PHYSICAL + PROMOTION OPEN.**
   R79 passed exact archive/1,741-file target readback and preflight. Composed Home
   and About captures show the aligned Wi-Fi/battery/clock row, live charge state,
   version and project URL. Normal expiry and forced input-router failure restored
@@ -68,12 +63,17 @@ Moonlight and PSP remain open.
   two Settings focus runs from about 29.5 to 57.2--57.5 submissions/s and HUD
   runs from 29.9 to 58.5--59.0; p50 was 16.64--16.71 ms. Services restored with
   zero failed units/kernel/ext4/OOM errors; LCD/readability, L3+R3 and promotion remain open.
+  09-26 faster tasks/resume/close and sequential USB keyboard/mouse passed; long-hold/game retention/hub remain open.
 - **[Jume Browser](../../gaming-browser/README.md) — TARGET GPU/SANDBOX PASS / HEAVY-SITE OOM + SECURITY OPEN.**
   Offline input/IME/tabs/About, WebGL 2, sandbox and lifecycle/privacy pass; mi.com policy/OOM failures remain.
   A 128 MiB tile budget passed bounded pressure/target regression; discard failed form retention and was withdrawn.
   Device cleanly powered off; the browser runbook owns exact scope and remaining gates.
 - **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
   Dynamic `schedutil` and both GTA engines passed; reset recovered a live GPU-min panic. Do not repeat it.
+- **Jume screen-off/scene policy — TARGET + ATTENDED WAKE PASS / DRAW + STANDBY OPEN.**
+  V0.18: AC/battery one-minute LCD off and first-Down wake without focus motion accepted;
+  volume wake/HUD accepted. Battery 80->0->80, caps 816->600->816; manual tuning denied.
+  Lease/services restored; shared-app/persistence/draw/standby gates: [details](../../gaming-shell/DEVICE.md).
 - **[Files/Transfer](../../gaming-files/TRANSFER.md) — TRANSIENT TARGET MACHINE PASS / PHYSICAL UX OPEN.**
   16 MiB Wi-Fi hash roundtrip, cancellation, readonly ROMs, link-loss revocation and app lifecycle/privacy passed.
   Eight Python dependencies added without upgrades; services restored and clean poweroff. QR/USB/LCD remain open.

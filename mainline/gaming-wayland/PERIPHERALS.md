@@ -1,6 +1,6 @@
 # USB keyboard, mouse and Jume Terminal
 
-2026-09-22: **ARM64 HOST INPUT/PTY PASS; PHYSICAL USB HOTPLUG OPEN**.
+2026-09-26: **SEQUENTIAL USB KEYBOARD/MOUSE ATTENDED PASS; HUB/APP-SPECIFIC FOCUS OPEN**.
 This is USB **host** input, not the deferred USB gamepad gadget feature. The
 kernel fragment already enables USB HID/evdev and the accepted port has bounded
 USB storage evidence. No kernel, DT, USB role or device permissions are changed.
@@ -8,8 +8,8 @@ USB storage evidence. No kernel, DT, USB role or device permissions are changed.
 ## Behavior
 
 - Connect a USB keyboard/mouse or receiver to the data/OTG port using the
-  appropriate adapter; a hub can provide both devices. Hardware enumeration,
-  hub power and reconnect behavior still need one attended R46H check.
+  appropriate adapter; a hub can provide both devices. Separate devices can be
+  tested sequentially without a hub; hub power/simultaneous use remain unproven.
 - Weston/libinput owns hotplug, layout and native pointer input. New/restored
   seat capabilities reapply focus to the foreground application. No extra evdev
   grab or competing USB input daemon is installed.
@@ -43,7 +43,25 @@ before starting Bash, while preserving the real home and Wayland session.
 The shared session derives HOME/USER/LOGNAME from its effective desktop account,
 not the root supervisor's environment. This fixes the attended 2026-09-26
 missing-HOME startup failure without granting extra permissions. Session tests
-cover both missing values and inherited root values.
+cover both missing values and inherited root values. Target retest confirmed
+UID 1000, `/home/ark` cwd/HOME, ark USER/LOGNAME and a real Bash PTY; startup,
+same-PID background/resume, normal close, relaunch and force-close passed.
+Remote capture stayed denied; no terminal text was recorded. This does not prove
+physical USB typing/hotplug. Evidence:
+`mainline/out/.cache/r46h-task-fixes-20260926.C35vGm/session.md`.
+
+In the subsequent attended run, a Compx MCHOSE 2.4G receiver (41e4:2001)
+hotplugged into USB 1-1.2 and was accepted by Weston/libinput. The operator
+confirmed terminal text/output, arrow/Backspace editing and Ctrl+C interrupt/
+clear with no reported missing/repeated keys or delay. After an expired preview
+was restarted, normal display and Ctrl+D exit were also accepted (machine exit 0).
+The operator subsequently connected a Logitech G502 HERO separately and accepted
+visible cursor, movement and clicking with no obvious delay, then confirmed
+wheel scrolling and mouse unplug/replug recovery. Keyboard unplug/replug input
+was also confirmed separately. This covers these two devices used sequentially;
+simultaneous hub use and browser/game-specific focus remain open. A receiver's composite
+pointer interface alone does not prove physical mouse behavior.
+Evidence: `mainline/out/.cache/r46h-usb-attended-20260926.EGffXZ/session.md`.
 
 Focused checks: `shell-check terminalEntryKeyboardMouseAndPrivacy`,
 `browser-check physicalMouseAndStickHandover`, and `test-peripherals.py`.
