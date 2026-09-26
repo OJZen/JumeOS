@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <cerrno>
 #include <cmath>
@@ -56,6 +57,7 @@ struct Shell {
     dev_t socketDevice = 0;
     ino_t socketInode = 0;
     pid_t uiPid = 0, controlPid = 0, gamePid = 0;
+    pid_t thumbnailPid = 0;
     bool panel = false, overlay = false, volume = false, privacy = true, destroying = false;
     int64_t captureUntil = 0;
     qint64 sequence = 0;
@@ -234,7 +236,7 @@ static QJsonObject status(Shell *shell)
     for (auto *item : shell->views) {
         const auto role = shell->uiPid && item->pid == shell->uiPid ? "ui" : gameClient(shell, item->pid) ? "game" : "unassigned";
         auto *surface = weston_desktop_surface_get_surface(item->desktop);
-        views.append(QJsonObject{{"pid", int(item->pid)}, {"role", role}, {"mapped", item->mapped}, {"width", surface->width}, {"height", surface->height}});
+        views.append(QJsonObject{{"pid", int(item->pid)}, {"id", qint64(item->id)}, {"role", role}, {"mapped", item->mapped}, {"width", surface->width}, {"height", surface->height}});
         if (item->mapped && gameClient(shell, item->pid) && !weston_desktop_surface_get_parent(item->desktop)
             && qint64(surface->width) * surface->height >= area) {
             measured = item; area = qint64(surface->width) * surface->height;
@@ -257,10 +259,21 @@ static QJsonObject status(Shell *shell)
     return {{"version", 1}, {"session", shell->session}, {"sequence", shell->sequence}, {"uiPid", int(shell->uiPid)},
             {"gamePid", int(shell->gamePid)}, {"panel", shell->panel}, {"overlay", shell->overlay}, {"volume", shell->volume}, {"privacy", shell->privacy}, {"surfaces", views}, {"frameStats", frames}};
 }
-static void finish(Request *request, const QJsonObject &response)
+static void finish(Request *request, const QJsonObject &response, int imageFd = -1)
 {
     const auto bytes = QJsonDocument(response).toJson(QJsonDocument::Compact) + '\n';
-    (void)send(request->fd, bytes.constData(), size_t(bytes.size()), MSG_NOSIGNAL);
+    if (imageFd < 0) (void)send(request->fd, bytes.constData(), size_t(bytes.size()), MSG_NOSIGNAL);
+    else {
+        iovec payload{const_cast<char *>(bytes.constData()), size_t(bytes.size())};
+        alignas(cmsghdr) char control[CMSG_SPACE(sizeof(int))]{};
+        msghdr message{}; message.msg_iov = &payload; message.msg_iovlen = 1;
+        message.msg_control = control; message.msg_controllen = sizeof(control);
+        auto *header = CMSG_FIRSTHDR(&message); header->cmsg_level = SOL_SOCKET;
+        header->cmsg_type = SCM_RIGHTS; header->cmsg_len = CMSG_LEN(sizeof(int));
+        memcpy(CMSG_DATA(header), &imageFd, sizeof(imageFd));
+        (void)sendmsg(request->fd, &message, MSG_NOSIGNAL);
+        close(imageFd);
+    }
     request->shell->requests.removeOne(request);
     if (request->source) wl_event_source_remove(request->source);
     if (request->timer) wl_event_source_remove(request->timer);
@@ -284,12 +297,43 @@ static int receive(int fd, uint32_t, void *data)
     const auto object = document.object(); const auto operation = object.value("op").toString();
     auto fail = [&](const char *message) { finish(request, {{"ok", false}, {"error", message}}); };
     QStringList fields {"version", "op"};
+    if (operation == "thumbnail") fields.append({"pid", "surface"});
     if (operation == "hello") fields.append("uiPid");
     if (operation == "overlay") fields.append("volume");
-    if (operation != "observe" && operation != "hello") fields.append({"session", "sequence", operation == "game" ? "pid" : "active"});
+    if (operation != "observe" && operation != "hello" && operation != "thumbnail") fields.append({"session", "sequence", (operation == "game"||operation=="close") ? "pid" : "active"});
     if (!document.isObject() || object.value("version") != QJsonValue(1)) { fail("invalid_request"); return 0; }
     for (auto it = object.begin(); it != object.end(); ++it) if (!fields.contains(it.key())) { fail("unknown_field"); return 0; }
-    if (!QStringList{"observe", "hello", "game", "panel", "overlay", "privacy"}.contains(operation)) { fail("unknown_operation"); return 0; }
+    if (!QStringList{"observe", "hello", "game", "panel", "overlay", "privacy", "close", "thumbnail"}.contains(operation)) { fail("unknown_operation"); return 0; }
+    if (operation == "thumbnail") {
+        // Only our launcher can read the exact surface just backgrounded. Output
+        // capture stays denied, even when the task page contains private content.
+        if (!shell->uiPid || request->pid != shell->uiPid || request->pid != shell->controlPid) { fail("wrong_owner"); return 0; }
+        if (shell->gamePid || !shell->thumbnailPid || object.value("pid").toInteger() != shell->thumbnailPid) { fail("stale_task"); return 0; }
+        View *target = nullptr;
+        for (auto *view : shell->views)
+            if (qint64(view->id) == object.value("surface").toInteger() && view->mapped
+                && view->pid != shell->uiPid && descendant(view->pid, shell->thumbnailPid)
+                && !weston_desktop_surface_get_parent(view->desktop)) target = view;
+        shell->thumbnailPid = 0; // At most one readback per background transition.
+        if (!target) { fail("window_unavailable"); return 0; }
+        auto *surface = weston_desktop_surface_get_surface(target->desktop);
+        // Mapping precedes the first renderer attach. Weston GL's readback API
+        // asserts a renderer buffer exists, so a never-rendered window has no
+        // preview yet (the task card keeps its icon instead).
+        if (!surface->renderer_state) { fail("window_unrendered"); return 0; }
+        int width = 0, height = 0; weston_surface_get_content_size(surface, &width, &height);
+        if (width < 1 || height < 1 || width > 4096 || height > 4096) { fail("capture_dimensions"); return 0; }
+        const qint64 bytes = qint64(width) * height * 4;
+        if (bytes > 4 * 1024 * 1024) { fail("capture_dimensions"); return 0; }
+        const int imageFd = memfd_create("jume-task", MFD_CLOEXEC);
+        if (imageFd < 0) { fail("capture_storage"); return 0; }
+        void *pixels = ftruncate(imageFd, bytes) ? MAP_FAILED : mmap(nullptr, size_t(bytes), PROT_READ | PROT_WRITE, MAP_SHARED, imageFd, 0);
+        const bool copied = pixels != MAP_FAILED && weston_surface_copy_content(surface, pixels, size_t(bytes), 0, 0, width, height) == 0;
+        if (pixels != MAP_FAILED) munmap(pixels, size_t(bytes));
+        if (!copied) { close(imageFd); fail("capture_failed"); return 0; }
+        finish(request, {{"ok", true}, {"width", width}, {"height", height}}, imageFd);
+        return 0;
+    }
     if (operation != "observe" && shell->sequence >= 9007199254740991LL) { fail("sequence_exhausted"); return 0; }
     if (operation == "hello") {
         if (shell->controlPid && shell->controlPid != request->pid) { fail("owner_exists"); return 0; }
@@ -300,11 +344,19 @@ static int receive(int fd, uint32_t, void *data)
     } else if (operation != "observe") {
         if (!shell->uiPid || request->pid != shell->controlPid) { fail("wrong_owner"); return 0; }
         if (object.value("session").toString() != shell->session || !object.value("sequence").isDouble() || object.value("sequence").toDouble() != double(shell->sequence)) { fail("stale_state"); return 0; }
-        if (operation == "game") {
+        if(operation=="close") {
+            if(!shell->gamePid||object.value("pid").toInteger()!=shell->gamePid){fail("invalid_pid");return 0;}
+            View *target=nullptr;
+            for(auto *view:shell->views)if(gameClient(shell,view->pid)&&!weston_desktop_surface_get_parent(view->desktop))target=view;
+            if(!target){fail("window_unavailable");return 0;}
+            // xdg_toplevel.close is cooperative: the app may prompt or refuse.
+            weston_desktop_surface_close(target->desktop);
+        } else if (operation == "game") {
             const double value = object.value("pid").toDouble(-1);
             if (!std::isfinite(value) || value < 0 || value > 4194304 || value != std::floor(value)) { fail("invalid_pid"); return 0; }
             struct stat st{};
             if (value && (::stat(qPrintable(QString("/proc/%1").arg(int(value))), &st) || st.st_uid != geteuid())) { fail("wrong_game_owner"); return 0; }
+            shell->thumbnailPid = value == 0 ? shell->gamePid : 0;
             shell->gamePid = pid_t(value); shell->panel = false;
         } else {
             if (!object.value("active").isBool()) { fail("invalid_state"); return 0; }

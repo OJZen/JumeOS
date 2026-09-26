@@ -4,6 +4,7 @@
 #include "telemetry.h"
 #include "control.h"
 #include "applications.h"
+#include "taskimages.h"
 #include "streaming.h"
 #include "device.h"
 #include "network.h"
@@ -18,6 +19,8 @@
 #include <QQuickItem>
 #include <QGuiApplication>
 #include <QQuickView>
+#include <QQuickImageProvider>
+#include <QQmlEngine>
 #include <QTimer>
 #include <QFontDatabase>
 #include <QPointer>
@@ -41,8 +44,8 @@ protected:
             return true;
         }
         if (event->type() == QEvent::Close && tools && !tools->save()) { event->ignore(); return true; }
-        if (event->type() == QEvent::Close && applications && applications->running()) {
-            closeAfterApplication = true; applications->stop(); event->ignore(); return true;
+        if (event->type() == QEvent::Close && applications && applications->hasTasks()) {
+            closeAfterApplication = true; applications->stopAll(); event->ignore(); return true;
         }
         return QQuickView::event(event);
     }
@@ -55,7 +58,8 @@ int main(int argc, char **argv) {
         const bool separate = QByteArray(argv[i]) == "--uinput-fd";
         if (uinputFd >= 0 || (separate && i + 1 == argc)) return 2;
         uinputFd = (separate ? QByteArray(argv[++i]) : QByteArray(argv[i]).mid(12)).toInt(&ok);
-        if (!ok || uinputFd < 3 || uinputFd > 1024 || fcntl(uinputFd, F_SETFD, FD_CLOEXEC) < 0) return 2;
+        if (!ok || uinputFd < 3 || uinputFd > 1021) return 2;
+        for(int fd=uinputFd;fd<uinputFd+4;++fd)if(fcntl(fd,F_SETFD,FD_CLOEXEC)<0)return 2;
     }
     for (int i = 1; i < argc; ++i) if (QByteArray(argv[i]) == "--control-call") {
         QCoreApplication relay(argc, argv); QCommandLineParser options;
@@ -78,7 +82,7 @@ int main(int argc, char **argv) {
                             {"content-root", "Read-only content root.", "path", "/roms"}, {"state-dir", "Private state directory.", "path"},
                             {"native-worker", "One validated native request."}, {"shared-native", "Run the validated Neo profile in the shared Wayland session."}, {"attended", "Operator-present runtime limit."}});
         options.process(worker);
-        if (options.isSet("native-worker")) return ToolState::runNative(options.value("state-dir"), options.isSet("attended") ? 2100 : 120, options.isSet("shared-native"));
+        if (options.isSet("native-worker")) return ToolState::runNative(options.value("state-dir"), options.isSet("attended") ? 2100 : 120, options.isSet("shared-native"), options.value("tool-id"));
         if (options.isSet("shared-native")) return 2;
         return ToolState::worker(options.value("tool-worker"), options.value("tool-id"), options.value("content-root"), options.value("state-dir"));
     }
@@ -177,6 +181,7 @@ int main(int argc, char **argv) {
     window.setSource(QUrl("qrc:/qt/qml/R46H/Shell/ShellView.qml"));
     if (window.status() != QQuickView::Ready) return 1;
     const QPointer<QQuickItem> root(window.rootObject());
+    window.engine()->addImageProvider("tasks",new TaskImages(&applications));
     const auto browserClient = QDir::cleanPath(QCoreApplication::applicationDirPath() + "/../../browser/browser-client.sh");
     root->setProperty("browserAvailable", QFileInfo(browserClient).isExecutable());
     const auto terminalClient = QCoreApplication::applicationDirPath() + "/foot";
@@ -201,6 +206,8 @@ int main(int argc, char **argv) {
         QObject::connect(root, SIGNAL(panelVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
         QObject::connect(root, SIGNAL(monitorVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
         QObject::connect(root, SIGNAL(volumeVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
+        QObject::connect(root, SIGNAL(taskHoldPercentChanged()), handheld.get(), SLOT(sceneChanged()));
+        QObject::connect(root, SIGNAL(tasksVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
         QObject::connect(root, SIGNAL(sensitiveVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
         QString error;
         if (!handheld->start(parser.value("handheld-router"), parser.value("input-device"), &error, uinputFd)) {
@@ -208,7 +215,22 @@ int main(int argc, char **argv) {
         }
     }
     QObject::connect(&tools, &ToolState::notice, &window, [root](const QString &message) { if (root) QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, message)); });
-    QString sharedNativeGame;
+    QObject::connect(&applications,&Applications::notice,&window,[root](const QString &message){if(root)QMetaObject::invokeMethod(root,"notify",Q_ARG(QVariant,message));});
+    QObject::connect(root,SIGNAL(backgroundRequested(bool)),&applications,SIGNAL(backgroundRequested(bool)));
+    QObject::connect(&applications,&Applications::backgroundRequested,&window,[&](bool tasks){
+        if(handheldMode)handheld->showDesktop(tasks);
+        else {applications.background();QMetaObject::invokeMethod(root,"showTasksOrDesktop",Q_ARG(QVariant,tasks));window.show();}
+    });
+    if(handheldMode) {
+        QObject::connect(handheld.get(),&HandheldSession::systemAction,&window,[&](const QString &action){
+            if(action=="tasks"||action=="desktop")QTimer::singleShot(0,&window,[&,action]{emit applications.backgroundRequested(action=="tasks");});
+            else if(action=="close") {if(root->property("tasksVisible").toBool())QMetaObject::invokeMethod(root,"closeSelectedTask");else {root->setProperty("quickOpen",false);applications.requestClose();}}
+            else if(action=="kill")applications.forceKill();
+        });
+        QObject::connect(handheld.get(),&HandheldSession::notice,&window,[root](const QString &text){QMetaObject::invokeMethod(root,"notify",Q_ARG(QVariant,text));});
+    } else {
+        QObject::connect(&applications,&Applications::closeRequested,&window,[root]{QMetaObject::invokeMethod(root,"notify",Q_ARG(QVariant,QStringLiteral("正常关闭需要共享 Wayland 会话；请使用应用自身的关闭按钮。")));});
+    }
     QObject::connect(root,SIGNAL(filesRequested(bool)),&applications,SIGNAL(filesRequested(bool)));
     QObject::connect(root,SIGNAL(transferRequested()),&applications,SIGNAL(transferRequested()));
     const auto launchFiles=[&](const QString &mode) {
@@ -255,11 +277,14 @@ int main(int argc, char **argv) {
         if (!preferences.save()) return;
         if (!handheldMode) { QCoreApplication::exit(79); return; }
         if (!handheld->ready() || applications.running()) return;
+        if(applications.contains("native."+game)){QFile::remove(state+"/tools/native-request.json");applications.activate("native."+game);return;}
+        if(!tools.stageNativeRequest(game)){QMetaObject::invokeMethod(root,"notify",Q_ARG(QVariant,QStringLiteral("无法隔离游戏启动请求。")));return;}
         auto environment = QProcessEnvironment::systemEnvironment();
         environment.insert("QT_QPA_PLATFORM", "wayland");
         environment.remove("R46H_SHELL_LOG");
-        if (applications.launchPrepared("native." + game, QCoreApplication::applicationFilePath(),
-            {"--native-worker", "--shared-native", "--state-dir", state}, state, environment)) sharedNativeGame = game;
+        if(!applications.launchPrepared("native." + game, QCoreApplication::applicationFilePath(),
+            {"--native-worker", "--shared-native", "--tool-id",game,"--state-dir", state}, state, environment))
+            QFile::remove(state+"/tools/native-request-"+game+".json");
     });
     QObject::connect(&device,&DeviceState::powerRequested,&app,[](int code){QCoreApplication::exit(code);});
     QObject::connect(&device,&DeviceState::warning,&window,[root](const QString &message){if(root)QMetaObject::invokeMethod(root,"notify",Q_ARG(QVariant,message));});
@@ -317,19 +342,16 @@ int main(int argc, char **argv) {
     });
     QObject::connect(&applications, &Applications::finished, &window, [&] {
         controller.suppressUntilNeutral();
-        if (!sharedNativeGame.isEmpty()) {
-            const auto game = std::exchange(sharedNativeGame, QString());
-            tools.nativeFinished(game, applications.error().isEmpty() ? 0 : applications.exitCode());
-        }
-        if (sharedStreamActive) {
-            sharedStreamActive = false;
-            streaming.streamFinished(applications.error().isEmpty() ? 0 : applications.exitCode());
-        }
         if (root && handheldMode) root->setProperty("quickOpen", false);
         window.show();
-        if (window.closeAfterApplication) { window.closeAfterApplication = false; window.close(); return; }
+        if (window.closeAfterApplication && !applications.hasTasks()) { window.closeAfterApplication = false; window.close(); return; }
         window.requestActivate();
         if (root) root->forceActiveFocus();
+    });
+    QObject::connect(&applications,&Applications::taskFinished,&window,[&](const QString &id,int code,bool failed){
+        if(id.startsWith("native."))tools.nativeFinished(id.mid(7),failed?code:0);
+        if(id=="builtin.moonlight"&&sharedStreamActive){sharedStreamActive=false;streaming.streamFinished(failed?code:0);}
+        if(window.closeAfterApplication&&!applications.hasTasks()){window.closeAfterApplication=false;QTimer::singleShot(0,&window,&QWindow::close);}
     });
     std::unique_ptr<ControlServer> control;
     if (parser.isSet("control-dir")) {

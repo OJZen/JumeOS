@@ -41,15 +41,16 @@ with tempfile.TemporaryDirectory(prefix='r46h-session-', dir='/run') as director
     pad = fixture.Pad(); os.chown(pad.path, user.pw_uid, user.pw_gid)
     # A preceding root-only check can leave its synthetic /dev/input directory 0700.
     pad.path.parent.chmod(0o755)
-    fd = os.open('/dev/uinput', os.O_WRONLY | os.O_CLOEXEC)
-    delegated = fcntl.fcntl(fd, fcntl.F_DUPFD_CLOEXEC, 7); os.close(fd)
-    assert delegated == 7
+    for desired in range(7,11):
+        fd = os.open('/dev/uinput', os.O_WRONLY | os.O_CLOEXEC)
+        delegated = fcntl.fcntl(fd, fcntl.F_DUPFD_CLOEXEC, desired); os.close(fd)
+        assert delegated == desired
     os.rename('/dev/uinput', '/dev/uinput.hidden')
     log = (out / 'session.log').open('w')
     process = subprocess.Popen([str(base / 'session.sh'), 'headless', str(state), 'handheld'],
         env={**environment, 'R46H_ROUTED_SOURCE': str(pad.path)}, user=user.pw_uid, group=user.pw_gid,
-        extra_groups=[], pass_fds=(7,), start_new_session=True, stdout=log, stderr=subprocess.STDOUT)
-    os.close(7)
+        extra_groups=[], pass_fds=(7,8,9,10), start_new_session=True, stdout=log, stderr=subprocess.STDOUT)
+    for fd in range(7,11):os.close(fd)
     routed = None
     endpoint = state / 'control/control.sock'
 
@@ -93,9 +94,12 @@ with tempfile.TemporaryDirectory(prefix='r46h-session-', dir='/run') as director
         peers = children(process.pid)
         weston = next(int(pid) for pid in peers if Path(f'/proc/{pid}/comm').read_text().strip() == 'weston')
         gui = next(int(pid) for pid in peers if Path(f'/proc/{pid}/comm').read_text().strip() == 'r46h-shell')
+        gui_environment = dict(item.split(b'=', 1) for item in Path(f'/proc/{gui}/environ').read_bytes().split(b'\0') if b'=' in item)
+        assert gui_environment[b'HOME'] == os.fsencode(user.pw_dir)
+        assert gui_environment[b'USER'] == gui_environment[b'LOGNAME'] == os.fsencode(user.pw_name)
         assert not uinput_handles(process.pid) and not uinput_handles(weston) and not uinput_handles(gui)
-        routers = children(gui); assert len(routers) == 1 and len(uinput_handles(routers[0])) == 1
-        paths = [p.parent for p in Path('/sys/devices/virtual/input').glob('input*/name') if p.read_text().strip() == 'R46H Routed Gamepad']
+        routers = children(gui); assert len(routers) == 1 and len(uinput_handles(routers[0])) == 4
+        paths = fixture.routed_devices()
         assert len(paths) == 1
         routed = fixture.event_node(paths[0].name); os.chown(routed, user.pw_uid, user.pw_gid)
         game = None
@@ -157,22 +161,28 @@ if not stream_mode:
     power_results = []
     try:
         for code in (77, 78):
-            launcher.write_text('#!/bin/sh\nprintf "DEVICE_FLAG=%s\\n" "${R46H_DEVICE_CONTROLS:-unset}"\nexit ' + str(code) + '\n')
+            launcher.write_text('#!/bin/sh\nprintf "DEVICE_FLAG=%s\\nHOME=%s\\nUSER=%s\\nLOGNAME=%s\\n" "${R46H_DEVICE_CONTROLS:-unset}" "$HOME" "$USER" "$LOGNAME"\nexit ' + str(code) + '\n')
             with tempfile.TemporaryDirectory(prefix='r46h-power-exit-', dir='/run') as directory:
                 state = Path(directory); os.chown(state, user.pw_uid, user.pw_gid)
                 pad = fixture.Pad(); os.chown(pad.path, user.pw_uid, user.pw_gid)
-                fd = os.open('/dev/uinput', os.O_WRONLY | os.O_CLOEXEC)
-                delegated = fcntl.fcntl(fd, fcntl.F_DUPFD_CLOEXEC, 7); os.close(fd)
-                assert delegated == 7
+                for desired in range(7,11):
+                    fd = os.open('/dev/uinput', os.O_WRONLY | os.O_CLOEXEC)
+                    delegated = fcntl.fcntl(fd, fcntl.F_DUPFD_CLOEXEC, desired); os.close(fd)
+                    assert delegated == desired
+                environment = {**os.environ, 'R46H_ROUTED_SOURCE': str(pad.path), 'R46H_DEVICE_CONTROLS': '1'}
+                for key in ('HOME', 'USER', 'LOGNAME'):
+                    environment.pop(key, None)
+                    if code == 78: environment[key] = '/root' if key == 'HOME' else 'root'
                 process = subprocess.Popen([str(base / 'session.sh'), 'headless', str(state), 'handheld'],
-                    env={**os.environ, 'R46H_ROUTED_SOURCE': str(pad.path), 'R46H_DEVICE_CONTROLS': '1'},
-                    user=user.pw_uid, group=user.pw_gid, extra_groups=[], pass_fds=(7,),
+                    env=environment,
+                    user=user.pw_uid, group=user.pw_gid, extra_groups=[], pass_fds=(7,8,9,10),
                     start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                os.close(7)
+                for fd in range(7,11):os.close(fd)
                 try:
                     stdout, _ = process.communicate(timeout=10)
                     assert process.returncode == code, (code, process.returncode, stdout)
-                    assert (state / 'clients.log').read_text().strip() == 'DEVICE_FLAG=1'
+                    assert (state / 'clients.log').read_text().splitlines() == [
+                        'DEVICE_FLAG=1', f'HOME={user.pw_dir}', f'USER={user.pw_name}', f'LOGNAME={user.pw_name}']
                     assert not list(state.glob('runtime.*')), 'Power request left its compositor runtime'
                     power_results.append({'guiExitCode': code, 'sessionExitCode': process.returncode})
                 finally:

@@ -550,13 +550,16 @@ llvmpipe, not Panfrost. Retain the named evidence, then remove only new disposab
 ## Input routing candidate
 
 `input-router.cpp` grabs only the name/VID/PID/version-checked **R46H Combined
-Gamepad**, then creates **R46H Routed Gamepad** (product 0x0049) with the same
+Gamepad**, then creates four **R46H Routed Gamepad** slots (products 0x0049–0x004c) with the same
 17 button capabilities and four axes/calibration. The unidentified HAPPY5 capability
 is retained without assigning it a new action. The accepted bridge is unchanged.
 Games read the routed endpoint; the UI receives normalized samples over an inherited
 parent-owned Unix `SOCK_SEQPACKET` connection. `input-route.h` owns the fixed local
-packet contract (version 2); GUI and router must come from the same candidate.
+packet contract (version 3); GUI and router must come from the same candidate.
 There is no listening socket or network input service in the router itself.
+Each application sees only its assigned endpoint. [Task controls](../gaming-shell/APPLICATIONS.md)
+own Select+Y, short/long Select+Start and Select+X. Select is a deferred modifier;
+all other ordinary buttons remain immediate. This new protocol has host proof only.
 
 The controller selects UI/game ownership with a strictly increasing sequence.
 Each change sends neutral game/UI state and waits for physical neutral. A matched
@@ -644,9 +647,9 @@ named evidence directory; these are host checks, not device acceptance.
 The session scripts now support the optional `handheld` profile beside the accepted
 two-window `windows` default. Target preflight finds exactly one named merged pad,
 checks `ark` can read it and verifies uinput's character-device identity. The root
-seat wrapper opens uinput once and drops to `ark` with `setpriv`; it closes its copy
-immediately. The compositor never inherits it. The GUI seals the descriptor before
-Qt initialization, passes it only to the router, then closes its own copy. No udev
+seat wrapper opens four independent uinput handles and drops to `ark` with `setpriv`;
+it closes its copies immediately. The compositor never inherits them. The GUI seals
+the descriptors before Qt, passes them only to the router, then closes its copies. No udev
 rule, global device mode or service is installed. Wrong-device/read-only descriptors
 are refused; the existing target cgroup and ES-DE recovery wrapper remain in use.
 
@@ -816,7 +819,7 @@ One request holds up to 16 named buttons and four normalized axes (-1..1) for
 it sends neutral tool state on expiry, then resumes the physical sample. Physical
 buttons or sticks leaving the established neutral gate cancel the sample. Opening
 the panel, input resynchronization, client disconnect or ownership loss also cancel
-it. Cancellation preserves physical input. Simultaneous L3 + R3 is reserved;
+it. Cancellation preserves physical input. L3+R3 and the Select task shortcuts are reserved;
 use the existing `tap quick` UI action for the panel. L1 + R1 remains available to
 the game/Moonlight. No unbounded press, text injection or arbitrary device write
 is exposed.

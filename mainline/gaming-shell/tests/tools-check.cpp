@@ -22,6 +22,29 @@ class ToolsCheck : public QObject {
     }
     static QByteArray get(const QString &path) { QFile f(path); return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray(); }
 private slots:
+    void nativeRequestsRemainIsolatedWhilePaused() {
+        QTemporaryDir dir; ToolState state(dir.path(), "/roms", false);
+        QVERIFY(state.choose("neoSmooth", false));
+        const auto source = dir.filePath("tools/native-request.json");
+        const auto first = dir.filePath("tools/native-request-gta3.json");
+        const auto second = dir.filePath("tools/native-request-gtavc.json");
+        auto writeRequest = [&](const QString &game, int version = 1) {
+            return put(source, QJsonDocument(QJsonObject{{"version", version}, {"game", game},
+                {"settings", QJsonObject::fromVariantMap(ToolState::defaults())}}).toJson())
+                && QFile::setPermissions(source, QFile::ReadOwner | QFile::WriteOwner);
+        };
+        QVERIFY(writeRequest("gta3"));
+        QVERIFY(!state.stageNativeRequest("gtavc"));
+        QVERIFY(!state.stageNativeRequest("../../escape"));
+        QVERIFY(state.stageNativeRequest("gta3")); QVERIFY(!QFileInfo::exists(source));
+        const auto firstRequest = get(first); QVERIFY(!firstRequest.isEmpty());
+        QVERIFY(writeRequest("gtavc")); QVERIFY(state.stageNativeRequest("gtavc"));
+        QCOMPARE(get(first), firstRequest); QVERIFY(!get(second).isEmpty());
+        QVERIFY(writeRequest("gta3", 2)); QVERIFY(!state.stageNativeRequest("gta3"));
+        QCOMPARE(get(first), firstRequest);
+        state.nativeFinished("gta3", 0);
+        QVERIFY(!QFileInfo::exists(first)); QVERIFY(QFileInfo::exists(second));
+    }
     void neoConfigurationAndNativeResult() {
         auto settings = ToolState::defaults(); settings["neoSmooth"] = true;
         const auto direct = ToolState::neoConfiguration(settings, "/private/game", false);

@@ -11,6 +11,20 @@
 #include <QJsonArray>
 #include <SDL.h>
 #include <chrono>
+#include <array>
+
+class TestView final:public QQuickView {
+public:
+    QString closeGate;int closeRequests=0;
+protected:
+    bool event(QEvent *event) override {
+        if(event->type()==QEvent::Close&&!closeGate.isEmpty()) {
+            ++closeRequests;QFile file(closeGate+".requests");if(file.open(QIODevice::WriteOnly))file.write(QByteArray::number(closeRequests));
+            if(!QFile::exists(closeGate)){event->ignore();return true;}
+        }
+        return QQuickView::event(event);
+    }
+};
 
 int main(int argc, char **argv)
 {
@@ -29,7 +43,7 @@ int main(int argc, char **argv)
         return game.alpha() == 255 && game.green() > game.red() * 2 && game.green() > game.blue()
             && panel.alpha() == 255 && panel != game ? 0 : 4;
     }
-    QQuickView view;
+    TestView view;view.closeGate=qEnvironmentVariable("R46H_TEST_CLOSE_GATE");
     if (QByteArray(argv[1])=="ui" && qEnvironmentVariableIntValue("R46H_TEST_PASS_THROUGH")==1)
         QTimer::singleShot(200, &view, [&] { view.setFlag(Qt::WindowTransparentForInput); });
     view.setColor(Qt::transparent);
@@ -48,6 +62,7 @@ int main(int argc, char **argv)
     view.setContent(QUrl(), &component, item);
     view.resize(640, 480); view.show();
     SDL_GameController *controller = nullptr;
+    std::array<int,SDL_CONTROLLER_BUTTON_MAX> presses{};
     QTimer timer;
     QTimer paintTimer; paintTimer.setTimerType(Qt::PreciseTimer);
     QObject::connect(&paintTimer, &QTimer::timeout, item, [item] { item->setProperty("frameTick", 1 - item->property("frameTick").toInt()); });
@@ -70,13 +85,17 @@ int main(int argc, char **argv)
                 bool ok = false; const int code = exitFile.read(16).trimmed().toInt(&ok);
                 if (ok && code >= 0 && code <= 255) { app.exit(code); return; }
             }
-            SDL_Event event; while (SDL_PollEvent(&event)) {}
+            SDL_Event event; while (SDL_PollEvent(&event)) {
+                if(event.type==SDL_CONTROLLERBUTTONDOWN&&controller&&event.cbutton.button<presses.size()
+                    &&event.cbutton.which==SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller)))++presses[event.cbutton.button];
+            }
             const auto sampledAt = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
             QJsonObject state{{"controllers", SDL_NumJoysticks()}, {"pid", QCoreApplication::applicationPid()},
                 {"renderedFrames", renderedFrames}, {"sampledAtMs", qint64(sampledAt)}, {"requestedFps", frameRate}};
             if (controller && !SDL_GameControllerGetAttached(controller)) { SDL_GameControllerClose(controller); controller = nullptr; }
             if (!controller) for (int i = 0; i < SDL_NumJoysticks(); ++i) {
-                if (SDL_JoystickGetDeviceVendor(i) != (server ? 0x045e : 0x5246) || SDL_JoystickGetDeviceProduct(i) != (server ? 0x02ea : 0x0049)) continue;
+                const auto selected=qEnvironmentVariable("SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT").section('/',1).toUInt(nullptr,16);
+                if (SDL_JoystickGetDeviceVendor(i) != (server ? 0x045e : 0x5246) || SDL_JoystickGetDeviceProduct(i) != (server ? 0x02ea : selected?selected:0x0049)) continue;
                 char guid[33]; SDL_JoystickGetGUIDString(SDL_JoystickGetDeviceGUID(i), guid, sizeof(guid));
                 state["guid"] = QString::fromLatin1(guid);
                 controller = SDL_GameControllerOpen(i); break;
@@ -87,7 +106,8 @@ int main(int argc, char **argv)
                 QJsonArray buttons, axes;
                 for (int i = 0; i < SDL_CONTROLLER_BUTTON_MAX; ++i) buttons.append(int(SDL_GameControllerGetButton(controller, SDL_GameControllerButton(i))));
                 for (int i = 0; i < SDL_CONTROLLER_AXIS_MAX; ++i) axes.append(int(SDL_GameControllerGetAxis(controller, SDL_GameControllerAxis(i))));
-                state["buttons"] = buttons; state["axes"] = axes;
+                QJsonArray edges;for(int value:presses)edges.append(value);
+                state["buttons"] = buttons; state["axes"] = axes;state["presses"]=edges;
             }
             if (server) {
                 item->setProperty("inputA", controller && SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A));

@@ -380,12 +380,23 @@ bool ToolState::requestPort(const QString &id) {
         return fail(QStringLiteral("无法保存启动请求。"));
     emit nativeRequested(id); return true;
 }
+bool ToolState::stageNativeRequest(const QString &game) {
+    if(!QStringList{"mslug","gta3","gtavc","stardew"}.contains(game)||!ownedTools(m_stateDirectory))return false;
+    const auto source=m_stateDirectory+"/tools/native-request.json";
+    const auto value=readJson(source);
+    if(value.size()!=3 || value.value("version")!=QJsonValue(1) || value.value("game").toString()!=game
+        || !validSettings(value.value("settings").toObject().toVariantMap()))return false;
+    const auto destination=m_stateDirectory+"/tools/native-request-"+game+".json";
+    return writeJson(destination,value)&&QFile::remove(source);
+}
 void ToolState::nativeFinished(const QString &game, int exitCode) {
     if (!QStringList{"mslug", "gta3", "gtavc", "stardew"}.contains(game) || !ownedTools(m_stateDirectory)
         || !writeJson(m_stateDirectory + "/tools/native-result.json", {{"version", 1}, {"game", game}, {"exit", exitCode}})) {
         fail(QStringLiteral("无法保存游戏结束状态。")); return;
     }
     m_lastGame = game;
+    const auto pending=m_stateDirectory+"/tools/native-request-"+game+".json";
+    if(privateFile(pending,true))QFile::remove(pending);
     emit changed();
     emit notice(exitCode == 0 ? QStringLiteral("游戏已结束") : QStringLiteral("游戏未正常结束，可检查后重试。"));
     if (game == "mslug" && m_kind == "neo") start("verify", "neo");
@@ -411,7 +422,7 @@ QByteArray ToolState::neoConfiguration(const QVariantMap &settings, const QStrin
     options += "input_player1_l2_btn = \"nul\"\ninput_player1_r2_btn = \"nul\"\ninput_player1_l2_axis = \"+4\"\ninput_player1_r2_axis = \"+5\"\n";
     return options.toUtf8();
 }
-int ToolState::runNative(const QString &state, int timeoutSeconds, bool sharedDisplay) {
+int ToolState::runNative(const QString &state, int timeoutSeconds, bool sharedDisplay, const QString &expectedGame) {
     // Both render paths require the fixed device and the corresponding outer supervisor.
     DeviceState device("/", false);
     if (!device.target() || geteuid() != 1000 || timeoutSeconds < 1 || timeoutSeconds > 2100 || state.contains('"') || state.contains('\\') || state.contains('\n') || state.contains('\r')) return 2;
@@ -419,11 +430,13 @@ int ToolState::runNative(const QString &state, int timeoutSeconds, bool sharedDi
     if (!cgroup.open(QIODevice::ReadOnly) || ::statvfs("/roms", &mount) || !(mount.f_flag & ST_RDONLY)
         || !QRegularExpression(sharedDisplay ? "/r46h-wayland-probe-[0-9]+\\.service(?:\\n|$)" : "/r46h-shell-probe-[0-9]+\\.service(?:\\n|$)")
             .match(QString::fromUtf8(cgroup.read(4096))).hasMatch()) return 2;
-    if (sharedDisplay ? (qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY") || qEnvironmentVariable("SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT") != "0x5246/0x0049")
+    if (sharedDisplay ? (qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY") || !QStringList{"0x5246/0x0049","0x5246/0x004a","0x5246/0x004b","0x5246/0x004c"}.contains(qEnvironmentVariable("SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT")))
                       : !qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")) return 2;
     if (!ownedTools(state)) return 2;
-    const QString requestPath = state + "/tools/native-request.json";
+    if(!expectedGame.isEmpty()&&(!sharedDisplay||!QStringList{"mslug","gta3","gtavc","stardew"}.contains(expectedGame)))return 2;
+    const QString requestPath = state + "/tools/native-request"+(expectedGame.isEmpty()?QString():"-"+expectedGame)+".json";
     const auto request = readJson(requestPath); const auto settings = request.value("settings").toObject().toVariantMap();
+    if(!expectedGame.isEmpty()&&request.value("game").toString()!=expectedGame)return 2;
     if (request.size() != 3 || request.value("version") != QJsonValue(1) || !QStringList{"mslug", "gta3", "gtavc", "stardew"}.contains(request.value("game").toString()) || !validSettings(settings)) return 2;
     const auto id = request.value("game").toString();
     if (id != "mslug") {

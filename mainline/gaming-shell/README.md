@@ -32,6 +32,8 @@ mainline/gaming-shell/run.sh --check
 [Application lists and launch](APPLICATIONS.md) owns `--applications`, stable
 favorites, scrolling, child lifecycle and display restrictions. Normal exit and
 failure restore the selected entry; returning waits for neutral controller input.
+It also owns background tasks, Select shortcuts, local thumbnails and cooperative
+versus forced close, including accepted device paths and remaining retention gates.
 [Moonlight management](STREAMING.md) owns host editing, PIN pairing, stream
 presets and the separate, bounded desktop-exit/stream/restart experiment.
 Its attended record also tracks the current rendering, input-UX and backlight gaps.

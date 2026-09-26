@@ -8,6 +8,7 @@
 #include <QQuickView>
 #include <QQuickItem>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <algorithm>
@@ -51,8 +52,8 @@ HandheldSession::HandheldSession(QQuickView *view, ControllerInput *input, Appli
             else fail(QStringLiteral("无法连接桌面合成器。"));
         }
     });
-    connect(m_applications, &Applications::started, this, &HandheldSession::sceneChanged);
-    connect(m_applications, &Applications::finished, this, &HandheldSession::sceneChanged);
+    connect(m_applications, &Applications::changed, this, &HandheldSession::sceneChanged);
+    connect(m_applications,&Applications::closeRequested,this,[this](qint64 pid){if(pid>1){m_closePid=pid;requestPolicy();}});
     m_captureDeadline.setSingleShot(true); m_captureDeadline.setInterval(2000);
     connect(&m_captureDeadline, &QTimer::timeout, this, [this] { cancelCapture("capture_failed"); });
     m_frameTimer.setInterval(1000);
@@ -60,6 +61,14 @@ HandheldSession::HandheldSession(QQuickView *view, ControllerInput *input, Appli
         if (m_capturePhase == Idle) { m_frameSampleDue = true; requestPolicy(); }
     });
     connect(m_view, &QWindow::visibilityChanged, this, [this] { updateFrameSampling(); });
+    connect(m_view, &QQuickWindow::afterSynchronizing, this, [this] {
+        if (m_thumbnailSurface && !m_applications->running()) m_thumbnailSynced = true;
+    }, Qt::QueuedConnection);
+    connect(m_view, &QQuickWindow::frameSwapped, this, [this] {
+        if (m_thumbnailSurface && m_thumbnailSynced && !m_applications->running()) {
+            m_thumbnailFrameReady = true; requestPolicy();
+        }
+    }, Qt::QueuedConnection);
 }
 HandheldSession::~HandheldSession() {
     disconnect(m_syncConnection); disconnect(m_frameConnection);
@@ -67,6 +76,7 @@ HandheldSession::~HandheldSession() {
     if (m_fence) wl_callback_destroy(m_fence);
 #endif
     if (m_captureThread) { m_captureThread->wait(); delete m_captureThread; }
+    if (m_thumbnailThread) { m_thumbnailThread->wait(); delete m_thumbnailThread; }
     m_failed = true; m_deadline.stop(); m_inputDeadline.stop(); m_notifier.reset();
     m_router.disconnect(this);
     if (m_control >= 0) ::close(m_control);
@@ -80,7 +90,7 @@ void HandheldSession::fail(const QString &message) {
     m_failed = true; m_ready = false; m_deadline.stop(); m_inputDeadline.stop(); m_frameTimer.stop(); m_notifier.reset();
     m_frameMetrics = {{"active", false}}; emit frameMetricsChanged();
     if (m_control >= 0) { ::close(m_control); m_control = -1; }
-    m_input->suppressUntilNeutral(); m_applications->stop();
+    m_input->suppressUntilNeutral(); m_applications->stopAll();
     if (m_capturePhase != Idle) {
         m_captureDeadline.stop(); m_capturePhase = Idle; m_captureImage = {};
         emit captureFinished({}, "capture_failed");
@@ -113,14 +123,15 @@ bool HandheldSession::start(const QString &router, const QString &device, QStrin
     if (::socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, channel)) { *error = QStringLiteral("无法创建输入通道。"); return false; }
     m_control = channel[0]; const int child = channel[1];
     m_router.setChildProcessModifier([child, uinputFd] {
-        if (::fcntl(child, F_SETFD, 0) < 0 || (uinputFd >= 0 && ::fcntl(uinputFd, F_SETFD, 0) < 0)) ::_exit(127);
+        if (::fcntl(child, F_SETFD, 0) < 0) ::_exit(127);
+        if(uinputFd>=0)for(int fd=uinputFd;fd<uinputFd+4;++fd)if(::fcntl(fd,F_SETFD,0)<0)::_exit(127);
     });
     QStringList arguments{device, QString::number(child), "120"};
     if (uinputFd >= 0) arguments.append(QString::number(uinputFd));
     m_router.start(router, arguments);
     // Startup is bounded before showing the UI. All steady-state IO is asynchronous.
     const bool started = m_router.waitForStarted(1500); ::close(child);
-    if (uinputFd >= 0) ::close(uinputFd);
+    if (uinputFd >= 0) for(int fd=uinputFd;fd<uinputFd+4;++fd)::close(fd);
     if (!started) { *error = QStringLiteral("无法启动输入路由。"); return false; }
     m_notifier = std::make_unique<QSocketNotifier>(m_control, QSocketNotifier::Read, this);
     connect(m_notifier.get(), &QSocketNotifier::activated, this, &HandheldSession::readInput);
@@ -134,7 +145,7 @@ void HandheldSession::readInput() {
         const auto size = ::recv(m_control, &packet, sizeof(packet), MSG_DONTWAIT | MSG_TRUNC);
         if (size < 0 && errno == EINTR) continue;
         if (size < 0 && errno == EAGAIN) return;
-        if (size != sizeof(packet) || packet.version != Route::Version || packet.reserved || packet.mode > Route::Game
+        if (size != sizeof(packet) || packet.version != Route::Version || packet.reserved>=Route::Slots || packet.mode > Route::Game
             || packet.flags & ~(Route::WaitingNeutral | Route::WaitingOwner | Route::InjectionCancelled) || packet.sequence > m_inputSequence) {
             fail(QStringLiteral("输入通道状态无效。")); return;
         }
@@ -148,7 +159,16 @@ void HandheldSession::readInput() {
             if (packet.sequence == m_inputSequence && packet.mode == Route::Ui && m_inputRequested < 0)
                 m_input->routedState(packet.keys, packet.axes);
         } else if (packet.type == Route::Ack && packet.sequence == m_modeSequence && int(packet.mode) == m_inputRequested) {
-            m_inputMode = m_inputRequested; m_inputRequested = -1; m_inputDeadline.stop(); synchronize();
+            if(int(packet.reserved)!=m_requestedSlot){fail(QStringLiteral("输入槽位不匹配。"));return;}
+            m_inputSlot=m_requestedSlot;m_inputMode = m_inputRequested; m_inputRequested = -1; m_inputDeadline.stop(); synchronize();
+        } else if(packet.type==Route::Hold && packet.keys<=100) {
+            if(packet.keys&&!m_view->rootObject()->property("taskHoldPercent").toInt()){m_holdId=m_applications->activeId();m_holdPid=m_applications->processId();}
+            m_view->rootObject()->setProperty("taskHoldPercent",int(packet.keys));
+        } else if(packet.type==Route::Tasks||packet.type==Route::Home||packet.type==Route::Close||packet.type==Route::Kill) {
+            m_inputMode=-1;m_input->suppressUntilNeutral();
+            if(packet.type!=Route::Kill||(m_holdPid>1&&m_applications->processId()==m_holdPid&&m_applications->activeId()==m_holdId))
+                emit systemAction(packet.type==Route::Tasks?"tasks":packet.type==Route::Home?"desktop":packet.type==Route::Close?"close":"kill");
+            synchronize();
         } else if (packet.type == Route::Panel) {
             auto *root = m_view->rootObject();
             // The router is already neutral and paused; policy then grants the next owner.
@@ -163,8 +183,10 @@ void HandheldSession::readInput() {
 void HandheldSession::selectInput(bool ui) {
 #ifdef Q_OS_LINUX
     const int mode = ui ? Route::Ui : Route::Game;
-    if (!m_routerReady || m_inputRequested >= 0 || m_inputMode == mode || m_failed) return;
+    const int slot=m_applications->inputSlot();
+    if (!m_routerReady || m_inputRequested >= 0 || (m_inputMode == mode && m_inputSlot==slot) || m_failed) return;
     Route::Packet packet; packet.type = Route::Mode; packet.mode = mode; packet.sequence = ++m_inputSequence;
+    packet.reserved=uint32_t(slot);m_requestedSlot=slot;
     m_modeSequence = packet.sequence; // A later cancellation may advance the channel before this mode ack arrives.
     if (::send(m_control, &packet, sizeof(packet), MSG_NOSIGNAL | MSG_DONTWAIT) != sizeof(packet)) {
         fail(QStringLiteral("无法切换输入归属。")); return;
@@ -181,6 +203,7 @@ void HandheldSession::synchronize() {
     requestPolicy();
 }
 void HandheldSession::sceneChanged() {
+    if (m_applications->processId() > 1) { ++m_thumbnailGeneration; m_thumbnailSurface = 0; }
     // A visible telemetry/volume overlay is not an input surface. USB pointer
     // events must reach the foreground app until the quick panel explicitly opens.
     m_view->setFlag(Qt::WindowTransparentForInput, m_applications->running()
@@ -238,10 +261,11 @@ bool HandheldSession::gameInputAvailable() const {
 bool HandheldSession::injectGame(quint32 keys, const qint32 axes[4], int milliseconds, quint64 expectedSequence, const QString &application) {
 #ifdef Q_OS_LINUX
     if (!gameInputAvailable() || expectedSequence != m_inputSequence || application != m_applications->activeId()
-        || milliseconds < 10 || milliseconds > 1000 || keys & ~0xffffU || (keys & Route::Chord) == Route::Chord
+        || milliseconds < 10 || milliseconds > 1000 || keys & ~0xffffU || Route::systemChord(keys)
         || m_inputSequence >= 9007199254740991ULL) return false;
     for (int i = 0; i < 4; ++i) if (axes[i] < -32767 || axes[i] > 32767) return false;
     Route::Packet packet; packet.type = Route::Inject; packet.mode = Route::Game;
+    packet.reserved=uint32_t(m_applications->inputSlot());
     packet.flags = milliseconds; packet.keys = keys; std::copy(axes, axes + 4, packet.axes);
     packet.sequence = ++m_inputSequence; m_remoteSequence = packet.sequence;
     if (::send(m_control, &packet, sizeof(packet), MSG_NOSIGNAL | MSG_DONTWAIT) != sizeof(packet)) {
@@ -257,6 +281,7 @@ void HandheldSession::cancelGameInput() {
 #ifdef Q_OS_LINUX
     if (!m_remoteSequence || m_failed) return;
     Route::Packet packet; packet.type = Route::CancelInject; packet.mode = Route::Game; packet.sequence = ++m_inputSequence;
+    packet.reserved=uint32_t(qMax(0,m_inputSlot));
     if (::send(m_control, &packet, sizeof(packet), MSG_NOSIGNAL | MSG_DONTWAIT) != sizeof(packet)) fail(QStringLiteral("无法释放远程游戏输入。"));
 #endif
 }
@@ -266,7 +291,7 @@ void HandheldSession::requestPolicy() {
     if (!root) return;
     const qint64 game = m_applications->processId();
     const bool panel = game && root->property("quickOpen").toBool();
-    const bool volume = game && root->property("volumeVisible").toBool();
+    const bool volume = game && (root->property("volumeVisible").toBool()||root->property("taskHoldPercent").toInt()>0);
     const bool overlay = game && (root->property("panelVisible").toBool() || root->property("monitorVisible").toBool() || volume);
     const bool privacy = m_capturePhase != Permit && m_capturePhase != Reading;
     QJsonObject request{{"version", 1}};
@@ -277,10 +302,15 @@ void HandheldSession::requestPolicy() {
     else if (m_state.value("overlay").toBool() != overlay || m_state.value("volume").toBool() != volume) {
         request["op"] = "overlay"; request["active"] = overlay; request["volume"] = volume;
     }
+    else if(m_closePid) {
+        if(m_closePid!=game){m_closePid=0;emit notice(QStringLiteral("应用已切换，已取消关闭请求。"));requestPolicy();return;}
+        request["op"]="close";request["pid"]=m_closePid;
+    }
     else if (m_frameSampleDue && m_ready && m_capturePhase == Idle) { request["op"] = "observe"; m_frameSampleDue = false; }
     else {
         if (m_capturePhase == Permit) readCapture();
         if (m_capturePhase == Closing && !m_captureThread) finishCapture();
+        if (!game && m_thumbnailSurface && m_thumbnailFrameReady && !m_thumbnailThread) readThumbnail();
         selectInput(!game || panel);
         const bool ready = m_routerReady && m_inputRequested < 0;
         if (m_ready != ready) { m_ready = ready; emit changed(); }
@@ -300,6 +330,10 @@ void HandheldSession::readPolicy() {
     const auto response = document.object();
     m_pending = false; m_deadline.stop(); m_policy.abort();
     if (!document.isObject()) { fail(QStringLiteral("合成器响应无效。")); return; }
+    if(m_request.value("op")==QJsonValue("close")&&response.value("error")!=QJsonValue("stale_state")) {
+        m_closePid=0;
+        if(response.value("error")==QJsonValue("window_unavailable")){emit notice(QStringLiteral("应用还没有可关闭的窗口；可长按 Select＋Start 强制终止。"));requestPolicy();return;}
+    }
     if (response.value("error") == QJsonValue("stale_state") && ++m_retries <= 4) {
         // A new/removed surface changes the generation. Re-claim our own UI to refresh it.
         m_state = {}; requestPolicy(); return;
@@ -319,10 +353,49 @@ void HandheldSession::readPolicy() {
     requestPolicy();
 }
 
+void HandheldSession::showDesktop(bool tasks) {
+    ++m_thumbnailGeneration; m_thumbnailSurface = 0;
+    m_thumbnailSynced = false; m_thumbnailFrameReady = false;
+    if (m_applications->processId() > 1 && m_state.value("gamePid").toInteger() == m_applications->processId()) {
+        m_thumbnailId = m_applications->activeId(); m_thumbnailPid = m_applications->processId();
+        qint64 area = 0;
+        for (const auto &value : m_state.value("surfaces").toArray()) {
+            const auto view = value.toObject();
+            const auto size = view.value("width").toInteger() * view.value("height").toInteger();
+            if (view.value("role") == QJsonValue("game") && view.value("mapped").toBool() && size > area) {
+                area = size; m_thumbnailSurface = quint64(view.value("id").toInteger());
+            }
+        }
+    }
+    // The page and input handoff never wait for image readback. Until it arrives,
+    // cards use the existing icon/previous preview; only the app surface is read.
+    m_applications->background();
+    QMetaObject::invokeMethod(m_view->rootObject(),"showTasksOrDesktop",Q_ARG(QVariant,tasks));
+}
+void HandheldSession::readThumbnail() {
+#ifdef Q_OS_LINUX
+    const auto id = m_thumbnailId; const auto pid = m_thumbnailPid;
+    const auto surface = m_thumbnailSurface; const auto generation = m_thumbnailGeneration;
+    m_thumbnailSurface = 0;
+    m_thumbnailThread = QThread::create([this, id, pid, surface, generation] {
+        const auto result = captureTask(m_socketPath, m_compositorPid, pid, surface);
+        QMetaObject::invokeMethod(this, [this, id, pid, generation, result] {
+            m_thumbnailThread->wait(); delete m_thumbnailThread; m_thumbnailThread = nullptr;
+            if (!m_failed && generation == m_thumbnailGeneration && !m_applications->running() && result.error.isEmpty())
+                m_applications->setThumbnail(id, pid, result.image);
+            if (qEnvironmentVariable("R46H_SHELL_LOG") == "1") qInfo("TASK_PREVIEW status=%s image=%dx%d", qPrintable(result.error), result.image.width(), result.image.height());
+            requestPolicy();
+        }, Qt::QueuedConnection);
+    });
+    m_thumbnailThread->start();
+#endif
+}
 bool HandheldSession::requestCapture() {
     if (m_capturePhase != Idle || m_failed) return false;
     const auto *root = m_view->rootObject();
-    if (!m_ready || !root) { emit captureFinished({}, "window_unavailable"); return true; }
+    if (!root || !m_ready) {
+        emit captureFinished({}, "window_unavailable");return true;
+    }
     if (root->property("sensitiveVisible").toBool()) { emit captureFinished({}, "sensitive_entry"); return true; }
     m_captureEpoch = m_sceneEpoch; ++m_captureId;
     m_captureImage = {}; m_captureError.clear(); m_frameSynced = false;

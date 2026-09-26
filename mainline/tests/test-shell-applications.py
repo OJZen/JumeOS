@@ -65,7 +65,7 @@ def main():
             tap("favorite")
             assert latest["state"]["selectedFavorite"] and latest["state"]["selectedApplication"] == "app-7"
             saved = json.loads((state / "preview.json").read_text())
-            assert saved["version"] == 3 and saved["applicationFavorites"] == ["app-7"]
+            assert saved["version"] == 4 and saved["screenOffSeconds"] == 300 and saved["applicationFavorites"] == ["app-7"]
             if args.evidence: control.save_result(args.evidence, observe(True))
             assert tap("accept")["externalSession"]
             # The parent ignores controls while another application owns the session.

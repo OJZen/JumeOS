@@ -17,7 +17,7 @@ set_source_files_properties(controls/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE 
 qt_add_executable(r46h-shell main.cpp input.cpp input.h handheld.cpp handheld.h preferences.cpp preferences.h telemetry.cpp telemetry.h control.cpp control.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
 target_compile_definitions(r46h-shell PRIVATE JUME_LAUNCHER_NAME="Jume Launcher" JUME_LAUNCHER_VERSION="${JUME_LAUNCHER_VERSION}")
 qt_add_qml_module(r46h-shell URI R46H.Shell VERSION 1.0
-    QML_FILES ShellView.qml GameCard.qml SettingRow.qml SettingsView.qml PerformancePanel.qml ControlHints.qml StreamingView.qml ToolPage.qml PortCatalog.qml
+    QML_FILES ShellView.qml TaskView.qml GameCard.qml SettingRow.qml SettingsView.qml PerformancePanel.qml ControlHints.qml StreamingView.qml ToolPage.qml PortCatalog.qml
         controls/Theme.qml controls/PageHeader.qml controls/Motion.qml controls/Label.qml controls/Icon.qml controls/FocusFrame.qml
         controls/Button.qml controls/Switch.qml controls/ProgressBar.qml controls/ScrollBar.qml controls/TextField.qml controls/Slider.qml
         controls/ListView.qml controls/TableView.qml controls/Page.qml controls/NavigationBar.qml controls/ChoicePopup.qml

@@ -255,6 +255,7 @@ QJsonObject ControlServer::observe(bool screenshot) {
     for (const auto *name : {"sharedDisplay", "sharedReady", "keyboardReady", "gameOverlay", "panelVisible", "monitorVisible", "page", "selected", "settingsCategory", "settingsIndex", "settingsSidebar", "settingsAdjusting", "settingsDetailReady",
                             "remoteTextAllowed", "portCatalogTotal", "portCatalogOpen", "portCatalogIndex", "portCatalogSidebar", "toolRoute", "toolOpen", "toolBusy", "toolIndex", "toolRow", "toolDetailReady", "toolSaveError", "tabsFocused", "quickOpen", "quickIndex", "session", "sessionMoves", "testingController", "editing", "dimmed", "choicesOpen", "externalSession", "activeApplication", "applicationError", "applicationExitCode", "selectedApplication", "selectedFavorite", "streamingOpen", "streamingBusy", "sensitiveVisible", "testInputCapture", "testInputVisible"})
         state[QString::fromLatin1(name)] = QJsonValue::fromVariant(root->property(name));
+    for(const auto *name:{"tasksVisible","taskCount","taskPreviewCount"})state[name]=QJsonValue::fromVariant(root->property(name));
     state["monitor"] = m_preferences->monitor(); state["reducedMotion"] = m_preferences->reducedMotion();
     state["gameInputAvailable"] = m_handheld && m_handheld->gameInputAvailable();
     state["inputSequence"] = m_handheld ? qint64(m_handheld->inputSequence()) : 0;

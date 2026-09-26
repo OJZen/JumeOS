@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Unprivileged compositor session. Device supervision belongs to probe-r46h.sh.
 set -eu
 [ "$#" -ge 2 ] && [ "$#" -le 3 ] && { [ "$1" = headless ] || [ "$1" = drm ] || [ "$1" = seat ]; } || exit 2
@@ -24,12 +24,12 @@ if [ "$mode" = seat ]; then
     stat -c '%d:%i' /run/seatd.sock > "$base/seatd-socket-identity"
     if [ "$profile" = handheld ]; then
         [ -c /dev/uinput ] && [ ! -L /dev/uinput ] && [ "$(stat -c '%t:%T' /dev/uinput)" = a:df ]
-        # Delegate one open handle, never global device permissions. No parent copy
-        # may survive: uinput destroys the virtual device on its last close.
-        exec 7>/dev/uinput
+        # Delegate four independent handles, never global device permissions.
+        # Each task has one endpoint; only the router retains these descriptors.
+        exec 7>/dev/uinput 8>/dev/uinput 9>/dev/uinput 10>/dev/uinput
         /usr/bin/setpriv --reuid=ark --regid=ark --init-groups -- "$0" drm "$output" handheld &
         client=$!
-        exec 7>&-
+        exec 7>&- 8>&- 9>&- 10>&-
         wait "$client"
     else
         /usr/sbin/runuser -u ark -- "$0" drm "$output"
@@ -67,7 +67,9 @@ export WESTON_MODULE_MAP
 shell=desktop-shell.so
 if [ "$profile" = handheld ]; then
     [ -n "${R46H_ROUTED_SOURCE:-}" ] && [ -c "$R46H_ROUTED_SOURCE" ] && [ -r "$R46H_ROUTED_SOURCE" ]
-    [ -c /proc/self/fd/7 ] && [ "$(stat -Lc '%t:%T' /proc/self/fd/7)" = a:df ]
+    for fd in 7 8 9 10; do
+        [ -c /proc/self/fd/$fd ] && [ "$(stat -Lc '%t:%T' /proc/self/fd/$fd)" = a:df ]
+    done
     shell="$lib/weston/handheld-shell.so"
 fi
 cat > "$output/weston.ini" <<CONFIG
@@ -110,7 +112,7 @@ else
 fi
 "$base/usr/bin/weston" "$@" --shell="$shell" --config="$output/weston.ini" \
     --socket="$WAYLAND_DISPLAY" --idle-time=0 --log="$output/weston.log" \
-    > "$output/weston-stderr.log" 2>&1 7>&- &
+    > "$output/weston-stderr.log" 2>&1 7>&- 8>&- 9>&- 10>&- &
 pid=$!
 for attempt in $(seq 1 100); do
     [ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ] || break
@@ -121,7 +123,7 @@ done
 if [ "$profile" = handheld ]; then
     "$base/handheld-client.sh" ui "$output" > "$output/clients.log" 2>&1 &
     client=$!
-    exec 7>&-
+    exec 7>&- 8>&- 9>&- 10>&-
     wait "$client"
     client=''
 else

@@ -36,6 +36,12 @@ claim and from R46H input proof; the R16 receipt retains both results.
 
 ## Test ownership
 
+`shell-check backgroundTasksAndClose`, `gaming-wayland/test-input-policy.cpp`,
+`test-input-router.py` and `test-tasks.py` own the [task manager](../gaming-shell/APPLICATIONS.md):
+four-process lifecycle/input isolation, local thumbnails, physical synthetic Select
+shortcuts, cooperative window-close refusal/acceptance and forced cleanup. Real
+Wayland/evdev host fixtures do not establish R46H physical controls or memory stability.
+
 `gaming-files/build.sh` compiles ARM64 Files/Text, runs disposable file/editor/
 USB D-Bus and GUI fixtures, and checks the packaged runtime with real synthetic
 PCM. `shell-check filesEntriesAndPrivacy` owns launcher routing/capture privacy.

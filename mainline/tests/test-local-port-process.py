@@ -35,7 +35,7 @@ if len(sys.argv) > 1:
             yield {'program': sys.executable, 'arguments': [__file__, 'engine', mode, directory], 'directory': work}
         (state / 'cleaned').write_text('yes')
     port.prepared = prepared
-    os.environ.update(WAYLAND_DISPLAY='fixture', SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT='0x5246/0x0049')
+    os.environ.update(WAYLAND_DISPLAY='fixture', SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT='0x5246/0x004c' if mode=='shared' else '0x5246/0x0049')
     seconds = 5 if mode == 'shared-bound-slow' else 30
     sys.exit(port.run_game('gta3', Path('/content'), state, seconds, host_test=True, shared_display=mode != 'direct'))
 
@@ -48,6 +48,7 @@ with tempfile.TemporaryDirectory(prefix='r46h-port-process-', dir='/run') as dir
             end = time.monotonic() + 5
             while not (state / 'engine.json').exists() and time.monotonic() < end and worker.poll() is None:
                 time.sleep(.02)
+            assert (state / 'engine.json').exists(), worker.communicate(timeout=2)[0].decode()
             engine = json.loads((state / 'engine.json').read_text())
             assert (engine['group'] == worker.pid) == (mode != 'direct')
             if mode == 'shared-bound-slow':

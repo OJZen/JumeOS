@@ -10,6 +10,7 @@
 #include <QJsonArray>
 #include <QFile>
 #include <QSaveFile>
+#include "taskimages.h"
 #include <QFontDatabase>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -542,6 +543,56 @@ private slots:
         Preferences loaded(directory.path()); QVERIFY(loaded.isFavorite(2)); QVERIFY(loaded.applicationFavorites().contains("game-a"));
         QVERIFY(loaded.toggleApplicationFavorite("game-a")); QVERIFY(loaded.save());
         Preferences removed(directory.path()); QVERIFY(removed.applicationFavorites().isEmpty()); QVERIFY(removed.isFavorite(2));
+    }
+    void backgroundTasksAndClose() {
+        QTemporaryDir directory;Applications apps;
+        const auto env=QProcessEnvironment::systemEnvironment();
+        auto launch=[&](const QString &id){return apps.launchPrepared(id,"/bin/sleep",{"30"},directory.path(),env);};
+        QVERIFY(launch("builtin.files"));QTRY_VERIFY(apps.processId()>1);const auto first=apps.processId();
+        QImage image(640,480,QImage::Format_RGB32);image.fill(Qt::green);
+        apps.setThumbnail("builtin.files",first+1,image);QVERIFY(apps.thumbnail("builtin.files").isNull());
+        apps.setThumbnail("builtin.files",first,image);QCOMPARE(apps.thumbnail("builtin.files").size(),QSize(320,240));
+        apps.background();QVERIFY(!apps.running());QVERIFY(apps.hasTasks());
+        image.fill(Qt::blue);apps.setThumbnail("builtin.files",first,image);
+        QCOMPARE(apps.thumbnail("builtin.files").pixelColor(0,0),QColor(Qt::blue));
+        apps.setThumbnail("builtin.files",first+1,QImage());
+        QCOMPARE(apps.thumbnail("builtin.files").pixelColor(0,0),QColor(Qt::blue));
+        QVERIFY(launch("builtin.text"));QTRY_VERIFY(apps.processId()>1);QCOMPARE(apps.inputSlot(),1);
+        apps.background();QVERIFY(apps.activate("builtin.files"));QCOMPARE(apps.processId(),first);QCOMPARE(apps.inputSlot(),0);
+        QSignalSpy close(&apps,&Applications::closeRequested);apps.requestClose();QCOMPARE(close.size(),1);
+        QTest::qWait(150);QCOMPARE(apps.processId(),first);QVERIFY(::kill(pid_t(first),0)==0); // No TERM escalation on cooperative close.
+        QVERIFY(launch("native.gta3"));QTRY_VERIFY(apps.processId()>1);const auto game=apps.processId();apps.background();
+#ifdef Q_OS_LINUX
+        QFile status(QString("/proc/%1/status").arg(game));QVERIFY(status.open(QIODevice::ReadOnly));
+        QTRY_VERIFY(([&]{status.seek(0);return status.readAll().contains("State:\tT");})());
+#else
+        Q_UNUSED(game);
+#endif
+        QVERIFY(apps.activate("builtin.files"));
+        QVERIFY(launch("builtin.transfer"));QTRY_VERIFY(apps.processId()>1);
+        QVERIFY(!launch("fifth"));QCOMPARE(apps.tasks().size(),4);
+        apps.forceKill("builtin.text");QTRY_COMPARE(apps.tasks().size(),3);QCOMPARE(apps.activeId(),QString("builtin.transfer"));
+        Preferences state(directory.path());Telemetry metrics(directory.path());ControllerInput controller;QQuickView view;
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.engine()->addImageProvider("tasks",new TaskImages(&apps));
+        view.setInitialProperties({{"store",QVariant::fromValue(&state)},{"metrics",QVariant::fromValue(&metrics)},
+            {"controller",QVariant::fromValue(&controller)},{"applications",QVariant::fromValue(&apps)}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));QCOMPARE(view.status(),QQuickView::Ready);
+        apps.background();auto *root=view.rootObject();QVERIFY(QMetaObject::invokeMethod(root,"showTasksOrDesktop",Q_ARG(QVariant,true)));
+        view.resize(640,480);view.show();QVERIFY(QTest::qWaitForWindowExposed(&view));
+        QVERIFY(root->property("tasksVisible").toBool());QVERIFY(root->property("sensitiveVisible").toBool());
+        const auto captures=qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
+        if(!captures.isEmpty()){QTest::qWait(100);QVERIFY(view.grabWindow().save(captures+"/tasks.png"));}
+        auto action=[&](const QString &name){QVERIFY(QMetaObject::invokeMethod(root,"dispatch",Q_ARG(QVariant,name),Q_ARG(QVariant,false)));};
+        auto *tasks=root->findChild<QObject *>("taskView");QVERIFY(tasks);
+        action("down");QCOMPARE(tasks->property("selected").toInt(),1);
+        if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+"/tasks-selected.png"));
+        action("up");QCOMPARE(tasks->property("selected").toInt(),0);
+        action("favorite");auto *choice=root->findChild<QObject *>("taskKillChoice");QVERIFY(choice);QVERIFY(choice->property("visible").toBool());
+        action("accept");QVERIFY(!choice->property("visible").toBool());QCOMPARE(apps.tasks().size(),3); // Cancel is the default.
+        action("favorite");action("down");action("accept");QTRY_COMPARE(apps.tasks().size(),2);
+        QVERIFY(!apps.contains("builtin.files"));
+        apps.stopAll();QTRY_VERIFY_WITH_TIMEOUT(!apps.hasTasks(),4000);QVERIFY(apps.thumbnail("builtin.files").isNull());
     }
     void browserEntryAndPrivacy() {
         QTemporaryDir directory;

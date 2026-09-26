@@ -187,7 +187,7 @@ def prepared_stardew(content, state, mono, mono_compat):
 def run_game(game, content, state, seconds, mono=None, mono_compat=None, capture_tool=None, exercise=False, host_test=False, shared_display=False, engine=None):
     if host_test and (platform.machine() != 'aarch64' or not Path('/.dockerenv').exists()):
         raise ValueError('This command runs only inside the bounded AArch64 host-test container')
-    if shared_display and (not os.environ.get('WAYLAND_DISPLAY') or os.environ.get('SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT') != '0x5246/0x0049' or exercise):
+    if shared_display and (not os.environ.get('WAYLAND_DISPLAY') or os.environ.get('SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT') not in ('0x5246/0x0049','0x5246/0x004a','0x5246/0x004b','0x5246/0x004c') or exercise):
         raise ValueError('Shared ports require the routed controller and Wayland session; X11 input injection is unavailable')
     if not host_test:
         group = Path('/proc/self/cgroup').read_text()

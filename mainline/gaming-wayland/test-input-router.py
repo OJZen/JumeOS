@@ -69,6 +69,16 @@ def event_node(sysname):
     raise AssertionError('Synthetic input did not appear')
 
 
+def delegated_slots(path='/dev/uinput'):
+    handles=[os.open(path,os.O_WRONLY|os.O_CLOEXEC) for _ in range(4)]
+    assert handles==list(range(handles[0],handles[0]+4)),handles
+    return handles
+
+def routed_devices(slot=0):
+    return [p.parent for p in Path('/sys/devices/virtual/input').glob('input*/name')
+            if p.read_text().strip()=='R46H Routed Gamepad' and
+            (p.parent/'id/product').read_text().strip()==f'{0x49+slot:04x}']
+
 def drain(fd):
     events = []
     while True:
@@ -87,22 +97,22 @@ def receive(channel, kind, timeout=2):
             raw = channel.recv(512)
             assert len(raw) == PACKET.size, raw
             packet = PACKET.unpack(raw)
-            assert packet[0] == 2
+            assert packet[0] == 3
             if packet[1] == kind:
                 return packet
     raise AssertionError('Missing broker packet: ' + str(kind))
 
 
-def command(channel, sequence, mode):
-    channel.sendall(PACKET.pack(2, 1, sequence, mode, 0, 0, 0, 0, 0, 0, b'', 0))
+def command(channel, sequence, mode, slot=0):
+    channel.sendall(PACKET.pack(3, 1, sequence, mode, 0, 0, 0, 0, 0, 0, b'', slot))
 
 
-def inject(channel, sequence, keys, axes=(0, 0, 0, 0), milliseconds=100):
-    channel.sendall(PACKET.pack(2, 6, sequence, 1, milliseconds, keys, *axes, b'', 0))
+def inject(channel, sequence, keys, axes=(0, 0, 0, 0), milliseconds=100, slot=0):
+    channel.sendall(PACKET.pack(3, 6, sequence, 1, milliseconds, keys, *axes, b'', slot))
 
 
 def cancel(channel, sequence):
-    channel.sendall(PACKET.pack(2, 7, sequence, 1, 0, 0, 0, 0, 0, 0, b'', 0))
+    channel.sendall(PACKET.pack(3, 7, sequence, 1, 0, 0, 0, 0, 0, 0, b'', 0))
 
 
 def run(executable):
@@ -214,6 +224,28 @@ def run(executable):
         pad.emit((1, KEYS[0], 0)); time.sleep(.03)
         drain(sink)
         # Invalid ownership sequence fails closed; destruction releases the grab.
+        other_path=event_node(routed_devices(1)[0].name)
+        other=os.open(other_path,os.O_RDONLY|os.O_NONBLOCK)
+        try:
+            command(controller,22,1,1);ack=receive(controller,5);assert ack[-1]==1
+            pad.emit((1,KEYS[0],1));time.sleep(.03)
+            assert (1,KEYS[0],1) in drain(other) and not drain(sink)
+            pad.emit((1,KEYS[0],0));time.sleep(.03);drain(other)
+            command(controller,23,1);receive(controller,5)
+            pad.emit((1,KEYS[0],1));time.sleep(.03)
+            assert (1,KEYS[0],1) in drain(sink) and not drain(other)
+            pad.emit((1,KEYS[0],0));time.sleep(.03);drain(sink)
+        finally:
+            os.close(other);other_path.unlink()
+        for seq,key,kind,hold in ((24,3,10,0),(25,2,12,0),(26,9,11,.05),(27,9,13,2.1)):
+            pad.emit((1,KEYS[8],1),(1,KEYS[key],1))
+            if key==9:
+                time.sleep(hold)
+                if kind==11:pad.emit((1,KEYS[8],0),(1,KEYS[key],0))
+            assert receive(controller,kind)[1]==kind
+            assert not any(e[0]==1 and e[1] in (KEYS[8],KEYS[key]) and e[2]==1 for e in drain(sink))
+            pad.emit((1,KEYS[8],0),(1,KEYS[key],0));command(controller,seq,1);receive(controller,5);time.sleep(.03)
+        print('TASK_INPUT_PASS: isolated slots, Select shortcuts, short release and 2-second forced exit')
         command(controller, 3, 0)
         assert proc.wait(timeout=3) == 1
         pad.emit((1, KEYS[0], 1)); time.sleep(.03)

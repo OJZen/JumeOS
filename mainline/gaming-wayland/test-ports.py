@@ -67,7 +67,7 @@ with tempfile.TemporaryDirectory(prefix='r46h-ports-', dir='/run') as directory:
     try:
         wait_for(lambda: endpoint.exists() or shell.poll() is not None, 'Desktop did not start')
         assert shell.poll() is None; wait_for(ready, 'Desktop ownership not ready')
-        paths = [p.parent for p in Path('/sys/devices/virtual/input').glob('input*/name') if p.read_text().strip() == 'R46H Routed Gamepad']
+        paths = fixture.routed_devices()
         assert len(paths) == 1; routed = fixture.event_node(paths[0].name)
         session = observe()['session']; results = []
         for index, game in enumerate(('gta3', 'gtavc', 'stardew')):

@@ -24,6 +24,17 @@ Item {
     property bool filesAvailable: false
     signal filesRequested(bool editor)
     signal transferRequested()
+    signal backgroundRequested(bool tasks)
+    property bool tasksVisible: false
+    property int taskHoldPercent: 0
+    readonly property int taskCount: applications ? applications.tasks.length : 0
+    readonly property int taskPreviewCount: applications ? applications.tasks.filter(function(task){return !!task.preview}).length : 0
+    function closeSelectedTask() { if(tasksVisible && taskPage.item)taskPage.item.closeSelected() }
+    function showTasksOrDesktop(tasks) {
+        quickOpen=false;gameExitChoice.close();tasksVisible=tasks
+        if(!tasks) { if(editing)closeEditor();showScene("home") }
+        root.forceActiveFocus()
+    }
     readonly property bool gameOverlay: sharedDisplay && externalSession
     readonly property bool panelVisible: quickOpen || quickPanel.x < 1024
     readonly property bool monitorVisible: store.monitor
@@ -46,7 +57,7 @@ Item {
     readonly property bool remoteTextAllowed: editing && !quickOpen && !choicesOpen && !dimmed && !externalSession && (editPurpose === "portSearch" || testInputVisible)
     readonly property int portCatalogIndex: toolView.item ? toolView.item.catalogIndex : 0
     readonly property bool portCatalogSidebar: !toolView.item || toolView.item.catalogSidebar
-    readonly property bool sensitiveVisible: (externalSession && ["builtin.browser", "builtin.terminal", "builtin.files", "builtin.text", "builtin.transfer"].includes(activeApplication)) || (editing && !testInputVisible) || (streaming !== null && streaming.pin.length > 0)
+    readonly property bool sensitiveVisible: tasksVisible || (externalSession && ["builtin.browser", "builtin.terminal", "builtin.files", "builtin.text", "builtin.transfer"].includes(activeApplication)) || (editing && !testInputVisible) || (streaming !== null && streaming.pin.length > 0)
     property string editPurpose: "test"
     property string editLabel: "文字输入测试"
     readonly property bool externalSession: applications !== null && applications.running
@@ -54,7 +65,7 @@ Item {
     readonly property string activeApplication: applications ? applications.activeId : ""
     readonly property bool applicationError: applications !== null && applications.error.length > 0
     readonly property int applicationExitCode: applications ? applications.exitCode : 0
-    readonly property string selectedApplication: (applications || tools) && games[selected] ? games[selected].id : ""
+    readonly property string selectedApplication: (applications || tools) && games[selected] ? (games[selected].id || "") : ""
     readonly property bool selectedFavorite: games[selected] ? ((applications || tools) ? store.applicationFavorites.indexOf(games[selected].id) >= 0 : store.favorites.indexOf(selected) >= 0) : false
     property bool keyboardEnabled: false
     readonly property bool keyboardReady: virtualKeyboard.status === Loader.Ready
@@ -269,6 +280,7 @@ Item {
         notify(selected === 0 ? "串流演示 · 尚未连接电脑" : "交互演示 · 未启动模拟器")
     }
     function dispatch(action, repeated) {
+        if(tasksVisible && taskPage.item) { if (!activity()) taskPage.item.dispatch(action,repeated);return }
         if (repeated && ["accept", "back", "quick", "favorite", "home"].indexOf(action) >= 0) return
         if (externalSession && (!sharedDisplay || (!quickOpen && action !== "quick"))) return
         if (activity()) return
@@ -395,10 +407,28 @@ Item {
     Timer { interval: 60000; running: true; repeat: true; onTriggered: root.clockText = Qt.formatTime(new Date(), "hh:mm") }
     Timer { id: noticeTimer; interval: 2600; onTriggered: root.notice = "" }
     Timer { id: volumeTimer; interval: 1800; onTriggered: root.volumeVisible = false }
+    Shortcut { sequence: "Ctrl+Tab"; onActivated: root.backgroundRequested(true) }
+    Shortcut { sequence: "Meta+D"; onActivated: root.backgroundRequested(false) }
     Item {
         id: canvas
         width: 1024; height: 768; anchors.centerIn: parent
         scale: Math.min(root.width / width, root.height / height)
+        Loader {
+            id: taskPage; anchors.fill: parent; z: 100; active: root.tasksVisible
+            sourceComponent: TaskView {
+                applications: root.applications
+                onDismissed: root.tasksVisible=false
+                onActivated: function(id) { if(root.applications.activate(id))root.tasksVisible=false }
+                onCloseRequested: function(id) { root.tasksVisible=false;root.applications.requestClose(id) }
+            }
+        }
+        Rectangle {
+            z: 101;anchors.horizontalCenter: parent.horizontalCenter;y: Ui.Theme.padding
+            width: 224;height: Ui.Theme.fieldHeight;radius: height/2;color: Ui.Theme.surface
+            visible: root.taskHoldPercent>0
+            Ui.ProgressBar { anchors.fill: parent;anchors.margins: 12;value: root.taskHoldPercent/100 }
+            Ui.Label { anchors.centerIn: parent;role:"caption";text:"继续按住以强制终止" }
+        }
         Item {
             anchors.fill: parent; visible: !root.editing
             Item {

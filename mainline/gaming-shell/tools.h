@@ -52,9 +52,10 @@ public:
     static bool validSettings(const QVariantMap &settings);
     static QVariantMap scan(const QString &contentRoot, const QString &stateDirectory, const QString &kind, bool verify);
     static int worker(const QString &operation, const QString &id, const QString &contentRoot, const QString &stateDirectory);
-    static int runNative(const QString &stateDirectory, int timeoutSeconds, bool sharedDisplay = false);
+    static int runNative(const QString &stateDirectory, int timeoutSeconds, bool sharedDisplay = false, const QString &expectedGame = QString());
     static QByteArray neoConfiguration(const QVariantMap &settings, const QString &gameDirectory, bool sharedDisplay);
     void nativeFinished(const QString &game, int exitCode);
+    bool stageNativeRequest(const QString &game);
 signals:
     void changed();
     void notice(const QString &message);

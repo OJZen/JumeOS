@@ -7,7 +7,10 @@ renderer=${R46H_TEST_RENDERER:-pixman}
 dpkg -i /debs/*.deb /wayland-debs/libqt6waylandclient6_*.deb /wayland-debs/weston_*.deb > /out/desktop-setup.log 2>&1
 cmake -S /src -B /out/linux-build -DCMAKE_BUILD_TYPE=Release
 cmake --build /out/linux-build -j 3
-QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /out/linux-build/shell-check virtualControllerEvents virtualControllerHandover routedControllerEvents applicationManifestAndForegroundLifecycle streamingProfilesAndWorker streamingNavigation terminalEntryKeyboardMouseAndPrivacy browserEntryAndPrivacy filesEntriesAndPrivacy volumeHudAndAtomicUpdates
+gcc -fPIC -c /out/linux-build/capture-protocol.c -o /out/linux-build/task-capture-protocol.o $(pkg-config --cflags wayland-client)
+g++ -fPIC -std=gnu++17 -O2 -Wall -Wextra -Werror -pthread -I/out/linux-build /wayland/capture.cpp /wayland/test-capture-task.cpp /out/linux-build/task-capture-protocol.o -o /out/test-capture-task $(pkg-config --cflags --libs Qt6Gui wayland-client libdrm)
+timeout 15 /out/test-capture-task
+QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /out/linux-build/shell-check virtualControllerEvents virtualControllerHandover routedControllerEvents applicationManifestAndForegroundLifecycle backgroundTasksAndClose streamingProfilesAndWorker streamingNavigation terminalEntryKeyboardMouseAndPrivacy browserEntryAndPrivacy filesEntriesAndPrivacy volumeHudAndAtomicUpdates
 g++ -std=c++17 -Wall -Wextra -Werror -O2 /wayland/input-router.cpp -o /out/input-router
 g++ -shared -fPIC -std=gnu++17 -O2 -Wall -Wextra -Werror /wayland/handheld-shell.cpp -o /out/handheld-shell.so $(pkg-config --cflags --libs libweston-14 Qt6Core)
 g++ -fPIC -std=gnu++17 -O2 -Wall -Wextra -Werror /wayland/test-client.cpp -o /out/test-client $(pkg-config --cflags --libs Qt6Quick sdl2)
@@ -28,3 +31,10 @@ for attempt in $(seq 1 40); do
 done
 mknod /dev/uinput c 10 223
 timeout 70 python3 -B /wayland/test-desktop.py
+# The first test leaves Weston running; stop it before reusing the socket.
+kill "$weston_pid" 2>/dev/null || true
+wait "$weston_pid" || true
+EGL_PLATFORM=surfaceless weston --backend=headless --renderer="$renderer" --width=640 --height=480 --idle-time=0 --no-config --socket=$WAYLAND_DISPLAY --shell=/out/handheld-shell.so --log=/out/tasks-weston.log > /out/tasks-weston-stderr.log 2>&1 &
+weston_pid=$!
+for attempt in $(seq 1 40); do [[ ! -S $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY ]] || break;kill -0 "$weston_pid";sleep .1;done
+timeout 85 python3 -B /wayland/test-tasks.py

@@ -11,6 +11,10 @@
 #include <unistd.h>
 #include <cstring>
 #include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/stat.h>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 namespace {
 struct State {
@@ -132,5 +136,74 @@ OutputCapture captureOutput(int timeoutMs, qint64 expectedCompositor)
     if (state.display) wl_display_disconnect(state.display);
     if (pixels != MAP_FAILED) munmap(pixels, bytes);
     if (fd >= 0) close(fd);
+    return result;
+}
+
+OutputCapture captureTask(const QString &socketPath, qint64 compositor, qint64 pid, quint64 surface)
+{
+    OutputCapture result{{}, "capture_failed"};
+    const auto path = socketPath.toUtf8();
+    sockaddr_un address{}; address.sun_family = AF_UNIX;
+    if (path.size() >= int(sizeof(address.sun_path))) return result;
+    memcpy(address.sun_path, path.constData(), size_t(path.size() + 1));
+    const int connection = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    if (connection < 0) return result;
+    QElapsedTimer clock; clock.start();
+    timeval timeout{1, 200000};
+    setsockopt(connection, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    setsockopt(connection, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+    int imageFd = -1;
+    auto receiveBudget = [&] {
+        const auto remaining = 1200 - clock.elapsed();
+        if (remaining <= 0) return false;
+        timeval limit{time_t(remaining / 1000), suseconds_t((remaining % 1000) * 1000)};
+        return setsockopt(connection, SOL_SOCKET, SO_RCVTIMEO, &limit, sizeof(limit)) == 0;
+    };
+    do {
+        if (connect(connection, reinterpret_cast<sockaddr *>(&address), sizeof(address))) break;
+        ucred peer{}; socklen_t length = sizeof(peer);
+        if (getsockopt(connection, SOL_SOCKET, SO_PEERCRED, &peer, &length)
+            || peer.uid != geteuid() || peer.pid != compositor) break;
+        const auto request = QJsonDocument(QJsonObject{{"version", 1}, {"op", "thumbnail"},
+            {"pid", pid}, {"surface", qint64(surface)}}).toJson(QJsonDocument::Compact) + '\n';
+        if (send(connection, request.constData(), size_t(request.size()), MSG_NOSIGNAL) != request.size()) break;
+        char data[1024]{}; alignas(cmsghdr) char control[CMSG_SPACE(sizeof(int))]{};
+        iovec payload{data, sizeof(data)}; msghdr message{};
+        message.msg_iov = &payload; message.msg_iovlen = 1;
+        message.msg_control = control; message.msg_controllen = sizeof(control);
+        if (!receiveBudget()) break;
+        const auto size = recvmsg(connection, &message, MSG_CMSG_CLOEXEC);
+        int descriptors = 0;
+        for (auto *header = CMSG_FIRSTHDR(&message); header; header = CMSG_NXTHDR(&message, header))
+            if (header->cmsg_level == SOL_SOCKET && header->cmsg_type == SCM_RIGHTS && header->cmsg_len >= CMSG_LEN(0))
+                for (size_t offset = 0; offset + sizeof(int) <= header->cmsg_len - CMSG_LEN(0); offset += sizeof(int)) {
+                    int received; memcpy(&received, CMSG_DATA(header) + offset, sizeof(received));
+                    if (++descriptors == 1) imageFd = received; else close(received);
+                }
+        if (size < 1 || descriptors != 1 || message.msg_flags & (MSG_TRUNC | MSG_CTRUNC)) break;
+        QByteArray response(data, int(size));
+        while (!response.endsWith('\n') && response.size() < 1024) {
+            if (!receiveBudget()) break;
+            const auto extra = recv(connection, data, size_t(1024 - response.size()), 0);
+            if (extra < 1) break;
+            response.append(data, int(extra));
+        }
+        if (!response.endsWith('\n') || clock.elapsed() >= 1200) break;
+        const auto metadata = QJsonDocument::fromJson(response).object();
+        const int width = metadata.value("width").toInt(), height = metadata.value("height").toInt();
+        if (width < 1 || height < 1 || width > 4096 || height > 4096) break;
+        const qint64 bytes = qint64(width) * height * 4;
+        struct stat info{};
+        if (!metadata.value("ok").toBool() || bytes > 4 * 1024 * 1024
+            || fstat(imageFd, &info) || !S_ISREG(info.st_mode) || info.st_size != bytes) break;
+        void *pixels = mmap(nullptr, size_t(bytes), PROT_READ, MAP_PRIVATE, imageFd, 0);
+        if (pixels == MAP_FAILED) break;
+        result.image = QImage(static_cast<const uchar *>(pixels), width, height, width * 4,
+            QImage::Format_RGBA8888_Premultiplied).scaled(320, 240, Qt::KeepAspectRatio, Qt::SmoothTransformation).copy();
+        munmap(pixels, size_t(bytes));
+        if (!result.image.isNull()) result.error.clear();
+    } while (false);
+    if (imageFd >= 0) close(imageFd);
+    close(connection);
     return result;
 }

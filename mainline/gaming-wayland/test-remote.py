@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory(prefix='r46h-ssh-', dir='/run') as directory:
     shutil.copyfile(str(identity) + '.pub', base / 'remote-client.pub'); (base / 'remote-client.pub').chmod(0o644)
     state = base / 'state/session.SSHTest'; state.mkdir(parents=True, mode=0o700); os.chown(state, 1000, 1000)
     # Only the hardware seat and diagnostic app selection are replaced in this fixture.
-    (base / 'session.sh').write_text('#!/bin/bash\nset -Eeuo pipefail\n[[ $1 == seat && $3 == handheld ]]\nexec 7>/dev/uinput\nexec /usr/bin/setpriv --reuid=ark --regid=ark --init-groups -- "${0%/*}/session-real.sh" headless "$2" handheld\n')
+    (base / 'session.sh').write_text('#!/bin/bash\nset -Eeuo pipefail\n[[ $1 == seat && $3 == handheld ]]\nexec 7>/dev/uinput 8>/dev/uinput 9>/dev/uinput 10>/dev/uinput\nexec /usr/bin/setpriv --reuid=ark --regid=ark --init-groups -- "${0%/*}/session-real.sh" headless "$2" handheld\n')
     (base / 'session.sh').chmod(0o755)
     game_wrapper = state / 'game.sh'
     game_wrapper.write_text('#!/bin/sh\nexport LD_LIBRARY_PATH=' + str(base / 'usr/lib/aarch64-linux-gnu') + '\nexport QT_PLUGIN_PATH=' + str(base / 'usr/lib/aarch64-linux-gnu/qt6/plugins') + '\nexec ' + str(base / 'usr/bin/test-client') + ' game ' + str(state / 'game.json') + ' > ' + str(state / 'game.log') + ' 2>&1\n')
@@ -79,7 +79,7 @@ with tempfile.TemporaryDirectory(prefix='r46h-ssh-', dir='/run') as directory:
         wait_for(lambda: observe()['state']['sharedReady'], 'Shared SSH ownership not ready')
         private = observe(capture=True); assert private['capture']['status'] == 'sensitive_entry'
         observe('back'); observe('home'); session = observe()['session']
-        paths = [p.parent for p in Path('/sys/devices/virtual/input').glob('input*/name') if p.read_text().strip() == 'R46H Routed Gamepad']
+        paths = fixture.routed_devices()
         assert len(paths) == 1; routed = fixture.event_node(paths[0].name); os.chown(routed, 1000, 1000)
         binary = hashlib.sha256((base / 'usr/bin/r46h-shell').read_bytes()).hexdigest()
         with (out / 'transport-check.log').open('w') as check_log:

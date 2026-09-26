@@ -23,6 +23,7 @@ public:
     bool start(const QString &router, const QString &device, QString *error, int uinputFd = -1);
     bool ready() const { return m_ready; }
     bool requestCapture();
+    void showDesktop(bool tasks);
     quint64 inputSequence() const { return m_inputSequence; }
     bool gameInputAvailable() const;
     bool injectGame(quint32 keys, const qint32 axes[4], int milliseconds, quint64 expectedSequence, const QString &application);
@@ -34,6 +35,8 @@ signals:
     void captureFinished(const QImage &image, const QString &error);
     void gameInputFinished(const QString &status);
     void frameMetricsChanged();
+    void systemAction(const QString &action);
+    void notice(const QString &message);
 public slots:
     void synchronize();
     void sceneChanged();
@@ -47,6 +50,7 @@ private:
     void readCapture();
     void cancelCapture(const QString &error);
     void finishCapture();
+    void readThumbnail();
     void updateFrameSampling();
     void readFrameMetrics();
     void frameSampleFailed();
@@ -70,6 +74,14 @@ private:
     quint64 m_remoteSequence = 0;
     qint64 m_compositorPid = 0;
     int m_inputMode = -1, m_inputRequested = -1, m_retries = 0;
+    int m_inputSlot = -1, m_requestedSlot = -1;
+    qint64 m_closePid = 0, m_thumbnailPid = 0;
+    QString m_thumbnailId;
+    QString m_holdId;
+    qint64 m_holdPid = 0;
+    quint64 m_thumbnailSurface = 0, m_thumbnailGeneration = 0;
+    bool m_thumbnailSynced = false, m_thumbnailFrameReady = false;
+    QThread *m_thumbnailThread = nullptr;
     bool m_routerReady = false, m_ready = false, m_failed = false, m_pending = false;
     enum CapturePhase { Idle, Frame, Fence, Permit, Reading, Closing };
     CapturePhase m_capturePhase = Idle;

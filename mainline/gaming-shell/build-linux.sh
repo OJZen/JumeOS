@@ -36,7 +36,7 @@ cmake -S /src -B /out/linux-build -DCMAKE_BUILD_TYPE=Release
 cmake --build /out/linux-build -j 4
 mkdir -p /out/runtime
 chmod 700 /out/runtime
-QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software XDG_RUNTIME_DIR=/out/runtime /out/linux-build/shell-check
+TMPDIR=/tmp QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software XDG_RUNTIME_DIR=/out/runtime /out/linux-build/shell-check
 /out/linux-build/network-check
 /out/linux-build/tools-check
 (

@@ -40,15 +40,15 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
     apps.write_text(json.dumps({'version': 1, 'applications': [{'id': 'test.game', 'title': '合成手柄测试', 'program': str(wrapper), 'arguments': []}]}))
     pad = fixture.Pad(); routed = None; stream_compositor = None
     logfile = (out / 'shell.log').open('w')
-    delegated = os.open('/dev/uinput', os.O_WRONLY | os.O_CLOEXEC)
+    handles=fixture.delegated_slots();delegated=handles[0]
     # Remove only our container-created path: even root cannot silently fall back to opening it.
     os.rename('/dev/uinput', '/dev/uinput.hidden')
     try:
         shell = subprocess.Popen(['/out/linux-build/r46h-shell', '--state-dir', str(state / 'settings'), '--control-dir', str(state / 'control'),
             '--applications', str(apps), '--scene', 'input', '--handheld-router', '/out/input-router', '--input-device', str(pad.path),
-            '--uinput-fd=' + str(delegated), '--fullscreen', '--quit-after', '90'], pass_fds=(delegated,), stdout=logfile, stderr=subprocess.STDOUT)
+            '--uinput-fd=' + str(delegated), '--fullscreen', '--quit-after', '90'], pass_fds=handles, stdout=logfile, stderr=subprocess.STDOUT)
     finally:
-        os.close(delegated)
+        for fd in handles:os.close(fd)
     endpoint = state / 'control/control.sock'
 
     def observe(capture=False, action=None):
@@ -129,7 +129,7 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
         (out / 'after-private-composed.png').write_bytes(base64.b64decode(response['capture']['png_base64']))
         observe(action='home')
         # No udev daemon in this container: create only our new broker's event node.
-        paths = [p.parent for p in Path('/sys/devices/virtual/input').glob('input*/name') if p.read_text().strip() == 'R46H Routed Gamepad']
+        paths = fixture.routed_devices()
         assert len(paths) == 1
         routed = fixture.event_node(paths[0].name)
         response = observe(True); assert response['capture']['status'] == 'ok', response['capture']
@@ -197,6 +197,13 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
         print('REMOTE_GAME_INPUT_PASS: actual RPC/CLI to SDL, automatic release, stale/wrong-game refusal, physical priority and disconnect cancellation')
         # Exercise the actual inherited SDL mapping, not a test-only added mapping.
         for raw, mapped in [(0, 1), (1, 0), (2, 2), (3, 3), (8, 4), (9, 6), (10, 11), (11, 12), (12, 13), (13, 14), (14, 7), (15, 8)]:
+            if raw==8:
+                before=game()['presses'][mapped]
+                pad.emit((1,fixture.KEYS[raw],1));time.sleep(.05)
+                assert game()['buttons'][mapped]==0,'Select modifier leaked before release'
+                pad.emit((1,fixture.KEYS[raw],0))
+                wait_for(lambda:game()['presses'][mapped]==before+1,'Standalone Select edge missing')
+                continue
             pad.emit((1, fixture.KEYS[raw], 1))
             wait_for(lambda: game()['buttons'][mapped] == 1, 'Missing SDL button ' + str(raw))
             pad.emit((1, fixture.KEYS[raw], 0))
@@ -295,8 +302,10 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
         observe(action='nextTab'); observe(action='nextTab')
         category = observe()['state']['settingsCategory']
         for _ in range(abs(8 - category)): observe(action='down' if category < 8 else 'up')
-        observe(action='accept'); observe(action='down')
-        assert observe()['state']['settingsCategory'] == 8 and observe()['state']['settingsIndex'] == 1
+        observe(action='accept')
+        wait_for(lambda:observe()['state']['settingsDetailReady'],'Async settings detail did not load')
+        observe(action='down')
+        assert observe()['state']['settingsCategory'] == 8 and observe()['state']['settingsIndex'] == 1,observe()['state']
         time.sleep(.15); wait_for(ready, 'Settings not ready for privacy race')
         compositor = int(os.environ['R46H_TEST_WESTON_PID'])
         assert b'--shell=/out/handheld-shell.so' in Path(f'/proc/{compositor}/cmdline').read_bytes()
@@ -374,17 +383,18 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
             '--idle-time=0', '--no-config', '--socket=r46h-stream-test', '--shell=/out/handheld-shell.so',
             '--log=/out/desktop-stream-weston.log'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         wait_for(lambda: (runtime / 'r46h-stream-test').exists(), 'Streaming compositor did not start')
-        delegated = os.open('/dev/uinput.hidden', os.O_WRONLY | os.O_CLOEXEC)
+        handles=fixture.delegated_slots('/dev/uinput.hidden');delegated=handles[0]
         try:
             shell = subprocess.Popen(['/out/linux-build/r46h-shell', '--state-dir', str(state / 'settings'), '--control-dir', str(state / 'control'),
                 '--scene', 'home', '--handheld-router', '/out/input-router', '--input-device', str(pad.path), '--uinput-fd', str(delegated),
                 '--moonlight-client', str(fake), '--moonlight-sha256', hashlib.sha256(fake.read_bytes()).hexdigest(),
-                '--fullscreen', '--quit-after', '90'], pass_fds=(delegated,), stdout=logfile, stderr=subprocess.STDOUT)
-        finally: os.close(delegated)
+                '--fullscreen', '--quit-after', '90'], pass_fds=handles, stdout=logfile, stderr=subprocess.STDOUT)
+        finally:
+            for fd in handles:os.close(fd)
         wait_for(lambda: endpoint.exists() or shell.poll() is not None, 'Shared streaming UI did not start')
         assert shell.poll() is None, (out / 'shell.log').read_text()
         wait_for(ready, 'Shared streaming UI did not become ready')
-        paths = [p.parent for p in Path('/sys/devices/virtual/input').glob('input*/name') if p.read_text().strip() == 'R46H Routed Gamepad']
+        paths = fixture.routed_devices()
         assert len(paths) == 1; routed = fixture.event_node(paths[0].name)
         initial = observe(); assert initial['state']['selectedApplication'] == 'builtin.moonlight'
         observe(action='accept'); assert observe()['state']['streamingOpen'], 'Foreground owner hid the built-in tool cards'

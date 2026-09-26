@@ -33,6 +33,8 @@ template<size_t N> static bool bit(const unsigned char (&bits)[N], unsigned key)
 
 struct Router {
     int source = -1, output = -1, control;
+    std::array<int,Slots> outputs{{-1,-1,-1,-1}};
+    uint32_t slot = 0, holdProgress = 0;
     bool grabbed = false, created = false, syncing = false;
     input_absinfo calibration[4]{};
     Sample input, center, game, ui;
@@ -43,14 +45,15 @@ struct Router {
     Sample remote;
     explicit Router(int fd, int chordMs) : control(fd), policy(chordMs) {}
     ~Router() {
-        if (created) { try { writeGame(center); } catch (...) {} ioctl(output, UI_DEV_DESTROY); }
+        if (created) { try { writeGame(center); } catch (...) {} }
         if (grabbed) ioctl(source, EVIOCGRAB, 0);
-        if (output >= 0) close(output);
+        for(int fd:outputs)if(fd>=0){ioctl(fd,UI_DEV_DESTROY);close(fd);}
         if (source >= 0) close(source);
     }
     void sendPacket(Packet packet) {
         if (packet.type != InjectDone && packet.type != InjectDenied) packet.sequence = commandSequence;
         packet.mode = policy.mode;
+        packet.reserved = slot;
         packet.flags |= (policy.waiting ? WaitingNeutral : 0U) | (policy.ownerPending ? WaitingOwner : 0U);
         ssize_t n;
         do { n = send(control, &packet, sizeof(packet), MSG_NOSIGNAL | MSG_DONTWAIT); } while (n < 0 && errno == EINTR);
@@ -112,9 +115,12 @@ struct Router {
         policy.update(input, neutral(), nowMs(), [&](const Sample &sample) {
             if (policy.mode == Game) writeGame(remoteUntil ? remote : sample);
             else if (sample != ui) { ui = sample; sendPacket(uiPacket(sample)); }
-        }, [&] {
-            neutralize(); Packet packet; packet.type = Panel; sendPacket(packet);
+        }, [&](uint32_t action) {
+            endRemote(true);neutralize(); Packet packet; packet.type = action; sendPacket(packet);
         });
+        const uint32_t progress=policy.shortcut==Start&&!policy.shortcutSpent&&policy.selecting
+            ? uint32_t(std::clamp<int64_t>((nowMs()-policy.heldAt)/20,1,100)):0;
+        if(progress!=holdProgress){holdProgress=progress;Packet packet;packet.type=Hold;packet.keys=progress;sendPacket(packet);}
     }
     void endRemote(bool cancelled) {
         if (!remoteUntil) return;
@@ -142,7 +148,9 @@ struct Router {
             require(a.maximum > a.minimum && a.flat >= 0 && int64_t(a.flat) * 2 < int64_t(a.maximum) - a.minimum, "invalid axis calibration");
             center.axes[i] = int32_t((int64_t(a.minimum) + a.maximum) / 2);
         }
-        output = inheritedOutput >= 0 ? inheritedOutput : open("/dev/uinput", O_WRONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW);
+        for(uint32_t index=0;index<Slots;++index) {
+        output = inheritedOutput >= 0 ? inheritedOutput+int(index) : open("/dev/uinput", O_WRONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW);
+        outputs[index]=output;
         require(output >= 0, "cannot open uinput");
         struct stat device{};
         const int flags = fcntl(output, F_GETFL);
@@ -157,9 +165,11 @@ struct Router {
             uinput_abs_setup axis{}; axis.code = Axes[i]; axis.absinfo = calibration[i]; axis.absinfo.value = center.axes[i];
             require(ioctl(output, UI_ABS_SETUP, &axis) == 0, "cannot copy axis calibration");
         }
-        uinput_setup setup{}; setup.id = {BUS_VIRTUAL, 0x5246, 0x0049, 1};
+        uinput_setup setup{}; setup.id = {BUS_VIRTUAL, 0x5246, uint16_t(0x0049+index), 1};
         std::strcpy(setup.name, "R46H Routed Gamepad");
         require(ioctl(output, UI_DEV_SETUP, &setup) == 0 && ioctl(output, UI_DEV_CREATE) == 0, "cannot create routed gamepad");
+        }
+        output=outputs[0];
         created = true; game = ui = center;
         require(ioctl(source, EVIOCGRAB, 1) == 0, "combined controller is already grabbed"); grabbed = true;
         readState();
@@ -173,9 +183,10 @@ struct Router {
         if (n < 0 && (errno == EINTR || errno == EAGAIN)) return;
         require(n == sizeof(packet), "invalid or disconnected control channel");
         require(packet.version == Version && (packet.type == Mode || packet.type == Inject || packet.type == CancelInject)
-            && packet.mode <= Game && packet.sequence == commandSequence + 1
+            && packet.mode <= Game && packet.reserved<Slots && packet.sequence == commandSequence + 1
             && commandSequence < UINT64_MAX, "invalid or stale input ownership command");
         Packet expected; expected.type = packet.type; expected.mode = packet.mode; expected.sequence = packet.sequence;
+        expected.reserved=packet.reserved;
         if (packet.type == Inject) { expected.keys = packet.keys; expected.flags = packet.flags; std::copy(std::begin(packet.axes), std::end(packet.axes), expected.axes); }
         require(!std::memcmp(&expected, &packet, sizeof(packet)), "unexpected control payload");
         ++commandSequence;
@@ -183,7 +194,7 @@ struct Router {
         if (packet.type == Inject) {
             readState();
             bool valid = packet.mode == Game && policy.mode == Game && !policy.waiting && !policy.ownerPending && !syncing && !remoteUntil && neutral()
-                && packet.flags >= 10 && packet.flags <= 1000 && !(packet.keys & ~0xffffU) && (packet.keys & Chord) != Chord;
+                && packet.reserved==slot && packet.flags >= 10 && packet.flags <= 1000 && !(packet.keys & ~0xffffU) && !systemChord(packet.keys);
             for (auto axis : packet.axes) valid &= axis >= -32767 && axis <= 32767;
             if (!valid) { Packet denied; denied.type = InjectDenied; denied.sequence = commandSequence; sendPacket(denied); return; }
             remote = center; remote.keys = packet.keys;
@@ -194,7 +205,7 @@ struct Router {
             remoteSequence = commandSequence; remoteUntil = nowMs() + packet.flags;
             writeGame(remote); return;
         }
-        endRemote(true); policy.setMode(packet.mode); neutralize();
+        endRemote(true);neutralize();slot=packet.reserved;output=outputs[slot];game=center;policy.setMode(packet.mode);neutralize();
         // Discard the previous owner's backlog before reading current held controls.
         input_event old{};
         bool drained = false;
