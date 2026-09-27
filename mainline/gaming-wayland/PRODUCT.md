@@ -1,14 +1,17 @@
 # Jume default-desktop candidate
 
-Status: **ARM64 host + supervised installed-session device trial passed; default promotion open**.
-This is the first Q1 step, not permission to remove ES-DE. The clean-source
-candidate is from `0ca4f27`, under `mainline/out/.cache/jume-product-arm64-20260927-r6/`.
+Status: **r7 corrected package HOST PASS; r6 supervised device trial PASS; default promotion open**.
+This is the first Q1 step, not permission to remove ES-DE. The current clean-source
+candidate is from `d481cb2`, under `mainline/out/.cache/jume-product-arm64-20260927-r7/`.
 Its `receipt.json` records source, archive and evidence hashes; all were rechecked.
 Qt checks (10 tools + 13 shell), desktop/tasks, PortMaster, packaged session/power
-exits and full installer seal passed. Fresh-container SSH passed twice with the
-same final ELF. macOS/Linux installation and memory-policy contracts pass too.
-Host checks alone do not prove installed systemd, DRM/seatd or cold boot. Build record:
-`mainline/out/.cache/jume-product-20260927.md`.
+exits and full installer seal passed. Fresh-container SSH passed with the final
+ELF. The corrected installer passes macOS and ARM64 Linux/Python contract checks.
+All 2,954 archive members were compared with r6: only installer, manifest and
+Launcher differ. Every Launcher ELF byte matches except a Qt-generated resource
+timestamp and its GNU build-id; the other binaries are identical. This explains
+the delta, not byte-reproducibility or r7 device acceptance. Build record:
+`mainline/out/.cache/jume-product-arm64-20260927-r7/session.md`.
 This artifact includes Files/Terminal/native ports, not Browser or Moonlight.
 The builder verifies the complete payload with the installer's seal checks.
 Remote tests use an anonymous Linux disk volume, removed with the container:
@@ -24,8 +27,8 @@ on v0.18. First startup exposed systemd 257 rejecting `reset-failed` for a fresh
 unloaded unit. The installer now queries ActiveState and resets only failed units;
 inactive, failed and query-error recovery paths have focused host coverage.
 On-device execution used a separately hash-verified corrected installer, leaving
-the sealed payload untouched. **Rebuild the sealed package before the next trial;
-the retained r6 installer's first-start bug is not fixed inside that artifact.**
+the sealed payload untouched. The corrected r7 package is now host-verified;
+the retained r6 installer's first-start bug is not fixed inside that artifact.
 
 Launcher (with Files active), Weston and seatd were killed separately. Each
 cleaned old children/leases and produced a new IPC generation and composed Home
@@ -111,9 +114,11 @@ python3 /var/lib/jume-launcher/current/product-install.py --rollback
 
 ## Next combined target gate
 
-1. Rebuild/verify the corrected installer package before another trial. Optional Browser pairing needs
-   the current guarded wrapper and a newly verified complete manifest; do not
-   copy the old unguarded browser wrapper into an installed release.
+1. Implement/test inactive release selection before deploying r7: current
+   `--install` deliberately refuses another selected release, and `--rollback`
+   retains r6's selection. Do not bypass this by manually changing `current`.
+   Preserve both releases/user state and prove interruption/rollback handling.
+   Optional Browser pairing needs its guarded wrapper and a new complete seal.
 2. Supervised trial: ready Home, settings/saves, input ownership, representative
    native/browser launches and rollback. Test beyond the old 120/290/360-second
    bounds and separately beyond the former two-hour CPU-helper limit.

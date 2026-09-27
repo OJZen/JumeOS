@@ -11,7 +11,7 @@ desktop, local gaming, streaming, and USB HID input. The
 
 ## Current baseline
 
-The device is **safely powered off after the 2026-09-27 [installed Jume trial](../mainline/gaming-wayland/PRODUCT.md#installed-trial--2026-09-27)**: separate Launcher/Weston/seatd recovery, native lifetime and ES-DE rollback passed on unchanged p2 v0.18. Inactive release/private backup retained; temporary services/staging/keys removed. The first-start fix needs a rebuilt sealed package. Prior browser/Files/PortMaster evidence: `mainline/out/.cache/r46h-unattended-20260927.cA9xEV/session.md`.
+The device is **safely powered off after the 2026-09-27 [installed Jume trial](../mainline/gaming-wayland/PRODUCT.md#installed-trial--2026-09-27)**: separate Launcher/Weston/seatd recovery, native lifetime and ES-DE rollback passed on unchanged p2 v0.18. Inactive r6/private backup retained; temporary services/staging/keys removed. Corrected r7 is host-built/verified, not deployed; Docker is stopped. Prior browser/Files/PortMaster evidence: `mainline/out/.cache/r46h-unattended-20260927.cA9xEV/session.md`.
 Fixed-profile readback, cold identity, service health, policy/package hashes, permission scope and base smoke pass.
 R79 passed archive/1,741-file readback, preflight, transient Launcher/game lifecycle and forced-child recovery; ES-DE remains default.
 R74 is the accepted GTA candidate after attended picture/audio/control approval; R63/R60 remain rollbacks.
@@ -125,7 +125,7 @@ Exact observations remain in the [ledger](../mainline/board/r46h/EXPERIMENT-STAT
 3. Keep R45 direct Stardew as fallback. Revisit the shared-Wayland stall only
    with a new source-level hypothesis; the unchanged R78/R79 Mono/Mesa path has
    already failed before window creation at two clock profiles.
-4. Rebuild the [default-desktop candidate](../mainline/gaming-wayland/PRODUCT.md) with its tested first-start fix. Installed individual-fault recovery and >360-second desktop/>120-second native lifetime pass; crash-loop exhaustion, two-hour endurance, GUI power and cold default boot remain open.
+4. Add/test safe inactive release selection for the [r7 candidate](../mainline/gaming-wayland/PRODUCT.md) before deployment; existing `--install` refuses the retained r6 selection. r7 full host build/SSH/installer checks pass; r6 individual-fault recovery and >360-second desktop/>120-second native lifetime pass. Crash-loop exhaustion, two-hour endurance, GUI power and cold default boot remain open.
    ES-DE stays the recovery frontend; ROM-entry coverage, save retention and a genuine upgrade/rollback cycle precede removal.
 5. Profile R74's below-30-FPS open-world phase only when a new software hypothesis
    exists. Keep R63/R60 available; do not repeat SGSR1 or a live GPU minimum-frequency

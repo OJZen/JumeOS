@@ -62,7 +62,7 @@ broader LCD/USB coverage, Moonlight and PSP remain open.
   09-27 installed trial recovered separately from Launcher/Weston/seatd loss, clearing old children/leases.
   Same desktop survived 460 seconds; GTA III survived 273 seconds with a fresh intro frame, then requested exit.
   Explicit ES-DE rollback and unchanged sealed payload passed; no failed units or kernel errors.
-  First-start installer fix needs a rebuilt package; cold default, two-hour endurance and save/load remain open.
+  r7 is host-built, not deployed; release switching, cold default, two-hour endurance and save/load remain open.
   [Installed trial](../../gaming-wayland/PRODUCT.md#installed-trial--2026-09-27) owns evidence and remaining gates.
 - **[Jume Browser](../../gaming-browser/README.md) — TARGET GPU/SANDBOX PASS / HEAVY-SITE OOM + SECURITY OPEN.**
   Offline input/IME/tabs/About, WebGL 2, sandbox and lifecycle/privacy pass; mi.com policy/OOM failures remain.
