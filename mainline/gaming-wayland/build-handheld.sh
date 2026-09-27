@@ -39,6 +39,7 @@ mkdir -p "$output/share/fonts/truetype/droid" "$output/qt-wayland"
 cp "$cache/r46h-compositor-20260910/share/fonts/truetype/droid/DroidSansFallbackFull.ttf" "$output/share/fonts/truetype/droid/"
 cp -R "$cache/r46h-compositor-20260910/qt-wayland/." "$output/qt-wayland/"
 # Full payload needs disk space and real Linux UIDs; --rm removes this anonymous volume.
+check_container() {
 docker run --rm --init --network none --memory 1536m --cpus 3 --pids-limit 256 --cap-add SYS_PTRACE \
   --tmpfs /run:rw,nosuid,nodev,exec,size=192m,mode=755 \
   --entrypoint /bin/bash --device-cgroup-rule 'c 10:223 rwm' --device-cgroup-rule 'c 13:* rwm' \
@@ -57,13 +58,16 @@ docker run --rm --init --network none --memory 1536m --cpus 3 --pids-limit 256 -
   -v "$peripherals:/peripheral-debs:ro" \
   ${client_bindings[@]+"${client_bindings[@]}"} \
   ${files_bindings[@]+"${files_bindings[@]}"} \
-  "$image" -c 'set -Eeuo pipefail
+  "$image" -c "$1" -- "$commit"
+}
+check_container 'set -Eeuo pipefail
     timeout 240 bash /wayland/check-desktop.sh > /out/desktop-check.log 2>&1
     rm /dev/uinput
-    timeout 120 bash /wayland/check-session.sh "$1" > /out/session-check.log 2>&1
-    rm /dev/uinput
+    timeout 120 bash /wayland/check-session.sh "$1" > /out/session-check.log 2>&1'
+# Do not carry build/previous input-fixture processes or memory charges into SSH tests.
+check_container 'set -Eeuo pipefail
     ln -s /out/r46h-handheld-desktop-arm64.tar.gz /candidate.tar.gz
-    timeout 170 bash /wayland/check-remote.sh > /out/remote-check.log 2>&1' -- "$commit"
+    timeout 170 bash /wayland/check-remote.sh > /out/remote-check.log 2>&1'
 [[ -z $(git -C "$repo" status --porcelain) && $(git -C "$repo" rev-parse HEAD) == "$commit" ]]
 git -C "$repo" archive --format=tar.gz --output="$output/r46h-source.tar.gz" "$commit" AGENTS.md docs mainline
 python3 -B - "$output" "$image" <<'PY'

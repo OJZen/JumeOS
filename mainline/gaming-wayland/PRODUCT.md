@@ -14,6 +14,8 @@ The builder verifies the complete payload with the installer's seal checks.
 Remote tests use an anonymous Linux disk volume, removed with the container:
 the payload exceeds the 192 MiB `/run` tmpfs, and macOS binds do not retain test UIDs.
 Build caches, final artifacts and evidence stay on the external workspace.
+Compilation/session and SSH checks run in separate, equally memory-limited
+containers; previous input fixtures and build memory do not carry into SSH tests.
 
 ## Ownership and recovery
 
