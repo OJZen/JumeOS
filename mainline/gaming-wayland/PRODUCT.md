@@ -1,6 +1,6 @@
 # Jume default-desktop candidate
 
-Status: **r7 corrected package HOST PASS; r6 supervised device trial PASS; default promotion open**.
+Status: **inactive selection source HOST PASS; r7 package HOST PASS; default promotion open**.
 This is the first Q1 step, not permission to remove ES-DE. The current clean-source
 candidate is from `d481cb2`, under `mainline/out/.cache/jume-product-arm64-20260927-r7/`.
 Its `receipt.json` records source, archive and evidence hashes; all were rechecked.
@@ -109,15 +109,42 @@ python3 /var/lib/jume-launcher/current/product-install.py --rollback
   leaves the old frontend selected on reboot.
 - Rollback removes the marker, stops/cleans Jume, disables its autostart and
   starts ES-DE. It never deletes a runtime, preference or save.
-- First installation only: switching an existing selection to a different
-  release is refused. Genuine version-to-version upgrade/rollback remains open.
+- Install is first-install only; it never replaces a different selection.
+
+## Inactive version selection
+
+Source now supports `--select FROM TO`. r6/r7's bundled installers do not;
+build a new sealed package before deploying this command. Stage and `sync` the
+complete successor first. Invoke its reviewed installer by the fixed release
+path, including when switching back (the older installer lacks this command):
+
+```sh
+python3 /var/lib/jume-launcher/releases/NEW/product-install.py --rollback
+python3 /var/lib/jume-launcher/releases/NEW/product-install.py --select OLD NEW
+python3 /var/lib/jume-launcher/current/product-install.py --trial
+# Return to the prior release after stopping the new trial:
+python3 /var/lib/jume-launcher/releases/NEW/product-install.py --rollback
+python3 /var/lib/jume-launcher/releases/NEW/product-install.py --select NEW OLD
+```
+
+Replace OLD/NEW with the respective manifest hashes. Selection requires Jume
+inactive and disabled, ES-DE active/enabled, no default/trial marker and no
+session/lease/cleanup receipts. Both complete seals, identical service definitions
+and unchanged sealed installed integration are required. Only `current` is
+atomically replaced and its parent synced; services, releases and user state
+are untouched. Service/schema migrations and online updates are not supported.
+After an interruption, retry the same FROM/TO: either complete release remains
+selected. A matching owned pending link can be reused; foreign pending paths
+are retained and refused, never deleted. Inspect identity before retrying.
+Host fixtures cover both interruption sides, reverse selection, refusal gates
+and unchanged save/service bytes. Actual power-loss and version cycling need
+R46H evidence; host filesystem mocks do not close those gates.
 
 ## Next combined target gate
 
-1. Implement/test inactive release selection before deploying r7: current
-   `--install` deliberately refuses another selected release, and `--rollback`
-   retains r6's selection. Do not bypass this by manually changing `current`.
-   Preserve both releases/user state and prove interruption/rollback handling.
+1. Build the selection-capable successor, then prove inactive r6/new selection,
+   trial and reverse selection on target. Do not manually change `current`.
+   Preserve both releases/user state and prove interrupted-cleanup handling.
    Optional Browser pairing needs its guarded wrapper and a new complete seal.
 2. Supervised trial: ready Home, settings/saves, input ownership, representative
    native/browser launches and rollback. Test beyond the old 120/290/360-second

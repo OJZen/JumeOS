@@ -101,11 +101,22 @@ def systemctl(*args):
     return subprocess.run(['systemctl', *args], check=True, timeout=150)
 
 
+def unit_value(name):
+    return subprocess.check_output(['systemctl', 'show', '--value', '--property=' + name,
+                                    'jume-launcher.service'], text=True, timeout=150).strip()
+
+
+def clean_runtime():
+    for name in ('/run/r46h-wayland-probe', '/run/r46h-device-lease', '/run/r46h-cpu-control',
+                 '/run/r46h-port-runtime', '/run/seatd.sock', '/run/jume-launcher/mount-id',
+                 '/run/jume-launcher/scope-created', '/run/jume-launcher/seatd-socket-identity',
+                 '/run/jume-launcher/session'):
+        require(not os.path.lexists(name), f'Cleanup incomplete; refusing transition: {name}')
+
+
 def stopped_cleanly():
     systemctl('stop', 'jume-launcher.service')
-    for name in ('/run/r46h-wayland-probe', '/run/r46h-device-lease', '/run/r46h-cpu-control',
-                 '/run/r46h-port-runtime', '/run/seatd.sock'):
-        require(not os.path.lexists(name), f'Cleanup incomplete; ES-DE remains stopped: {name}')
+    clean_runtime()
 
 
 def target():
@@ -119,10 +130,10 @@ def target():
 
 
 def main(argv):
-    require(len(argv) in (1, 2), 'Use --verify HASH, --install HASH, --trial, --enable or --rollback')
+    require(len(argv) in (1, 2, 3), 'Use --verify HASH, --install HASH, --select FROM TO, --trial, --enable or --rollback')
     action = argv[0]
-    require(action in ('--verify', '--install', '--trial', '--enable', '--rollback'), 'Unknown action')
-    require(len(argv) == (2 if action in ('--verify', '--install') else 1), 'Wrong arguments')
+    require(action in ('--verify', '--install', '--select', '--trial', '--enable', '--rollback'), 'Unknown action')
+    require(len(argv) == (3 if action == '--select' else 2 if action in ('--verify', '--install') else 1), 'Wrong arguments')
     target()
     if action == '--verify':
         # ExecStartPre verifies while --trial is waiting for systemctl start.
@@ -151,7 +162,7 @@ def perform(argv):
         # First promotion only: do not silently replace an existing version or unit.
         current = ROOT / 'current'
         require(not os.path.lexists(current) or current.is_symlink() and current.resolve() == release,
-                'Another release is selected; version upgrade needs its own validated transaction')
+                'Another release is selected; use --rollback then --select FROM TO')
         systemctl('is-enabled', '--quiet', 'r46h-gaming-frontend.service')
         for path, data in ((UNIT, (release / 'jume-launcher.service').read_bytes()), (DROPIN, DROPIN_CONTENT)):
             for parent in path.parents:
@@ -171,6 +182,40 @@ def perform(argv):
     current = ROOT / 'current'
     require(current.is_symlink() and current.resolve().parent == ROOT / 'releases', 'No selected release')
     require(current.lstat().st_uid == 0, 'Foreign selection')
+    if action == '--select':
+        before, after = argv[1:]
+        require(all(re.fullmatch('[0-9a-f]{64}', value) for value in (before, after)) and before != after,
+                'Use distinct manifest hashes for FROM and TO')
+        old, new = (ROOT / 'releases' / value for value in (before, after))
+        require(current.resolve() in (old, new), 'Selection changed; inspect current before retrying')
+        require(not os.path.lexists(ROOT / 'enabled') and not os.path.lexists(TRIAL), 'Run --rollback first')
+        require(unit_value('ActiveState') == 'inactive' and unit_value('UnitFileState') == 'disabled',
+                'Launcher must be inactive and disabled')
+        systemctl('is-enabled', '--quiet', 'r46h-gaming-frontend.service')
+        systemctl('is-active', '--quiet', 'r46h-gaming-frontend.service')
+        clean_runtime()
+        verify(old, before)
+        verify(new, after)
+        service = (old / 'jume-launcher.service').read_bytes()
+        # ponytail: same-unit inactive switching only; service/schema migrations need a separate transaction.
+        require((new / 'jume-launcher.service').read_bytes() == service, 'Service migration is not supported')
+        for path, data in ((UNIT, service), (DROPIN, DROPIN_CONTENT)):
+            for parent in (path, *path.parents):
+                sealed(parent)
+            require(path.is_file() and path.stat().st_size == len(data) and path.read_bytes() == data,
+                    f'Existing integration differs: {path}')
+        temporary = ROOT / 'current.incoming'
+        if os.path.lexists(temporary):
+            require(temporary.is_symlink() and temporary.lstat().st_uid == 0 and os.readlink(temporary) == str(new),
+                    'Foreign pending selection; retained for inspection')
+        else:
+            temporary.symlink_to(new)
+        # Retain a matching pending link on failure. Retry FROM TO even if rename
+        # succeeded but fsync failed; current is always one complete old/new link.
+        os.replace(temporary, current)
+        sync_directory(ROOT)
+        print(f'JUME_RELEASE_SELECTED from={before} to={after} inactive; ES-DE remains default')
+        return
     if action == '--rollback':
         # Safe on reboot even if later cleanup fails. Do not start a second compositor.
         (ROOT / 'enabled').unlink(missing_ok=True)
@@ -188,9 +233,7 @@ def perform(argv):
         systemctl('stop', 'r46h-gaming-frontend.service')
         try:
             # A fresh inactive unit may be unloaded; reset-failed then fails on systemd 257.
-            state = subprocess.check_output(['systemctl', 'show', '--value', '--property=ActiveState',
-                                             'jume-launcher.service'], text=True, timeout=150).strip()
-            if state == 'failed':
+            if unit_value('ActiveState') == 'failed':
                 systemctl('reset-failed', 'jume-launcher.service')
             systemctl('start', 'jume-launcher.service')
             systemctl('is-active', '--quiet', 'jume-launcher.service')

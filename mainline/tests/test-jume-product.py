@@ -144,7 +144,7 @@ sync() { echo SYNC; }
     def systemctl(*args):
         calls.append(args)
     with patch.multiple(install, ROOT=product, UNIT=unit, DROPIN=dropin, TRIAL=trial), \
-         patch.object(install, 'target'), patch.object(install, 'sealed'), patch.object(install, 'verify'), \
+         patch.object(install, 'target'), patch.object(install, 'sealed'), patch.object(install, 'verify') as verify_release, \
          patch.object(install, 'systemctl', side_effect=systemctl), \
          patch.object(install.subprocess, 'check_output', return_value='inactive\n') as service_state:
         install.main(['--install', expected])
@@ -171,7 +171,7 @@ sync() { echo SYNC; }
         def root_marker(path):
             # Python 3.13 Path.lstat delegates to Path.stat (patched below).
             meta = os.lstat(path)
-            if path in (product / 'current', trial):
+            if path in (product / 'current', product / 'current.incoming', trial):
                 values = list(meta)
                 values[4] = 0
                 return os.stat_result(values)
@@ -217,6 +217,94 @@ sync() { echo SYNC; }
             with patch.object(install.os.path, 'lexists', return_value=True):
                 refuses(lambda: install.main(['--rollback']))
             assert calls == [('stop', 'jume-launcher.service')], 'Do not resume ES-DE after failed cleanup'
+
+            # Inactive selection changes only the link, never services, releases or saves.
+            successor = 'b' * 64
+            newer = product / 'releases' / successor
+            newer.mkdir()
+            service = (release / 'jume-launcher.service').read_bytes()
+            (newer / 'jume-launcher.service').write_bytes(service)
+            save = product / 'user-save'
+            save.write_bytes(b'keep this save')
+            pending = product / 'current.incoming'
+            select = lambda: install.main(['--select', expected, successor])
+            states = {'ActiveState': 'inactive', 'UnitFileState': 'disabled'}
+            service_state.side_effect = lambda args, **kwargs: states[args[3].split('=', 1)[1]] + '\n'
+            calls.clear()
+            refuses(lambda: install.main(['--install', successor]))
+            verify_release.reset_mock()
+            select()
+            assert verify_release.call_args_list == [((release, expected),), ((newer, successor),)]
+            assert (product / 'current').resolve() == newer and not pending.exists()
+            install.main(['--select', successor, expected])
+            assert (product / 'current').resolve() == release
+            for field, values in (('ActiveState', ('active', 'activating', 'deactivating', 'failed', '')),
+                                  ('UnitFileState', ('enabled', 'enabled-runtime', 'masked', ''))):
+                original = states[field]
+                for value in values:
+                    states[field] = value
+                    refuses(select)
+                states[field] = original
+            for arguments in (['--select'], ['--select', expected], ['--select', expected, '../bad'],
+                              ['--select', expected, expected], ['--select', 'c' * 64, successor]):
+                refuses(lambda: install.main(arguments))
+            for marker in (trial, product / 'enabled'):
+                marker.symlink_to(root / 'absent')
+                refuses(select)
+                marker.unlink()
+            real_lexists = os.path.lexists
+            for residue in ('/run/r46h-device-lease', '/run/jume-launcher/mount-id',
+                            '/run/jume-launcher/seatd-socket-identity', '/run/jume-launcher/session'):
+                with patch.object(install.os.path, 'lexists', side_effect=lambda path: str(path) == residue or real_lexists(path)):
+                    refuses(select)
+            with patch.object(install, 'unit_value', side_effect=subprocess.TimeoutExpired('systemctl', 150)):
+                refuses(select)
+            with patch.object(install, 'systemctl', side_effect=subprocess.CalledProcessError(1, 'systemctl')):
+                refuses(select)
+            with (product / 'operation.lock').open('rb') as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                refuses(select)
+            for bad_release in (release, newer):
+                verify_release.side_effect = lambda path, expected: install.require(path != bad_release, 'Bad seal')
+                refuses(select)
+            verify_release.side_effect = None
+            for path in (newer / 'jume-launcher.service', unit, dropin):
+                data = path.read_bytes()
+                path.write_bytes(b'changed unit')
+                refuses(select)
+                path.write_bytes(data)
+            with patch.object(install, 'sealed', side_effect=ValueError('Unsealed integration')):
+                refuses(select)
+            pending.write_text('foreign file')
+            refuses(select)
+            assert pending.read_text() == 'foreign file'
+            pending.unlink()
+            pending.symlink_to(release)
+            refuses(select)
+            assert pending.resolve() == release
+            pending.unlink()
+            assert (product / 'current').resolve() == release
+            # Before publication: retain the old link and a recoverable owned pending link.
+            with patch.object(install.os, 'replace', side_effect=OSError('Interrupted rename')):
+                refuses(select)
+            assert (product / 'current').resolve() == release and pending.resolve() == newer
+            foreign_meta = list(os.lstat(pending))
+            foreign_meta[4] = 12345
+            with patch.object(Path, 'lstat', lambda path: os.stat_result(foreign_meta) if path == pending else root_marker(path)):
+                refuses(select)
+            # After publication: same FROM/TO is an idempotent retry, including fsync failure.
+            with patch.object(install, 'sync_directory', side_effect=OSError('Interrupted fsync')):
+                refuses(select)
+            assert (product / 'current').resolve() == newer and not pending.exists()
+            select()
+            install.main(['--select', successor, expected])
+            assert (product / 'current').resolve() == release
+            assert save.read_bytes() == b'keep this save'
+            assert (release / 'jume-launcher.service').read_bytes() == service
+            assert (newer / 'jume-launcher.service').read_bytes() == service
+            assert unit.read_bytes() == service and dropin.read_bytes() == install.DROPIN_CONTENT
+            assert not trial.exists() and not (product / 'enabled').exists()
+            assert calls and all(call[0] in ('is-active', 'is-enabled') for call in calls)
 
     # Run the actual port event loop: product has no diagnostic timeout but exits normally.
     @contextlib.contextmanager
@@ -270,4 +358,4 @@ assert 'systemctl start r46h-gaming-frontend' not in product
 assert product.index('--restore "$unit" 1 1') < product.index('umount "$scope"') < product.index('systemctl --no-block')
 for path in ('product-session.sh', 'session.sh', 'handheld-client.sh', 'session-leases.sh'):
     subprocess.run(['bash', '-n', str(code / path)], check=True)
-print('JUME_PRODUCT_HOST_PASS: seal, trial/default/rollback, native membership and lifetime; systemd/ARM64/boot untested')
+print('JUME_PRODUCT_HOST_PASS: seal, inactive selection/retry, trial/default/rollback, native membership and lifetime; systemd/ARM64/boot untested')

@@ -125,7 +125,7 @@ Exact observations remain in the [ledger](../mainline/board/r46h/EXPERIMENT-STAT
 3. Keep R45 direct Stardew as fallback. Revisit the shared-Wayland stall only
    with a new source-level hypothesis; the unchanged R78/R79 Mono/Mesa path has
    already failed before window creation at two clock profiles.
-4. Add/test safe inactive release selection for the [r7 candidate](../mainline/gaming-wayland/PRODUCT.md) before deployment; existing `--install` refuses the retained r6 selection. r7 full host build/SSH/installer checks pass; r6 individual-fault recovery and >360-second desktop/>120-second native lifetime pass. Crash-loop exhaustion, two-hour endurance, GUI power and cold default boot remain open.
+4. Safe inactive release selection/retry passes host fixtures; build a [selection-capable successor](../mainline/gaming-wayland/PRODUCT.md#inactive-version-selection) before target r6/new/reverse cycling. r7 remains host-verified but lacks this command; r6 individual-fault recovery and >360-second desktop/>120-second native lifetime pass. Crash-loop exhaustion, two-hour endurance, GUI power and cold default boot remain open.
    ES-DE stays the recovery frontend; ROM-entry coverage, save retention and a genuine upgrade/rollback cycle precede removal.
 5. Profile R74's below-30-FPS open-world phase only when a new software hypothesis
    exists. Keep R63/R60 available; do not repeat SGSR1 or a live GPU minimum-frequency
