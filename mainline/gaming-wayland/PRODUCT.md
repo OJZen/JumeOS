@@ -1,17 +1,15 @@
 # Jume default-desktop candidate
 
-Status: **inactive selection source HOST PASS; r7 package HOST PASS; default promotion open**.
+Status: **r8 selection-capable package HOST PASS; r6 device trial PASS; default promotion open**.
 This is the first Q1 step, not permission to remove ES-DE. The current clean-source
-candidate is from `d481cb2`, under `mainline/out/.cache/jume-product-arm64-20260927-r7/`.
+candidate is from `bee41bf`, under `mainline/out/.cache/jume-product-arm64-20260927-r8/`.
 Its `receipt.json` records source, archive and evidence hashes; all were rechecked.
 Qt checks (10 tools + 13 shell), desktop/tasks, PortMaster, packaged session/power
 exits and full installer seal passed. Fresh-container SSH passed with the final
-ELF. The corrected installer passes macOS and ARM64 Linux/Python contract checks.
-All 2,954 archive members were compared with r6: only installer, manifest and
-Launcher differ. Every Launcher ELF byte matches except a Qt-generated resource
-timestamp and its GNU build-id; the other binaries are identical. This explains
-the delta, not byte-reproducibility or r7 device acceptance. Build record:
-`mainline/out/.cache/jume-product-arm64-20260927-r7/session.md`.
+ELF. The installer's selection/retry/refusal contracts pass macOS and ARM64 Linux.
+All 2,954 archive members were compared with r7: only installer, manifest and
+Launcher differ; no byte-reproducibility or r8 device acceptance is claimed.
+Build record: `mainline/out/.cache/jume-product-arm64-20260927-r8/session.md`.
 This artifact includes Files/Terminal/native ports, not Browser or Moonlight.
 The builder verifies the complete payload with the installer's seal checks.
 Remote tests use an anonymous Linux disk volume, removed with the container:
@@ -27,7 +25,7 @@ on v0.18. First startup exposed systemd 257 rejecting `reset-failed` for a fresh
 unloaded unit. The installer now queries ActiveState and resets only failed units;
 inactive, failed and query-error recovery paths have focused host coverage.
 On-device execution used a separately hash-verified corrected installer, leaving
-the sealed payload untouched. The corrected r7 package is now host-verified;
+the sealed payload untouched. The corrected installer is included in r7/r8;
 the retained r6 installer's first-start bug is not fixed inside that artifact.
 
 Launcher (with Files active), Weston and seatd were killed separately. Each
@@ -113,9 +111,8 @@ python3 /var/lib/jume-launcher/current/product-install.py --rollback
 
 ## Inactive version selection
 
-Source now supports `--select FROM TO`. r6/r7's bundled installers do not;
-build a new sealed package before deploying this command. Stage and `sync` the
-complete successor first. Invoke its reviewed installer by the fixed release
+r8 supports `--select FROM TO`. r6/r7's bundled installers do not.
+Stage and `sync` the complete successor first. Invoke its reviewed installer by the fixed release
 path, including when switching back (the older installer lacks this command):
 
 ```sh
@@ -142,7 +139,7 @@ R46H evidence; host filesystem mocks do not close those gates.
 
 ## Next combined target gate
 
-1. Build the selection-capable successor, then prove inactive r6/new selection,
+1. Deploy the sealed r8 candidate, then prove inactive r6/r8 selection,
    trial and reverse selection on target. Do not manually change `current`.
    Preserve both releases/user state and prove interrupted-cleanup handling.
    Optional Browser pairing needs its guarded wrapper and a new complete seal.

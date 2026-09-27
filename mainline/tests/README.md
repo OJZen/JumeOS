@@ -268,7 +268,8 @@ No host contract check changes sysfs, NetworkManager,
 power state or swap. See the [device gate](../gaming-shell/DEVICE.md).
 
 `test-jume-product.py` checks sealed-release/manifest-type rejection, real host lock contention, interrupted publication,
-inactive installation, trial/default/ES-DE rollback ordering, cleanup refusal,
+inactive installation/selection/reverse selection, retries before/after link
+publication, trial/default/ES-DE rollback ordering, cleanup refusal,
 native cgroup membership and the installed port lifetime with a fake game.
 CI runs it without root or a systemd daemon. It does not prove installed service
 ordering, cgroup/VT recovery, an ARM64 build or cold boot; those are tracked in
