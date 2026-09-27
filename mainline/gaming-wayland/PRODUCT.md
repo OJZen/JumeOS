@@ -1,15 +1,15 @@
 # Jume default-desktop candidate
 
-Status: **source/host candidate only; not installed or accepted on R46H**.
-This is the first Q1 step, not permission to remove ES-DE. ARM64 packaging and
-target systemd/boot proof remain open. Docker is used only temporarily for builds.
-
-Host checks: installation/recovery fixtures pass on macOS and Linux/Python 3.13;
-adjacent lease/probe guards pass. Linux checks use the packaged worker path,
-independent of checkout depth, and nonrecursive filesystem-stat mocks;
-macOS Qt 6.8.2 `tools-check` rebuilt and passed 10 checks including actual Qt
-cgroup-pattern matching. This is not a Linux/ARM64 product build. Receipt:
+Status: **ARM64 host build passed; not installed or accepted on R46H**.
+This is the first Q1 step, not permission to remove ES-DE. The clean-source
+candidate is from `0ca4f27`, under `mainline/out/.cache/jume-product-arm64-20260927-r6/`.
+Its `receipt.json` records source, archive and evidence hashes; all were rechecked.
+Qt checks (10 tools + 13 shell), desktop/tasks, PortMaster, packaged session/power
+exits and full installer seal passed. Fresh-container SSH passed twice with the
+same final ELF. macOS/Linux installation and memory-policy contracts pass too.
+These do not prove installed systemd, DRM/seatd or cold boot. Full work record:
 `mainline/out/.cache/jume-product-20260927.md`.
+This artifact includes Files/Terminal/native ports, not Browser or Moonlight.
 The builder verifies the complete payload with the installer's seal checks.
 Remote tests use an anonymous Linux disk volume, removed with the container:
 the payload exceeds the 192 MiB `/run` tmpfs, and macOS binds do not retain test UIDs.
@@ -85,8 +85,9 @@ python3 /var/lib/jume-launcher/current/product-install.py --rollback
 
 ## Next combined target gate
 
-1. Build the paired ARM64 payload when Linux resources are available; keep the
-   host's Docker low-memory restriction. Host contracts alone cannot deploy this.
+1. Verify and stage the frozen ARM64 candidate. Optional Browser pairing needs
+   the current guarded wrapper and a newly verified complete manifest; do not
+   copy the old unguarded browser wrapper into an installed release.
 2. Supervised trial: ready Home, settings/saves, input ownership, representative
    native/browser launches and rollback. Test beyond the old 120/290/360-second
    bounds and separately beyond the former two-hour CPU-helper limit.

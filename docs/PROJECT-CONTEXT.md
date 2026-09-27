@@ -115,7 +115,7 @@ Exact observations remain in the [ledger](../mainline/board/r46h/EXPERIMENT-STAT
 
 ## Immediate next work
 
-1. Prioritize the default-Jume build/trial in item 4; do not expand peripheral features before this transition.
+1. Prioritize the default-Jume trial in item 4; do not expand peripheral features before this transition.
    Use the [combined acceptance route](../mainline/gaming-shell/DEVICE.md#combined-acceptance-route) for remaining long-hold kill,
    game/save/transfer retention, Files/QR, LCD/audio and L3+R3 observations.
    Media, sequential USB, wake/HUD and task entry/resume/close already pass; do not replay them unchanged.
@@ -125,14 +125,14 @@ Exact observations remain in the [ledger](../mainline/board/r46h/EXPERIMENT-STAT
 3. Keep R45 direct Stardew as fallback. Revisit the shared-Wayland stall only
    with a new source-level hypothesis; the unchanged R78/R79 Mono/Mesa path has
    already failed before window creation at two clock profiles.
-4. Build and trial the [default-desktop candidate](../mainline/gaming-wayland/PRODUCT.md): host contracts pass, but the new ELF, installed systemd recovery and cold boot are unproven.
+4. Stage and trial the [default-desktop candidate](../mainline/gaming-wayland/PRODUCT.md): the new ARM64 ELF, full package seal and host regressions pass; installed systemd recovery and cold boot remain unproven.
    ES-DE stays the recovery frontend; ROM-entry coverage, save retention and a genuine upgrade/rollback cycle precede removal.
 5. Profile R74's below-30-FPS open-world phase only when a new software hypothesis
    exists. Keep R63/R60 available; do not repeat SGSR1 or a live GPU minimum-frequency
    raise unchanged.
 6. Build v0.19 from clean committed inputs when Linux build resources are available;
    use the guarded zram installer, accepted v0.17 DTB and existing boot fallback.
-   Docker remains stopped at the user's low-memory request; no product artifact or persistent proof yet.
+   Use Docker only for temporary memory-limited builds; v0.19 still has no product artifact or persistent proof.
 7. Retain the [paired browser memory boundary](../mainline/gaming-browser/README.md#browser-memory-boundary--source-candidate)
    for subsequent heavy-page trials; target memcg and actual browser recovery now pass.
    Do not equate induced group OOM recovery with mi.com performance or global-OOM immunity.
