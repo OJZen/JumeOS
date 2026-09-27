@@ -1,17 +1,18 @@
 # Jume default-desktop candidate
 
-Status: **r6/r8 DEVICE CYCLE PASS; post-fault rollback fix DEVICE PASS / REPACKAGE OPEN**.
+Status: **r9 corrected package HOST PASS; r6/r8 DEVICE CYCLE PASS; default promotion open**.
 This is the first Q1 step, not permission to remove ES-DE. The current clean-source
-candidate is from `bee41bf`, under `mainline/out/.cache/jume-product-arm64-20260927-r8/`.
+candidate is from `5126d40`, under `mainline/out/.cache/jume-product-arm64-20260927-r9/`.
 Its `receipt.json` records source, archive and evidence hashes; all were rechecked.
 Qt checks (10 tools + 13 shell), desktop/tasks, PortMaster, packaged session/power
 exits and full installer seal passed. Fresh-container SSH passed with the final
 ELF. The installer's selection/retry/refusal contracts pass macOS and ARM64 Linux.
-All 2,954 archive members were compared with r7: only installer, manifest and
+All 2,954 archive members were compared with r8: only installer, manifest and
 Launcher differ; that host comparison alone proves neither byte-reproducibility nor device acceptance.
-Build record: `mainline/out/.cache/jume-product-arm64-20260927-r8/session.md`.
+Build record: `mainline/out/.cache/jume-product-arm64-20260927-r9/session.md`.
 This artifact includes Files/Terminal/native ports, not Browser or Moonlight.
-The post-fault rollback correction below is not in sealed r8; rebuild before further promotion.
+The r9 installer exactly matches the separately device-tested rollback correction below.
+Sealed r8 lacks that correction; r9 is host-verified but not deployed.
 The builder verifies the complete payload with the installer's seal checks.
 Remote tests use an anonymous Linux disk volume, removed with the container:
 the payload exceeds the 192 MiB `/run` tmpfs, and macOS binds do not retain test UIDs.
@@ -136,7 +137,8 @@ python3 /var/lib/jume-launcher/current/product-install.py --rollback
 
 ## Inactive version selection
 
-r8 supports `--select FROM TO`. r6/r7's bundled installers do not.
+r8/r9 support `--select FROM TO`; use r9 for corrected failed-state rollback.
+r6/r7's bundled installers do not support selection.
 Stage and `sync` the complete successor first. Invoke its reviewed installer by the fixed release
 path, including when switching back (the older installer lacks this command):
 
@@ -164,13 +166,14 @@ recovery remains open and is not established by host filesystem mocks.
 
 ## Next combined target gate
 
-1. Rebuild the failed-state rollback correction into a sealed successor before deployment.
-   r6/r8 selection and trials pass; do not manually change `current` or edit sealed r8.
+1. Deploy verified r9 and validate its packaged rollback after a failed unit.
+   r6/r8 selection and trials pass; preserve them and use the new fixed-path controller.
    Preserve both releases/user state and prove interrupted lease-cleanup handling.
    Optional Browser pairing needs its guarded wrapper and a new complete seal.
 2. Supervised trial: ready Home, settings/saves, input ownership, representative
    native/browser launches and rollback. Test beyond the old 120/290/360-second
    bounds and separately beyond the former two-hour CPU-helper limit.
+   Endurance needs guard/SSH lifetimes beyond that window; the old 45-minute guard cannot cover it.
 3. Individual Launcher/Weston/seatd recovery and old-child/lease cleanup pass;
    fast prepare-failure limiting and explicit rescue now pass on r6's identical unit.
    Test GUI power actions and interrupted prepare/cleanup on target.
