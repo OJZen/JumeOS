@@ -11,7 +11,7 @@ desktop, local gaming, streaming, and USB HID input. The
 
 ## Current baseline
 
-The device is **safely powered off after the 2026-09-27 [r6/r8 release cycle](../mainline/gaming-wayland/PRODUCT.md#release-cycling-and-failed-state-recovery--2026-09-27)** on unchanged p2 v0.18. Inactive r6 selected; sealed r8/private backups retained; temporary services/staging/keys removed. The [r9 package](../mainline/gaming-wayland/PRODUCT.md) now includes the exact device-tested failed-state rollback fix and passes full host/session/SSH checks; not deployed. Docker is stopped. Prior browser/Files/PortMaster evidence: `mainline/out/.cache/r46h-unattended-20260927.cA9xEV/session.md`.
+The device is **safely powered off after the 2026-09-27 [r9 recovery and GUI reboot tests](../mainline/gaming-wayland/PRODUCT.md#packaged-r9-recovery-and-gui-reboot--2026-09-27)** on unchanged p2 v0.18. Inactive r9 selected; sealed r6/r8/private backups retained; temporary services/staging/keys removed. Packaged failed-state rollback, bidirectional selection, receipt-mismatch cleanup refusal/recovery and GUI warm reboot pass. ES-DE remains default; all 167 prior files unchanged. Docker was not started. Prior browser/Files/PortMaster evidence: `mainline/out/.cache/r46h-unattended-20260927.cA9xEV/session.md`.
 Fixed-profile readback, cold identity, service health, policy/package hashes, permission scope and base smoke pass.
 R79 passed archive/1,741-file readback, preflight, transient Launcher/game lifecycle and forced-child recovery; ES-DE remains default.
 R74 is the accepted GTA candidate after attended picture/audio/control approval; R63/R60 remain rollbacks.
@@ -125,7 +125,7 @@ Exact observations remain in the [ledger](../mainline/board/r46h/EXPERIMENT-STAT
 3. Keep R45 direct Stardew as fallback. Revisit the shared-Wayland stall only
    with a new source-level hypothesis; the unchanged R78/R79 Mono/Mesa path has
    already failed before window creation at two clock profiles.
-4. Deploy [host-verified r9](../mainline/gaming-wayland/PRODUCT.md) and verify its packaged failed-state rollback. r6/r8 bidirectional selection/startup and 167-file retention pass; fast prepare-failure limiting and corrected explicit rescue pass on r6's identical unit. Two-hour endurance, GUI power, interrupted lease cleanup and cold default boot remain open.
+4. Continue [installed r9](../mainline/gaming-wayland/PRODUCT.md): packaged failed-state rollback, release cycling, cleanup-receipt refusal/recovery, GUI warm reboot and 167-file retention pass. Two-hour endurance, GUI poweroff, actual interrupted lease cleanup and cold default boot remain open; receipt mismatch is not interruption proof.
    ES-DE stays the recovery frontend; ROM-entry coverage, physical save/load and default-boot acceptance precede removal.
 5. Profile R74's below-30-FPS open-world phase only when a new software hypothesis
    exists. Keep R63/R60 available; do not repeat SGSR1 or a live GPU minimum-frequency

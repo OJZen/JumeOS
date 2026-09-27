@@ -1,6 +1,6 @@
 # Jume default-desktop candidate
 
-Status: **r9 corrected package HOST PASS; r6/r8 DEVICE CYCLE PASS; default promotion open**.
+Status: **r9 packaged recovery + GUI reboot MACHINE PASS; default promotion open**.
 This is the first Q1 step, not permission to remove ES-DE. The current clean-source
 candidate is from `5126d40`, under `mainline/out/.cache/jume-product-arm64-20260927-r9/`.
 Its `receipt.json` records source, archive and evidence hashes; all were rechecked.
@@ -12,7 +12,7 @@ Launcher differ; that host comparison alone proves neither byte-reproducibility 
 Build record: `mainline/out/.cache/jume-product-arm64-20260927-r9/session.md`.
 This artifact includes Files/Terminal/native ports, not Browser or Moonlight.
 The r9 installer exactly matches the separately device-tested rollback correction below.
-Sealed r8 lacks that correction; r9 is host-verified but not deployed.
+Sealed r8 lacks that correction; r9 is installed and machine-tested below.
 The builder verifies the complete payload with the installer's seal checks.
 Remote tests use an anonymous Linux disk volume, removed with the container:
 the payload exceeds the 192 MiB `/run` tmpfs, and macOS binds do not retain test UIDs.
@@ -69,6 +69,29 @@ Final state: inactive r6 selected, r8 and private backups retained, ES-DE defaul
 no failed units/kernel errors. Task staging/SSH/guard/keys were removed and UART
 confirmed clean poweroff. No physical LCD/audio/save-load or sudden-power-loss claim.
 Evidence: `mainline/out/.cache/jume-r8-device-20260927.aMhPCy/session.md`.
+
+## Packaged r9 recovery and GUI reboot — 2026-09-27
+
+r9 transfer/full seal, trial Home and exact Launcher identity passed. Three
+verified prepare failures reached the restart limit; the packaged installer
+recovered the failed unit to inactive/disabled and restored ES-DE. Subsequent
+r9-to-r6-to-r9 selection passed without a separate repair script.
+
+With real device/CPU/Mono leases held, a reversible owned mount-receipt mismatch
+made rollback refuse cleanup and keep ES-DE stopped. Restoring the exact receipt
+and running the sealed cleanup hook recovered normally. This proves fail-closed
+receipt handling, not interruption of the cleanup hook or sudden power loss.
+
+The Settings reboot confirmation triggered a real warm reboot, with UART filesystem
+detachment and a new boot ID. ES-DE/input/volume and Wi-Fi returned automatically;
+Jume stayed inactive/disabled with r9 selected. All 167 prior files, including the
+existing save/backup, remained identical. No failed units or kernel errors.
+GUI poweroff, two-hour endurance and operator/save-load acceptance remain open.
+
+Final state: r9 selected inactive, r6/r8 and private backups retained, ES-DE default.
+117 guard samples peaked at CPU 76.923 C/GPU 76.538 C; no abort. Task staging,
+SSH/guard/keys were removed; UART confirmed final clean poweroff.
+Evidence: `mainline/out/.cache/jume-r9-device-20260927.uudLqJ/session.md`.
 
 ## Ownership and recovery
 
@@ -166,9 +189,9 @@ recovery remains open and is not established by host filesystem mocks.
 
 ## Next combined target gate
 
-1. Deploy verified r9 and validate its packaged rollback after a failed unit.
-   r6/r8 selection and trials pass; preserve them and use the new fixed-path controller.
-   Preserve both releases/user state and prove interrupted lease-cleanup handling.
+1. Keep installed r9 and retained r6/r8; packaged failed-state rollback and
+   bidirectional selection pass. Receipt-mismatch cleanup refusal/recovery passes;
+   actual interrupted lease cleanup remains open. Use the fixed-path r9 controller.
    Optional Browser pairing needs its guarded wrapper and a new complete seal.
 2. Supervised trial: ready Home, settings/saves, input ownership, representative
    native/browser launches and rollback. Test beyond the old 120/290/360-second
@@ -176,7 +199,7 @@ recovery remains open and is not established by host filesystem mocks.
    Endurance needs guard/SSH lifetimes beyond that window; the old 45-minute guard cannot cover it.
 3. Individual Launcher/Weston/seatd recovery and old-child/lease cleanup pass;
    fast prepare-failure limiting and explicit rescue now pass on r6's identical unit.
-   Test GUI power actions and interrupted prepare/cleanup on target.
+   GUI warm reboot passes; test GUI poweroff and interrupted cleanup on target.
 4. After trial/save acceptance, enable and verify cold boot, Wi-Fi/settings/save
    retention and serial rollback. Conduct endurance; schema/service migrations remain unsupported.
 5. Inventory actual ES-DE systems/ROM entries against Jume before removal;
