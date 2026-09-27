@@ -61,9 +61,9 @@ broader LCD/USB coverage, Moonlight and PSP remain open.
   09-26 faster tasks/resume/close and sequential USB keyboard/mouse passed; long-hold/hub remain open.
   09-27 installed trial recovered separately from Launcher/Weston/seatd loss, clearing old children/leases.
   Same desktop survived 460 seconds; GTA III survived 273 seconds with a fresh intro frame, then requested exit.
-  Explicit ES-DE rollback and unchanged sealed payload passed; no failed units or kernel errors.
-  r7 is host-built, not deployed; release switching, cold default, two-hour endurance and save/load remain open.
-  [Installed trial](../../gaming-wayland/PRODUCT.md#installed-trial--2026-09-27) owns evidence and remaining gates.
+  r6/r8 bidirectional selection/trials passed; all 167 prior files unchanged, then clean ES-DE rollback/poweroff.
+  Fast prepare-failure limiting/failed-state rescue pass; repackage fix. Cold default/endurance/save-load remain open.
+  [Installed-session runbook](../../gaming-wayland/PRODUCT.md) owns evidence and remaining gates.
 - **[Jume Browser](../../gaming-browser/README.md) — TARGET GPU/SANDBOX PASS / HEAVY-SITE OOM + SECURITY OPEN.**
   Offline input/IME/tabs/About, WebGL 2, sandbox and lifecycle/privacy pass; mi.com policy/OOM failures remain.
   A 128 MiB tile budget passed bounded pressure/target regression; discard failed form retention and was withdrawn.

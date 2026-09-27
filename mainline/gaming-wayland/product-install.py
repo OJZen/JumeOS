@@ -222,6 +222,9 @@ def perform(argv):
         TRIAL.unlink(missing_ok=True)
         sync_directory(ROOT)
         stopped_cleanly()
+        # stop alone preserves failed/start-limit state; selection requires inactive.
+        if unit_value('ActiveState') == 'failed':
+            systemctl('reset-failed', 'jume-launcher.service')
         systemctl('disable', 'jume-launcher.service')
         systemctl('start', 'r46h-gaming-frontend.service')
         print('JUME_ROLLBACK_ESDE saves and installed release retained')

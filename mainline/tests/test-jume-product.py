@@ -207,12 +207,24 @@ sync() { echo SYNC; }
             install.main(['--enable'])
             assert (product / 'enabled').read_bytes() == b'jume\n' and not trial.exists()
             calls.clear()
+            service_state.return_value = 'inactive\n'
             with patch.object(install.os.path, 'lexists', return_value=False):
                 install.main(['--rollback'])
             assert not (product / 'enabled').exists()
             assert calls == [('stop', 'jume-launcher.service'), ('disable', 'jume-launcher.service'),
                              ('start', 'r46h-gaming-frontend.service')]
             assert release.exists() and (product / 'current').is_symlink()
+            calls.clear()
+            service_state.return_value = 'failed\n'
+            with patch.object(install.os.path, 'lexists', return_value=False):
+                install.main(['--rollback'])
+            assert calls == [('stop', 'jume-launcher.service'), ('reset-failed', 'jume-launcher.service'),
+                             ('disable', 'jume-launcher.service'), ('start', 'r46h-gaming-frontend.service')]
+            calls.clear()
+            with patch.object(install, 'unit_value', side_effect=subprocess.CalledProcessError(1, 'systemctl')), \
+                 patch.object(install.os.path, 'lexists', return_value=False):
+                refuses(lambda: install.main(['--rollback']))
+            assert calls == [('stop', 'jume-launcher.service')], 'Do not continue after state lookup failure'
             calls.clear()
             with patch.object(install.os.path, 'lexists', return_value=True):
                 refuses(lambda: install.main(['--rollback']))
