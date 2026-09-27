@@ -167,9 +167,9 @@ sync() { echo SYNC; }
         assert unit.read_text() == 'foreign integration'
         unit.write_bytes((code / 'jume-launcher.service').read_bytes())
         # Simulate the root-owned selection/marker when testing on a non-root Mac.
-        original_lstat = Path.lstat
         def root_marker(path):
-            meta = original_lstat(path)
+            # Python 3.13 Path.lstat delegates to Path.stat (patched below).
+            meta = os.lstat(path)
             if path in (product / 'current', trial):
                 values = list(meta)
                 values[4] = 0
@@ -216,6 +216,7 @@ sync() { echo SYNC; }
         state = root / f'game-state-{index}'
         state.mkdir(exist_ok=True)
         with patch.object(Path, 'read_text', read), patch.object(port.os, 'geteuid', return_value=1000), \
+             patch.object(port, '__file__', str(root / 'runtime/usr/share/r46h/ports/local_port.py')), \
              patch.object(port.platform, 'release', return_value='6.12.99-r46h-mainline-v0.15-gaming-product'), \
              patch.object(port.os, 'statvfs', return_value=SimpleNamespace(f_flag=os.ST_RDONLY)), \
              patch.object(port, 'prepared', prepared), patch.object(port, '_device_libraries', return_value='/unused'), \

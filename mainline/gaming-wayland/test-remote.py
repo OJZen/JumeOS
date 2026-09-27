@@ -86,7 +86,12 @@ with tempfile.TemporaryDirectory(prefix='r46h-ssh-', dir='/run') as directory:
             subprocess.run(['/usr/bin/python3', '-B', '/project/mainline/tests/test-shell-ssh.py', '--host', '127.0.0.1', '--port', '22222',
                 '--identity', str(identity), '--known-hosts', str(known), '--binary', binary,
                 '--evidence', '/project/mainline/out/remote/transport'], stdout=check_log, stderr=subprocess.STDOUT, check=True, timeout=35)
-        observe('accept'); wait_for(lambda: 'buttons' in game() and observe()['state']['gameInputAvailable'], 'SSH could not launch the SDL game')
+        observe('accept')
+        try:
+            wait_for(lambda: 'buttons' in game() and observe()['state']['gameInputAvailable'], 'SSH could not launch the SDL game')
+        except AssertionError:
+            (out / 'launch-failure.json').write_text(json.dumps({'desktop': observe(), 'game': game()}, indent=2) + '\n')
+            raise
         request = sample(); replies = []; errors = []
         def send():
             try: replies.append(exchange(request))

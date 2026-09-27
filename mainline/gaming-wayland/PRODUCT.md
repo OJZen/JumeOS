@@ -4,7 +4,9 @@ Status: **source/host candidate only; not installed or accepted on R46H**.
 This is the first Q1 step, not permission to remove ES-DE. ARM64 packaging and
 target systemd/boot proof remain open. Docker is used only temporarily for builds.
 
-Host checks: installation/recovery fixtures and adjacent lease/probe guards pass;
+Host checks: installation/recovery fixtures pass on macOS and Linux/Python 3.13;
+adjacent lease/probe guards pass. Linux checks use the packaged worker path,
+independent of checkout depth, and nonrecursive filesystem-stat mocks;
 macOS Qt 6.8.2 `tools-check` rebuilt and passed 10 checks including actual Qt
 cgroup-pattern matching. This is not a Linux/ARM64 product build. Receipt:
 `mainline/out/.cache/jume-product-20260927.md`.
