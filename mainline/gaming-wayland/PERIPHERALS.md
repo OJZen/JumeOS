@@ -35,8 +35,10 @@ USB storage evidence. No kernel, DT, USB role or device permissions are changed.
 `prepare-peripherals.py ABSOLUTE_CACHE [--check]` fetches or verifies exact
 Debian package sizes/SHA-256. `build-handheld.sh` uses the external cache
 `r46h-peripherals/`, then assembles offline with `install-peripherals.sh`.
-Only Foot, its extra libraries, terminfo, DMZ-White cursors, an explicit monospace
+Only Foot, its extra libraries, Foot's three terminfo entries, DMZ-White cursors, an explicit monospace
 font and licenses are added. No Foot server or systemd service is installed.
+Unrelated terminfo aliases into the system database are not copied; Terminal's
+existing `xterm-256color` mode uses the base system's ncurses database.
 The existing runtime supplies the rest of the ELF closure; target preflight
 must resolve it. The terminal clears the launcher's private Qt/Mesa/font settings
 before starting Bash, while preserving the real home and Wayland session.

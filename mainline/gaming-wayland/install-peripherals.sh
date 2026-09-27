@@ -22,7 +22,12 @@ mkdir -p "$stage/usr/share/fonts"
 cp -a "$temporary/usr/share/fonts/." "$stage/usr/share/fonts/"
 cp -a "$temporary/usr/lib/aarch64-linux-gnu/"{libfcft.so*,libutf8proc.so*} "$stage/usr/lib/aarch64-linux-gnu/"
 cp -a "$temporary/usr/share/icons/DMZ-White" "$stage/usr/share/icons/"
-cp -a "$temporary/usr/share/terminfo/." "$stage/usr/share/terminfo/"
+# Only Foot entries are needed; the full database has aliases into ncurses-base.
+mkdir -p "$stage/usr/share/terminfo/f"
+for entry in foot foot+base foot-direct; do
+    install -m 644 "$temporary/usr/share/terminfo/f/$entry" "$stage/usr/share/terminfo/f/"
+    [[ -s $stage/usr/share/terminfo/f/$entry && ! -L $stage/usr/share/terminfo/f/$entry ]]
+done
 for package in foot libfcft4t64 libutf8proc3 ncurses-term dmz-cursor-theme fonts-dejavu-mono; do
     cp -a "$temporary/usr/share/doc/$package" "$stage/usr/share/doc/"
 done
