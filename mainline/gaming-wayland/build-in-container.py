@@ -123,7 +123,7 @@ def build():
             destination = stage / 'usr/share/doc' / package / 'copyright'
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, destination)
-        for name in ('session.sh', 'clients.sh', 'probe-r46h.sh'):
+        for name in ('session.sh', 'clients.sh', 'probe-r46h.sh', 'browser-cgroup.sh'):
             shutil.copyfile(PROJECT / 'gaming-wayland' / name, stage / name)
             (stage / name).chmod(0o755)
         # Inherited Qt license files can be group-writable; the target rejects them.

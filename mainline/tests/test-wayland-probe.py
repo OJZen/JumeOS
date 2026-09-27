@@ -248,11 +248,23 @@ for status, device, lease_status, power_status in [(77, 1, 0, 0), (78, 1, 0, 0),
 hooks = source[source.index('unit_properties=()'):source.index('restore() {')]
 for ports, device in ((0, 0), (1, 0), (0, 1), (1, 1)):
     result = bash(hooks + '\nif (( ports_mode || device_mode )); then printf "%s\\n" "${unit_properties[@]}"; fi', scope='/owned',
-                  unit='r46h-wayland-probe-123.service', ports_mode=str(ports), device_mode=str(device))
+                  unit='r46h-wayland-probe-123.service', ports_mode=str(ports), device_mode=str(device), profile='handheld')
     assert result.returncode == 0, result
     if ports or device:
         assert result.stdout.splitlines() == ['-p', f'ExecStartPre=/bin/bash /owned/session-leases.sh --acquire r46h-wayland-probe-123.service {ports} {device}',
                                              '-p', f'ExecStopPost=/bin/bash /owned/session-leases.sh --restore r46h-wayland-probe-123.service {ports} {device}'], result
+
+with tempfile.TemporaryDirectory(prefix='browser-unit-', dir=cache) as directory:
+    wrapper = Path(directory) / 'browser/browser-client.sh'
+    wrapper.parent.mkdir(); wrapper.write_text('#!/bin/sh\nexit 0\n')
+    for profile, executable in [('handheld', True), ('handheld', False), ('windows', True)]:
+        wrapper.chmod(0o755 if executable else 0o644)
+        # Bash 3.2 treats an empty array as unset under nounset; print only populated cases.
+        result = bash(hooks + '\nset +u\nprintf "%s\\n" "${unit_properties[@]}"',
+                      scope=directory, profile=profile, ports_mode='0', device_mode='0')
+        assert result.returncode == 0, result
+        expected = ['-p', 'Delegate=memory', '-p', 'DelegateSubgroup=desktop', '-p', 'OOMPolicy=continue']
+        assert result.stdout.split() == (expected if profile == 'handheld' and executable else []), result
 
 assert '-p RuntimeMaxSec=360 -p TimeoutStopSec=10 -p KillMode=control-group' in source
 assert "trap 'exit 129' HUP" in source

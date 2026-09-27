@@ -1,9 +1,9 @@
 #!/bin/bash
 # Mount only the identified original Mono image, and release only our recorded mount.
 set -Eeuo pipefail
-[[ $# == 2 && ( $1 == --acquire || $1 == --release ) && $2 =~ ^r46h-(shell|wayland)-probe-[0-9]+\.service$ && $EUID == 0 ]] || exit 2
+[[ $# == 2 && ( $1 == --acquire || $1 == --release ) && $2 =~ ^(r46h-(shell|wayland)-probe-[0-9]+|jume-launcher)\.service$ && $EUID == 0 ]] || exit 2
 scope=/run/r46h-shell-probe
-[[ $2 != r46h-wayland-probe-* ]] || scope=/run/r46h-wayland-probe
+[[ $2 != r46h-wayland-probe-* && $2 != jume-launcher.service ]] || scope=/run/r46h-wayland-probe
 target=$scope/mono
 record=/run/r46h-port-runtime
 source_file=/roms/tools/PortMaster/libs/mono-6.12.0.122-aarch64.squashfs

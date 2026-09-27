@@ -7,6 +7,7 @@ renderer=${R46H_TEST_RENDERER:-pixman}
 dpkg -i /debs/*.deb /wayland-debs/libqt6waylandclient6_*.deb /wayland-debs/weston_*.deb > /out/desktop-setup.log 2>&1
 cmake -S /src -B /out/linux-build -DCMAKE_BUILD_TYPE=Release
 cmake --build /out/linux-build -j 3
+timeout 30 /out/linux-build/tools-check
 gcc -fPIC -c /out/linux-build/capture-protocol.c -o /out/linux-build/task-capture-protocol.o $(pkg-config --cflags wayland-client)
 g++ -fPIC -std=gnu++17 -O2 -Wall -Wextra -Werror -pthread -I/out/linux-build /wayland/capture.cpp /wayland/test-capture-task.cpp /out/linux-build/task-capture-protocol.o -o /out/test-capture-task $(pkg-config --cflags --libs Qt6Gui wayland-client libdrm)
 timeout 15 /out/test-capture-task

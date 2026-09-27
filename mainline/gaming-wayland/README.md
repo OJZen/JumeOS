@@ -7,6 +7,9 @@ installed compositor, replacement desktop or finished global overlay. The
 [desktop plan](../../docs/DEVICE-SHELL.md) owns the integration gates; the
 [agent-control plan](../../docs/REMOTE-CONTROL.md) owns remote operation and UI tests.
 
+The opt-in [installed-session candidate](PRODUCT.md) reuses this runtime but has
+separate lifetime, recovery and promotion gates; no device promotion is implied.
+
 ## Prepare on the host
 
 ```sh

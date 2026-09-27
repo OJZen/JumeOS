@@ -13,4 +13,10 @@ export QTWEBENGINE_LOCALES_PATH="$base/usr/share/qt6/translations/qtwebengine_lo
 export QSG_RHI_BACKEND=opengl
 unset QT_QUICK_BACKEND QT_QPA_EGLFS_INTEGRATION LIBGL_ALWAYS_SOFTWARE
 # The session owns Mesa/Panfrost selection. Preserve its GBM/EGL/DRI settings.
+if [ -n "${JUME_BROWSER_MEMORY_GUARD:-}" ]; then
+    [ "$JUME_BROWSER_MEMORY_GUARD" = /run/r46h-wayland-probe/browser-cgroup.sh ] || exit 2
+    exec /bin/bash "$JUME_BROWSER_MEMORY_GUARD" --run "$base/usr/bin/jume-browser" "$@"
+fi
+# Only standalone host fixtures may run without the target's root-created group.
+[ "$base" != /run/r46h-wayland-probe/browser ] || { echo 'Browser memory guard missing.' >&2; exit 2; }
 exec "$base/usr/bin/jume-browser" "$@"

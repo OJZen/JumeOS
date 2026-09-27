@@ -20,7 +20,7 @@ if [[ $1 == --check && $# == 1 ]]; then
 fi
 [[ $EUID == 0 ]] || die root-required
 busy=0
-pgrep -u 1000 -f '(^|/)(retroarch|moonlight(-qt)?)([[:space:]]|$)' >/dev/null || busy=$?
+pgrep -u 1000 -f '(^|/)(retroarch|moonlight(-qt)?|r46h-shell|jume-browser|jume-files|re3|reVC|mono(-sgen)?)([[:space:]]|$)' >/dev/null || busy=$?
 [[ $busy == 1 ]] || die game-active-or-process-check-failed
 [[ $(findmnt -rn -T /var/lib -o FSTYPE) == ext4 && $(findmnt -rn -T /var/lib -o UUID) == "$root_uuid" ]] || die storage
 if [[ ! -e $state && ! -L $state ]]; then

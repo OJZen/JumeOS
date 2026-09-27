@@ -136,7 +136,7 @@ def apply(request, root=Path('/'), lease=LEASE):
 
 
 def serve(unit):
-    if os.geteuid() != 0 or not re.fullmatch(r'r46h-(?:shell|wayland)-probe-[0-9]+\.service', unit):
+    if os.geteuid() != 0 or not re.fullmatch(r'(?:r46h-(?:shell|wayland)-probe-[0-9]+|jume-launcher)\.service', unit):
         raise Rejected('invalid_owner')
     if (os.uname().release != '6.12.99-r46h-mainline-v0.15-gaming-product'
             or read(Path('/'), Path('sys/class/block/mmcblk0/device/cid')) != 'fe343253440000002000002d57019567'

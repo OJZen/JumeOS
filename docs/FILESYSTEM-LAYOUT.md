@@ -6,7 +6,7 @@ ordinary, user-owned files. Do not place caches beside ROMs or user documents.
 
 | Purpose | Location / owner |
 | --- | --- |
-| Installed runtime | Versioned root-owned bundle; no application writes here |
+| Installed runtime | Candidate `/var/lib/jume-launcher/releases/<manifest-sha>/`; root-owned selection `current`; no application writes here ([deployment](../mainline/gaming-wayland/PRODUCT.md)) |
 | Launcher root | Explicit `--state-dir`; accepted legacy device path remains `/home/ark/.local/share/r46h-preview` |
 | New Files/Text preferences | `<state>/apps/files/view.json`; private `config/`, `cache/` and session locks alongside it |
 | File Transfer | Private state `<state>/apps/transfer/`; default shared files in XDG Downloads / `Jume Transfer`; credentials stay in memory |

@@ -2,8 +2,8 @@
 # Bounded compositor probe with optional shared-desktop diagnostic profile.
 set -Eeuo pipefail
 umask 077
-[[ ( ( $# == 2 || $# == 3 ) && ( $1 == --check || $1 == --run ) || $# == 5 && $1 == --remote ) && $2 =~ ^[0-9a-f]{64}$ ]] || {
-  echo 'Usage: probe-r46h.sh --check|--run MANIFEST_SHA256 [handheld] | --remote MANIFEST_SHA256 PUBLIC_KEY_SHA256 DEVICE_IP HOST_IP' >&2; exit 2;
+[[ ( ( $# == 2 || $# == 3 ) && ( $1 == --check || $1 == --check-installed || $1 == --run ) || $# == 5 && $1 == --remote ) && $2 =~ ^[0-9a-f]{64}$ ]] || {
+  echo 'Usage: probe-r46h.sh --check|--check-installed|--run MANIFEST_SHA256 [handheld] | --remote MANIFEST_SHA256 PUBLIC_KEY_SHA256 DEVICE_IP HOST_IP' >&2; exit 2;
 }
 mode=$1
 profile=${3:-windows}
@@ -25,7 +25,7 @@ esac
 (cd "$scope" && sha256sum --check --quiet SHA256SUMS)
 [[ -z $(find "$scope/usr" -not -user root -print -quit) ]]
 [[ -z $(find "$scope/usr" \( -type f -o -type d \) -perm /022 -print -quit) ]]
-for file in session.sh clients.sh probe-r46h.sh; do
+for file in session.sh clients.sh probe-r46h.sh browser-cgroup.sh; do
   [[ -f $scope/$file && ! -L $scope/$file && $(stat -c %u:%g:%a "$scope/$file") == 0:0:755 ]]
 done
 if [[ $mode == --remote ]]; then
@@ -38,6 +38,12 @@ if [[ $profile == handheld ]]; then
   for file in handheld-client.sh shell-client.sh; do
     [[ -f $scope/$file && ! -L $scope/$file && $(stat -c %u:%g:%a "$scope/$file") == 0:0:755 ]]
   done
+  if [[ -e $scope/browser/browser-client.sh || -L $scope/browser/browser-client.sh ]]; then
+    [[ -f $scope/browser/browser-client.sh && ! -L $scope/browser/browser-client.sh
+       && $(stat -c %u:%g:%a "$scope/browser/browser-client.sh") == 0:0:755 ]]
+    # Refuse an old wrapper that would silently skip the new memory boundary.
+    grep -Fq 'JUME_BROWSER_MEMORY_GUARD' "$scope/browser/browser-client.sh"
+  fi
   if [[ -e $scope/MOONLIGHT_SHA256 || -L $scope/MOONLIGHT_SHA256 ]]; then
     [[ -f $scope/MOONLIGHT_SHA256 && ! -L $scope/MOONLIGHT_SHA256 && $(stat -c %u:%g:%a "$scope/MOONLIGHT_SHA256") == 0:0:644 ]]
     [[ $(cat "$scope/MOONLIGHT_SHA256") =~ ^[0-9a-f]{64}$ && -x $scope/usr/bin/moonlight-qt ]]
@@ -74,6 +80,10 @@ if (( device_mode || ports_mode )); then
   [[ -f $scope/session-leases.sh && ! -L $scope/session-leases.sh && $(stat -c %u:%g:%a "$scope/session-leases.sh") == 0:0:755 ]] || exit 1
 fi
 for service in r46h-gaming-input r46h-volume-keys r46h-gaming-frontend; do
+  if [[ $mode == --check-installed && $service == r46h-gaming-frontend ]]; then
+    [[ $(systemctl show -p ActiveState --value "$service.service") == inactive ]]
+    continue
+  fi
   systemctl is-active --quiet "$service.service"
 done
 status=0
@@ -98,7 +108,7 @@ if [[ -f $scope/usr/share/r46h/ports/manager.py ]]; then
     "$scope/usr/bin/python3.13" -I -B -c 'import bz2, ctypes, lzma, sqlite3, ssl, urllib.request, zipfile'
 fi
 printf 'WAYLAND_PREFLIGHT PASS kernel=v0.15 rootfs=%s device_runtime=UNTESTED\n' "$rootfs"
-[[ $mode != --check ]] || exit 0
+[[ $mode != --check && $mode != --check-installed ]] || exit 0
 exec 9> "$scope/probe.lock"
 flock -n 9
 rm -f -- "$scope/seatd-socket-identity"
@@ -112,6 +122,9 @@ unit_properties=()
 if (( ports_mode || device_mode )); then
   unit_properties=(-p "ExecStartPre=/bin/bash $scope/session-leases.sh --acquire $unit $ports_mode $device_mode"
                    -p "ExecStopPost=/bin/bash $scope/session-leases.sh --restore $unit $ports_mode $device_mode")
+fi
+if [[ $profile == handheld && -x $scope/browser/browser-client.sh ]]; then
+  unit_properties+=(-p Delegate=memory -p DelegateSubgroup=desktop -p OOMPolicy=continue)
 fi
 restore() {
   result=$?

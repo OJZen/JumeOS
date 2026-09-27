@@ -76,6 +76,54 @@ cards when the browser wrapper exists, even without a native-ports lease.
 Packaging requires a traversable archive root and explicitly includes XComposite,
 XDamage and Xtst; availability in the builder is not target dependency proof.
 
+## Browser memory boundary — source candidate
+
+The 2026-09-26 candidate uses native cgroup v2 rather than another supervisor.
+The root-owned transient unit delegates `memory` with `DelegateSubgroup=desktop`;
+`browser-cgroup.sh` creates a sibling browser group with **384 MiB memory.max**,
+**128 MiB memory.swap.max** and whole-group OOM kill. Swap is a ceiling, not an
+allocation: no swap is enabled by this feature. Launch requires 256 MiB currently
+available RAM. These initial limits need target tuning; they do not guarantee
+heavy-page success, GPU allocation coverage or freedom from system-wide OOM.
+
+Only the membership files needed for migration are writable by ark, not limits,
+directories or desktop membership. The wrapper moves itself before exec, so its
+Chromium children inherit the boundary. `OOMPolicy=continue` keeps a browser
+memcg kill from automatically stopping the shared desktop unit; its existing
+deadline and cleanup still apply. A group kill loses unsaved browser state.
+Relaunch refuses a populated previous group. See the native
+[cgroup rules](https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html)
+and [systemd subgroup contract](https://github.com/systemd/systemd/blob/v257/man/systemd.resource-control.xml).
+
+Upgrade the browser wrapper **together with** session/probe/helper and rebuild
+their manifests. Preflight rejects the old wrapper; the target wrapper refuses
+missing isolation. Do not overlay just one side onto the accepted package.
+Host contracts and the 2026-09-27 bounded R46H tests below pass; this remains a
+transient candidate, not persistent promotion or heavy-site acceptance.
+On an authorized, idle Linux/systemd host with ark UID 1000,
+cgroup v2, systemd 254+ and at least 640 MiB available RAM, root can run:
+
+```sh
+bash mainline/gaming-wayland/test-browser-cgroup.sh
+```
+
+This bounded test intentionally triggers a browser-group OOM, checks a desktop
+sentinel survives, detached children exit and relaunch succeeds. It creates no
+GUI, swap or boot changes and does not prove compositor/browser UI recovery.
+Run it before controlled offline R46H pages, then the reported heavy-page path;
+retain the accepted bundle and stop on global OOM, storage or GPU faults.
+
+2026-09-27, accepted v0.15 kernel/p2 v0.18, systemd 257, no swap: the fixture
+triggered `CONSTRAINT_MEMCG`, killed the detached child, preserved its desktop
+sentinel and relaunched. The paired real desktop/browser then passed offline
+input/IME/tabs/About, sandbox and Panfrost WebGL 2 blue-pixel checks under the cap
+(peak 352,825,344 bytes). A separate bounded allocator in the real browser group
+caused one group OOM: browser/Chromium exited, the launcher PID and IPC generation
+survived, the task cleared with signal 9 and a new browser/renderer generation
+started. Both sessions restored leases and ES-DE. This is induced-pressure machine
+proof, **not mi.com, physical smoothness or security acceptance**. Exact hashes,
+logs and cleanup: `mainline/out/.cache/r46h-unattended-20260927.cA9xEV/session.md`.
+
 ## Graphics and security gates
 
 Qt Quick uses OpenGL; the wrapper retains the session's Mesa/Panfrost EGL/GBM/DRI
@@ -105,6 +153,8 @@ still trails upstream; it is not a claim of current security coverage. Keep this
 preview to controlled pages, not sensitive accounts. Review security advisories
 and a current maintained engine before ordinary Internet use or promotion;
 host sandbox proof alone does not close target sandbox or GPU gates.
+The Debian backports package was rechecked on 2026-09-26: the same pinned version
+was still listed, so no unverified version bump was made.
 
 ## Verification
 

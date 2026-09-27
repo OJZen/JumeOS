@@ -1,0 +1,36 @@
+[Unit]
+Description=Jume Launcher
+ConditionPathExists=|/var/lib/jume-launcher/enabled
+ConditionPathExists=|/run/jume-launcher-trial
+Requires=r46h-gaming-input.service
+Wants=r46h-volume-keys.service
+RequiresMountsFor=/roms /var/lib/jume-launcher /home/ark
+After=systemd-user-sessions.service r46h-gaming-input.service r46h-volume-keys.service r46h-gaming-frontend.service
+Conflicts=getty@tty2.service
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+Type=exec
+RuntimeDirectory=jume-launcher
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+ExecStartPre=/bin/bash /var/lib/jume-launcher/current/product-session.sh --prepare
+ExecStart=/bin/bash /var/lib/jume-launcher/current/product-session.sh --run
+ExecStopPost=/bin/bash /var/lib/jume-launcher/current/product-session.sh --restore
+Restart=always
+RestartSec=3
+RestartPreventExitStatus=77 78
+SuccessExitStatus=77 78
+KillMode=control-group
+TimeoutStartSec=120
+TimeoutStopSec=15
+Delegate=memory
+DelegateSubgroup=desktop
+OOMPolicy=continue
+UMask=0077
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=200
+
+[Install]
+WantedBy=multi-user.target

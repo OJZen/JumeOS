@@ -422,14 +422,21 @@ QByteArray ToolState::neoConfiguration(const QVariantMap &settings, const QStrin
     options += "input_player1_l2_btn = \"nul\"\ninput_player1_r2_btn = \"nul\"\ninput_player1_l2_axis = \"+4\"\ninput_player1_r2_axis = \"+5\"\n";
     return options.toUtf8();
 }
+bool ToolState::nativeSessionAllowed(const QString &membership, bool sharedDisplay) {
+    return QRegularExpression(sharedDisplay
+        ? "^0::/system\\.slice/(?:r46h-wayland-probe-[0-9]+\\.service(?:/desktop)?|jume-launcher\\.service/desktop)(?:\\n)?$"
+        : "^0::/system\\.slice/r46h-shell-probe-[0-9]+\\.service(?:\\n)?$").match(membership).hasMatch();
+}
 int ToolState::runNative(const QString &state, int timeoutSeconds, bool sharedDisplay, const QString &expectedGame) {
     // Both render paths require the fixed device and the corresponding outer supervisor.
     DeviceState device("/", false);
     if (!device.target() || geteuid() != 1000 || timeoutSeconds < 1 || timeoutSeconds > 2100 || state.contains('"') || state.contains('\\') || state.contains('\n') || state.contains('\r')) return 2;
     QFile cgroup("/proc/self/cgroup"); struct statvfs mount{};
-    if (!cgroup.open(QIODevice::ReadOnly) || ::statvfs("/roms", &mount) || !(mount.f_flag & ST_RDONLY)
-        || !QRegularExpression(sharedDisplay ? "/r46h-wayland-probe-[0-9]+\\.service(?:\\n|$)" : "/r46h-shell-probe-[0-9]+\\.service(?:\\n|$)")
-            .match(QString::fromUtf8(cgroup.read(4096))).hasMatch()) return 2;
+    if (!cgroup.open(QIODevice::ReadOnly) || ::statvfs("/roms", &mount) || !(mount.f_flag & ST_RDONLY)) return 2;
+    const auto membership = QString::fromUtf8(cgroup.read(4096));
+    if (!nativeSessionAllowed(membership, sharedDisplay)) return 2;
+    const bool installed = sharedDisplay && membership.trimmed() == "0::/system.slice/jume-launcher.service/desktop";
+    if (installed) timeoutSeconds = 0; // The product service, not a diagnostic timer, owns lifetime.
     if (sharedDisplay ? (qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY") || !QStringList{"0x5246/0x0049","0x5246/0x004a","0x5246/0x004b","0x5246/0x004c"}.contains(qEnvironmentVariable("SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT")))
                       : !qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")) return 2;
     if (!ownedTools(state)) return 2;
@@ -461,7 +468,7 @@ int ToolState::runNative(const QString &state, int timeoutSeconds, bool sharedDi
         child.start(python, arguments);
         int result = 1;
         if (child.waitForStarted(5000)) {
-            if (child.waitForFinished((timeoutSeconds + 10) * 1000)) result = child.exitStatus() == QProcess::NormalExit ? child.exitCode() : 1;
+            if (child.waitForFinished(installed ? -1 : (timeoutSeconds + 10) * 1000)) result = child.exitStatus() == QProcess::NormalExit ? child.exitCode() : 1;
             else { child.terminate(); if (!child.waitForFinished(3000)) { child.kill(); child.waitForFinished(2000); } result = 124; }
         }
         drain();
@@ -506,7 +513,7 @@ int ToolState::runNative(const QString &state, int timeoutSeconds, bool sharedDi
     process.start("/usr/bin/retroarch", {"-c", config, "--appendconfig", game + "/retroarch.cfg", "-L", core, "/roms/neogeo/mslug.zip"});
     int result = 1;
     if (process.waitForStarted(5000)) {
-        if (process.waitForFinished(timeoutSeconds * 1000)) result = process.exitStatus() == QProcess::NormalExit ? process.exitCode() : 1;
+        if (process.waitForFinished(installed ? -1 : timeoutSeconds * 1000)) result = process.exitStatus() == QProcess::NormalExit ? process.exitCode() : 1;
         else { process.terminate(); if (!process.waitForFinished(3000)) { process.kill(); process.waitForFinished(2000); } result = 124; }
     }
     drain();

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Internal, temporary sysfs lease. systemd runs restore even if the GUI/probe dies.
 set -Eeuo pipefail
-[[ ( $# == 2 && ( $1 == --acquire || $1 == --restore ) && $2 =~ ^r46h-(shell|wayland)-probe-[0-9]+\.service$ || $# == 1 && $1 == --restore ) && $EUID == 0 ]] || exit 2
+[[ ( $# == 2 && ( $1 == --acquire || $1 == --restore ) && $2 =~ ^(r46h-(shell|wayland)-probe-[0-9]+|jume-launcher)\.service$ || $# == 1 && $1 == --restore ) && $EUID == 0 ]] || exit 2
 readonly unit=${2:-}
 readonly lease=/run/r46h-device-lease
 readonly control=/run/r46h-cpu-control
@@ -25,7 +25,7 @@ restore() {
         [[ -f $lease/helper.unit && ! -L $lease/helper.unit ]] || return 1
         local helper_unit
         helper_unit=$(cat "$lease/helper.unit")
-        [[ $helper_unit =~ ^r46h-(shell|wayland)-probe-[0-9]+-cpu\.service$ ]] || return 1
+        [[ $helper_unit =~ ^(r46h-(shell|wayland)-probe-[0-9]+|jume-launcher)-cpu\.service$ ]] || return 1
         systemctl stop "$helper_unit" || [[ $(systemctl show -p LoadState --value "$helper_unit") == not-found ]] || return 1
         if [[ -e $control || -L $control ]]; then
             [[ -d $control && ! -L $control ]] || return 1
@@ -106,7 +106,11 @@ for node in "${nodes[@]:1}"; do chown root:root "$node";chmod 0644 "$node";done
 helper_unit="${unit%.service}-cpu.service"
 printf '%s\n' "$helper_unit" > "$lease/helper.unit"
 mkdir -m 750 "$control";chown root:ark "$control"
-systemd-run --quiet --collect --unit="$helper_unit" -p RuntimeMaxSec=7200 -p TimeoutStopSec=2 -- /usr/bin/python3 "$base/cpu-control.py" "$unit"
+helper_properties=(-p RuntimeMaxSec=7200)
+if [[ $unit == jume-launcher.service ]]; then
+    helper_properties=(-p BindsTo=jume-launcher.service)
+fi
+systemd-run --quiet --collect --unit="$helper_unit" "${helper_properties[@]}" -p TimeoutStopSec=2 -- /usr/bin/python3 "$base/cpu-control.py" "$unit"
 for attempt in {1..50}; do
     [[ ! -S $control/control.sock ]] || break
     sleep .02

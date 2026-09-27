@@ -185,15 +185,21 @@ def prepared_stardew(content, state, mono, mono_compat):
 
 
 def run_game(game, content, state, seconds, mono=None, mono_compat=None, capture_tool=None, exercise=False, host_test=False, shared_display=False, engine=None):
+    if type(seconds) is not int or not (5 <= seconds <= (120 if host_test else 2100) or seconds == 0):
+        raise ValueError('Invalid runtime bound')
+    if seconds == 0 and (host_test or not shared_display):
+        raise ValueError('Unbounded execution requires the installed shared session')
     if host_test and (platform.machine() != 'aarch64' or not Path('/.dockerenv').exists()):
         raise ValueError('This command runs only inside the bounded AArch64 host-test container')
     if shared_display and (not os.environ.get('WAYLAND_DISPLAY') or os.environ.get('SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT') not in ('0x5246/0x0049','0x5246/0x004a','0x5246/0x004b','0x5246/0x004c') or exercise):
         raise ValueError('Shared ports require the routed controller and Wayland session; X11 input injection is unavailable')
     if not host_test:
         group = Path('/proc/self/cgroup').read_text()
-        unit = r'/r46h-wayland-probe-[0-9]+\.service(?:\n|$)' if shared_display else r'/r46h-shell-probe-[0-9]+\.service(?:\n|$)'
-        if os.geteuid() != 1000 or platform.release() != '6.12.99-r46h-mainline-v0.15-gaming-product' or not re.search(unit, group) or content != Path('/roms'):
+        unit = r'0::/system\.slice/(?:r46h-wayland-probe-[0-9]+\.service(?:/desktop)?|jume-launcher\.service/desktop)\n?' if shared_display else r'0::/system\.slice/r46h-shell-probe-[0-9]+\.service\n?'
+        if os.geteuid() != 1000 or platform.release() != '6.12.99-r46h-mainline-v0.15-gaming-product' or not re.fullmatch(unit, group) or content != Path('/roms'):
             raise ValueError('Device execution requires the identified native preview supervisor')
+        if seconds == 0 and group.strip() != '0::/system.slice/jume-launcher.service/desktop':
+            raise ValueError('Diagnostic sessions require a time bound')
         if Path('/sys/class/block/mmcblk0/device/cid').read_text().strip() != 'fe343253440000002000002d57019567':
             raise ValueError('Device media identity differs')
         mono = Path(__file__).resolve().parents[4] / 'mono'
@@ -278,8 +284,8 @@ def run_game(game, content, state, seconds, mono=None, mono_compat=None, capture
                                              stderr=subprocess.DEVNULL, timeout=8)
                     captured = capture.returncode == 0
                     capture_tool = None
-                if (elapsed >= seconds or stop_requested) and stop_started is None:
-                    stop = elapsed >= seconds
+                if ((seconds > 0 and elapsed >= seconds) or stop_requested) and stop_started is None:
+                    stop = seconds > 0 and elapsed >= seconds
                     stop_grace = 1 if shared_display and not stop else 5
                     stop_started = time.monotonic()
                     send_signal(signal.SIGTERM)
@@ -298,7 +304,7 @@ def run_game(game, content, state, seconds, mono=None, mono_compat=None, capture
                   'frontendReached': frontend_reached(log), 'x11ReturnSent': input_sent, 'initialWindowGeometry': geometry, 'captured': captured, 'forcedKill': forced_kill,
                   'deliberateSelfExit': game == 'stardew' and b'R46H_PORT_SELF_EXIT' in log and proc.returncode == -signal.SIGKILL and not forced_kill, 'peakRssKiB': resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss,
                   'renderer': next((line for line in log.decode(errors='replace').splitlines() if line.startswith('OpenGL version:')), ''),
-                  'boundary': ('AArch64 container, ' + ('Wayland' if shared_display else 'X11') + '/software Mesa, null audio') if host_test else 'R46H bounded process only; LCD/audio/controls require observation'}
+                  'boundary': ('AArch64 container, ' + ('Wayland' if shared_display else 'X11') + '/software Mesa, null audio') if host_test else 'R46H process only; LCD/audio/controls require observation'}
         atomic_json(state / ('host-result.json' if host_test else 'result.json'), result)
         print(json.dumps(result))
     return 0 if proc.returncode == 0 or result['deliberateSelfExit'] else 1
@@ -324,7 +330,7 @@ if __name__ == '__main__':
         parser.error('Host diagnostic overrides are not accepted by the device runner')
     if args.engine and (not args.host_test or args.game == 'stardew'):
         parser.error('Only GTA host tests accept an explicit source-built engine')
-    if not args.content_root.is_absolute() or not args.state.is_absolute() or not 5 <= args.seconds <= (2100 if args.device_run else 120):
+    if not args.content_root.is_absolute() or not args.state.is_absolute() or not (5 <= args.seconds <= (2100 if args.device_run else 120) or args.seconds == 0 and args.device_run and args.shared_display):
         parser.error('Absolute paths and a 5..120 second bound are required')
     os.umask(0o077)
     if args.host_test or args.device_run:

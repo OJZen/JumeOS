@@ -18,6 +18,15 @@ jobs:
           components: clippy,rustfmt
       - name: Documentation
         run: python3 -B mainline/tests/test-project-docs.py
+      - name: Memory policy contracts
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          mkdir -p mainline/out/.cache
+          python3 -B mainline/tests/test-memory-control.py
+          python3 -B mainline/tests/test-browser-cgroup.py
+          python3 -B mainline/tests/test-jume-product.py
+          bash -n mainline/gaming-wayland/test-browser-cgroup.sh
       - name: Rust format
         working-directory: mainline/tools/r46h-card-toolchain
         run: cargo fmt --all -- --check

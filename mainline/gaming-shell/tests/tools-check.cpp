@@ -22,6 +22,20 @@ class ToolsCheck : public QObject {
     }
     static QByteArray get(const QString &path) { QFile f(path); return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray(); }
 private slots:
+    void nativeSessionMembership() {
+        for (const auto &path : {"r46h-wayland-probe-42.service", "r46h-wayland-probe-42.service/desktop",
+                                 "jume-launcher.service/desktop"}) {
+            const auto group = QString("0::/system.slice/%1\n").arg(path);
+            QVERIFY(ToolState::nativeSessionAllowed(group, true));
+            QVERIFY(!ToolState::nativeSessionAllowed(group, false));
+        }
+        for (const auto &path : {"jume-launcher.service/browser", "jume-launcher.service", "other.service/desktop",
+                                 "r46h-wayland-probe-42.service/desktop/child", "r46h-wayland-probe-42.service/browser"})
+            QVERIFY(!ToolState::nativeSessionAllowed(QString("0::/system.slice/%1\n").arg(path), true));
+        QVERIFY(!ToolState::nativeSessionAllowed("0::/user.slice/system.slice/jume-launcher.service/desktop\n", true));
+        QVERIFY(!ToolState::nativeSessionAllowed("0::/system.slice/jume-launcher.service/desktop\n0::/other\n", true));
+        QVERIFY(ToolState::nativeSessionAllowed("0::/system.slice/r46h-shell-probe-42.service\n", false));
+    }
     void nativeRequestsRemainIsolatedWhilePaused() {
         QTemporaryDir dir; ToolState state(dir.path(), "/roms", false);
         QVERIFY(state.choose("neoSmooth", false));

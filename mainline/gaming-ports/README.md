@@ -168,6 +168,18 @@ preservation. `test-portmaster-ui.py` drives the actual Qt/backend pair, includi
 120% fonts, modal isolation, installed filtering, instructions and private-editor
 refusal. Evidence is under `mainline/out/.cache/r46h-ports-backend-20260910/`.
 
+On 2026-09-27, the packaged backend refreshed 1,408 live records over R46H Wi-Fi.
+In isolated disposable state, `2048.zip` installed, replaced its generation with
+the same release, rolled back and uninstalled while preserving a synthetic save.
+The game was never executed: genuine newer-version updates, real saves and the
+interactive installation flow remain open. No existing library was changed.
+Receipt: `mainline/out/.cache/r46h-unattended-20260927.cA9xEV/session.md`.
+
+The [installed desktop candidate](../gaming-wayland/PRODUCT.md) removes native
+game timers only inside its exact supervised desktop cgroup. Diagnostic probes
+remain bounded. Both worker guards accept the browser candidate's `/desktop`
+subgroup; this source correction requires a new Launcher ELF and target replay.
+
 The frozen R19 package/source/receipt are in that evidence directory; the newer
 R20 native-launch package/source/receipt are separately retained in its `r20/`
 subdirectory. R20 also includes the v4 Moonlight combined package; it has no

@@ -7,10 +7,34 @@ output=$2
 profile=${3:-windows}
 case "$profile" in windows|handheld) ;; *) exit 2;; esac
 base=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+installed=${R46H_INSTALLED_SESSION:-0}
+case "$installed" in
+    0) ;;
+    1) grep -Fqx '0::/system.slice/jume-launcher.service/desktop' /proc/self/cgroup || exit 1 ;;
+    *) exit 2 ;;
+esac
+seat_log="$base/seatd.log"
+seat_identity="$base/seatd-socket-identity"
+weston_log="$output/weston.log"
+weston_errors="$output/weston-stderr.log"
+client_log="$output/clients.log"
+if [ "$installed" = 1 ]; then
+    seat_identity=/run/jume-launcher/seatd-socket-identity
+fi
+launch_logged() {
+    log=$1; shift
+    # Inherited journal sockets cannot safely be reopened through /dev/stderr.
+    if [ "$installed" = 1 ]; then exec "$@" >&2; else exec "$@" > "$log" 2>&1; fi
+}
 if [ "$mode" = seat ]; then
     [ "$(id -u)" = 0 ] && [ "$base" = /run/r46h-wayland-probe ] || exit 1
+    unset JUME_BROWSER_MEMORY_GUARD
+    if [ "$profile" = handheld ] && [ -x "$base/browser/browser-client.sh" ]; then
+        /bin/bash "$base/browser-cgroup.sh" --prepare
+        export JUME_BROWSER_MEMORY_GUARD="$base/browser-cgroup.sh"
+    fi
     [ ! -e /run/seatd.sock ] && [ ! -L /run/seatd.sock ] || exit 1
-    "$base/usr/sbin/seatd" -u ark -g ark > "$base/seatd.log" 2>&1 &
+    launch_logged "$seat_log" "$base/usr/sbin/seatd" -u ark -g ark &
     seat=$!
     trap 'kill "$seat" 2>/dev/null || true; wait "$seat" 2>/dev/null || true' EXIT
     trap 'exit 143' TERM HUP
@@ -21,7 +45,7 @@ if [ "$mode" = seat ]; then
         sleep 0.1
     done
     [ -S /run/seatd.sock ]
-    stat -c '%d:%i' /run/seatd.sock > "$base/seatd-socket-identity"
+    stat -c '%d:%i' /run/seatd.sock > "$seat_identity"
     if [ "$profile" = handheld ]; then
         [ -c /dev/uinput ] && [ ! -L /dev/uinput ] && [ "$(stat -c '%t:%T' /dev/uinput)" = a:df ]
         # Delegate four independent handles, never global device permissions.
@@ -30,6 +54,12 @@ if [ "$mode" = seat ]; then
         /usr/bin/setpriv --reuid=ark --regid=ark --init-groups -- "$0" drm "$output" handheld &
         client=$!
         exec 7>&- 8>&- 9>&- 10>&-
+        if [ "$installed" = 1 ]; then
+            result=0
+            wait -n -p completed "$client" "$seat" || result=$?
+            [ "$completed" != "$seat" ] || exit 1
+            exit "$result"
+        fi
         wait "$client"
     else
         /usr/sbin/runuser -u ark -- "$0" drm "$output"
@@ -110,9 +140,9 @@ else
     fi
     set -- --backend=drm-backend.so --renderer=gl --drm-device=card0 --current-mode --continue-without-input
 fi
-"$base/usr/bin/weston" "$@" --shell="$shell" --config="$output/weston.ini" \
-    --socket="$WAYLAND_DISPLAY" --idle-time=0 --log="$output/weston.log" \
-    > "$output/weston-stderr.log" 2>&1 7>&- 8>&- 9>&- 10>&- &
+set -- "$@" --shell="$shell" --config="$output/weston.ini" --socket="$WAYLAND_DISPLAY" --idle-time=0
+[ "$installed" = 1 ] || set -- "$@" --log="$weston_log"
+launch_logged "$weston_errors" "$base/usr/bin/weston" "$@" 7>&- 8>&- 9>&- 10>&- &
 pid=$!
 for attempt in $(seq 1 100); do
     [ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ] || break
@@ -121,9 +151,16 @@ for attempt in $(seq 1 100); do
 done
 [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]
 if [ "$profile" = handheld ]; then
-    "$base/handheld-client.sh" ui "$output" > "$output/clients.log" 2>&1 &
+    launch_logged "$client_log" "$base/handheld-client.sh" ui "$output" &
     client=$!
     exec 7>&- 8>&- 9>&- 10>&-
+    if [ "$installed" = 1 ]; then
+        # Bash 5 on Debian 13: compositor death must not leave an invisible desktop alive.
+        result=0
+        wait -n -p completed "$client" "$pid" || result=$?
+        [ "$completed" != "$pid" ] || exit 1
+        exit "$result"
+    fi
     wait "$client"
     client=''
 else

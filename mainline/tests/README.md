@@ -258,8 +258,21 @@ checks the top-right battery/charge text and normalized Wi-Fi link quality.
 escaped profile names, known UUIDs, literal up/down arguments and read-only refusal.
 `test-device-lease.py` executes the actual recovery/power-exit shell blocks against
 owned files and mocked services; `test-memory-control.py` covers sizes, memory
-reserve and ownership refusal. No host check changes sysfs, NetworkManager,
+reserve, active-application refusal and zram installer ownership/symlink guards.
+`test-browser-cgroup.py` checks exact membership paths, limit rejection and paired
+package wiring. CI runs these two host-only memory checks; neither proves Linux
+enforcement. The root-only `gaming-wayland/test-browser-cgroup.sh` is a separate,
+bounded real memcg OOM/sentinel/relaunch test; see the
+[browser runbook](../gaming-browser/README.md#browser-memory-boundary--source-candidate).
+No host contract check changes sysfs, NetworkManager,
 power state or swap. See the [device gate](../gaming-shell/DEVICE.md).
+
+`test-jume-product.py` checks sealed-release/manifest-type rejection, real host lock contention, interrupted publication,
+inactive installation, trial/default/ES-DE rollback ordering, cleanup refusal,
+native cgroup membership and the installed port lifetime with a fake game.
+CI runs it without root or a systemd daemon. It does not prove installed service
+ordering, cgroup/VT recovery, an ARM64 build or cold boot; those are tracked in
+the [product-session gate](../gaming-wayland/PRODUCT.md).
 
 `streamingApplicationListAndFallback` covers bounded upstream-style list parsing,
 literal names, cancellation, host-cache invalidation, shared choices and manual

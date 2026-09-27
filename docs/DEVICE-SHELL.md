@@ -86,6 +86,8 @@ the streaming exit chord.
 
 ## ES-DE removal gate
 
+The [default-desktop candidate](../mainline/gaming-wayland/PRODUCT.md) owns installation, trial, opt-in promotion and retained-ES-DE rollback. It remains source/host-only until the paired ARM64 build and device gates pass.
+
 Jume Launcher may become the default frontend after its persistent image install,
 cold boot, repeated launch/exit/crash recovery, input ownership and save-retention
 gates pass. Keep ES-DE as a recovery entry during that transition. Remove it only
