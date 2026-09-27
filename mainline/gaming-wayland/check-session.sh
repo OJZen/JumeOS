@@ -58,12 +58,14 @@ fi
 if [[ $# == 1 ]]; then
     [[ ! -e /out/r46h-handheld-desktop-arm64.tar.gz && ! -e /out/receipt.json ]]
     python3 -B - "$stage" "$1" <<'PY'
-import hashlib, json, pathlib, sys
+import hashlib, json, pathlib, runpy, sys
 root = pathlib.Path(sys.argv[1])
 def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 manifest = ''.join(f'{digest(f)}  {f.relative_to(root)}\n' for f in sorted(root.rglob('*'))
                    if f.is_file() and not f.is_symlink() and f != root / 'SHA256SUMS')
 (root / 'SHA256SUMS').write_text(manifest)
+runpy.run_path(str(root / 'product-install.py'))['verify'](root, digest(root / 'SHA256SUMS'))
+print('PRODUCT_SEALED_PAYLOAD_PASS: full packaged manifest, ownership and links')
 record = {'mesa_runtime_revision': 60, 'status': 'HANDHELD_HOST_PASS_R46H_UNTESTED',
           'source_commit': sys.argv[2], 'base_runtime_sha256': digest(pathlib.Path('/wayland-runtime.tar.gz')),
           'mesa_runtime_sha256': digest(pathlib.Path('/mesa-runtime.tar.gz')),

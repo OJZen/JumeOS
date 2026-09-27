@@ -13,8 +13,8 @@ repo = Path(__file__).resolve().parents[2]
 source = (repo / 'mainline/gaming-wayland/probe-r46h.sh').read_text()
 handheld = (repo / 'mainline/gaming-wayland/handheld-client.sh').read_text()
 builder = (repo / 'mainline/gaming-wayland/build-handheld.sh').read_text()
-assert '-v "$output/remote-runtime:/run/r46h-wayland-probe"' in builder
-assert 'trap \'rm -rf -- "$output/remote-runtime"\' EXIT' in builder
+assert '--mount type=volume,destination=/run/r46h-wayland-probe' in builder
+assert 'docker run --rm ' in builder
 
 
 

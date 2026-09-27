@@ -27,6 +27,10 @@ for deb in /native-debs/*.deb; do dpkg-deb -x "$deb" "$native"; done
 mkdir -p "$stage/usr/bin" "$stage/usr/lib"
 install -m 755 "$native/usr/bin/python3.13" "$stage/usr/bin/"
 cp -a "$native/usr/lib/python3.13" "$stage/usr/lib/"
+# Debian's absolute /etc link would escape the sealed private runtime.
+[[ $(readlink "$stage/usr/lib/python3.13/sitecustomize.py") == /etc/python3.13/sitecustomize.py ]]
+rm -- "$stage/usr/lib/python3.13/sitecustomize.py"
+install -m 644 "$native/etc/python3.13/sitecustomize.py" "$stage/usr/lib/python3.13/"
 cp -a "$native/usr/share/doc/"{python3.13-minimal,libpython3.13-minimal,libpython3.13-stdlib} "$stage/usr/share/doc/r46h-ports/"
 env -u LD_LIBRARY_PATH -u PYTHONHOME -u PYTHONPATH "$stage/usr/bin/python3.13" -I -B "$tests/test-port-python.py"
 env -u LD_LIBRARY_PATH -u PYTHONHOME -u PYTHONPATH "$stage/usr/bin/python3.13" -I -B "$stage/usr/share/r46h/ports/local_port.py" --help > /dev/null

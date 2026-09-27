@@ -8,8 +8,10 @@ Host checks: installation/recovery fixtures and adjacent lease/probe guards pass
 macOS Qt 6.8.2 `tools-check` rebuilt and passed 10 checks including actual Qt
 cgroup-pattern matching. This is not a Linux/ARM64 product build. Receipt:
 `mainline/out/.cache/jume-product-20260927.md`.
-The builder keeps the remote test's full payload on the external output disk,
-not the 192 MiB `/run` tmpfs; its disposable extraction is removed on exit.
+The builder verifies the complete payload with the installer's seal checks.
+Remote tests use an anonymous Linux disk volume, removed with the container:
+the payload exceeds the 192 MiB `/run` tmpfs, and macOS binds do not retain test UIDs.
+Build caches, final artifacts and evidence stay on the external workspace.
 
 ## Ownership and recovery
 

@@ -38,9 +38,7 @@ fi
 mkdir -p "$output/share/fonts/truetype/droid" "$output/qt-wayland"
 cp "$cache/r46h-compositor-20260910/share/fonts/truetype/droid/DroidSansFallbackFull.ttf" "$output/share/fonts/truetype/droid/"
 cp -R "$cache/r46h-compositor-20260910/qt-wayland/." "$output/qt-wayland/"
-# Files makes the remote fixture exceed /run's small tmpfs; keep payloads on disk.
-mkdir "$output/remote-runtime"
-trap 'rm -rf -- "$output/remote-runtime"' EXIT
+# Full payload needs disk space and real Linux UIDs; --rm removes this anonymous volume.
 docker run --rm --init --network none --memory 1536m --cpus 3 --pids-limit 256 --cap-add SYS_PTRACE \
   --tmpfs /run:rw,nosuid,nodev,exec,size=192m,mode=755 \
   --entrypoint /bin/bash --device-cgroup-rule 'c 10:223 rwm' --device-cgroup-rule 'c 13:* rwm' \
@@ -52,7 +50,7 @@ docker run --rm --init --network none --memory 1536m --cpus 3 --pids-limit 256 -
   -v "$portmaster:/portmaster-backend.tar.gz:ro" -v "$native:/native-debs:ro" -v "$gta:/gta-source:ro" \
   -v "$cache/r46h-compositor-20260910/ssh-debs:/ssh-debs:ro" \
   -v "$output:/out" -v "$output/desktop:/project/mainline/out" \
-  -v "$output/remote-runtime:/run/r46h-wayland-probe" \
+  --mount type=volume,destination=/run/r46h-wayland-probe \
   -v "$cache/r46h-shell/linux-build:/out/linux-build" \
   -v "$cache/r46h-ports-backend-20260910/game-debs:/debs:ro" -v "$cache/r46h-wayland/deb-cache:/wayland-debs:ro" \
   -v "$cache/r46h-wayland/r46h-wayland-preview-arm64.tar.gz:/wayland-runtime.tar.gz:ro" \

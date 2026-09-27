@@ -7,6 +7,7 @@ import json
 import lzma
 from pathlib import Path
 import sqlite3
+import sitecustomize
 import ssl
 import sys
 import urllib.request
@@ -17,7 +18,7 @@ assert sys.flags.isolated and sys.dont_write_bytecode
 assert Path(sys.prefix).resolve() == prefix, (sys.prefix, prefix)
 for path in sys.path:
     assert Path(path).resolve().is_relative_to(prefix), path
-for module in (bz2, ctypes, json, lzma, sqlite3, ssl, urllib.request, zipfile):
+for module in (bz2, ctypes, json, lzma, sqlite3, sitecustomize, ssl, urllib.request, zipfile):
     assert Path(module.__file__).resolve().is_relative_to(prefix), module.__file__
 sample = b'R46H private Python'
 assert bz2.decompress(bz2.compress(sample)) == lzma.decompress(lzma.compress(sample)) == sample

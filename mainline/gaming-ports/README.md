@@ -116,6 +116,8 @@ platform probes cannot read the launching account's home. Python 3.10+ is requir
 R31 bundles Debian's [Python 3.13 interpreter and standard library](https://packages.debian.org/trixie/python3.13-minimal),
 pinned in `prepare-native.py` with official package-index sizes/SHA-256. They
 live at `usr/bin/python3.13` and `usr/lib/python3.13`, without a system install.
+Debian's `sitecustomize.py` is copied from the pinned package into that private
+stdlib; no absolute `/etc` symlink is retained in the sealed runtime.
 Both catalog and native-port workers use this interpreter with `-I -B`; a missing
 packaged interpreter fails closed. Unpackaged development retains system Python.
 `test-port-python.py` verifies imports, TLS validation and paths inside the bundle;
