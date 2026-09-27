@@ -147,6 +147,20 @@ the private audio server and bounds a real app startup. Launcher entry and
 sensitive-capture checks also pass, including a custom application list.
 Evidence: `mainline/out/.cache/jume-files/RESULTS.md` and adjacent logs/images.
 
+2026-09-27 R46H **offscreen machine checks** passed nine functional cases:
+operations/trash/restore, safe text saves, hostile ZIP/roundtrip/cancellation,
+clipboard/worker responsiveness, cross-filesystem cut, 3,001-entry navigation,
+sorting/preferences/menu bounds, Office text safety and text/image/PDF previews.
+The retained test ELF used the hash-verified package libraries, a temporary Qt
+Test 6.8.2 library, private HOME/fixtures and a read-only system sandbox. No system
+package was installed. Peak test RSS was 81,396 KiB; the large-directory check
+recorded 11 heartbeat ticks and five row widgets, not LCD frame-rate evidence.
+First startup lacked the test-only library; the first functional run's isolated
+`/dev/shm` had wrong permissions. After setting its private mount mode to 1777,
+the cross-filesystem case separately passed. Both failures remain in the receipt:
+`mainline/out/.cache/r46h-unattended-20260927.cA9xEV/session.md`.
+These tests do not close real USB, physical input, speaker/video or LCD gates.
+
 Next single R46H batch: guarded distro dependency/policy setup; a disposable
 USB folder through mount/copy/edit/hash/trash/restore/unmount; refusal of busy
 unmount; controlled hot-unplug during a disposable copy; readonly `/roms`;

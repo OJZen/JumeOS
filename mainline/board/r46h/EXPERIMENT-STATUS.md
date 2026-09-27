@@ -1,6 +1,6 @@
 # R46H experiment status ledger
 
-> Current checkpoint: 2026-09-26. This ledger owns physical evidence and open
+> Current checkpoint: 2026-09-27. This ledger owns physical evidence and open
 > hardware gates; commands, hashes and receipts stay in linked runbooks.
 
 ## How to read this ledger
@@ -67,16 +67,16 @@ broader LCD/USB coverage, Moonlight and PSP remain open.
 - **[Jume Browser](../../gaming-browser/README.md) — TARGET GPU/SANDBOX PASS / HEAVY-SITE OOM + SECURITY OPEN.**
   Offline input/IME/tabs/About, WebGL 2, sandbox and lifecycle/privacy pass; mi.com policy/OOM failures remain.
   A 128 MiB tile budget passed bounded pressure/target regression; discard failed form retention and was withdrawn.
-  Device cleanly powered off; the browser runbook owns exact scope and remaining gates.
+  09-27 paired smoke and browser OOM/relaunch passed with launcher surviving; clean poweroff. Heavy sites remain open.
 - **CPU 600--1008 MHz default — HOST + TARGET + WARM-REBOOT PASS / IMAGE OPEN.**
-  Dynamic `schedutil` and both GTA engines passed; reset recovered a live GPU-min panic. Do not repeat it.
+  P2 v0.18 restores 600--1296 MHz outside Jume; default-cap integration is open. Do not repeat live GPU-min panic.
 - **Jume screen-off/scene policy — TARGET + ATTENDED WAKE PASS / DRAW + STANDBY OPEN.**
   V0.18: AC/battery one-minute LCD off and first-Down wake without focus motion accepted;
   volume wake/HUD accepted. Battery 80->0->80, caps 816->600->816; manual tuning denied.
   Lease/services restored; shared-app/persistence/draw/standby gates: [details](../../gaming-shell/DEVICE.md).
 - **[Files/Transfer](../../gaming-files/TRANSFER.md) — TRANSIENT TARGET MACHINE PASS / PHYSICAL UX OPEN.**
   16 MiB Wi-Fi hash roundtrip, cancellation, readonly ROMs, link-loss revocation and app lifecycle/privacy passed.
-  Eight Python dependencies added without upgrades; services restored and clean poweroff. QR/USB/LCD remain open.
+  Nine ARM64 offscreen Files cases passed on 09-27; services restored and clean poweroff. QR/USB/LCD remain open.
 - **Wayland/ports — R74 SHORT ATTENDED + R79 TRANSIENT MACHINE PASS / BROADER PLAY OPEN.**
   R48 fixed D-pad Down; 640x480, first-config and [private Mesa](../../gaming-mesa/README.md)
   passed. R60's Vice City LCD/audio/controls passed at 816/300 MHz. R62 found
@@ -91,8 +91,8 @@ broader LCD/USB coverage, Moonlight and PSP remain open.
   R79 then routed two B presses into each accepted engine, captured distinct GTA III
   and Vice City startup animations, sampled roughly 25--30 compositor submissions/s
   below 81 C and returned to Jume Launcher with clean lease/service restoration.
-  Neo launch/menu/exit also passed. The offline PortMaster catalog was empty, so
-  live package lifecycle, broader GTA play/save and Stardew remain open.
+  Neo passed. 09-27 live PortMaster install/same-release replacement/rollback/uninstall preserved a synthetic save;
+  genuine newer-version update, game execution/save, broader GTA play and Stardew remain open.
   A 480x360 SGSR1 candidate failed Mesa compilation, then its fixed-mode variant
   exited -11 before the frontend. R63/R60 remain rollbacks.
 - **GLES2 frontend — V0.7 PRODUCT PHYSICAL PASS / MINOR STUTTER OPEN.**
@@ -123,7 +123,7 @@ broader LCD/USB coverage, Moonlight and PSP remain open.
 - **Onboard Bluetooth — NOT PRESENT / UI REMOVED.** Boot `BT=0`, rfkill/sysfs/USB/DTS show no controller.
 - **Zram — ONE-SHOT KERNEL + APPLY/DISABLE DEVICE PASS / PRODUCT BUILD + PROMOTION OPEN.**
   The v0.18 candidate used 43.5/256 MiB LZ4 under bounded pressure, then reset/unloaded cleanly.
-  v0.19 source carries the same startup policy; normal v0.15/media remain the accepted fallback.
+  v0.19 source guards passed target active-app/missing-module refusal; v0.15/media remain fallback. Build/install open.
 - **Hantro media — QT V3 SHORT HUD/A/V/RETURN PASS / LONG SESSION OPEN.**
   Default-preset native HUD, picture/audio, shoulders, host-loss return and reconnect
   were accepted; 59.25 rendered FPS reported. Application-list retrieval failed to
@@ -132,8 +132,8 @@ broader LCD/USB coverage, Moonlight and PSP remain open.
   A known disk's bounded hashes matched. R41 found DWC2 Host, `dr_mode=host` and no
   UDC/gadget/role entry; wiring evidence plus a recoverable kernel/DT candidate are required.
 - **Rumble — DIRECT MOTOR PASS / APP ROUTING OPEN.** Two pulses felt; routing, magnitude and suspend are open.
-- **Charger ONLINE + net charging — SHORT ATTENDED PASS / LIMITS OPEN.** GPIO
-  ONLINE and meter proved short-run net charging; limits open. V0.12 RK817 150 mA is host-only/unbooted.
+- **Charger — SHORT ATTENDED PASS / LIMITS OPEN.** ONLINE and meter proved short-run net charging.
+  V0.12 charge termination at 150 mA: PASS (HOST ONLY), unbooted.
 - **A2 media — READ-ONLY PASS / CQE OPEN.** Tested p2 works; comparative performance remains open.
 - **Second card slot — UNAVAILABLE.** V0.17 disables it; dual-card needs isolation.
 - **Suspend/resume — OPEN / HIGH RISK.** Require bounded wake/recovery before retesting.

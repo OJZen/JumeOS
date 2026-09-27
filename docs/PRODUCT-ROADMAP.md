@@ -1,6 +1,6 @@
 # R46H product roadmap
 
-Updated 2026-09-21. This owns the feature backlog and completion criteria.
+Updated 2026-09-26. This owns the feature backlog and completion criteria.
 [Project Context](PROJECT-CONTEXT.md) owns the immediate order and current device
 state; the [ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) owns physical proof.
 P0 closes the first usable gameplay flows. P1 builds the product around them.
@@ -26,52 +26,20 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
 | S2 / P1 | CPU and memory profiles | Retain accepted CPU controls; ship the fixed 256 MiB LZ4 zram policy only after the product artifact and rollback-safe persistent boot pass; keep disk swap manual |
 | S3 / P1 | Power management | Retain real dim/wake and supervised reboot/poweroff; measure charging/battery reporting and low-voltage policy, then design bounded suspend/wake recovery |
 | B1 / P1 | [Jume Browser](../mainline/gaming-browser/README.md) | Dual-stick scrolling/cursor, B/Y/A/X, tabs/address/IME; maintained Chromium security baseline, sandbox, Panfrost composition/WebGL and separately measured video decode; memory/thermal and foreground recovery on device |
+| F1 / P1 | [Files, previews and Text](../mainline/gaming-files/README.md) | Responsive large directories; copy/cut/paste/delete, ZIP, partitions/USB; safe cancellation, preserved originals, supported previews and editing on device |
+| F2 / P1 | [Wi-Fi Transfer](../mainline/gaming-files/TRANSFER.md) | Phone QR/link upload/download, bounded long transfers, background retention and disconnect revocation without data loss |
+| T1 / P1 | [Background tasks](../mainline/gaming-shell/APPLICATIONS.md) | Fast previews and isolated input; resume, normal close and physical long-hold kill; retained game/save/transfer/audio state |
 | Q1 / P1→P2 | Product installation and endurance | Make Jume Launcher the persistent default after settings/pairing/saves, bounded logs/caches, repeated launches and sustained gameplay pass; remove ES-DE only after cold-boot, crash recovery and upgrade/rollback no longer depend on it |
 
-## Current evidence by workstream — 2026-09-20
+## Evidence owners
 
-- **M1/M2:** v5 fixes the empty application-list path. Real pairing, listing,
-  H.264/PCM, native stats and virtual controller roundtrip passed the isolated
-  [Linux host check](../mainline/gaming-stream-input-test/README.md) on this Mac.
-  Source input was synthetic; R46H LAN/physical input and shared Hantro streaming
-  remain open. The earlier v3 attended A/V/exit/reconnect result stays valid.
-- **G1/G2:** R35 retained R33's launch/exit proof, then wrote a persistent slot 0
-  state, warm-rebooted and loaded the exact retained hash through Ozone; both save
-  and load reached RetroArch's target log. Physical controls and longer gameplay
-  remain open.
-- **W1/W2/R1/H1:** R32 machine checks passed composed game/panel/HUD images,
-  routed input refusal while the panel owns it, B returning input ownership,
-  authenticated SSH, and normal/thermal recovery without the old teardown BUG.
-  R33's external-stop cleanup passed on device with no manual runtime deletion.
-  [The device record](../mainline/gaming-wayland/HANDHELD.md#r35r36-device-follow-up-2026-09-12)
-  owns exact evidence and the 85 C limit. Physical L3+R3, LCD/audio, sustained
-  performance, precise overlay cost and actual Moonlight remain open.
-- **P1–P4:** resource/save management and HarbourMaster lifecycle have host checks.
-  R74's accepted GTA III/Vice City engines pin the ring-upload and simple-shadow
-  source build; Vice City's short intro passed picture, audio and controls, while
-  open-world performance, broader play and saves remain open. Stardew's source,
-  managed copy and backup remain hash-equal with overwrite refused. Its accepted
-  direct path crosses SDL/GBM and survives the 120-second bound, while both shared
-  Wayland clock profiles still stop before window creation. GTA III broader
-  physical play and Stardew shared-window diagnosis/save/load remain open. The
-  separate SA Android-loader/direct-evdev findings do not establish a working port.
-- **U1:** shared controls, headers, icons, font/spacing/motion rules and frame
-  diagnostics are implemented; R35 displayed actual battery/charge/Wi-Fi status,
-  and R32 adds the bounded HUD-independent first-frame
-  wait. Use the [control contract](../mainline/gaming-shell/controls/README.md)
-  for new tools. R32's three short samples per phase retained about 59.5–60.5 game
-  submissions/s; this does not prove LCD 60 Hz or sustained performance.
-- **I1:** the independent USB profile page and offline HID encoder/export exist.
-  R41 confirmed the current device has Host-only DWC2 and no UDC/gadget/role entry.
-  Output stays disabled pending connector routing evidence and a separate kernel/DT candidate.
-- **S1/S2/S3/Q1:** the temporary ark-only Wi-Fi policy passed its exact three
-  actions and denied unrelated permissions. Its byte-reproducible v0.18 successor
-  passes host validation; media deployment, a new password and reboot persistence
-  remain open. The isolated zram kernel passed one-shot apply/pressure/disable;
-  v0.19 product source now fixes that policy at 256 MiB LZ4, with build and
-  persistent-device proof open. The exact board has no onboard
-  Bluetooth controller, so its launcher surface was removed; suspend and product
-  installation remain open.
+Use [current feature evidence](PROJECT-CONTEXT.md#current-feature-evidence) and
+the [physical ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md), not a second
+dated snapshot here. The [combined route](../mainline/gaming-shell/DEVICE.md#combined-acceptance-route)
+separates automated preparation from the remaining operator observations and
+does not repeat accepted media, sequential USB, wake or task-entry checks.
+Browser isolation has bounded target OOM/recovery proof; zram has target refusal checks.
+Both remain source candidates, without persistent product promotion.
 
 ## Delivery constraints
 

@@ -243,9 +243,10 @@ ark-only rule for exactly `network-control`, `settings.modify.system` and
 and reactivated the saved profile, retained its address and reached the gateway;
 all unrelated NetworkManager permissions stayed denied. The exact packages and
 `49-r46h-network.rules` are now integrated in the byte-reproducible
-[v0.18 host artifact](../rootfs-debian13-gaming-v18/README.md), without broadening
-the rule. It is not deployed; media proof, new-password AddAndActivateConnection2
-and reboot persistence still require acceptance.
+[v0.18 artifact](../rootfs-debian13-gaming-v18/README.md), without broadening
+the rule. Media readback, cold base and exact permissions passed. Correcting the
+saved SSID restored activation and next-cold-boot autoconnect. Launcher-created
+new-password AddAndActivateConnection2 and its reboot persistence remain open.
 The [test index](../tests/README.md#current-review-gaps) records the Mac window-
 activation limitation separately from the passing offscreen/ARM64 checks.
 
@@ -263,7 +264,8 @@ category or pairing placeholder.
 `memory-control.sh` is the single guarded implementation for the product zram
 service and operator experiments. The UI reports memory state. `--check` only
 reads; other modes require root, exact device/storage identity and no active
-game/stream. Disk-swap changes additionally require external power.
+Jume desktop, browser, Files/Transfer, supported native game or stream. Leave the
+transient desktop before changing swap. Disk-swap changes also require external power.
 
 ```sh
 /run/r46h-shell-probe/memory-control.sh --check
@@ -301,31 +303,53 @@ accepted v0.17 DTB and existing boot fallback.** The generic archive's boot.ini
 and DTB are not the accepted card configuration; do not rewrite the TF base. This
 Qt adapter intentionally still accepts only the accepted kernel.
 
+`zram-service.sh --check|--install|--remove` prepares the persistent service;
+it is a **host-tested source candidate**, not a deployed kernel or boot proof.
+Stage it beside `memory-control.sh` and `r46h-zram.service` in a root-owned,
+non-writable directory; verify their source hashes and seal the sibling files
+root:root 0644/0755. With the verified v0.19 module closure already installed,
+run `bash zram-service.sh --check`, then `--install`. Installation refuses foreign
+or symlink destinations, enables the exact-kernel service for a later boot and
+does not start swap, replace the kernel or change boot selection. The helper and
+unit go only to `/usr/local/sbin/r46h-memory-control` and
+`/etc/systemd/system/r46h-zram.service`. Keep the accepted kernel/DTB fallback.
+After one-shot kernel acceptance, separately prove ordinary boot activation,
+pressure, return to the accepted kernel and service inactivity there.
+For removal, close applications, use guarded `--zram-off` if active, stop the
+service, then `--remove`; removal refuses active swap and mismatched files.
+On 2026-09-27, target read-only identity/memory checks passed, an active Jume
+desktop correctly blocked `--zram-off`, and installer `--check` refused missing
+v0.19 modules without changing swap or installed files. Installation, product
+build and persistent activation remain open; the same session's evidence is in
+`mainline/out/.cache/r46h-unattended-20260927.cA9xEV/session.md`.
+
 ## Combined acceptance route
 
-Keep the device off during host preparation. One attended batch can cover the
-following sequence; most navigation, capture and readback is agent-operated.
-The batch starts with the exact [p2 v0.18](../rootfs-debian13-gaming-v18/README.md)
-media write, so the TF card must be available before power-on. Rediscover media,
-serial and host-key identity first; keep external supply connected. Freeze the
-[R79 handheld package](../gaming-wayland/HANDHELD.md#resume-and-rebuild) and
-[R45 direct Stardew fallback](../gaming-ports/README.md#r45-stardew-gallium-preload),
-with p2 v0.17 and ES-DE ready for recovery.
+Prepare and hash the paired candidate before power-on; use the current baseline
+and receipts in [Project Context](../../docs/PROJECT-CONTEXT.md), not an old R-number.
+The v0.18 media/cold-base, sequential USB keyboard/mouse, first-key wake, volume
+wake/HUD and task-page entry/resume/normal close already passed. **No TF rewrite
+or repeated accepted input test is required.** Rediscover serial/device/SSH
+identity, keep external supply and ES-DE recovery available. Finish agent-only
+checks first, then ask for one compact operator batch.
 
 | Route | Agent checks | Operator observations |
 | --- | --- | --- |
-| v0.18 media and cold identity | Fixed-profile p2 write/readback, cold identity, exact package/rule hashes, service health and unrelated-action denial | Card handling and normal boot observation |
-| R79 transient desktop baseline | Target manifest/preflight, Home/About/status and clean/forced recovery pass; finish 100%/120% fonts, settings/storage and physical L3+R3 | LCD layout/motion, readability and physical shortcut feel |
-| PortMaster lifecycle | Offline refresh recovery passes with zero entries; finish live refresh plus install/update/remove one bounded test port and prove retained user data | Confirm progress/error readability if requested |
+| Candidate health and isolation | Identity/manifest/preflight; browser memcg OOM/sentinel/relaunch before controlled pages; logs, services and fallback | Only after machine pass: changed browser path, LCD layout/readability, physical L3+R3 |
+| Tasks and power | Capture timing, foreground routing and retained state across background/resume; bounded idle/active CPU and wake checks | Physical long-hold Select+Start kill; game/audio/save retention; in-game volume HUD |
+| Files and Transfer | Copy/cut/paste/delete/ZIP cancellation and error preservation on owned fixtures; Wi-Fi hash/long-transfer/background checks | One Files controls/preview batch; USB stick when available; phone QR upload/download |
+| PortMaster lifecycle | Live refresh/install/same-release replacement/rollback/remove and synthetic-save retention passed; genuine newer-version update and game saves remain open | Confirm progress/error readability if requested |
 | Local lifecycle and retained state | Metal Slug launch/menu/exit and GTA III/Vice City startup/exit pass by remote control; finish retained slot load, broader GTA play and save/relaunch hashes | Picture, audio and physical controls; confirm expected loaded state |
-| Stardew direct then shared | R45 start/load/save/exit/relaunch with source/backup hashes preserved; revisit R79 shared state only with a new source hypothesis | Direct-path picture, audio, controls and loaded farm; report whether a changed shared path creates a window |
-| Network, reboot and recovery | Forced-child recovery, repeated transient expiry and ES-DE fallback pass; finish Wi-Fi create/reconnect/forget, warm-reboot persistence and bounded log/cache growth | Enter secrets only on the handheld and confirm expected network choice |
+| Stardew direct then shared | Preserve R45 and source/backup hashes; investigate the shared pre-window stall only with a new source hypothesis | Save/load and direct-path picture/audio/controls only after machine readiness |
+| Network, reboot and recovery | Launcher-created isolated Wi-Fi profile activation/persistence/forget, restored original profile; bounded logs/caches | Confirm network choice only if automated private entry is unavailable; never repeat secrets in logs |
 
 Run each changed path once; repeat only after a relevant failure/fix. A denied
 permission, thermal/voltage warning or missing capability remains an explicit
 open item, not an excuse to bypass the guard. Cool between game bounds and stop
-at the existing 85 C external abort. Moonlight, zram-kernel promotion, USB HID
-and suspend/resume are intentionally outside this batch: each is deferred or
-lacks a changed hypothesis.
+at the existing 85 C external abort. Zram gets its own one-variable kernel/rollback
+batch after build resources and verified artifacts exist, not alongside new UI.
+Moonlight is user-deferred; USB gadget, simultaneous hub input, battery calibration
+and real suspend need their separate hardware/evidence gates. ES-DE removal waits
+for retained saves, cold boot, recovery and persistent product acceptance.
 Keep machine receipts separate from the operator's LCD/audio observations.
 End with restored settings, health checks, sync and serial-confirmed poweroff.
