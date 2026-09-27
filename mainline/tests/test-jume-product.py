@@ -145,7 +145,8 @@ sync() { echo SYNC; }
         calls.append(args)
     with patch.multiple(install, ROOT=product, UNIT=unit, DROPIN=dropin, TRIAL=trial), \
          patch.object(install, 'target'), patch.object(install, 'sealed'), patch.object(install, 'verify'), \
-         patch.object(install, 'systemctl', side_effect=systemctl):
+         patch.object(install, 'systemctl', side_effect=systemctl), \
+         patch.object(install.subprocess, 'check_output', return_value='inactive\n') as service_state:
         install.main(['--install', expected])
         # A concurrent mutation fails promptly; the service's read-only verification
         # remains available while --trial holds the lock across systemctl start.
@@ -182,6 +183,27 @@ sync() { echo SYNC; }
             install.main(['--trial'])
             assert trial.exists() and not (product / 'enabled').exists()
             assert ('stop', 'r46h-gaming-frontend.service') in calls
+            assert ('reset-failed', 'jume-launcher.service') not in calls
+            trial.unlink()
+            service_state.return_value = 'failed\n'
+            install.main(['--trial'])
+            assert ('reset-failed', 'jume-launcher.service') in calls
+            trial.unlink()
+            calls.clear()
+            service_state.side_effect = subprocess.CalledProcessError(1, ['systemctl', 'show'])
+            with patch.object(install.os.path, 'lexists', return_value=False):
+                try:
+                    install.main(['--trial'])
+                except subprocess.CalledProcessError:
+                    pass
+                else:
+                    raise AssertionError('State lookup failure must abort the trial')
+            assert not trial.exists()
+            assert calls == [('is-active', '--quiet', 'r46h-gaming-frontend.service'),
+                             ('stop', 'r46h-gaming-frontend.service'), ('stop', 'jume-launcher.service'),
+                             ('start', 'r46h-gaming-frontend.service')]
+            service_state.side_effect = None
+            install.main(['--trial'])
             install.main(['--enable'])
             assert (product / 'enabled').read_bytes() == b'jume\n' and not trial.exists()
             calls.clear()

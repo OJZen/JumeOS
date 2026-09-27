@@ -187,7 +187,11 @@ def perform(argv):
         durable_write(TRIAL, b'trial\n')
         systemctl('stop', 'r46h-gaming-frontend.service')
         try:
-            systemctl('reset-failed', 'jume-launcher.service')
+            # A fresh inactive unit may be unloaded; reset-failed then fails on systemd 257.
+            state = subprocess.check_output(['systemctl', 'show', '--value', '--property=ActiveState',
+                                             'jume-launcher.service'], text=True, timeout=150).strip()
+            if state == 'failed':
+                systemctl('reset-failed', 'jume-launcher.service')
             systemctl('start', 'jume-launcher.service')
             systemctl('is-active', '--quiet', 'jume-launcher.service')
         except subprocess.SubprocessError:

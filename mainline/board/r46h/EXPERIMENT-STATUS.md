@@ -54,16 +54,16 @@ broader LCD/USB coverage, Moonlight and PSP remain open.
 - **Remote input — V0.16/V0.17 10 MS DEVICE PASS.** Self-test and exact
   screenshot-verified right/left single-step roundtrip passed; v0.15 uses 100 ms.
 - **[Jume Launcher](../../gaming-shell/DEVICE.md) — DEVICE/PERFORMANCE PASS / PHYSICAL + PROMOTION OPEN.**
-  R79 passed exact archive/1,741-file target readback and preflight. Composed Home
-  and About captures show the aligned Wi-Fi/battery/clock row, live charge state,
-  version and project URL. Normal expiry and forced input-router failure restored
-  ES-DE and all transient leases. The 2026-09-20 candidate passed 39 target actions:
-  Settings, Neo and PortMaster focus left details unloaded; async open/return and
-  PortMaster in-flight cancellation passed. A v0.18 same-device A/B then raised
-  two Settings focus runs from about 29.5 to 57.2--57.5 submissions/s and HUD
-  runs from 29.9 to 58.5--59.0; p50 was 16.64--16.71 ms. Services restored with
-  zero failed units/kernel/ext4/OOM errors; LCD/readability, L3+R3 and promotion remain open.
-  09-26 faster tasks/resume/close and sequential USB keyboard/mouse passed; long-hold/game retention/hub remain open.
+  R79 readback/preflight, Home/About captures and transient lease restoration passed.
+  The 09-20 two-level pages passed 39 actions, async open/return and cancellation.
+  Same-device A/B raised Settings from ~29.5 to 57.2--57.5 submissions/s and HUD
+  from 29.9 to 58.5--59.0; p50 16.64--16.71 ms. LCD/L3+R3 remain open.
+  09-26 faster tasks/resume/close and sequential USB keyboard/mouse passed; long-hold/hub remain open.
+  09-27 installed trial recovered separately from Launcher/Weston/seatd loss, clearing old children/leases.
+  Same desktop survived 460 seconds; GTA III survived 273 seconds with a fresh intro frame, then requested exit.
+  Explicit ES-DE rollback and unchanged sealed payload passed; no failed units or kernel errors.
+  First-start installer fix needs a rebuilt package; cold default, two-hour endurance and save/load remain open.
+  [Installed trial](../../gaming-wayland/PRODUCT.md#installed-trial--2026-09-27) owns evidence and remaining gates.
 - **[Jume Browser](../../gaming-browser/README.md) — TARGET GPU/SANDBOX PASS / HEAVY-SITE OOM + SECURITY OPEN.**
   Offline input/IME/tabs/About, WebGL 2, sandbox and lifecycle/privacy pass; mi.com policy/OOM failures remain.
   A 128 MiB tile budget passed bounded pressure/target regression; discard failed form retention and was withdrawn.

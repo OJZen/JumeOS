@@ -1,13 +1,13 @@
 # Jume default-desktop candidate
 
-Status: **ARM64 host build passed; not installed or accepted on R46H**.
+Status: **ARM64 host + supervised installed-session device trial passed; default promotion open**.
 This is the first Q1 step, not permission to remove ES-DE. The clean-source
 candidate is from `0ca4f27`, under `mainline/out/.cache/jume-product-arm64-20260927-r6/`.
 Its `receipt.json` records source, archive and evidence hashes; all were rechecked.
 Qt checks (10 tools + 13 shell), desktop/tasks, PortMaster, packaged session/power
 exits and full installer seal passed. Fresh-container SSH passed twice with the
 same final ELF. macOS/Linux installation and memory-policy contracts pass too.
-These do not prove installed systemd, DRM/seatd or cold boot. Full work record:
+Host checks alone do not prove installed systemd, DRM/seatd or cold boot. Build record:
 `mainline/out/.cache/jume-product-20260927.md`.
 This artifact includes Files/Terminal/native ports, not Browser or Moonlight.
 The builder verifies the complete payload with the installer's seal checks.
@@ -16,6 +16,32 @@ the payload exceeds the 192 MiB `/run` tmpfs, and macOS binds do not retain test
 Build caches, final artifacts and evidence stay on the external workspace.
 Compilation/session and SSH checks run in separate, equally memory-limited
 containers; previous input fixtures and build memory do not carry into SSH tests.
+
+## Installed trial — 2026-09-27
+
+The frozen r6 payload passed verified installation and a UART/85 C-guarded trial
+on v0.18. First startup exposed systemd 257 rejecting `reset-failed` for a fresh
+unloaded unit. The installer now queries ActiveState and resets only failed units;
+inactive, failed and query-error recovery paths have focused host coverage.
+On-device execution used a separately hash-verified corrected installer, leaving
+the sealed payload untouched. **Rebuild the sealed package before the next trial;
+the retained r6 installer's first-start bug is not fixed inside that artifact.**
+
+Launcher (with Files active), Weston and seatd were killed separately. Each
+cleaned old children/leases and produced a new IPC generation and composed Home
+frame without starting ES-DE. Full validation adds roughly 40 seconds per restart.
+One desktop survived 460 seconds; GTA III survived 273 seconds, accepted two
+routed B presses and produced an intro frame with positive recent submissions.
+The explicit End Game action cleared its group and returned to the same desktop;
+this was requested SIGTERM cleanup, not proof of engine exit 0 or save flushing.
+Files capture privacy also passed. CPU-helper RuntimeMaxUSec is infinity;
+actual two-hour endurance, crash-loop exhaustion and interrupted cleanup remain open.
+Explicit rollback restored ES-DE/input/volume and CPU/backlight, with no failed
+units or kernel errors. All 164 prior files remained present; the existing save
+hash was unchanged. The inactive sealed release and root-private pre-trial backup
+remain installed; task staging/SSH/guard/keys were removed. UART confirmed clean
+poweroff. These are machine observations, not operator LCD/audio/save-load acceptance.
+Evidence: `mainline/out/.cache/jume-product-device-20260927.hB4f8e/session.md`.
 
 ## Ownership and recovery
 
@@ -85,14 +111,14 @@ python3 /var/lib/jume-launcher/current/product-install.py --rollback
 
 ## Next combined target gate
 
-1. Verify and stage the frozen ARM64 candidate. Optional Browser pairing needs
+1. Rebuild/verify the corrected installer package before another trial. Optional Browser pairing needs
    the current guarded wrapper and a newly verified complete manifest; do not
    copy the old unguarded browser wrapper into an installed release.
 2. Supervised trial: ready Home, settings/saves, input ownership, representative
    native/browser launches and rollback. Test beyond the old 120/290/360-second
    bounds and separately beyond the former two-hour CPU-helper limit.
-3. Kill Launcher, Weston and seatd separately; prove fresh-session recovery,
-   old-child/lease cleanup, bounded crash-loop stop and no ES-DE dependency.
+3. Individual Launcher/Weston/seatd recovery and old-child/lease cleanup pass;
+   prove bounded crash-loop stop and no ES-DE dependency after exhaustion.
    Test GUI power actions and interrupted prepare/cleanup on target.
 4. After trial/save acceptance, enable and verify cold boot, Wi-Fi/settings/save
    retention and serial rollback. Then conduct endurance and a genuine upgrade cycle.
