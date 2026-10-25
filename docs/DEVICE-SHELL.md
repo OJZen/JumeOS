@@ -12,6 +12,7 @@ Use Qt 6 Quick/QML for the interface and small C++ components for state and
 controller events. Keep one visual system for cards, settings and quick controls.
 The [shared Qt controls](../mainline/gaming-shell/controls/README.md) own primitive
 styling, navigation and motion; feature pages reuse them and own their data/actions.
+The [Jume UI v1 specification](JUME-UI.md) owns the v1 tokens, key layers and screen acceptance.
 Use the physical 1024×768 aspect ratio, explicit focus, short transitions and
 bounded cover sizes. Reuse existing launch, network, audio and input services
 through narrow device adapters. The opt-in [temporary settings mode](../mainline/gaming-shell/DEVICE.md)
