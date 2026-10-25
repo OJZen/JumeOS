@@ -6,11 +6,19 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSaveFile>
+#include <QDateTime>
 #include <QRegularExpression>
 #include <QSet>
 #include <cerrno>
 #include <cmath>
 #include <sys/stat.h>
+
+namespace {
+const QList<int> FontPercents{90, 100, 115, 130};
+const QStringList NightModes{QStringLiteral("off"), QStringLiteral("on"), QStringLiteral("auto")};
+constexpr int RecentLimit = 32;
+bool validId(const QString &id) { return QRegularExpression("^[a-z0-9][a-z0-9._-]{0,63}$").match(id).hasMatch(); }
+}
 
 Preferences::Preferences(QString directory, QObject *parent)
     : QObject(parent), m_directory(std::move(directory)) {
@@ -37,14 +45,17 @@ Preferences::Preferences(QString directory, QObject *parent)
             && number >= low && number <= high;
     };
     bool valid = parse.error == QJsonParseError::NoError && document.isObject()
-        && QList<QJsonValue>{1, 2, 3, 4}.contains(data.value("version"))
+        && QList<QJsonValue>{1, 2, 3, 4, 5}.contains(data.value("version"))
         && validInteger(data.value("volume"), 0, 100)
         && validInteger(data.value("brightness"), 10, 100)
         && data.value("reducedMotion").isBool() && data.value("favorites").isArray();
-    if (data.value("version").toInt() >= 2) {
+    const int version = data.value("version").toInt();
+    if (version >= 2) {
+        // Schemas 2-4 stored 100/110/120; migration keeps each rank as 100/115/130.
+        const QList<int> fonts = version >= 5 ? FontPercents : QList<int>{100, 110, 120};
         valid = valid && data.value("monitor").isBool()
-            && validInteger(data.value("fontPercent"), 100, 120)
-            && data.value("fontPercent").toInt() % 10 == 0
+            && validInteger(data.value("fontPercent"), 90, 130)
+            && fonts.contains(data.value("fontPercent").toInt())
             && validInteger(data.value("dimSeconds"), 0, 120)
             && QList<int>{0, 30, 60, 120}.contains(data.value("dimSeconds").toInt());
     }
@@ -53,18 +64,29 @@ Preferences::Preferences(QString directory, QObject *parent)
         if (!validInteger(value, 0, 5) || seen.contains(value.toInt())) valid = false;
         seen.insert(value.toInt());
     }
-    if (data.value("version").toInt() >= 3) {
+    if (version >= 3) {
         const auto values = data.value("applicationFavorites"); QSet<QString> applicationIds;
         valid = valid && values.isArray() && values.toArray().size() <= 256;
         for (const auto &value : values.toArray()) {
             const auto id = value.toString();
-            if (!value.isString() || !QRegularExpression("^[a-z0-9][a-z0-9._-]{0,63}$").match(id).hasMatch() || applicationIds.contains(id)) valid = false;
+            if (!value.isString() || !validId(id) || applicationIds.contains(id)) valid = false;
             applicationIds.insert(id);
         }
     }
-    if (data.value("version") == QJsonValue(4))
+    if (version >= 4)
         valid = valid && validInteger(data.value("screenOffSeconds"), 0, 900)
             && QList<int>{0, 60, 180, 300, 600, 900}.contains(data.value("screenOffSeconds").toInt());
+    if (version >= 5) {
+        valid = valid && NightModes.contains(data.value("nightMode").toString());
+        const auto values = data.value("recentApplications"); QSet<QString> recentIds;
+        valid = valid && values.isArray() && values.toArray().size() <= RecentLimit;
+        for (const auto &value : values.toArray()) {
+            const auto entry = value.toObject(); const auto id = entry.value("id").toString();
+            if (!value.isObject() || entry.size() != 2 || !entry.value("id").isString() || !validId(id) || recentIds.contains(id)
+                || !validInteger(entry.value("playedAt"), 0, 2147483647)) valid = false;
+            recentIds.insert(id);
+        }
+    }
     if (!valid) {
         m_loadFailed = true;
         setError(QStringLiteral("预览设置格式异常；请保留原文件，移开后再重试。"));
@@ -74,14 +96,22 @@ Preferences::Preferences(QString directory, QObject *parent)
     m_brightness = data.value("brightness").toInt();
     m_reducedMotion = data.value("reducedMotion").toBool();
     m_favorites = data.value("favorites").toArray().toVariantList();
-    if (data.value("version").toInt() >= 3)
+    if (version >= 3)
         m_applicationFavorites = data.value("applicationFavorites").toArray().toVariantList();
-    if (data.value("version").toInt() >= 2) {
+    if (version >= 2) {
         m_monitor = data.value("monitor").toBool();
-        m_fontPercent = data.value("fontPercent").toInt();
+        const int font = data.value("fontPercent").toInt();
+        m_fontPercent = version >= 5 ? font : FontPercents[QList<int>{100, 110, 120}.indexOf(font) + 1];
         m_dimSeconds = data.value("dimSeconds").toInt();
     }
-    if (data.value("version") == QJsonValue(4)) m_screenOffSeconds = data.value("screenOffSeconds").toInt();
+    if (version >= 4) m_screenOffSeconds = data.value("screenOffSeconds").toInt();
+    if (version >= 5) {
+        m_nightMode = data.value("nightMode").toString();
+        for (const auto &value : data.value("recentApplications").toArray()) {
+            const auto entry = value.toObject();
+            m_recentApplications.append(QVariantMap{{"id", entry.value("id").toString()}, {"playedAt", entry.value("playedAt").toInteger()}});
+        }
+    }
 }
 
 void Preferences::setError(const QString &message) {
@@ -95,7 +125,7 @@ void Preferences::adjust(const QString &name, int step) {
     else if (name == "brightness") m_brightness = qBound(10, m_brightness + qBound(-100, step, 100), 100);
     else if (name == "motion") m_reducedMotion = !m_reducedMotion;
     else if (name == "monitor") m_monitor = !m_monitor;
-    else if (name == "font") m_fontPercent = qBound(100, m_fontPercent + (step < 0 ? -10 : 10), 120);
+    else if (name == "font") m_fontPercent = FontPercents[qBound(0, int(FontPercents.indexOf(m_fontPercent)) + (step < 0 ? -1 : 1), int(FontPercents.size()) - 1)];
     else if (name == "dim") {
         const QList<int> choices{0, 30, 60, 120};
         m_dimSeconds = choices[qBound(0, choices.indexOf(m_dimSeconds) + (step < 0 ? -1 : 1), 3)];
@@ -112,7 +142,13 @@ void Preferences::adjust(const QString &name, int step) {
 bool Preferences::isFavorite(int index) const { return m_favorites.contains(index); }
 
 bool Preferences::choose(const QString &name, int index) {
-    const QList<int> values = name == "font" ? QList<int>{100, 110, 120}
+    if (name == "night") {
+        if (index < 0 || index >= NightModes.size()) return false;
+        m_nightMode = NightModes[index];
+        m_dirty = true; emit changed();
+        return save();
+    }
+    const QList<int> values = name == "font" ? FontPercents
         : name == "dim" ? QList<int>{0, 30, 60, 120}
         : name == "screenOff" ? QList<int>{0, 60, 180, 300, 600, 900} : QList<int>{};
     if (index < 0 || index >= values.size()) return false;
@@ -128,10 +164,28 @@ void Preferences::toggleFavorite(int index) {
     emit changed();
 }
 bool Preferences::toggleApplicationFavorite(const QString &id) {
-    if (!QRegularExpression("^[a-z0-9][a-z0-9._-]{0,63}$").match(id).hasMatch()) return false;
+    if (!validId(id)) return false;
     if (!m_applicationFavorites.contains(id) && m_applicationFavorites.size() >= 256) return false;
     if (!m_applicationFavorites.removeOne(id)) m_applicationFavorites.append(id);
     m_dirty = true; emit changed(); return true;
+}
+// Most recent first; launching again moves an entry to the front.
+bool Preferences::recordRecent(const QString &id, qint64 playedAt) {
+    if (!validId(id)) return false;
+    if (playedAt < 0) playedAt = QDateTime::currentSecsSinceEpoch();
+    if (playedAt > 2147483647) return false;
+    removeRecent(id);
+    m_recentApplications.prepend(QVariantMap{{"id", id}, {"playedAt", playedAt}});
+    while (m_recentApplications.size() > RecentLimit) m_recentApplications.removeLast();
+    m_dirty = true; emit changed(); return true;
+}
+bool Preferences::removeRecent(const QString &id) {
+    for (int i = 0; i < m_recentApplications.size(); ++i) {
+        if (m_recentApplications[i].toMap().value("id").toString() != id) continue;
+        m_recentApplications.removeAt(i);
+        m_dirty = true; emit changed(); return true;
+    }
+    return false;
 }
 
 bool Preferences::save() {
@@ -144,10 +198,11 @@ bool Preferences::save() {
     }
     QSaveFile file(directory.filePath("preview.json"));
     const auto bytes = QJsonDocument(QJsonObject{
-        {"version", 4}, {"volume", m_volume}, {"brightness", m_brightness},
+        {"version", 5}, {"volume", m_volume}, {"brightness", m_brightness},
         {"monitor", m_monitor}, {"fontPercent", m_fontPercent}, {"dimSeconds", m_dimSeconds}, {"screenOffSeconds", m_screenOffSeconds},
-        {"reducedMotion", m_reducedMotion}, {"favorites", QJsonArray::fromVariantList(m_favorites)},
-        {"applicationFavorites", QJsonArray::fromVariantList(m_applicationFavorites)}
+        {"nightMode", m_nightMode}, {"reducedMotion", m_reducedMotion}, {"favorites", QJsonArray::fromVariantList(m_favorites)},
+        {"applicationFavorites", QJsonArray::fromVariantList(m_applicationFavorites)},
+        {"recentApplications", QJsonArray::fromVariantList(m_recentApplications)}
     }).toJson();
     if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
         setError(QStringLiteral("无法保存预览设置；当前修改仍保留，可重试。"));

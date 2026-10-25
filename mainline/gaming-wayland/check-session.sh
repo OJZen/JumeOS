@@ -11,6 +11,9 @@ chmod 755 "$stage"
 tar -xzf /wayland-runtime.tar.gz -C "$stage"
 install -m 755 /out/linux-build/r46h-shell "$stage/usr/bin/"
 install -m 755 /out/input-router "$stage/usr/bin/"
+python3 -B /src/interface-fonts.py install /interface-fonts "$stage"
+R46H_REQUIRE_UI_FONTS=1 R46H_UI_FONT_DIR="$stage/usr/share/fonts/opentype/noto" QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+  timeout 30 /out/linux-build/shell-check interfaceFontWeights
 bash /wayland/install-peripherals.sh "$stage" /peripheral-debs
 if [[ -n ${JUME_FILES_SHA:-} ]]; then
     [[ $JUME_FILES_SHA =~ ^[0-9a-f]{64}$ && $(sha256sum /files-runtime.tar.gz | cut -d ' ' -f 1) == "$JUME_FILES_SHA" ]]
@@ -55,6 +58,7 @@ if [[ -n ${R46H_CLIENT_SHA:-} ]]; then
     rm -rf -- "$stage/client-check"
     timeout 45 python3 -B /wayland/test-session.py "$stage" --stream-ui
 fi
+python3 -B /src/interface-fonts.py verify "$stage"
 if [[ $# == 1 ]]; then
     [[ ! -e /out/r46h-handheld-desktop-arm64.tar.gz && ! -e /out/receipt.json ]]
     python3 -B - "$stage" "$1" <<'PY'

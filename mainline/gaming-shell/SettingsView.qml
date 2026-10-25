@@ -26,6 +26,8 @@ Item {
     readonly property bool choiceOpen: choices.visible
     readonly property bool detailReady: !sidebar && detailLoader.status === Loader.Ready
     readonly property var categories: ["常用", "网络与 Wi-Fi", "摇杆测试", "声音", "屏幕", "存储", "系统信息", "电量与电源", "字体与输入", "CPU 频率", "内存与 Swap", "关于"]
+    readonly property var nightModes: ["off", "on", "auto"]
+    readonly property var nightLabels: ["关闭", "开启", "跟随时间"]
     readonly property var categoryIcons: ["settings", "wifi", "gamepad", "volume", "display", "storage", "info", "battery", "keyboard", "cpu", "memory", "info"]
     readonly property var hints: choices.visible ? choices.hints : sidebar ? [["↑↓", "选择分类"], ["A / ↵", "进入"], ["B / Esc", "主页"]]
         : !detailReady ? [["← / B", "返回分类"]]
@@ -43,7 +45,7 @@ Item {
             {name: "忘记网络", key: "netForget"}, {name: "刷新网络状态", key: "netRefresh"}]
         case 2: return []
         case 3: return [volume, {name: "声音输出", detail: "扬声器 / 耳机", value: "未接入"}]
-        case 4: return [brightness, motion, {name: "预览分辨率", detail: "", value: "1024 × 768"}]
+        case 4: return [brightness, {name: "夜间模式", detail: "", key: "night"}, motion, {name: "预览分辨率", detail: "", value: "1024 × 768"}]
         case 5: return hardware ? [{name: "系统分区", key: "storage0"}, {name: "游戏分区", key: "storage1"}, {name: "启动分区", key: "storage2"}]
             : [{name: "预览文件所在卷", detail: "", info: "storage", value: "刷新", key: "storage"}]
         case 6: return [{name: "当前运行环境", detail: "", info: "system", value: "本机"}, {name: "系统 CPU", detail: "", key: "systemCpu"}, {name: "系统内存", detail: "", key: "memory"}, {name: "处理器温度", detail: "", key: "temperature"}, {name: "GPU 频率", detail: "", key: "gpuFrequency"}, {name: "内存压力（10 秒）", detail: "", key: "pressure"}]
@@ -89,6 +91,7 @@ Item {
         case "volume": return hardware ? "机身音量键" : store.volume + "%"
         case "brightness": return hardware ? metric("brightnessPercent", "%") : store.brightness + "%"
         case "font": return store.fontPercent + "%"
+        case "night": return nightLabels[nightModes.indexOf(store.nightMode)] || "关闭"
         case "dim": return store.dimSeconds ? store.dimSeconds + " 秒" : "关闭"
         case "screenOff": return store.screenOffSeconds ? store.screenOffSeconds / 60 + " 分钟" : "关闭"
         case "screenOffNow": return "熄屏"
@@ -199,9 +202,11 @@ Item {
             else if (row.key === "cpuGovernor") { choiceValues = cpu.governors; labels = cpu.governors; index = labels.indexOf(cpu.governor) }
             else { choiceValues = cpu.frequencies; labels = choiceValues.map(function(v) { return (v / 1000).toFixed(0) + " MHz" }); index = choiceValues.indexOf(row.key === "cpuMin" ? cpu.scaling_min_freq : cpu.scaling_max_freq) }
             choices.present(choiceAnchor(), labels, Math.max(0,index), row.name)
-        } else if (row.key === "font" || row.key === "dim" || row.key === "screenOff") {
-            const labels = row.key === "font" ? ["100%", "110%", "120%"] : row.key === "dim" ? ["关闭", "30 秒", "60 秒", "120 秒"] : ["关闭", "1 分钟", "3 分钟", "5 分钟", "10 分钟", "15 分钟"]
-            const index = row.key === "font" ? (store.fontPercent - 100) / 10 : row.key === "dim" ? [0, 30, 60, 120].indexOf(store.dimSeconds) : [0, 60, 180, 300, 600, 900].indexOf(store.screenOffSeconds)
+        } else if (row.key === "font" || row.key === "night" || row.key === "dim" || row.key === "screenOff") {
+            const labels = row.key === "font" ? Ui.Theme.fontPercents.map(function(value) { return value + "%" }) : row.key === "night" ? nightLabels
+                : row.key === "dim" ? ["关闭", "30 秒", "60 秒", "120 秒"] : ["关闭", "1 分钟", "3 分钟", "5 分钟", "10 分钟", "15 分钟"]
+            const index = row.key === "font" ? Ui.Theme.fontPercents.indexOf(store.fontPercent) : row.key === "night" ? nightModes.indexOf(store.nightMode)
+                : row.key === "dim" ? [0, 30, 60, 120].indexOf(store.dimSeconds) : [0, 60, 180, 300, 600, 900].indexOf(store.screenOffSeconds)
             choices.present(choiceAnchor(), labels, index, row.name)
         } else if (row && valueIsAdjustable(row.key)) {
             if (adjustingValue && !store.save()) return
@@ -308,7 +313,7 @@ Item {
                         }
                         value: settings.adjustingValue && selected ? "↑  " + settings.rowValue(modelData) + "  ↓" : settings.rowValue(modelData)
                         actionable: settings.canActivate(modelData.key)
-                        choice: modelData.key === "font" || modelData.key === "dim" || modelData.key === "screenOff" || ["netProfiles", "netScan", "netForget"].indexOf(modelData.key) >= 0 || (!!modelData.key && modelData.key.indexOf("cpu") === 0 && modelData.key !== "cpuCurrent" && modelData.key !== "cpuAuto")
+                        choice: modelData.key === "font" || modelData.key === "night" || modelData.key === "dim" || modelData.key === "screenOff" || ["netProfiles", "netScan", "netForget"].indexOf(modelData.key) >= 0 || (!!modelData.key && modelData.key.indexOf("cpu") === 0 && modelData.key !== "cpuCurrent" && modelData.key !== "cpuAuto")
                         reducedMotion: settings.store.reducedMotion
                         toggleState: modelData.key === "motion" ? Number(settings.store.reducedMotion) : modelData.key === "monitor" ? Number(settings.store.monitor) : modelData.key === "netRemember" ? Number(settings.network && settings.network.remember) : -1
                         progress: modelData.key === "volume" && !settings.hardware ? settings.store.volume / 100 : modelData.key === "brightness" ? (settings.hardware ? settings.device.info.brightnessPercent : settings.store.brightness) / 100 : -1
@@ -319,26 +324,26 @@ Item {
                 }
                 Item {
                     y: Ui.Theme.contentY; width: parent.width; height: parent.height - y; visible: settings.category === 2
-                    Ui.Label { width: parent.width; elide: Text.ElideRight; text: settings.controller.deviceName || "未检测到手柄"; color: "#cfdee8"; fontScale: settings.fontScale }
+                    Ui.Label { width: parent.width; elide: Text.ElideRight; text: settings.controller.deviceName || "未检测到手柄"; color: Ui.Theme.text; fontScale: settings.fontScale }
                     Row {
                         y: 55; spacing: 72
                         Repeater {
                             model: 2
                             Rectangle {
                                 required property int index
-                                width: 220; height: 220; radius: 110; color: "#1d3442"; border.color: "#43616e"
-                                Rectangle { x: 109; y: 0; width: 1; height: 220; color: "#45616d" }
-                                Rectangle { x: 0; y: 109; width: 220; height: 1; color: "#45616d" }
+                                width: 220; height: 220; radius: 110; color: Ui.Theme.surfaceSunken; border.color: Ui.Theme.outline
+                                Rectangle { x: 109; y: 0; width: 1; height: 220; color: Ui.Theme.outline }
+                                Rectangle { x: 0; y: 109; width: 220; height: 1; color: Ui.Theme.outline }
                                 Rectangle {
                                     x: 98 + Number(settings.controller.axes[parent.index * 2]) * 95
                                     y: 98 + Number(settings.controller.axes[parent.index * 2 + 1]) * 95
-                                    width: 24; height: 24; radius: 12; color: parent.index === 0 ? Ui.Theme.accent : "#cbb8f5"
+                                    width: 24; height: 24; radius: 12; color: parent.index === 0 ? Ui.Theme.accent : Ui.Theme.warning
                                 }
-                                Ui.Label { anchors.horizontalCenter: parent.horizontalCenter; y: 233; text: (parent.index === 0 ? "左" : "右") + "  X " + Number(settings.controller.axes[parent.index * 2]).toFixed(2) + " / Y " + Number(settings.controller.axes[parent.index * 2 + 1]).toFixed(2); color: "#b4c8d4"; role: "caption" }
+                                Ui.Label { anchors.horizontalCenter: parent.horizontalCenter; y: 233; text: (parent.index === 0 ? "左" : "右") + "  X " + Number(settings.controller.axes[parent.index * 2]).toFixed(2) + " / Y " + Number(settings.controller.axes[parent.index * 2 + 1]).toFixed(2); color: Ui.Theme.textSecondary; role: "caption" }
                             }
                         }
                     }
-                    Ui.Label { y: 323; width: parent.width; elide: Text.ElideRight; text: "按键  " + (settings.controller.buttons || "—") + "     LT " + Number(settings.controller.axes[4]).toFixed(2) + " / RT " + Number(settings.controller.axes[5]).toFixed(2); color: "#cfdee8"; role: "caption" }
+                    Ui.Label { y: 323; width: parent.width; elide: Text.ElideRight; text: "按键  " + (settings.controller.buttons || "—") + "     LT " + Number(settings.controller.axes[4]).toFixed(2) + " / RT " + Number(settings.controller.axes[5]).toFixed(2); color: Ui.Theme.text; role: "caption" }
                     MouseArea { anchors.fill: parent; onClicked: { settings.tester = true; settings.activity() } }
                 }
                 Ui.FocusFrame {

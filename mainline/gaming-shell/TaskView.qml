@@ -32,17 +32,17 @@ Rectangle {
     }
     onTasksChanged: selected = Math.max(0, Math.min(selected, tasks.length - 1))
 
-    Ui.Label { x: 36; y: 25; width: 680; height: 48; role: "title"; text: "后台任务" }
-    Ui.Label { x: 36; y: 76; width: 760; height: 28; role: "caption"; text: root.tasks.length ? "选择任务，继续上次的进度" : "运行过的应用会出现在这里" }
+    Ui.Label { x: Ui.Theme.margin; y: 25; width: 680; height: 48; role: "title"; text: "后台任务" }
+    Ui.Label { x: Ui.Theme.margin; y: 76; width: 760; height: 28; role: "caption"; text: root.tasks.length ? "选择任务，继续上次的进度" : "运行过的应用会出现在这里" }
     Rectangle {
-        x: 856; y: 32; width: 132; height: 44; radius: 22
+        x: Ui.Theme.margin + Ui.Theme.contentWidth - width; y: 32; width: 132; height: 44; radius: 22
         color: Ui.Theme.surface; border.color: Ui.Theme.outline
         Ui.Label { anchors.centerIn: parent; role: "caption"; font.bold: true; text: "后台 " + root.tasks.length + " / 4" }
     }
 
     Rectangle {
         id: featured
-        x: 36; y: 130; width: 602; height: 484; radius: 18; clip: true
+        x: Ui.Theme.margin; y: 130; width: Ui.Theme.contentWidth - queue.width - Ui.Theme.space16; height: 484; radius: 18; clip: true
         visible: root.currentTask !== null
         color: Ui.Theme.surface; border.color: Ui.Theme.outline
         Image {
@@ -59,13 +59,13 @@ Rectangle {
             anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
             height: 156
             gradient: Gradient {
-                GradientStop { position: 0; color: "#00111a24" }
-                GradientStop { position: 0.5; color: "#cc111a24" }
-                GradientStop { position: 1; color: "#f5111a24" }
+                GradientStop { position: 0; color: Ui.Theme.alpha(Ui.Theme.ground, 0) }
+                GradientStop { position: 0.5; color: Ui.Theme.alpha(Ui.Theme.ground, 0.8) }
+                GradientStop { position: 1; color: Ui.Theme.alpha(Ui.Theme.ground, 0.96) }
             }
         }
         Rectangle {
-            x: 20; y: 20; width: 114; height: 34; radius: 17; color: "#de111a24"
+            x: 20; y: 20; width: 114; height: 34; radius: 17; color: Ui.Theme.alpha(Ui.Theme.ground, 0.87)
             Rectangle { x: 12; anchors.verticalCenter: parent.verticalCenter; width: 8; height: 8; radius: 4; color: Ui.Theme.accent }
             Ui.Label { x: 28; anchors.verticalCenter: parent.verticalCenter; width: 78; role: "micro"; font.bold: true; text: "当前选择" }
         }
@@ -79,7 +79,8 @@ Rectangle {
     }
 
     Column {
-        x: 654; y: 130; width: 334; spacing: 12
+        id: queue
+        x: featured.x + featured.width + Ui.Theme.space16; y: 130; width: 334; spacing: 12
         visible: root.tasks.length > 0
         Repeater {
             model: root.tasks
@@ -111,7 +112,7 @@ Rectangle {
     }
 
     Rectangle {
-        x: 36; y: 130; width: 952; height: 484; radius: 18
+        x: Ui.Theme.margin; y: 130; width: Ui.Theme.contentWidth; height: 484; radius: 18
         visible: root.tasks.length === 0; color: Ui.Theme.surface; border.color: Ui.Theme.outline
         Ui.Icon { width: 72; height: 72; anchors.horizontalCenter: parent.horizontalCenter; y: 128; name: "monitor"; color: Ui.Theme.muted }
         Ui.Label { width: parent.width; y: 222; role: "title"; horizontalAlignment: Text.AlignHCenter; text: "没有后台任务" }
@@ -119,7 +120,7 @@ Rectangle {
     }
 
     Rectangle {
-        x: 36; y: 644; width: 952; height: 72; radius: 16
+        x: Ui.Theme.margin; y: 644; width: Ui.Theme.contentWidth; height: 72; radius: 16
         color: Ui.Theme.surface; border.color: Ui.Theme.outline
         Ui.Button { x: 14; y: 12; width: 218; text: "A  继续应用"; primary: true; enabled: root.canAct; onClicked: root.activated(root.currentTask.id) }
         Ui.Button { x: 246; y: 12; width: 218; text: "Y  正常关闭"; enabled: root.canAct; onClicked: root.closeSelected() }

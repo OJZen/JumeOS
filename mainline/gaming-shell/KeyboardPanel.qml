@@ -15,7 +15,7 @@ InputPanel {
         return true
     }
     // Same pinned Qt 6.8.2 adapter as the layout cache; checked with the packaged IME.
-    Binding { target: panel.keyboard.style; property: "navigationHighlightColor"; value: Ui.Theme.accent }
+    Binding { target: panel.keyboard.style; property: "navigationHighlightColor"; value: Ui.Theme.focus }
     Binding { target: panel.keyboard; property: "noAnimations"; value: panel.reducedMotion }
     // Application integration: one panel, no extra EGLFS window.
     Component.onCompleted: {

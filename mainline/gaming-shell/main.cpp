@@ -1,6 +1,7 @@
 #include "input.h"
 #include "handheld.h"
 #include "preferences.h"
+#include "fonts.h"
 #include "telemetry.h"
 #include "control.h"
 #include "applications.h"
@@ -97,8 +98,7 @@ int main(int argc, char **argv) {
     app.setApplicationName(QStringLiteral(JUME_LAUNCHER_NAME));
     app.setApplicationDisplayName(QStringLiteral(JUME_LAUNCHER_NAME));
     app.setApplicationVersion(QStringLiteral(JUME_LAUNCHER_VERSION));
-    const auto bundledFont = QCoreApplication::applicationDirPath() + "/../share/fonts/truetype/droid/DroidSansFallbackFull.ttf";
-    if (QFileInfo::exists(bundledFont)) QFontDatabase::addApplicationFont(bundledFont);
+    registerInterfaceFonts();
     QCommandLineParser parser;
     parser.setApplicationDescription("Jume Launcher preview; hardware controls require a guarded session.");
     parser.addHelpOption();

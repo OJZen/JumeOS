@@ -205,7 +205,7 @@ Rectangle {
         x: pad ? pad.position.x : 0; y: pad ? pad.position.y : 0; width: 24; height: 32
         visible: !root.editing && pad && pad.controllerPointer; enabled: false; z: 100
         preferredRendererType: Shape.GeometryRenderer
-        ShapePath { strokeColor: "#111a24"; strokeWidth: 2; fillColor: "white"; PathSvg { path: "M1 1L1 26L8 20L14 31L19 28L13 18L23 17Z" } }
+        ShapePath { strokeColor: Ui.Theme.pointerOutline; strokeWidth: 2; fillColor: Ui.Theme.pointer; PathSvg { path: "M1 1L1 26L8 20L14 31L19 28L13 18L23 17Z" } }
     }
     // No network or real profile is used by this smoke check.
     property int testStep: 0

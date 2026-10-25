@@ -112,9 +112,10 @@ No device endpoint/key was installed. Real editor/PIN captures remain blocked;
 Control captures and performance profiling remain separate runs.
 
 On a host, volume and brightness are preview values. Favorites, those values, reduced
-motion, font size, HUD visibility, idle dim and automatic screen-off timing are saved atomically to
-`state/preview.json`. Versions 1/2/3 migrate to schema 4 on the next write; stable
-application favorites are separate from the old demo indexes.
+motion, font size, night mode, HUD visibility, idle dim and automatic screen-off timing are saved atomically to
+`state/preview.json`. Versions 1–4 migrate to schema 5 on the next write; saved
+110/120% font sizes keep their rank as 115/130%. Stable application favorites are
+separate from the old demo indexes.
 Save failure retains the
 in-memory change, displays an error and blocks the attempted settings/panel or
 window exit until retry succeeds. An unreadable/invalid existing file is never
@@ -244,8 +245,8 @@ native Mac captures were reviewed. The Mac used Metal on Apple M4; these are
 not LCD/Panfrost evidence.
 Input-test captures also require `--test-input-capture`, even when empty;
 real host editors and pairing PINs always remain private.
-For repeatable navigation/100%/120% screenshots, create an external output
-directory and set `R46H_UI_CAPTURE_DIR` when running `run.sh --check`.
+For repeatable navigation, 100%/130% and light/night screenshots, create an external
+output directory and set `R46H_UI_CAPTURE_DIR` when running `run.sh --check`.
 
 The [current shared candidate](TOOLS.md#current-shared-candidate) links to R78's
 frozen source, package and checks. R36 remains the accepted device proof for
@@ -420,6 +421,10 @@ The full session receipt is
 `build-linux.sh` builds/tests in the pinned Moonlight ARM64 toolchain and packages
 `r46h-shell-preview-arm64.tar.gz` using the hash-bound Qt baseline. It mounts
 source read-only and uses external build/package staging with no network.
+It installs the pinned Noto Sans SC Regular/Medium/Bold from
+`mainline/out/.cache/fonts/noto-sans-sc` (`interface-fonts.py prepare ABSOLUTE_DIR`
+fetches or checks it; `R46H_UI_FONT_CACHE` overrides the path) and refuses the
+package unless the staged binary resolves all three weights by family.
 
 1. Rediscover serial and listen before cold power. Verify the accepted v0.17
    identity through the [device contract](../rootfs-debian13-gaming-v17/README.md#persistent-device-acceptance).

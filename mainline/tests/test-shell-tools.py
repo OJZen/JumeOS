@@ -73,13 +73,13 @@ with tempfile.TemporaryDirectory(prefix='tools-check-',dir=repo/'mainline/out/.c
    deadline=time.monotonic()+5
    while not ask()['state']['settingsDetailReady']:
     assert time.monotonic()<deadline,'settings detail timeout';time.sleep(.02)
-   tap('accept');tap('down');tap('down');tap('accept');assert ask()['state']['fontPercent']==120
-   tap('home');tap('nextTab');tap('down');tap('accept');wait();wait_detail();capture('usb-120')
+   tap('accept');tap('down');tap('down');tap('accept');assert ask()['state']['fontPercent']==130
+   tap('home');tap('nextTab');tap('down');tap('accept');wait();wait_detail();capture('usb-130')
    assert not ask()['state']['toolSaveError']
-   tap('back');tap('home');tap('right');tap('accept');wait();tap('accept');wait_detail();capture('neo-120')
-   tap('back');tap('back');tap('right');tap('accept');wait();tap('accept');wait_detail();capture('ports-120')
+   tap('back');tap('home');tap('right');tap('accept');wait();tap('accept');wait_detail();capture('neo-130')
+   tap('back');tap('back');tap('right');tap('accept');wait();tap('accept');wait_detail();capture('ports-130')
    completed=True
-   result={'status':'SHELL_TOOLS_PASS','actions':actions,'checks':['separate routes','stable favorites','save import without overwrite','backup','USB draft/export only','modal isolation','120% font capture'],'boundary':'host fixtures only; no game execution or USB device writes'}
+   result={'status':'SHELL_TOOLS_PASS','actions':actions,'checks':['separate routes','stable favorites','save import without overwrite','backup','USB draft/export only','modal isolation','130% font capture'],'boundary':'host fixtures only; no game execution or USB device writes'}
   finally:
    if completed:
     try:proc.wait(timeout=45)

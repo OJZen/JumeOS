@@ -1,5 +1,6 @@
 #include "input.h"
 #include "preferences.h"
+#include "fonts.h"
 #include "telemetry.h"
 #include "applications.h"
 #include "streaming.h"
@@ -12,6 +13,8 @@
 #include <QSaveFile>
 #include "taskimages.h"
 #include <QFontDatabase>
+#include <QFontInfo>
+#include <QFontMetrics>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QInputMethod>
@@ -26,10 +29,31 @@
 #include <QAccessible>
 #include <QStyleHints>
 #include <QTemporaryDir>
+#include <QDirIterator>
+#include <cmath>
+#include <QRegularExpression>
 #include <QtTest>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
+
+// The Theme singleton of an engine, resolved through the same directory import as ShellView.
+static QObject *shellTheme(QQmlEngine *engine, QScopedPointer<QObject> &holder) {
+    QQmlComponent probe(engine);
+    probe.setData("import QtQuick\nimport \"controls\" as Ui\nQtObject { property QtObject theme: Ui.Theme }",
+        QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ThemeProbe.qml")));
+    holder.reset(probe.create());
+    if (!holder) qWarning("%s", qPrintable(probe.errorString()));
+    return holder ? holder->property("theme").value<QObject *>() : nullptr;
+}
+static double contrast(const QColor &first, const QColor &second) {
+    const auto luminance = [](const QColor &color) {
+        const auto channel = [](double value) { return value <= 0.03928 ? value / 12.92 : std::pow((value + 0.055) / 1.055, 2.4); };
+        return 0.2126 * channel(color.redF()) + 0.7152 * channel(color.greenF()) + 0.0722 * channel(color.blueF());
+    };
+    const auto a = luminance(first), b = luminance(second);
+    return (qMax(a, b) + 0.05) / (qMin(a, b) + 0.05);
+}
 
 class ShellCheck final : public QObject {
     Q_OBJECT
@@ -38,8 +62,8 @@ private slots:
         QGuiApplication::setApplicationDisplayName(QStringLiteral(JUME_LAUNCHER_NAME));
         QCoreApplication::setApplicationVersion(QStringLiteral(JUME_LAUNCHER_VERSION));
         QGuiApplication::styleHints()->setTabFocusBehavior(Qt::TabFocusAllControls);
-        const auto font = QCoreApplication::applicationDirPath() + "/../share/fonts/truetype/droid/DroidSansFallbackFull.ttf";
-        if (QFileInfo::exists(font)) QVERIFY(QFontDatabase::addApplicationFont(font) >= 0);
+        // Noto Sans SC when R46H_UI_FONT_DIR or the packaged copy exists; captures record which one ran.
+        qInfo("INTERFACE_FONT %s", registerInterfaceFonts() ? "noto-sans-sc" : "fallback");
     }
     void preferencesRoundtripAndFailure() {
         QTemporaryDir directory;
@@ -257,8 +281,8 @@ private slots:
         };
         auto *hud = root->findChild<QQuickItem *>("performancePanel"); QVERIFY(hud);
         const auto captures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
-        for (int scale : {100, 120}) {
-            if (scale == 120) { state.adjust("font", 1); state.adjust("font", 1); }
+        for (int scale : {100, 130}) {
+            if (scale == 130) { state.adjust("font", 1); state.adjust("font", 1); }
             for (const auto &scene : {"home", "library", "settings", "about", "power", "controller", "quick", "input"}) {
                 action("home");
                 QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString(scene))));
@@ -434,10 +458,10 @@ private slots:
         QCOMPARE(state.volume(), 42); QVERIFY(state.isFavorite(2));
         QCOMPARE(state.fontPercent(), 100); QCOMPARE(state.dimSeconds(), 0); QCOMPARE(state.screenOffSeconds(), 300); QVERIFY(!state.monitor());
         state.adjust("font", 1); state.adjust("font", 1); state.adjust("font", 1);
-        QCOMPARE(state.fontPercent(), 120);
+        QCOMPARE(state.fontPercent(), 130);
         for (int i = 0; i < 4; ++i) state.adjust("dim", 1);
         QCOMPARE(state.dimSeconds(), 120); state.adjust("monitor", 1); QVERIFY(state.save());
-        Preferences loaded(directory.path()); QCOMPARE(loaded.fontPercent(), 120); QVERIFY(loaded.monitor());
+        Preferences loaded(directory.path()); QCOMPARE(loaded.fontPercent(), 130); QVERIFY(loaded.monitor());
         QCOMPARE(loaded.dimSeconds(), 120); QCOMPARE(loaded.volume(), 42);
         QVERIFY(loaded.choose("screenOff", 1)); QCOMPARE(loaded.screenOffSeconds(), 60);
         // A malformed v2 field must not turn into an apparently valid default.
@@ -455,6 +479,215 @@ private slots:
         QSignalSpy changes(&metrics, &Telemetry::changed);
         metrics.frameSubmitted(); QTest::qWait(1100); QVERIFY(changes.isEmpty());
         metrics.setActive(true); QVERIFY(metrics.history().isEmpty()); QVERIFY(metrics.submissions() < 0);
+    }
+    void preferenceSchemaV5() {
+        QTemporaryDir directory; QVERIFY(directory.isValid());
+        QFile file(directory.filePath("preview.json"));
+        auto write = [&](const QJsonObject &data) {
+            QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate)); file.write(QJsonDocument(data).toJson()); file.close();
+        };
+        const QJsonObject v4{{"version", 4}, {"volume", 40}, {"brightness", 70}, {"reducedMotion", false}, {"favorites", QJsonArray{}},
+            {"monitor", false}, {"fontPercent", 110}, {"dimSeconds", 0}, {"applicationFavorites", QJsonArray{"game-a"}}, {"screenOffSeconds", 300}};
+        // Schema 4 sizes keep their rank in the v1 steps: 100/110/120 become 100/115/130.
+        for (const auto &size : {qMakePair(100, 100), qMakePair(110, 115), qMakePair(120, 130)}) {
+            auto data = v4; data["fontPercent"] = size.first; write(data);
+            Preferences migrated(directory.path()); QVERIFY(migrated.error().isEmpty());
+            QCOMPARE(migrated.fontPercent(), size.second); QCOMPARE(migrated.nightMode(), QString("off"));
+            QVERIFY(migrated.recentApplications().isEmpty()); QVERIFY(migrated.applicationFavorites().contains("game-a"));
+        }
+        Preferences state(directory.path());
+        QVERIFY(state.choose("night", 2)); QCOMPARE(state.nightMode(), QString("auto"));
+        QVERIFY(state.recordRecent("game-a", 1000)); QVERIFY(state.recordRecent("game-b", 2000)); QVERIFY(state.recordRecent("game-a", 3000));
+        QVERIFY(!state.recordRecent("../bad")); QCOMPARE(state.recentApplications().size(), 2);
+        QCOMPARE(state.recentApplications().first().toMap().value("id").toString(), QString("game-a"));
+        state.adjust("font", -1); QCOMPARE(state.fontPercent(), 115);
+        for (int i = 0; i < 4; ++i) state.adjust("font", -1);
+        QCOMPARE(state.fontPercent(), 90); QVERIFY(state.save());
+        QVERIFY(file.open(QIODevice::ReadOnly)); const auto saved = QJsonDocument::fromJson(file.readAll()).object(); file.close();
+        QCOMPARE(saved.value("version").toInt(), 5); QCOMPARE(saved.value("nightMode").toString(), QString("auto"));
+        QCOMPARE(saved.value("fontPercent").toInt(), 90);
+        QCOMPARE(saved.value("recentApplications").toArray().first().toObject().value("playedAt").toInt(), 3000);
+        Preferences loaded(directory.path()); QVERIFY(loaded.error().isEmpty());
+        QCOMPARE(loaded.fontPercent(), 90); QCOMPARE(loaded.nightMode(), QString("auto"));
+        QCOMPARE(loaded.recentApplications(), state.recentApplications());
+        QVERIFY(loaded.removeRecent("game-b")); QVERIFY(!loaded.removeRecent("game-b")); QCOMPARE(loaded.recentApplications().size(), 1);
+        for (int i = 0; i < 40; ++i) QVERIFY(loaded.recordRecent(QString("game-%1").arg(i), i));
+        QCOMPARE(loaded.recentApplications().size(), 32);
+        QCOMPARE(loaded.recentApplications().first().toMap().value("id").toString(), QString("game-39"));
+        // Invalid v5 values are refused and the original file is not overwritten.
+        for (const auto &field : {qMakePair(QString("fontPercent"), QJsonValue(110)), qMakePair(QString("nightMode"), QJsonValue("dusk")),
+                 qMakePair(QString("recentApplications"), QJsonValue(QJsonArray{QJsonObject{{"id", "game-a"}, {"playedAt", -1}}}))}) {
+            auto data = saved; data[field.first] = field.second; write(data);
+            QVERIFY(file.open(QIODevice::ReadOnly)); const auto original = file.readAll(); file.close();
+            Preferences invalid(directory.path()); QVERIFY2(!invalid.error().isEmpty(), qPrintable(field.first));
+            invalid.adjust("font", 1); QVERIFY(!invalid.save());
+            QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), original); file.close();
+        }
+    }
+    void themeTokensAndNightMode() {
+        QTemporaryDir directory;
+        Preferences state(directory.path()); Telemetry metrics(directory.path()); ControllerInput controller;
+        QQuickView view;
+        view.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(&metrics)}, {"controller", QVariant::fromValue(&controller)}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready); view.resize(1024, 768); view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view)); auto *root = view.rootObject();
+        QScopedPointer<QObject> holder; auto *theme = shellTheme(view.engine(), holder); QVERIFY(theme);
+        auto color = [&](const char *name) { return theme->property(name).value<QColor>(); };
+        auto call = [&](const char *method, const QVariant &argument) {
+            QVariant result; QMetaObject::invokeMethod(theme, method, Q_RETURN_ARG(QVariant, result), Q_ARG(QVariant, argument)); return result.toInt();
+        };
+        QVERIFY(!theme->property("night").toBool());
+        QCOMPARE(color("ground"), QColor("#F2F4F5")); QCOMPARE(color("surface"), QColor("#FFFFFF"));
+        QCOMPARE(color("focus"), QColor("#009482")); QCOMPARE(color("accent"), QColor("#00756A"));
+        QCOMPARE(color("textSecondary"), QColor("#48535B")); QCOMPARE(color("danger"), QColor("#B3261E"));
+        QVERIFY(qAbs(color("scrim").alphaF() - 0.48) < 0.01); QCOMPARE(view.color(), QColor("#F2F4F5"));
+        QCOMPARE(call("fontSize", "display"), 36); QCOMPARE(call("lineHeight", "display"), 44); QCOMPARE(call("fontSize", "micro"), 18);
+        QVERIFY(state.choose("font", 3)); QCOMPARE(call("fontSize", "title"), 39);
+        QVERIFY(state.choose("font", 0)); QCOMPARE(call("fontSize", "title"), 27);
+        QVERIFY(state.choose("font", 1));
+        // §1 layout rules for other aspect ratios; R46H itself is 1024 wide.
+        struct Layout { int width, margin, content, columns, cell; bool dual; };
+        for (const auto &layout : {Layout{1024, 40, 944, 4, 212, true}, Layout{1152, 46, 1060, 4, 237, true},
+                 Layout{1365, 54, 1257, 5, 225, true}, Layout{768, 40, 688, 2, 237, false}}) {
+            theme->setProperty("canvasWidth", layout.width);
+            QCOMPARE(theme->property("margin").toInt(), layout.margin); QCOMPARE(theme->property("contentWidth").toInt(), layout.content);
+            QCOMPARE(theme->property("gridColumns").toInt(), layout.columns); QCOMPARE(theme->property("gridCellWidth").toInt(), layout.cell);
+            QCOMPARE(theme->property("dualPane").toBool(), layout.dual);
+        }
+        theme->setProperty("canvasWidth", 1024); QCOMPARE(theme->property("contentHeight").toInt(), 632);
+        // Switching palettes cross-fades a one-frame snapshot, then leaves nothing animating.
+        auto *fade = root->findChild<QQuickItem *>("themeFade"); QVERIFY(fade); QVERIFY(!fade->isVisible());
+        QSignalSpy fadeShown(fade, &QQuickItem::visibleChanged);
+        QVERIFY(state.choose("night", 1));
+        QTRY_VERIFY(theme->property("night").toBool()); QVERIFY(fade->isVisible());
+        const auto captures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
+        if (!captures.isEmpty()) { QTest::qWait(60); QVERIFY(view.grabWindow().save(captures + "/theme-crossfade.png")); }
+        QCOMPARE(color("ground"), QColor("#0F1316")); QCOMPARE(color("accentText"), QColor("#062A25"));
+        QTRY_VERIFY_WITH_TIMEOUT(!fade->isVisible(), 1000); QCOMPARE(fadeShown.size(), 2);
+        QTRY_COMPARE(view.color(), QColor("#0F1316"));
+        QTest::qWait(200); QSignalSpy idle(&view, &QQuickWindow::frameSwapped); QTest::qWait(500);
+        QVERIFY2(idle.size() <= 3, qPrintable(QString("Night theme repainted %1 times while idle").arg(idle.size())));
+        // Reduced motion switches directly; "auto" follows the clock (19:00-07:00).
+        state.adjust("motion", 1); fadeShown.clear();
+        QVERIFY(state.choose("night", 0)); QVERIFY(!theme->property("night").toBool());
+        QVERIFY(state.choose("night", 2));
+        for (const auto &sample : {qMakePair(QTime(22, 18), true), qMakePair(QTime(16, 39), false), qMakePair(QTime(6, 59), true), qMakePair(QTime(7, 0), false), qMakePair(QTime(19, 0), true)}) {
+            root->setProperty("now", QDateTime(QDate(2026, 10, 25), sample.first));
+            QCOMPARE(theme->property("night").toBool(), sample.second);
+        }
+        QCOMPARE(fadeShown.size(), 0);
+        if (QFontDatabase::families().contains(QStringLiteral("Noto Sans SC"))) {
+            const auto font = root->findChild<QObject *>("brandName")->property("font").value<QFont>();
+            QCOMPARE(QFontInfo(font).family(), QStringLiteral("Noto Sans SC"));
+        }
+    }
+    void interfaceFontWeights() {
+        // Packages set R46H_REQUIRE_UI_FONTS=1; host checks without the cache copy skip.
+        const bool required = qEnvironmentVariable("R46H_REQUIRE_UI_FONTS") == "1";
+        if (!required && !QFontDatabase::families().contains(QStringLiteral("Noto Sans SC"))) QSKIP("Noto Sans SC is not installed for this run");
+        QVERIFY(QFontDatabase::families().contains(QStringLiteral("Noto Sans SC")));
+        for (const auto &weight : {qMakePair(QFont::Normal, QStringLiteral("Regular")), qMakePair(QFont::Medium, QStringLiteral("Medium")), qMakePair(QFont::Bold, QStringLiteral("Bold"))}) {
+            QFont font(QStringLiteral("Noto Sans SC")); font.setPixelSize(24); font.setWeight(weight.first);
+            const QFontInfo info(font);
+            QCOMPARE(info.family(), QStringLiteral("Noto Sans SC")); QCOMPARE(info.styleName(), weight.second);
+            QVERIFY(QFontMetrics(font).inFont(QChar(0x6E38))); // 游
+        }
+    }
+    void qmlColorsComeFromTheme() {
+        // Colors are Theme tokens; the browser bundles these controls, so it is checked when present.
+        const QRegularExpression literal(QStringLiteral(R"re("#[0-9A-Fa-f]{3,8}"|\bQt\.(rgba|hsla|hsva)\s*\(|"(white|black|red|green|blue|gray|grey|yellow)")re"));
+        QStringList roots{QStringLiteral(SHELL_SOURCE_DIR)};
+        if (QFileInfo::exists(QStringLiteral(SHELL_SOURCE_DIR "/../gaming-browser"))) roots << QStringLiteral(SHELL_SOURCE_DIR "/../gaming-browser");
+        int files = 0; QStringList offenders;
+        for (const auto &root : roots) {
+            QDirIterator entries(root, {QStringLiteral("*.qml")}, QDir::Files, QDirIterator::Subdirectories);
+            while (entries.hasNext()) {
+                const auto path = entries.next();
+                if (path.endsWith(QStringLiteral("/controls/Theme.qml"))) continue;
+                QFile file(path); QVERIFY(file.open(QIODevice::ReadOnly)); ++files;
+                const auto lines = QString::fromUtf8(file.readAll()).split(u'\n');
+                for (int i = 0; i < lines.size(); ++i)
+                    if (lines[i].contains(literal)) offenders << QDir(root).relativeFilePath(path) + ":" + QString::number(i + 1);
+            }
+        }
+        QVERIFY(files >= 20);
+        QVERIFY2(offenders.isEmpty(), qPrintable("Hard-coded QML colors: " + offenders.join(", ")));
+    }
+    void themeTokenContrast() {
+        QQmlEngine engine; QScopedPointer<QObject> holder; auto *theme = shellTheme(&engine, holder); QVERIFY(theme);
+        auto color = [&](const char *name) { return theme->property(name).value<QColor>(); };
+        const QList<QPair<const char *, const char *>> text{{"text", "ground"}, {"text", "surface"}, {"text", "surfaceSunken"},
+            {"textSecondary", "ground"}, {"textSecondary", "surface"}, {"textSecondary", "surfaceSunken"}, {"textTertiary", "ground"},
+            {"textTertiary", "surface"}, {"accentText", "accent"}, {"accentInk", "accentSoft"}, {"glyphText", "glyph"},
+            {"glyphSoftText", "glyphSoft"}, {"danger", "surface"}, {"warning", "surface"}, {"accent", "surface"}, {"errorToastText", "errorToast"}};
+        for (const bool night : {false, true}) {
+            theme->setProperty("night", night);
+            // §2: text at least 4.5:1 and focus at least 3:1 against the surfaces they sit on.
+            for (const auto &pair : text) QVERIFY2(contrast(color(pair.first), color(pair.second)) >= 4.5,
+                qPrintable(QString("%1 on %2 (%3)").arg(pair.first, pair.second, night ? "night" : "light")));
+            QVERIFY(contrast(color("focus"), color("ground")) >= 3); QVERIFY(contrast(color("focus"), color("surface")) >= 3);
+            // Card titles are large bold text on fixed card colors (3:1 large-text threshold).
+            for (const auto &card : theme->property("cardPalette").toList())
+                QVERIFY2(contrast(color("onCard"), QColor(card.toString())) >= 3, qPrintable(card.toString()));
+        }
+    }
+    void themedPagesLightAndNight() {
+        QTemporaryDir directory;
+        auto put = [&](const QString &name, const QByteArray &text) {
+            QFile file(directory.filePath(name)); QDir().mkpath(QFileInfo(file).absolutePath());
+            QVERIFY(file.open(QIODevice::WriteOnly)); QCOMPARE(file.write(text), text.size());
+        };
+        put("proc/net/wireless", "Inter-| sta-|   Quality        |   Discarded packets               | Missed | WE\n face | tus | link level noise |  nwid  crypt   frag  retry   misc | beacon | 22\n wlan0: 0000   55.  -55.  -256        0      0      0      0      0        0\n");
+        put("sys/class/power_supply/rk817-battery/capacity", "82"); put("sys/class/power_supply/rk817-battery/status", "Discharging");
+        put("sys/class/power_supply/rk817-charger/online", "0");
+        DeviceState device(directory.path(), false, true);
+        Preferences state(directory.filePath("state")); Telemetry metrics(directory.path()); ControllerInput controller;
+        Applications applications; QQuickView view;
+        view.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(&metrics)}, {"controller", QVariant::fromValue(&controller)},
+            {"device", QVariant::fromValue(&device)}, {"applications", QVariant::fromValue(&applications)}});
+        view.engine()->addImageProvider("tasks", new TaskImages(&applications));
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready); view.resize(1024, 768); view.show(); QVERIFY(QTest::qWaitForWindowExposed(&view));
+        auto *root = view.rootObject();
+        auto action = [&](const char *name) { QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, QString(name)), Q_ARG(QVariant, false))); };
+        auto scene = [&](const char *name) { action("home"); QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString(name)))); };
+        const auto captures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
+        state.adjust("motion", 1); // Captures show settled pages, not transitions.
+        for (const bool night : {false, true}) {
+            QVERIFY(state.choose("night", night ? 1 : 0));
+            const QString mode = night ? "night" : "light";
+            auto capture = [&](const QString &name) {
+                QTest::qWait(150);
+                if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/" + name + "-" + mode + ".png"));
+            };
+            QCOMPARE(view.color(), QColor(night ? "#0F1316" : "#F2F4F5"));
+            scene("home"); root->setProperty("selected", 1); capture("home");
+            QVERIFY(QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, QStringLiteral("已加入收藏")))); capture("notice");
+            QVERIFY(QMetaObject::invokeMethod(root, "clearNotice"));
+            scene("library"); capture("library");
+            scene("settings"); capture("settings");
+            root->setProperty("settingsCategory", 4); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); capture("settings-display");
+            scene("controller"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); capture("controller");
+            if (!state.monitor()) state.adjust("monitor", 1);
+            scene("quick"); capture("quick-hud");
+            action("back"); state.adjust("monitor", 1);
+            scene("input"); capture("input"); QVERIFY(QMetaObject::invokeMethod(root, "closeEditor"));
+            scene("session"); capture("session");
+            root->setProperty("dimmed", true); capture("dimmed"); root->setProperty("dimmed", false);
+        }
+        const auto environment = QProcessEnvironment::systemEnvironment();
+        for (const auto *id : {"builtin.files", "builtin.text"}) {
+            QVERIFY(applications.launchPrepared(id, "/bin/sleep", {"30"}, directory.path(), environment));
+            QTRY_VERIFY(applications.processId() > 1); applications.background();
+        }
+        for (const bool night : {false, true}) {
+            QVERIFY(state.choose("night", night ? 1 : 0));
+            QVERIFY(QMetaObject::invokeMethod(root, "showTasksOrDesktop", Q_ARG(QVariant, true))); QTest::qWait(150);
+            if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/tasks-" + (night ? "night" : "light") + ".png"));
+            action("back");
+        }
+        applications.stopAll(); QTRY_VERIFY_WITH_TIMEOUT(!applications.hasTasks(), 4000);
     }
     void settingsInputMonitorAndIdle() {
         QTemporaryDir directory;
@@ -475,7 +708,7 @@ private slots:
         for (int i = 0; i < 8; ++i) action("down");
         QCOMPARE(root->property("settingsCategory").toInt(), 8);
         action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
-        action("accept"); action("down"); action("accept"); QCOMPARE(state.fontPercent(), 110);
+        action("accept"); action("down"); action("accept"); QCOMPARE(state.fontPercent(), 115);
         action("down"); action("accept"); QVERIFY(root->property("editing").toBool());
         state.adjust("monitor", 1);
         auto *hud = root->findChild<QQuickItem *>("performancePanel"); QVERIFY(hud);
@@ -755,18 +988,18 @@ private slots:
         auto *field = root->findChild<QQuickItem *>("inputField"); QVERIFY(field);
         field->setProperty("text", "127.0.0.1"); QVERIFY(QMetaObject::invokeMethod(root, "finishEditor"));
         QVERIFY(!root->property("editing").toBool()); QCOMPARE(manager.hosts().size(), 1);
-        QVERIFY(state.choose("font", 2));
+        QVERIFY(state.choose("font", 3));
         action("accept"); // Enter details at Start, then move to the overlay switch.
         root->setProperty("quickIndex", 0); root->setProperty("quickOpen", true);
         action("down"); QCOMPARE(root->property("quickIndex").toInt(), 1);
         action("back"); QVERIFY(!root->property("quickOpen").toBool()); QVERIFY(root->property("streamingOpen").toBool());
         const auto captures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
         QTest::qWait(200);
-        if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/streaming-120.png"));
+        if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/streaming-130.png"));
         action("up"); action("up"); action("accept"); QVERIFY(!manager.current().value("overlay").toBool());
         action("up"); action("accept"); QVERIFY(root->property("choicesOpen").toBool());
         QTest::qWait(200);
-        if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/streaming-choices-120.png"));
+        if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/streaming-choices-130.png"));
         action("down"); QCOMPARE(manager.current().value("preset").toInt(), 0);
         action("accept"); QCOMPARE(manager.current().value("preset").toInt(), 1);
         action("up"); action("accept"); QVERIFY(root->property("choicesOpen").toBool());
@@ -849,10 +1082,43 @@ private slots:
         QCOMPARE(field->property("text").toString(), QString("test"));
         auto *button = sample->findChild<QQuickItem *>("galleryButton"); QVERIFY(button); button->forceActiveFocus();
         const auto captures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
-        for (int percent : {100, 120}) {
-            sample->setProperty("fontScale", percent / 100.); QTest::qWait(200);
-            if (!captures.isEmpty()) QVERIFY(gallery.grabWindow().save(captures + QString("/controls-%1.png").arg(percent)));
+        for (const bool night : {false, true}) {
+            sample->setProperty("night", night);
+            for (int percent : {100, 130}) {
+                sample->setProperty("fontScale", percent / 100.);
+                for (const auto *page : {"controls", "foundations"}) {
+                    sample->setProperty("page", QString::fromLatin1(page)); QTest::qWait(200);
+                    if (!captures.isEmpty()) QVERIFY(gallery.grabWindow().save(captures + QString("/%1-%2-%3.png")
+                        .arg(QLatin1String(page), night ? "night" : "light").arg(percent)));
+                }
+            }
         }
+        // Foundations page: palette, shapes and type ramp stay apart and inside the margins; no text is cut.
+        sample->setProperty("page", "foundations");
+        for (const qreal scale : {1.0, 1.3}) {
+            sample->setProperty("fontScale", scale); QTest::qWait(100);
+            QList<QRectF> blocks;
+            for (const auto *name : {"foundationColors", "foundationShapes", "foundationRamp"}) {
+                auto *block = sample->findChild<QQuickItem *>(name); QVERIFY(block);
+                const auto rect = block->mapRectToScene(block->boundingRect());
+                QVERIFY2(rect.left() >= 40 && rect.right() <= 1024 - 40 && rect.bottom() <= 768,
+                    qPrintable(QString("%1 outside the page at %2%").arg(name).arg(scale * 100)));
+                for (const auto &other : blocks) QVERIFY2(!rect.intersects(other), qPrintable(QString("%1 overlaps at %2%").arg(name).arg(scale * 100)));
+                blocks << rect;
+            }
+            QList<QRectF> texts; QList<QQuickItem *> pending{sample->findChild<QQuickItem *>("galleryFoundations")};
+            while (!pending.isEmpty()) {
+                auto *item = pending.takeLast(); pending.append(item->childItems());
+                if (!item->isVisible() || !item->inherits("QQuickText")) continue;
+                QVERIFY(!item->property("truncated").toBool());
+                QVERIFY2(item->width() + 0.5 >= item->implicitWidth(), qPrintable(item->property("text").toString()));
+                const auto rect = item->mapRectToScene(QRectF(0, 0, item->implicitWidth(), item->height())).adjusted(0.5, 0.5, -0.5, -0.5);
+                for (const auto &other : texts) QVERIFY2(!rect.intersects(other), qPrintable(item->property("text").toString()));
+                texts << rect;
+            }
+            QVERIFY(texts.size() >= 30);
+        }
+        sample->setProperty("night", false); sample->setProperty("fontScale", 1.); sample->setProperty("page", "controls"); QTest::qWait(100);
         QVERIFY(QMetaObject::invokeMethod(sample, "visitLast")); QTest::qWait(200);
         int cells = 0, rows = 0;
         QList<QQuickItem *> pending{sample};
@@ -893,7 +1159,7 @@ private slots:
         QVERIFY(QDir().rmdir(directory.filePath("preview.json")));
         action("left"); QVERIFY(root->property("settingsSidebar").toBool());
         Preferences saved(directory.path()); QCOMPARE(saved.dimSeconds(), 60);
-        QVERIFY(!state.choose("font", 3)); QVERIFY(!state.choose("unknown", 0));
+        QVERIFY(!state.choose("font", 4)); QVERIFY(!state.choose("night", 3)); QVERIFY(!state.choose("unknown", 0));
         action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); action("accept"); QTest::qWait(200);
         if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/settings-choices.png"));
         action("back");
@@ -1025,8 +1291,8 @@ private slots:
         QCOMPARE(bounds.center().x(),320.); QCOMPARE(bounds.top(),12.5);
         const auto captures=qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
         QVERIFY(QMetaObject::invokeMethod(root,"closeEditor"));
-        for(int scale:{100,120}) {
-            if(scale==120){state.adjust("font",1);state.adjust("font",1);}
+        for(int scale:{100,130}) {
+            if(scale==130){state.adjust("font",1);state.adjust("font",1);}
             save("201\n"); QTest::qWait(100);
             auto *label=root->findChild<QQuickItem *>("volumeLabel"); QVERIFY(label);
             QVERIFY(label->property("contentWidth").toReal()<=label->width());
@@ -1145,7 +1411,7 @@ private slots:
         if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+"/device-cpu.png"));
         QVERIFY(device.cpuPreset("original"));
         QCOMPARE(device.info().value("socTemperatureC").toDouble(),55.);
-        QVERIFY(state.choose("font",2));state.adjust("monitor",1);root->setProperty("testInputCapture",true);
+        QVERIFY(state.choose("font",3));state.adjust("monitor",1);root->setProperty("testInputCapture",true);
         QVERIFY(QMetaObject::invokeMethod(root,"openEditor"));
         auto *hud=root->findChild<QQuickItem *>("performancePanel");QVERIFY(hud);
         QCOMPARE(hud->height(),150.);QVERIFY(hud->y()+hud->height()<183);
@@ -1238,7 +1504,7 @@ private slots:
         auto *keyLayout = root->findChild<QQuickItem *>("keyboardLayoutLoader"); QVERIFY(keyLayout);
         QVERIFY(QQmlProperty(keyLayout, "layer.enabled").read().toBool());
         auto *keyboard = root->findChild<QQuickItem *>("keyboard"); QVERIFY(keyboard);
-        QCOMPARE(QQmlProperty(keyboard, "style.navigationHighlightColor").read().value<QColor>(), QColor("#99efdb"));
+        QCOMPARE(QQmlProperty(keyboard, "style.navigationHighlightColor").read().value<QColor>(), QColor("#009482"));
         state.adjust("motion", 1); QVERIFY(keyboard->property("noAnimations").toBool());
         state.adjust("motion", 1); QVERIFY(!keyboard->property("noAnimations").toBool());
         auto *field = root->findChild<QQuickItem *>("inputField"); QVERIFY(field);
@@ -1291,7 +1557,7 @@ private slots:
         state.adjust("font", 1); state.adjust("font", 1); state.adjust("monitor", 1);
         QTest::qWait(200);
         const auto captures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
-        if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/arm64-keyboard-pinyin-120.png"));
+        if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/arm64-keyboard-pinyin-130.png"));
         QObject *hideKey = nullptr;
         for (auto *item : root->findChildren<QObject *>()) {
             if (QByteArray(item->metaObject()->className()).startsWith("HideKeyboardKey")) { hideKey = item; break; }

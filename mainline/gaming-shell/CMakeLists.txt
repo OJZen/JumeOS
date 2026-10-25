@@ -14,7 +14,7 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Quick Test Network DBus)
 find_package(SDL2 REQUIRED)
 qt_standard_project_setup(REQUIRES 6.8)
 set_source_files_properties(controls/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
-qt_add_executable(r46h-shell main.cpp input.cpp input.h handheld.cpp handheld.h preferences.cpp preferences.h telemetry.cpp telemetry.h control.cpp control.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
+qt_add_executable(r46h-shell main.cpp fonts.h input.cpp input.h handheld.cpp handheld.h preferences.cpp preferences.h telemetry.cpp telemetry.h control.cpp control.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
 target_compile_definitions(r46h-shell PRIVATE JUME_LAUNCHER_NAME="Jume Launcher" JUME_LAUNCHER_VERSION="${JUME_LAUNCHER_VERSION}")
 qt_add_qml_module(r46h-shell URI R46H.Shell VERSION 1.0
     QML_FILES ShellView.qml TaskView.qml GameCard.qml SettingRow.qml SettingsView.qml PerformancePanel.qml ControlHints.qml StreamingView.qml ToolPage.qml PortCatalog.qml
@@ -43,7 +43,7 @@ qt_add_resources(r46h-shell keyboard PREFIX "/qt/qml/R46H/Shell" FILES KeyboardP
 set_target_properties(r46h-shell PROPERTIES MACOSX_BUNDLE FALSE)
 include(CTest)
 if(BUILD_TESTING)
-    qt_add_executable(shell-check tests/check.cpp preferences.cpp preferences.h input.cpp input.h telemetry.cpp telemetry.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
+    qt_add_executable(shell-check tests/check.cpp fonts.h preferences.cpp preferences.h input.cpp input.h telemetry.cpp telemetry.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
     target_include_directories(shell-check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(shell-check PRIVATE Qt6::Quick Qt6::Test Qt6::Network Qt6::DBus SDL2::SDL2)
     target_compile_definitions(shell-check PRIVATE SHELL_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}" JUME_LAUNCHER_NAME="Jume Launcher" JUME_LAUNCHER_VERSION="${JUME_LAUNCHER_VERSION}")

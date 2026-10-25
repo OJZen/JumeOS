@@ -123,7 +123,7 @@ Item {
         function onApplicationsReady() { if (view.visible && !view.sidebar && view.row === 2) view.chooseApplication() }
     }
     Rectangle {
-        anchors.fill: parent; radius: Ui.Theme.radius; color: "#f0111a24"; visible: view.manager.busy
+        anchors.fill: parent; radius: Ui.Theme.radius; color: Ui.Theme.alpha(Ui.Theme.ground, 0.94); visible: view.manager.busy
         MouseArea { anchors.fill: parent }
         Ui.Label { anchors.horizontalCenter: parent.horizontalCenter; y: 115; text: view.manager.pin ? "请在 Sunshine 中输入 PIN" : "正在读取应用列表…"; color: Ui.Theme.text; role: "title" }
         Ui.Label { anchors.horizontalCenter: parent.horizontalCenter; y: 175; text: view.manager.pin; color: Ui.Theme.accent; font.pixelSize: 64; font.letterSpacing: 12 }

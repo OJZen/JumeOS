@@ -306,7 +306,7 @@ in the [combined acceptance route](../gaming-shell/DEVICE.md#combined-acceptance
 
 `test-shell-tools.py --binary ABSOLUTE_BINARY --evidence EXTERNAL_DIRECTORY`
 drives Neo/PortMaster/USB through real local IPC, uses disposable save fixtures,
-checks non-overwrite/backup/export/save failure/modal routes and captures 100/120%
+checks non-overwrite/backup/export/save failure/modal routes and captures 100/130%
 fonts. `gaming-shell/tests/tools-check.cpp` covers asynchronous inspection and
 HID encoding. `test-gaming-probe.py` includes the bounded native supervisor.
 `test-moonlight-list.py SOURCE_CPP EXTERNAL_DIRECTORY` compiles and
@@ -319,7 +319,7 @@ HarbourMaster with disposable archives: install/update/rollback, traversal/link
 rejection, failures before and after index publication, corrupt/link cache repair,
 cancel/failure recovery, verified runtime reuse and non-destructive
 uninstall. `test-portmaster-ui.py --binary SHELL --runtime PRIVATE_RUNTIME
---evidence EXTERNAL_DIRECTORY` checks actual Qt/worker interaction, 120% layout,
+--evidence EXTERNAL_DIRECTORY` checks actual Qt/worker interaction, the largest (130%) layout,
 search, instructions and confirmation isolation. `--packaged` requires the
 relocated package's default helper locations. Private search text is never copied
 into response records; host/PIN/password editors reject the new text operation.

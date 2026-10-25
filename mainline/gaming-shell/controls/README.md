@@ -10,31 +10,47 @@ owns the underlying template APIs. Complex game/library views remain custom.
 
 ## Defaults and ownership
 
-`Theme.qml` owns the palette, spacing, corner radius, text scale and motion
-durations. One application owner binds `Theme.fontScale` and
-`Theme.reducedMotion` to its preferences. Controls have no settings persistence,
+`Theme.qml` owns the [Jume UI v1](../../../docs/JUME-UI.md) tokens: the light and
+night palette, type ramp, spacing, layout, corner radius, focus geometry and
+motion. One application owner binds `Theme.fontScale`, `Theme.reducedMotion`,
+`Theme.night` and `Theme.canvasWidth`. Controls have no settings persistence,
 device writes or shell commands. State belongs to the calling
 feature; pass values in and handle native signals or the documented action.
 Labels default to plain text, vertical centering and elision. Use semantic roles,
 not page-local pixel sizes. Geometry uses the 1024×768 logical canvas; only text
-scales from 100–120%. Do not scale a whole page to implement font size. The
-compact header status uses caption text, 18 px icon boxes, `smallGap` within each
-metric and `labelGap` between metrics, all on one centerline.
+scales (90/100/115/130%). Do not scale a whole page to implement font size.
+Pages keep `Theme.margin` (40 at 1024 wide) on both sides and lay out inside
+`Theme.contentWidth` (944).
+
+Colors come only from `Theme.qml`: other QML has no hex value, `Qt.rgba` or named
+color. Use `Theme.alpha(token, opacity)` for a translucent variant and
+`Theme.cardColor(index)` for fallback card colors; the night palette keeps the
+same names. `shell-check qmlColorsComeFromTheme` guards the shell and browser QML;
+`themeTokenContrast` keeps text pairs at 4.5:1 or more and focus/card titles at
+3:1 or more in both modes.
+
+The interface font is Noto Sans SC Regular/Medium/Bold, the Simplified Chinese
+subset of Noto Sans CJK. [`interface-fonts.py`](../interface-fonts.py) pins,
+installs and verifies it for packages; `fonts.h` registers it and keeps Droid Sans
+Fallback for glyphs outside the subset. Host runs read `R46H_UI_FONT_DIR`, which
+`run.sh` points at the verified cache when present.
 
 ### Required defaults for new tools
 
 | Property | Default / allowed variant |
 | --- | --- |
-| Text | title 26, section 20, body/value/input 18, caption 14, micro 12 px, multiplied by `fontScale` |
-| Spacing | 4 within a label group, 8 between rows, 12 between icon/label, 20 inside controls |
-| Page geometry | 36 outer margin, tool top 100 / height 576, 952 content width, 256 sidebar, 32 column gap; lists begin at `Theme.contentY` (84) |
-| Row | 60 high; 84 when it has a description or progress track; derive focus height from the actual row |
-| Button / editor / hit area | 48 / 56 / at least 48 high; width follows content plus padding |
-| Switch | 56×32 track, 24 thumb inside a 48-high hit area |
-| Track / scrollbar | 4 track; reserve 8 for scrollbars through `ListView.rowWidth` |
-| Corners / icons | 12 radius; 24 row icon, 32 page icon; one original 24-unit stroke family |
-| Alignment | row contents vertically centered, title left, value right; reserve trailing width before laying out text |
-| Motion | focus 90, control 100, page 140, popup 150 ms; `Motion` owns easing, `Theme.reducedMotion` owns the opt-out |
+| Text | display 36/44, title 30/38, headline 26/34, body 24/32, label 22/30, caption 20/26, micro 18/24; `Theme.fontSize(role)` and `lineHeight(role)` apply `fontScale` |
+| Color | `ground`, `surface`, `surfaceSunken`, `outline`; `text`, `textSecondary`, `textTertiary`; `focus`, `accent` (+`accentText`/`accentSoft`/`accentInk`); `glyph`/`glyphSoft`; `danger`, `warning`, `scrim` |
+| Spacing | `space4` to `space48`; 4 within a group, 8 between rows |
+| Page geometry | top bar 72, hint bar 64, `margin` max(40, 4% of width), `contentWidth` × `contentHeight` (944×632); `gridColumns`, `gridCellWidth` and `dualPane` follow `canvasWidth` |
+| Rows / targets | list row 72, or 96 with a description or slider; focus targets at least 56 high |
+| Button / switch / slider | button 56; switch 64×36 with a light 28 thumb, state shown by the track color; track 8, thumb 28 (36 while adjusting) |
+| Corners | badge 8, key 12, row/button 16, grid card 20, card 24, panel/sheet/dock tile 28 |
+| Focus | 4 px `focus` stroke, 4 px gap in the container color, radius + 7; cards lift to 1.04 |
+| Motion | press 80, focus 120, settle 260, page 220/160, sheet 240/180, dialog 200/140, HUD 180/140, theme 200 ms; `Motion { curve }` selects standard, emphasized or exit |
+
+Pages that the v1 screens replace still read the pre-v1 metric aliases at the end
+of `Theme.qml`; new code must not use them.
 
 Set a control's text, value/state and actions first. Do **not** repeat its default
 height, font, margin, radius or animation duration in feature QML. Add a shared
@@ -147,9 +163,10 @@ overlay becomes available. Do not create a second window to implement a menu.
 
 ## Motion and performance
 
-Focus movement takes 90 ms, control feedback 100 ms, page reveals 140 ms and
-popup entry 150 ms, with one shared ease-out curve. Logical selection updates
-immediately. No bounce, animated full-page layout, blur, shadow stack or new
+Durations and the standard/emphasized/exit curves follow the table above and
+[JUME-UI §6](../../../docs/JUME-UI.md#6-动效). Logical selection updates
+immediately. A palette change cross-fades one non-live snapshot for 200 ms and
+switches directly with reduced motion. No bounce, animated full-page layout, blur, shadow stack or new
 per-frame JavaScript loop is added. A focus outline changes its own small
 geometry; it does not relayout cached text. Game art, settings content, keyboard
 keys and the quick panel retain their existing cache boundaries.
@@ -179,7 +196,9 @@ R46H_UI_CAPTURE_DIR="$PWD/mainline/out/.cache/r46h-controls-review" \
   mainline/gaming-shell/run.sh --check standardControlsAndChoices streamingNavigation
 ```
 
-The check covers pointer/keyboard activation, disabled state, font sizes,
+The gallery's `foundations` page mirrors `Foundations.png`; captures cover light
+and night at 100% and 130%, and the check asserts that its blocks and labels never
+overlap or truncate. The check also covers pointer/keyboard activation, disabled state, font sizes,
 viewport-limited delegates, idle repaint, modal isolation, cancellation and
 failed-save recovery. The three review regressions also exercise native and
 accessibility row activation, Tab/Space isolation, outside clicks, scaled popup
@@ -189,7 +208,8 @@ model creation: selection and the focus outline must name the same row on open.
 Shell coverage also checks that rapid category/game selection creates no detail
 page, entry loads exactly one detail page, and immediate return cancels creation.
 `test-shell-control.py` additionally drives actual popup
-navigation and PNG validation through the remote-control protocol. New-tool IPC checks cover 100% tool interactions and 120% snapshots of all three
+navigation and PNG validation through the remote-control protocol. `themedPagesLightAndNight`
+captures the current pages in both palettes. New-tool IPC checks cover 100% tool interactions and 130% snapshots of all three
 pages, verify modal routing and exercise disposable save import/backup; screenshots do not
 prove device motion. The ARM64
 builder checks the relocated package and its real Qt keyboard. Device delivery,

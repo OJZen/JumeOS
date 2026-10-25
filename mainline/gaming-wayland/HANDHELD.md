@@ -685,7 +685,11 @@ space and serial procedure remains in [the display runbook](README.md#first-devi
 The newer builder also uses the shared [port runtime assembly](../gaming-ports/README.md#shared-target-session-candidate).
 Prepare the existing PortMaster bundle and native-library cache first; optional
 `R46H_PORTMASTER_BUNDLE` and `R46H_PORT_NATIVE_CACHE` select their verified external
-locations. The target's explicit persistent-state path enables the Mono lease
+locations. It also needs the verified interface fonts in
+`EXISTING_MAINLINE_CACHE/fonts/noto-sans-sc` (see `gaming-shell/interface-fonts.py`;
+`R46H_UI_FONT_CACHE` overrides); the session check installs them under
+`usr/share/fonts/opentype/noto/` and refuses a payload missing any weight.
+The target's explicit persistent-state path enables the Mono lease
 and shared native-port capability. Omit it for the disposable diagnostic session.
 The [current candidate](#resume-and-rebuild) owns the next combined archive;
 the [ports contract](../gaming-ports/README.md#shared-target-session-candidate)

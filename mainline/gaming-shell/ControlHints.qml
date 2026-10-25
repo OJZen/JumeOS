@@ -18,10 +18,10 @@ Row {
             spacing: 8
             Rectangle {
                 width: key.implicitWidth + 14; height: 28; radius: 7
-                color: "#253641"; border.color: Ui.Theme.outline
-                Ui.Label { id: key; anchors.centerIn: parent; text: hints.keyLabel(parent.parent.modelData[0]); color: "#e0eee9"; font.pixelSize: 12 * hints.fontScale; font.bold: true }
+                color: Ui.Theme.glyph
+                Ui.Label { id: key; anchors.centerIn: parent; text: hints.keyLabel(parent.parent.modelData[0]); color: Ui.Theme.glyphText; font.pixelSize: 12 * hints.fontScale; font.bold: true }
             }
-            Ui.Label { objectName: "hintLabel"; anchors.verticalCenter: parent.verticalCenter; text: parent.modelData[1]; color: Ui.Theme.muted; font.pixelSize: 13 * hints.fontScale }
+            Ui.Label { objectName: "hintLabel"; anchors.verticalCenter: parent.verticalCenter; text: parent.modelData[1]; color: Ui.Theme.textSecondary; font.pixelSize: 13 * hints.fontScale }
         }
     }
 }

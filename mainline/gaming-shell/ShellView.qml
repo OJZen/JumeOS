@@ -103,7 +103,22 @@ Item {
     property real avatarX: 480
     property real avatarY: 350
     property string notice: ""
-    property string clockText: Qt.formatTime(new Date(), "hh:mm")
+    property var now: new Date()
+    readonly property string clockText: Qt.formatTime(now, "hh:mm")
+    // "auto" follows local time: night from 19:00 until 07:00.
+    readonly property int clockMinutes: now.getHours() * 60 + now.getMinutes()
+    readonly property bool nightActive: store.nightMode === "on" || (store.nightMode === "auto" && (clockMinutes >= 19 * 60 || clockMinutes < 7 * 60))
+    function applyTheme() {
+        themeFade.stop()
+        if (Ui.Theme.night === nightActive || motionReduced || !windowVisible || !visible) {
+            themeSnapshot.visible = false; themeSnapshot.sourceItem = null
+            Ui.Theme.night = nightActive; return
+        }
+        // Capture one frame of the old palette; scheduledUpdateCompleted switches and fades it out.
+        themeSnapshot.opacity = 1; themeSnapshot.sourceItem = canvas; themeSnapshot.visible = true
+        themeSnapshot.scheduleUpdate()
+    }
+    onNightActiveChanged: applyTheme()
     function boundedPercent(value) {
         const number = Number(value)
         return Number.isFinite(number) && number >= 0 && number <= 100 ? Math.round(number) : -1
@@ -129,17 +144,17 @@ Item {
         return (["files", "text", "transfer"].includes(entry.route) && root.filesAvailable) || (entry.route === "terminal" && root.terminalAvailable)
     })) : tools ? builtinGames : demoGames
     readonly property var builtinGames: [
-        {id: "builtin.moonlight", title: "Moonlight", detail: "电脑游戏串流", color: "#3159a2", route: "streaming", icon: "monitor"},
-        {id: "builtin.neo", title: "Neo 模拟器", detail: "Neo Geo 游戏与配置", color: "#9c573e", route: "neo", icon: "cartridge"},
-        {id: "builtin.ports", title: "PortMaster", detail: "移植游戏与存档", color: "#386c72", route: "ports", icon: "ports"},
-        {id: "builtin.usb", title: "USB 手柄", detail: "手柄映射与配置", color: "#667948", route: "usb", icon: "usb"},
-        {id: "builtin.controller", title: "摇杆测试", detail: "查看按键与摇杆", color: "#805779", route: "controller", icon: "gamepad"},
-        {id: "builtin.settings", title: "设置", detail: "设备与界面", color: "#397d91", route: "settings", icon: "settings"},
-        {id: "builtin.browser", title: "Jume Browser", detail: browserAvailable ? "Chromium 掌机浏览器 · 开发预览" : "浏览器运行时尚未安装", color: "#3159a2", route: "browser", icon: "monitor"},
-        {id: "builtin.terminal", title: "终端", detail: terminalAvailable ? "Bash · 请连接 USB 键盘" : "终端运行时尚未安装", color: "#34575c", route: "terminal", icon: "terminal"},
-        {id: "builtin.files", title: "文件管理器", detail: filesAvailable ? "分区 · U 盘 · 文件预览" : "文件运行时尚未安装", color: "#46635a", route: "files", icon: "folder"},
-        {id: "builtin.text", title: "文本编辑器", detail: filesAvailable ? "UTF-8 · 原子保存 · USB 键盘" : "文件运行时尚未安装", color: "#536478", route: "text", icon: "document"},
-        {id: "builtin.transfer", title: "文件传输", detail: filesAvailable ? "Wi-Fi · 扫码上传与下载" : "文件运行时尚未安装", color: "#386c72", route: "transfer", icon: "folder"}
+        {id: "builtin.moonlight", title: "Moonlight", detail: "电脑游戏串流", palette: 2, route: "streaming", icon: "monitor"},
+        {id: "builtin.neo", title: "Neo 模拟器", detail: "Neo Geo 游戏与配置", palette: 0, route: "neo", icon: "cartridge"},
+        {id: "builtin.ports", title: "PortMaster", detail: "移植游戏与存档", palette: 1, route: "ports", icon: "ports"},
+        {id: "builtin.usb", title: "USB 手柄", detail: "手柄映射与配置", palette: 4, route: "usb", icon: "usb"},
+        {id: "builtin.controller", title: "摇杆测试", detail: "查看按键与摇杆", palette: 3, route: "controller", icon: "gamepad"},
+        {id: "builtin.settings", title: "设置", detail: "设备与界面", palette: 1, route: "settings", icon: "settings"},
+        {id: "builtin.browser", title: "Jume Browser", detail: browserAvailable ? "Chromium 掌机浏览器 · 开发预览" : "浏览器运行时尚未安装", palette: 2, route: "browser", icon: "monitor"},
+        {id: "builtin.terminal", title: "终端", detail: terminalAvailable ? "Bash · 请连接 USB 键盘" : "终端运行时尚未安装", palette: 4, route: "terminal", icon: "terminal"},
+        {id: "builtin.files", title: "文件管理器", detail: filesAvailable ? "分区 · U 盘 · 文件预览" : "文件运行时尚未安装", palette: 4, route: "files", icon: "folder"},
+        {id: "builtin.text", title: "文本编辑器", detail: filesAvailable ? "UTF-8 · 原子保存 · USB 键盘" : "文件运行时尚未安装", palette: 1, route: "text", icon: "document"},
+        {id: "builtin.transfer", title: "文件传输", detail: filesAvailable ? "Wi-Fi · 扫码上传与下载" : "文件运行时尚未安装", palette: 1, route: "transfer", icon: "folder"}
     ]
     function openTool(kind) {
         if (!tools || !["neo", "ports", "usb"].includes(kind) || !tools.save()) return
@@ -147,12 +162,12 @@ Item {
     }
     function closeTool() { if (tools && !tools.save()) return false; toolRoute = ""; clearNotice(); root.forceActiveFocus(); return true }
     readonly property var demoGames: [
-        {title: "Moonlight", detail: "电脑游戏串流", color: "#3159a2"},
-        {title: "像素远征", detail: "街机 · 示例游戏", color: "#9c573e"},
-        {title: "夜航", detail: "Game Gear · 示例游戏", color: "#386c72"},
-        {title: "方块花园", detail: "Game Boy · 示例游戏", color: "#667948"},
-        {title: "星际快线", detail: "街机 · 示例游戏", color: "#805779"},
-        {title: "海岛来信", detail: "掌机 · 示例游戏", color: "#397d91"}
+        {title: "Moonlight", detail: "电脑游戏串流", palette: 2},
+        {title: "像素远征", detail: "街机 · 示例游戏", palette: 0},
+        {title: "夜航", detail: "Game Gear · 示例游戏", palette: 1},
+        {title: "方块花园", detail: "Game Boy · 示例游戏", palette: 4},
+        {title: "星际快线", detail: "街机 · 示例游戏", palette: 3},
+        {title: "海岛来信", detail: "掌机 · 示例游戏", palette: 1}
     ]
     function showScene(name) {
         toolRoute = ""
@@ -212,7 +227,10 @@ Item {
         return true
     }
     onPowerSceneChanged: if (hardware && device.controls && !device.setPowerScene(powerScene)) notify(device.error)
-    Component.onCompleted: if (hardware && device.controls && !device.setPowerScene(powerScene)) notify(device.error)
+    Component.onCompleted: {
+        Ui.Theme.night = nightActive
+        if (hardware && device.controls && !device.setPowerScene(powerScene)) notify(device.error)
+    }
     function openEditor() { openTextEditor("文字输入测试", "", "test") }
     function openTextEditor(label, value, purpose) {
         editPurpose = purpose || "test"; editLabel = label || "文字输入测试"
@@ -429,8 +447,8 @@ Item {
         onTriggered: root.blankScreen()
     }
     TapHandler { onPressedChanged: if (pressed) root.activity() }
-    Timer { interval: 60000; running: !root.screenOff; repeat: true; onTriggered: root.clockText = Qt.formatTime(new Date(), "hh:mm") }
-    onScreenOffChanged: if (!screenOff) clockText = Qt.formatTime(new Date(), "hh:mm")
+    Timer { interval: 60000; running: !root.screenOff; repeat: true; onTriggered: root.now = new Date() }
+    onScreenOffChanged: if (!screenOff) now = new Date()
     Timer { id: noticeTimer; interval: 2600; onTriggered: root.notice = "" }
     Timer { id: volumeTimer; interval: 1800; onTriggered: root.volumeVisible = false }
     Shortcut { sequence: "Ctrl+Tab"; onActivated: if (root.screenOff) root.activity(); else root.backgroundRequested(true) }
@@ -459,13 +477,13 @@ Item {
             anchors.fill: parent; visible: !root.editing
             Item {
             anchors.fill: parent; visible: !root.gameOverlay
-            Rectangle { id: brandMark; x: 36; y: 30; width: 37; height: 37; radius: 11; color: Ui.Theme.accent
-                Ui.Label { anchors.centerIn: parent; text: "J"; font.pixelSize: 25 * root.fontScale; font.bold: true; color: "#142c30" }
+            Rectangle { id: brandMark; x: Ui.Theme.margin; y: 30; width: 37; height: 37; radius: 11; color: Ui.Theme.accent
+                Ui.Label { anchors.centerIn: parent; text: "J"; font.pixelSize: 25 * root.fontScale; font.bold: true; color: Ui.Theme.accentText }
             }
-            Ui.Label { objectName: "brandName"; x: 86; y: 35; text: "Jume"; font.pixelSize: 22 * root.fontScale; font.bold: true; font.letterSpacing: 2; color: Ui.Theme.text }
-            Ui.Label { id: statusClock; objectName: "statusClock"; anchors.right: parent.right; anchors.rightMargin: Ui.Theme.pageMargin; anchors.verticalCenter: statusMetrics.verticalCenter; height: Ui.Theme.bodySize; text: root.clockText; color: Ui.Theme.text; font.pixelSize: Ui.Theme.captionSize * root.fontScale; visible: !root.store.monitor }
-            Rectangle { anchors.right: statusClock.left; anchors.rightMargin: Ui.Theme.labelGap; anchors.verticalCenter: statusMetrics.verticalCenter; width: 152; height: 30; radius: 15; color: "#253743"; visible: !root.store.monitor && !root.hardware
-                Ui.Label { anchors.centerIn: parent; text: root.hardware ? (root.device.info.online === 1 ? "外部供电" : root.device.info.online === 0 ? "电池供电" : "供电状态未知") : "本地界面预览"; color: "#b1c5cf"; font.pixelSize: 13 }
+            Ui.Label { objectName: "brandName"; anchors.left: brandMark.right; anchors.leftMargin: Ui.Theme.labelGap; y: 35; text: "Jume"; font.pixelSize: 22 * root.fontScale; font.bold: true; font.letterSpacing: 2; color: Ui.Theme.text }
+            Ui.Label { id: statusClock; objectName: "statusClock"; anchors.right: parent.right; anchors.rightMargin: Ui.Theme.margin; anchors.verticalCenter: statusMetrics.verticalCenter; height: Ui.Theme.bodySize; text: root.clockText; color: Ui.Theme.text; font.pixelSize: Ui.Theme.captionSize * root.fontScale; visible: !root.store.monitor }
+            Rectangle { anchors.right: statusClock.left; anchors.rightMargin: Ui.Theme.labelGap; anchors.verticalCenter: statusMetrics.verticalCenter; width: 152; height: 30; radius: 15; color: Ui.Theme.surfaceSunken; visible: !root.store.monitor && !root.hardware
+                Ui.Label { anchors.centerIn: parent; text: root.hardware ? (root.device.info.online === 1 ? "外部供电" : root.device.info.online === 0 ? "电池供电" : "供电状态未知") : "本地界面预览"; color: Ui.Theme.textSecondary; font.pixelSize: 13 }
             }
             Row {
                 id: statusMetrics
@@ -473,17 +491,17 @@ Item {
                 visible: !root.store.monitor && root.hardware
                 Row {
                     spacing: Ui.Theme.smallGap
-                    Ui.Icon { objectName: "statusWifiIcon"; width: Ui.Theme.bodySize; height: Ui.Theme.bodySize; name: "wifi"; color: root.wifiSignal >= 0 ? "#b1c5cf" : Ui.Theme.muted }
-                    Ui.Label { objectName: "statusWifi"; anchors.verticalCenter: parent.verticalCenter; height: Ui.Theme.bodySize; text: root.wifiSignal >= 0 ? root.wifiSignal + "%" : "未连接"; color: "#b1c5cf"; font.pixelSize: Ui.Theme.captionSize * root.fontScale }
+                    Ui.Icon { objectName: "statusWifiIcon"; width: Ui.Theme.bodySize; height: Ui.Theme.bodySize; name: "wifi"; color: root.wifiSignal >= 0 ? Ui.Theme.textSecondary : Ui.Theme.textTertiary }
+                    Ui.Label { objectName: "statusWifi"; anchors.verticalCenter: parent.verticalCenter; height: Ui.Theme.bodySize; text: root.wifiSignal >= 0 ? root.wifiSignal + "%" : "未连接"; color: Ui.Theme.textSecondary; font.pixelSize: Ui.Theme.captionSize * root.fontScale }
                 }
                 Row {
                     spacing: Ui.Theme.smallGap
-                    Ui.Icon { objectName: "statusBatteryIcon"; width: Ui.Theme.bodySize; height: Ui.Theme.bodySize; name: "battery"; color: root.batteryState === "charging" ? Ui.Theme.accent : "#b1c5cf" }
-                    Ui.Label { objectName: "statusBattery"; anchors.verticalCenter: parent.verticalCenter; height: Ui.Theme.bodySize; text: root.batteryText; color: "#b1c5cf"; font.pixelSize: Ui.Theme.captionSize * root.fontScale }
+                    Ui.Icon { objectName: "statusBatteryIcon"; width: Ui.Theme.bodySize; height: Ui.Theme.bodySize; name: "battery"; color: root.batteryState === "charging" ? Ui.Theme.accent : Ui.Theme.textSecondary }
+                    Ui.Label { objectName: "statusBattery"; anchors.verticalCenter: parent.verticalCenter; height: Ui.Theme.bodySize; text: root.batteryText; color: Ui.Theme.textSecondary; font.pixelSize: Ui.Theme.captionSize * root.fontScale }
                 }
             }
             Ui.NavigationBar {
-                x: 36; y: 100; visible: !root.session && !root.streamingOpen && !root.toolOpen
+                x: Ui.Theme.margin; y: 100; visible: !root.session && !root.streamingOpen && !root.toolOpen
                 model: ["主页", "游戏库", "设置"]; currentIndex: root.page
                 navigationActive: root.tabsFocused && !root.quickOpen
                 onActivated: function(index) { root.changePage(index) }
@@ -495,26 +513,26 @@ Item {
                 route: root.toolOpen ? root.toolRoute : root.streamingOpen ? "streaming" : String(root.page)
                 reducedMotion: root.motionReduced
             Item {
-                x: 36; y: 173; width: 952; height: 500; visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page < 2
+                x: Ui.Theme.margin; y: 173; width: Ui.Theme.contentWidth; height: 500; visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page < 2
                 Ui.Label { text: root.page === 0 ? ((root.applications || root.tools) ? "应用与游戏" : "继续游玩") : "游戏库"; color: Ui.Theme.text; role: "title" }
-                Ui.Label { y: 48; text: (root.applications || root.tools) ? (root.page === 0 ? "常用入口" : "全部") + " · " + (root.page === 0 ? Math.min(3, root.games.length) : root.games.length) + " 项" : root.page === 0 ? "最近使用 · 3 个演示入口" : "全部 6 项 · 示例内容"; font.pixelSize: 14 * root.fontScale; color: "#a1b4c1" }
-                Ui.Label { anchors.centerIn: parent; visible: root.games.length === 0; text: "暂无应用"; color: "#a1b4c1"; font.pixelSize: 22 * root.fontScale }
+                Ui.Label { y: 48; text: (root.applications || root.tools) ? (root.page === 0 ? "常用入口" : "全部") + " · " + (root.page === 0 ? Math.min(3, root.games.length) : root.games.length) + " 项" : root.page === 0 ? "最近使用 · 3 个演示入口" : "全部 6 项 · 示例内容"; font.pixelSize: 14 * root.fontScale; color: Ui.Theme.textSecondary }
+                Ui.Label { anchors.centerIn: parent; visible: root.games.length === 0; text: "暂无应用"; color: Ui.Theme.textSecondary; font.pixelSize: 22 * root.fontScale }
                 GridView {
                     id: gameGrid; objectName: "gameGrid"
-                    x: -12; y: 79; width: 976; height: 421; clip: true
-                    cellWidth: 325; cellHeight: root.page === 0 ? 350 : 198
+                    x: -12; y: 79; width: parent.width + 24; height: 421; clip: true
+                    cellWidth: width / 3; cellHeight: root.page === 0 ? 350 : 198
                     model: root.page === 0 ? Math.min(3, root.games.length) : root.games.length
                     currentIndex: root.selected
                     boundsBehavior: Flickable.StopAtBounds
                     onCurrentIndexChanged: if (currentIndex >= 0) positionViewAtIndex(currentIndex, GridView.Contain)
                     delegate: Item {
                         id: tile; required property int index
-                        width: 325; height: gameGrid.cellHeight
+                        width: gameGrid.cellWidth; height: gameGrid.cellHeight
                         GameCard {
                             x: 12; y: 12
-                            width: 302; height: root.page === 0 ? 330 : 178
+                            width: parent.width - 23; height: root.page === 0 ? 330 : 178
                             title: root.games[tile.index].title; subtitle: root.games[tile.index].detail
-                            accent: root.games[tile.index].color; artwork: tile.index
+                            accent: Ui.Theme.cardColor(root.games[tile.index].palette !== undefined ? root.games[tile.index].palette : tile.index); artwork: tile.index
                             demonstration: !root.tools && !root.applications && !(root.streaming && tile.index === 0)
                             iconName: root.games[tile.index].icon || ""
                             selected: root.selected === tile.index && !root.tabsFocused && !root.quickOpen
@@ -527,7 +545,7 @@ Item {
                 }
             }
             Loader {
-                id: toolView; objectName: "toolView"; x: Ui.Theme.pageMargin; y: Ui.Theme.toolTop; width: Ui.Theme.contentWidth; height: Ui.Theme.toolHeight
+                id: toolView; objectName: "toolView"; x: Ui.Theme.margin; y: Ui.Theme.toolTop; width: Ui.Theme.contentWidth; height: Ui.Theme.toolHeight
                 active: root.toolOpen && root.tools !== null; visible: active
                 sourceComponent: ToolPage {
                     tools: root.tools; kind: root.toolRoute
@@ -537,7 +555,7 @@ Item {
                 }
             }
             SettingsView {
-                id: settingsView; x: 36; y: 178; width: 952; height: 493
+                id: settingsView; x: Ui.Theme.margin; y: 178; width: Ui.Theme.contentWidth; height: 493
                 navigationActive: root.windowVisible && !root.quickOpen && !root.tabsFocused && !root.editing && !root.dimmed
                 visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page === 2
                 store: root.store; metrics: root.metrics; controller: root.controller; device: root.device; network: root.network
@@ -550,22 +568,22 @@ Item {
             }
             Item {
                 anchors.fill: parent; visible: !root.toolOpen && !root.streamingOpen && root.session
-                Ui.Label { x: 36; y: 115; text: root.games[root.selected] ? root.games[root.selected].title : ""; textFormat: Text.PlainText; color: "#eff7fa"; font.pixelSize: 34 * root.fontScale; font.bold: true }
-                Ui.Label { x: 36; y: 163; text: "交互演示 · 方向键移动方块，Q 呼出快捷面板"; color: "#a7baca"; font.pixelSize: 16 }
+                Ui.Label { x: Ui.Theme.margin; y: 115; text: root.games[root.selected] ? root.games[root.selected].title : ""; textFormat: Text.PlainText; color: Ui.Theme.text; font.pixelSize: 34 * root.fontScale; font.bold: true }
+                Ui.Label { x: Ui.Theme.margin; y: 163; text: "交互演示 · 方向键移动方块，Q 呼出快捷面板"; color: Ui.Theme.textSecondary; font.pixelSize: 16 }
                 Rectangle {
-                    x: 36; y: 219; width: 952; height: 426; radius: 24; color: "#1c3443"
+                    x: Ui.Theme.margin; y: 219; width: Ui.Theme.contentWidth; height: 426; radius: 24; color: Ui.Theme.surface; border.color: Ui.Theme.outline
                     Repeater {
                         model: 8
-                        Rectangle { required property int index; x: 38 + index * 116; y: 0; width: 1; height: 426; color: "#244352" }
+                        Rectangle { required property int index; x: 38 + index * 116; y: 0; width: 1; height: 426; color: Ui.Theme.outline }
                     }
-                    Rectangle { x: 0; y: 213; width: 952; height: 1; color: "#31515e" }
-                    Ui.Label { x: 28; y: 25; text: "PREVIEW SESSION"; color: "#7399a5"; font.pixelSize: 12 * root.fontScale; font.letterSpacing: 3 }
-                    Ui.Label { x: 28; y: 360; text: "未运行游戏或串流"; color: "#a2bdc8"; font.pixelSize: 16 }
+                    Rectangle { x: 0; y: 213; width: parent.width; height: 1; color: Ui.Theme.outline }
+                    Ui.Label { x: 28; y: 25; text: "PREVIEW SESSION"; color: Ui.Theme.textTertiary; font.pixelSize: 12 * root.fontScale; font.letterSpacing: 3 }
+                    Ui.Label { x: 28; y: 360; text: "未运行游戏或串流"; color: Ui.Theme.textSecondary; font.pixelSize: 16 }
                 }
                 Rectangle { x: root.avatarX; y: root.avatarY; width: 38; height: 38; radius: 10; color: Ui.Theme.accent }
             }
             Loader {
-                id: streamingView; x: Ui.Theme.pageMargin; y: Ui.Theme.toolTop; width: Ui.Theme.contentWidth; height: Ui.Theme.toolHeight
+                id: streamingView; x: Ui.Theme.margin; y: Ui.Theme.toolTop; width: Ui.Theme.contentWidth; height: Ui.Theme.toolHeight
                 visible: root.streamingOpen && root.streaming !== null
                 active: root.streaming !== null
                 readonly property var hints: item ? item.hints : []
@@ -579,21 +597,21 @@ Item {
             }
             }
             Rectangle {
-                anchors.fill: parent; color: "#99080e17"; opacity: root.quickOpen ? 1 : 0; visible: opacity > 0
+                anchors.fill: parent; color: Ui.Theme.scrim; opacity: root.quickOpen ? 1 : 0; visible: opacity > 0
                 Behavior on opacity { Ui.Motion {} }
                 MouseArea { anchors.fill: parent; enabled: root.quickOpen; onClicked: root.leaveQuick() }
             }
             Rectangle {
                 id: quickPanel
                 objectName: "quickPanel"
-                x: root.quickOpen ? 590 : 1036; y: 92; width: 398; height: 588; radius: 25; color: "#172631"; border.color: "#354b59"
+                x: root.quickOpen ? Ui.Theme.canvasWidth - Ui.Theme.margin - width : Ui.Theme.canvasWidth + 12; y: 92; width: 398; height: 588; radius: 25; color: Ui.Theme.surface; border.color: Ui.Theme.outline
                 layer.enabled: true
                 enabled: root.quickOpen
-                visible: root.quickOpen || x < 1024
+                visible: root.quickOpen || x < Ui.Theme.canvasWidth
                 Behavior on x { Ui.Motion { duration: Ui.Theme.reducedMotion ? 0 : Ui.Theme.popupDuration } }
                 // Consume pointer events too, so the covered preview cannot activate.
                 MouseArea { anchors.fill: parent }
-                Ui.Label { x: 24; y: 25; text: "快捷设置"; color: "#f0f8fa"; role: "title" }
+                Ui.Label { x: 24; y: 25; text: "快捷设置"; color: Ui.Theme.text; role: "title" }
                 Column {
                     x: 20; y: 85; spacing: 8
                     Repeater {
@@ -617,17 +635,17 @@ Item {
             }
         }
         Item {
-            x: 36; y: 700; width: 952; height: 52; visible: !root.editing && (!root.gameOverlay || root.quickOpen)
-            Rectangle { width: parent.width; height: 1; color: "#2a3946" }
+            x: Ui.Theme.margin; y: 700; width: Ui.Theme.contentWidth; height: 52; visible: !root.editing && (!root.gameOverlay || root.quickOpen)
+            Rectangle { width: parent.width; height: 1; color: Ui.Theme.outline }
             ControlHints { objectName: "footerHints"; y: 16; actions: root.controlHints; fontScale: root.fontScale; gamepad: root.gamepadHints }
         }
         Item {
             anchors.fill: parent; visible: root.editing
             MouseArea { anchors.fill: parent }
-            Ui.Label { x: 36; y: 70; width: root.store.monitor ? performancePanel.x - x - Ui.Theme.padding : 952; text: root.editLabel; color: Ui.Theme.text; role: "title" }
-            Ui.Label { x: 36; y: 123; width: 780; wrapMode: Text.Wrap; text: root.testInputVisible ? "自动化输入测试允许截图，请勿填写密码" : root.editPurpose === "test" ? "退出后清空输入内容" : root.editPurpose === "wifiPassword" ? "完成后连接 · B 取消" : "完成后保存 · B 取消"; color: "#a8bdcb"; font.pixelSize: 16 * root.fontScale }
+            Ui.Label { x: Ui.Theme.margin; y: 70; width: root.store.monitor ? performancePanel.x - x - Ui.Theme.padding : Ui.Theme.contentWidth; text: root.editLabel; color: Ui.Theme.text; role: "title" }
+            Ui.Label { x: Ui.Theme.margin; y: 123; width: inputField.width; wrapMode: Text.Wrap; text: root.testInputVisible ? "自动化输入测试允许截图，请勿填写密码" : root.editPurpose === "test" ? "退出后清空输入内容" : root.editPurpose === "wifiPassword" ? "完成后连接 · B 取消" : "完成后保存 · B 取消"; color: Ui.Theme.textSecondary; font.pixelSize: 16 * root.fontScale }
             Ui.TextField {
-                id: inputField; objectName: "inputField"; x: 36; y: 183; width: 780; height: 64
+                id: inputField; objectName: "inputField"; x: Ui.Theme.margin; y: 183; width: Ui.Theme.contentWidth - doneButton.width - Ui.Theme.padding; height: 64
                 fontScale: root.fontScale; maximumLength: root.editPurpose === "wifiPassword" ? 64 : root.editPurpose === "portSearch" ? 80 : 128
                 echoMode: root.editPurpose === "wifiPassword" ? TextInput.Password : TextInput.Normal
                 inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhSensitiveData | (root.editPurpose === "wifiPassword" ? Qt.ImhHiddenText | Qt.ImhLatinOnly | Qt.ImhNoAutoUppercase : 0)
@@ -635,9 +653,9 @@ Item {
                 Keys.onEscapePressed: root.closeEditor()
                 Keys.onReturnPressed: root.finishEditor()
             }
-            Ui.Button { x: 836; y: 183; width: 152; height: 64; text: "完成"; primary: true; focusPolicy: Qt.NoFocus; Accessible.name: "完成输入"; onClicked: root.finishEditor() }
-            Ui.Label { x: 36; y: 270; visible: virtualKeyboard.status === Loader.Error; text: "虚拟键盘模块不可用；仍可使用实体键盘。"; color: Ui.Theme.danger; font.pixelSize: 17 }
-            ControlHints { x: 36; y: 267; visible: virtualKeyboard.status !== Loader.Error; fontScale: root.fontScale; gamepad: root.gamepadHints; actions: root.keyboardEnabled ? [["方向", "选择按键"], ["A", "输入"], ["Y", "退格"], ["START", "确认"], ["B", "取消"]] : [["键盘", "输入文字"], ["Enter", "确认"], ["Esc", "取消"]] }
+            Ui.Button { id: doneButton; x: Ui.Theme.margin + Ui.Theme.contentWidth - width; y: 183; width: 152; height: 64; text: "完成"; primary: true; focusPolicy: Qt.NoFocus; Accessible.name: "完成输入"; onClicked: root.finishEditor() }
+            Ui.Label { x: Ui.Theme.margin; y: 270; visible: virtualKeyboard.status === Loader.Error; text: "虚拟键盘模块不可用；仍可使用实体键盘。"; color: Ui.Theme.danger; font.pixelSize: 17 }
+            ControlHints { x: Ui.Theme.margin; y: 267; visible: virtualKeyboard.status !== Loader.Error; fontScale: root.fontScale; gamepad: root.gamepadHints; actions: root.keyboardEnabled ? [["方向", "选择按键"], ["A", "输入"], ["Y", "退格"], ["START", "确认"], ["B", "取消"]] : [["键盘", "输入文字"], ["Enter", "确认"], ["Esc", "取消"]] }
             Loader {
                 id: virtualKeyboard; objectName: "virtualKeyboard"
                 active: root.keyboardEnabled && root.editing
@@ -650,7 +668,7 @@ Item {
         PerformancePanel {
             id: performancePanel
             objectName: "performancePanel"
-            x: root.quickOpen ? 36 : 988 - width; y: root.quickOpen ? 168 : 20
+            x: root.quickOpen ? Ui.Theme.margin : Ui.Theme.canvasWidth - Ui.Theme.margin - width; y: root.quickOpen ? 168 : 20
             metrics: root.metrics; device: root.device; fontScale: root.fontScale; compact: root.editing || root.quickOpen
             visible: root.store.monitor
         }
@@ -660,23 +678,27 @@ Item {
             onClosed: root.forceActiveFocus()
         }
         Rectangle {
-            anchors.fill: parent; visible: root.dimmed; color: root.hardware && root.device.controls ? "transparent" : "#b3000000"
-            Ui.Label { anchors.centerIn: parent; visible: !root.hardware || !root.device.controls; text: "界面已变暗 · 按键或点击恢复"; color: "#d8e8ee"; font.pixelSize: 21 }
+            anchors.fill: parent; visible: root.dimmed; color: root.hardware && root.device.controls ? "transparent" : Ui.Theme.scrim
+            Rectangle {
+                anchors.centerIn: parent; visible: !root.hardware || !root.device.controls
+                width: dimNotice.implicitWidth + 2 * Ui.Theme.space24; height: Ui.Theme.minTarget; radius: height / 2; color: Ui.Theme.surface
+                Ui.Label { id: dimNotice; anchors.centerIn: parent; text: "界面已变暗 · 按键或点击恢复"; color: Ui.Theme.text; font.pixelSize: 21 }
+            }
             MouseArea { anchors.fill: parent; onPressed: root.activity() }
         }
         Rectangle {
             anchors.fill: parent; z: 200; visible: root.screenOff
-            color: root.hardware && root.device.controls ? "transparent" : "black"
+            color: root.hardware && root.device.controls ? "transparent" : Ui.Theme.blackout
             Accessible.role: Accessible.Pane
             Accessible.name: "屏幕已关闭，按任意键唤醒"
             MouseArea { anchors.fill: parent; onPressed: root.activity() }
         }
         Rectangle {
-            x: root.quickOpen ? 36 : (parent.width - width) / 2
+            x: root.quickOpen ? Ui.Theme.margin : (parent.width - width) / 2
             y: root.editing ? 310 : root.quickOpen ? Math.max(340, performancePanel.visible ? performancePanel.y + performancePanel.height + 12 : 340) : Math.min(632, 690 - height)
-            width: Math.min(root.quickOpen ? 530 : 936, message.implicitWidth + 48); height: Math.max(48, message.implicitHeight + 24); radius: 14
-            visible: root.notice !== "" || root.store.error !== ""; color: root.store.error ? "#8a413b" : "#d9eee7"
-            Ui.Label { id: message; x: 24; y: 12; width: parent.width - 48; text: root.store.error || root.notice; color: root.store.error ? "white" : "#18352d"; font.pixelSize: 15 * root.fontScale; wrapMode: Text.Wrap }
+            width: Math.min(root.quickOpen ? 530 : Ui.Theme.contentWidth, message.implicitWidth + 48); height: Math.max(48, message.implicitHeight + 24); radius: 14
+            visible: root.notice !== "" || root.store.error !== ""; color: root.store.error ? Ui.Theme.errorToast : Ui.Theme.glyph
+            Ui.Label { id: message; x: 24; y: 12; width: parent.width - 48; text: root.store.error || root.notice; color: root.store.error ? Ui.Theme.errorToastText : Ui.Theme.glyphText; font.pixelSize: 15 * root.fontScale; wrapMode: Text.Wrap }
         }
         Rectangle {
             id: volumeHud; objectName: "volumeHud"
@@ -697,6 +719,17 @@ Item {
                 objectName: "volumeLabel"; x: 136; width: 76; anchors.verticalCenter: parent.verticalCenter
                 role: "value"; horizontalAlignment: Text.AlignHCenter; text: root.volumePercent + "%"
             }
+        }
+    }
+    // A sibling of the canvas, so the one-frame capture never contains itself.
+    ShaderEffectSource {
+        id: themeSnapshot; objectName: "themeFade"
+        anchors.centerIn: parent; width: canvas.width; height: canvas.height; scale: canvas.scale
+        live: false; visible: false; sourceItem: null
+        onScheduledUpdateCompleted: { Ui.Theme.night = root.nightActive; themeFade.restart() }
+        Ui.Motion {
+            id: themeFade; target: themeSnapshot; property: "opacity"; from: 1; to: 0; duration: Ui.Theme.themeDuration
+            onFinished: { themeSnapshot.visible = false; themeSnapshot.sourceItem = null }
         }
     }
 }

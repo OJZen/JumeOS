@@ -9,12 +9,12 @@ T.Switch {
     indicator: Rectangle {
         x: (control.width - width) / 2; y: (control.height - height) / 2
         width: Theme.switchWidth; height: Theme.switchHeight; radius: height / 2
-        color: control.checked ? Theme.accent : Theme.track
+        color: control.checked ? Theme.accent : Theme.switchOff
         opacity: control.enabled ? 1 : 0.5
         border.width: control.visualFocus ? 2 : 0; border.color: Theme.text
         Rectangle {
             x: Theme.smallGap + control.visualPosition * (parent.width - width - 2 * Theme.smallGap); y: Theme.smallGap; width: Theme.thumbSize; height: width; radius: width / 2
-            color: control.checked ? Theme.accentText : Theme.text
+            color: Theme.switchThumb
             Behavior on x { enabled: !control.down && !control.reducedMotion; Motion {} }
         }
     }

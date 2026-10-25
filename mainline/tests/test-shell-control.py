@@ -165,7 +165,7 @@ def main():
             assert tap("down")["fontPercent"] == 100
             assert tap("nextTab")["page"] == 2  # A choice owns input until confirm/cancel.
             assert not tap("back")["choicesOpen"]
-            tap("accept"); tap("down"); assert tap("accept", True)["fontPercent"] == 110
+            tap("accept"); tap("down"); assert tap("accept", True)["fontPercent"] == 115
             tap("down"); assert tap("accept", True)["editing"]
             assert latest["capture"]["status"] == "sensitive_entry" and "png_base64" not in latest["capture"]
             assert set(latest["state"]).isdisjoint({"text", "input", "clipboard", "notice", "error"})

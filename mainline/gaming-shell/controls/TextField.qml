@@ -9,6 +9,7 @@ T.TextField {
     color: Theme.text; placeholderTextColor: Theme.muted
     selectionColor: Theme.accent; selectedTextColor: Theme.accentText
     font.pixelSize: Theme.bodySize * fontScale
+    font.family: Theme.fontFamily
     verticalAlignment: TextInput.AlignVCenter
     selectByMouse: true
     background: Rectangle { color: Theme.raised; radius: Theme.radius; border.width: 2; border.color: control.activeFocus ? Theme.accent : Theme.outline }

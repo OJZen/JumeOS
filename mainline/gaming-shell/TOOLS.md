@@ -198,7 +198,7 @@ is established. Keep R17/v3 fallbacks and end bounded device runs with normal po
 `tools-check` exercises dirty-save retry, in-flight route inspection, safe copy
 and HID report encoding. `test-shell-tools.py --binary ABSOLUTE_BINARY --evidence
 ABSOLUTE_EXTERNAL_DIRECTORY` drives actual IPC: independent routes, favorites,
-copy/refusal/backup, export, failed-save recovery, modal isolation and 100/120%
+copy/refusal/backup, export, failed-save recovery, modal isolation and 100/130%
 font screenshots. `test-gaming-probe.py` checks native and stream supervisor
 normal/error/timeout/invalid-request cleanup. The Linux builder runs the relocated
 package, existing application/stream lifecycle and packaged keyboard checks.

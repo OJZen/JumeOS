@@ -87,7 +87,6 @@ bool Applications::load(const QString &path) {
         object.size() != 2 || object.value("applications").toArray().size() > 512)
         return fail(QStringLiteral("应用列表格式不正确。"));
     QList<Entry> entries; QVariantList items; QSet<QString> ids;
-    const QStringList colors{"#3159a2", "#9c573e", "#386c72", "#667948", "#805779", "#397d91"};
     const auto validText = [](const QJsonValue &value, int maximum, bool allowEmpty = false) {
         return value.isString() && (allowEmpty || !value.toString().isEmpty()) && value.toString().size() <= maximum &&
             !value.toString().contains(QRegularExpression("[\\x00-\\x1f\\x7f]"));
@@ -111,8 +110,7 @@ bool Applications::load(const QString &path) {
         if (!valid) return fail(QStringLiteral("应用列表第 %1 项无效或标识重复。").arg(entries.size() + 1));
         ids.insert(id); entries.append(entry);
         items.append(QVariantMap{{"id", id}, {"title", item.value("title").toString()},
-            {"detail", item.value("description").toString(QStringLiteral("应用"))},
-            {"color", colors[items.size() % colors.size()]}});
+            {"detail", item.value("description").toString(QStringLiteral("应用"))}});
     }
     m_entries = entries; m_items = items; m_hasManifest = true; m_error.clear(); return true;
 }

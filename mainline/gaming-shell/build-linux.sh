@@ -15,6 +15,8 @@ keyboard="$output/keyboard/qtvirtualkeyboard-runtime-arm64.tar.gz"
 portmaster=${R46H_PORTMASTER_BUNDLE:-"$workspace/mainline/out/.cache/r46h-ports-backend-20260910/prepared/portmaster-backend.tar.gz"}
 [ -f "$portmaster" ] && [ -f "$(dirname "$portmaster")/runtime.sha256" ] || { echo 'Run gaming-ports/prepare-backend.py first.' >&2; exit 1; }
 [ "$(shasum -a 256 "$portmaster" | cut -d ' ' -f 1)" = "$(cat "$(dirname "$portmaster")/runtime.sha256")" ]
+fonts=${R46H_UI_FONT_CACHE:-"$workspace/mainline/out/.cache/fonts/noto-sans-sc"}
+python3 -B "$source_dir/interface-fonts.py" prepare "$fonts" --check
 native=${R46H_PORT_NATIVE_CACHE:-"$workspace/mainline/out/.cache/r46h-ports-native"}
 python3 -B "$workspace/mainline/gaming-ports/prepare-native.py" "$native" --check
 gta=${R46H_GTA_SOURCE_OUTPUT:-"$workspace/mainline/out/.cache/r46h-gta-source-ring-simple-shadow-r74-20260919"}
@@ -26,7 +28,7 @@ docker run --rm --network none --entrypoint /bin/bash \
   -v "$workspace/mainline/gaming-shell:/project/mainline/gaming-shell:ro" \
   -v "$workspace/mainline/gaming-remote-screen:/project/mainline/gaming-remote-screen:ro" \
   -v "$workspace/mainline/gaming-ports:/project/mainline/gaming-ports:ro" -v "$portmaster:/portmaster-backend.tar.gz:ro" \
-  -v "$native:/native-debs:ro" -v "$gta:/gta-source:ro" \
+  -v "$native:/native-debs:ro" -v "$gta:/gta-source:ro" -v "$fonts:/interface-fonts:ro" \
   -v "$workspace/mainline/tests:/project/mainline/tests:ro" \
   -v "$output/control-tests:/project/mainline/out/.cache" \
   -e TMPDIR=/out/tmp -e LANG=C.UTF-8 -e QML_DISABLE_DISK_CACHE=1 -e QT_DISABLE_SHADER_DISK_CACHE=1 \
@@ -56,6 +58,7 @@ install -m 755 /out/linux-build/r46h-shell "$stage/usr/bin/r46h-shell"
 strip --strip-unneeded "$stage/usr/bin/r46h-shell"
 install -m 755 /src/shell-client.sh /src/probe-r46h.sh /src/desktop-session.sh /src/remote-session.sh /src/device-lease.sh /src/cpu-control.py /src/memory-control.sh "$stage/"
 install -m 644 /src/applications.example.json "$stage/"
+python3 -B /src/interface-fonts.py install /interface-fonts "$stage"
 bash /project/mainline/gaming-ports/install-runtime.sh "$stage"
 lib=usr/lib/aarch64-linux-gnu
 # Virtual Keyboard imports this QML module; the SDK previously hid its absence.
@@ -102,8 +105,14 @@ QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software XDG_RUNTIME_DIR=/out/runtime
   LD_LIBRARY_PATH="$stage/usr/lib/aarch64-linux-gnu:$stage/usr/lib/aarch64-linux-gnu/libproxy" \
   QT_PLUGIN_PATH="$stage/usr/lib/aarch64-linux-gnu/qt6/plugins" QML_IMPORT_PATH="$stage/usr/lib/aarch64-linux-gnu/qt6/qml" \
   "$stage/usr/bin/shell-check" virtualKeyboardInput
+# Package check: the staged binary must resolve all three packaged weights by family.
+QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software XDG_RUNTIME_DIR=/out/runtime R46H_REQUIRE_UI_FONTS=1 \
+  LD_LIBRARY_PATH="$stage/usr/lib/aarch64-linux-gnu:$stage/usr/lib/aarch64-linux-gnu/libproxy" \
+  QT_PLUGIN_PATH="$stage/usr/lib/aarch64-linux-gnu/qt6/plugins" QML_IMPORT_PATH="$stage/usr/lib/aarch64-linux-gnu/qt6/qml" \
+  "$stage/usr/bin/shell-check" interfaceFontWeights
 rm "$stage/usr/bin/shell-check"
 rm -rf -- "$stage/state"
+python3 -B /src/interface-fonts.py verify "$stage"
 tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C "$stage" -cf - . | gzip -n > /out/r46h-shell-preview-arm64.tar.gz.incoming
 mv /out/r46h-shell-preview-arm64.tar.gz.incoming /out/r46h-shell-preview-arm64.tar.gz
 sha256sum /out/r46h-shell-preview-arm64.tar.gz

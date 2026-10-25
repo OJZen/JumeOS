@@ -26,7 +26,7 @@ Use one accent for active focus, quieter backgrounds for the current page or
 category, and context-specific button hints for a controller-first interface.
 Logical input must respond immediately; short visual transitions may follow it
 and must respect reduced motion. Keep large text, unavailable controls and HUD
-placement legible at 100% and 120% font size. Cache stable content; avoid adding
+placement legible at 90% to 130% font size in light and night themes. Cache stable content; avoid adding
 blur or animated page layout to achieve depth.
 
 The host prototype includes home/library/settings, favorite persistence,

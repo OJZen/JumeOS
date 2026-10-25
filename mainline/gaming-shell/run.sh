@@ -9,6 +9,8 @@ export QT_DISABLE_SHADER_DISK_CACHE=1
 export QT_SHADER_CACHE_PATH="$output/shader-cache"
 export CLANG_MODULE_CACHE_PATH="$output/clang-cache"
 mkdir -p "$TMPDIR"
+fonts="$workspace/mainline/out/.cache/fonts/noto-sans-sc"
+[ -n "${R46H_UI_FONT_DIR:-}" ] || [ ! -f "$fonts/NotoSansSC-Regular.otf" ] || export R46H_UI_FONT_DIR="$fonts"
 if [ "$(uname -s)" = Darwin ]; then
     qt_prefix=${R46H_QT_PREFIX:-"$output/qt/6.8.2/macos"}
 else

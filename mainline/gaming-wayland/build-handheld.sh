@@ -25,6 +25,8 @@ mesa=${R46H_MESA_RUNTIME:-$cache/r46h-mesa-26.2.2/r60/mesa-26.2.2-r46h-runtime.t
 python3 -B "$repo/mainline/gaming-ports/prepare-native.py" "$native" --check
 [[ -f $gta/BUILD-INFO && -f $gta/SHA256SUMS ]] && (cd "$gta" && sha256sum --check --quiet SHA256SUMS)
 PYTHONDONTWRITEBYTECODE=1 python3 -B "$repo/mainline/gaming-mesa/runtime.py" validate-runtime "$mesa"
+fonts=${R46H_UI_FONT_CACHE:-$cache/fonts/noto-sans-sc}
+python3 -B "$repo/mainline/gaming-shell/interface-fonts.py" prepare "$fonts" --check
 peripherals="$cache/r46h-peripherals"
 PYTHONDONTWRITEBYTECODE=1 python3 -B "$source_dir/prepare-peripherals.py" "$peripherals"
 files_bindings=()
@@ -55,7 +57,7 @@ docker run --rm --init --network none --memory 1536m --cpus 3 --pids-limit 256 -
   -v "$cache/r46h-shell/linux-build:/out/linux-build" \
   -v "$cache/r46h-ports-backend-20260910/game-debs:/debs:ro" -v "$cache/r46h-wayland/deb-cache:/wayland-debs:ro" \
   -v "$cache/r46h-wayland/r46h-wayland-preview-arm64.tar.gz:/wayland-runtime.tar.gz:ro" \
-  -v "$peripherals:/peripheral-debs:ro" \
+  -v "$peripherals:/peripheral-debs:ro" -v "$fonts:/interface-fonts:ro" \
   ${client_bindings[@]+"${client_bindings[@]}"} \
   ${files_bindings[@]+"${files_bindings[@]}"} \
   "$image" -c "$1" -- "$commit"
