@@ -14,7 +14,6 @@ Item {
     readonly property bool hardware: device !== null && device.target
     property var choiceValues: []
     property string choiceKey: ""
-    clip: true
     property int category: 0
     property int openedCategory: 0
     property int rowIndex: 0
@@ -267,7 +266,7 @@ Item {
             layer.enabled: true
             visible: settings.sidebar; currentIndex: settings.category
             model: settings.categories
-            delegate: SettingRow {
+            delegate: Ui.ListRow {
                 required property string modelData; required property int index
                 width: categoryList.rowWidth; title: modelData; iconName: settings.categoryIcons[index]
                 selected: settings.category === index; focusOutline: false
@@ -300,7 +299,7 @@ Item {
                     y: Ui.Theme.contentY; width: parent.width; height: parent.height - y
                     visible: settings.category !== 2
                     model: settings.rows; currentIndex: settings.rowIndex
-                    delegate: SettingRow {
+                    delegate: Ui.ListRow {
                         required property var modelData; required property int index
                         width: settingRows.rowWidth; fontScale: settings.fontScale
                         title: modelData.name

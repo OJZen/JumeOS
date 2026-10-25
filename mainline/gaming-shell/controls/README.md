@@ -60,9 +60,11 @@ colors and interaction feedback still use these tokens where applicable.
 Do not hide unavailable actions behind enabled-looking controls, replace switches
 with “已开启/已关闭”, or use a progress track for a value with unknown bounds.
 
-Use `PageHeader` on tool pages, followed by the smallest required `Ui.ListView`.
-Use the list's `rowWidth` for delegates and the selected delegate's actual
-position/height for `FocusFrame`; do not multiply a hard-coded row stride.
+Use `TopBar` and `HintBar` on every page; the hint bar is generated from the page's
+declared actions. Tool pages still use `PageHeader` followed by the smallest
+required `Ui.ListView` until the v1 screens replace them. Use the list's `rowWidth`
+for delegates and give `FocusFrame` the focused delegate's actual position, height
+and radius; do not multiply a hard-coded row stride. Only that frame moves.
 The shell owns outer navigation. Category or game lists must not instantiate
 their detail page while focus moves: A/right activates one asynchronous `Loader`,
 and left/B deactivates it and returns to the preserved list selection. USB's
@@ -75,7 +77,7 @@ Ui.ListView {
     id: rows
     y: Ui.Theme.contentY; width: parent.width; height: parent.height - y
     model: options
-    delegate: SettingRow {
+    delegate: Ui.ListRow {
         required property var modelData
         width: rows.rowWidth; title: modelData.title
         toggleState: Number(modelData.enabled)
@@ -92,30 +94,38 @@ changes its color. Keep source artwork bounded to the displayed size. Game image
 may come from a verified local game manifest later; no guessed covers or remote
 posters are loaded for the management pages.
 
-| Component | Contract |
+| Component | Contract (JUME-UI §5) |
 | --- | --- |
-| `Button` | Native button semantics and `clicked`; `primary`, `selected`, disabled/focus/press feedback |
-| `Switch` | Native `checked`/`toggled`; use `Accessible.name` and a nearby `Label` or `SettingRow` |
-| `Slider` | Native horizontal value/step/drag/keyboard behavior; `moved` identifies user changes |
-| `ProgressBar` | Native bounded value; indeterminate motion requires a visible/enabled item in a shown, non-minimized window; reduced motion shows a fixed segment |
+| `Button` | Native `clicked`; `variant` primary / secondary / danger (solid only while focused), `selected` focus, 56 high, r16, press 0.97 + deeper fill |
+| `Switch` | Native `checked`/`toggled`; 64×36 track, light 28 thumb, state shown by the track; `selected` draws the ring |
+| `Slider` | Native value/step (5%); 8 track, 28 thumb with a 3 px ring; `adjusting` turns warning and grows the thumb to 36 |
+| `ProgressBar` | 8 high bounded value; indeterminate motion needs a visible item in a shown window; reduced motion shows a fixed segment |
 | `ScrollBar` | Native attached scrollbar with a visible position indicator; no idle animation |
-| `Label` | `text`, `role: "title" / "section" / "body" / "caption" / "micro"`; use explicit wrapping only where needed |
+| `Label` | `role` display / title / headline / body / label / caption / micro (`section`, `value` map to headline, label); `tabular` figures |
 | `TextField` | Native editing/selection/IME; caller owns maximum length, validation and sensitive-input policy |
-| `Icon` | Named navigation/device/game line icons from `Icon.qml`; `source` accepts custom image assets without recoloring |
-| `ListView` | Qt virtualized/reused delegates, containment on selection and shared scrollbar; caller supplies its model/delegate |
-| `TableView` | Qt's two-axis virtualized table with native selection model; default read-only cells use the model's `display` role; supply a custom delegate for editing |
-| `FocusFrame` | Empty outline shared by both sidebars/details; content remains stationary; `active`/`adjusting` select feedback |
-| `NavigationBar` | `model`, externally owned `currentIndex`, `activated(index)`; a failed navigation/save can leave selection unchanged |
-| `PageHeader` | Shared title/icon/status, optional back/action buttons and determinate or indeterminate bounded-work progress |
-| `Page` | A `route` change reveals content; transitions retarget while input stays live, and reduced motion settles immediately |
-| `ChoicePopup` | Native modal `Popup.Item` with pending/current indexes, confirmation and cancellation; stays in the existing window |
+| `Icon` | Named 24-unit, 2 px round-stroke icons from `Icon.qml`; `source` accepts custom images without recoloring |
+| `ListView` / `TableView` | Qt virtualized/reused delegates and the shared scrollbar; caller supplies model and delegate |
+| `ListRow` | 72 or 96 high surface; basic (`chevron`), choice (`value` + `choice`), switch (`toggleState`), `description`, slider (`progress`, `adjusting`), read-only, disabled (`disabledReason`, still focusable); `current` = accentSoft |
+| `FocusFrame` | The one moving ring: target rect + `radius`; 4 px stroke outside a 4 px gap, radius + 7; `adjusting`, `lift`, `bounce(dx, dy)`; settles once after it stops |
+| `Tabs` | 48-high capsules between soft L1/R1 badges; current = `text` fill; `navigationActive` rings the current tab |
+| `GameCard` | Fallback = card color + 135° 7% stripes (14 px); `iconName` apps, `badge`/`badgeIcon`, `favorite`, `available`; title on 256 cards only; focus lifts 1.04 with shadow and ring |
+| `DockTile` | 88×88 surface r28 with 40 icon and caption; focus 1.06, ring, bold label |
+| `GlyphBadge` | A/B/X/Y circles, shoulders r8 squares, Start/Select capsules, d-pad drawings; 34 / 30 / 26; `soft` for content; `progress` hold ring |
+| `HintBar` | Built from `actions` ({button, label} or older pairs): A B X Y Start fixed at the right, directions/Select/shoulders lead after `context`; at most five; `overflow` reports a cramped bar |
+| `TopBar` | 72 high; Jume mark or `title`; night, Wi-Fi (`statusWifi.level`), battery and clock on one centerline |
+| `Panel` → `Sheet` / `Dialog` / `QuickPanel` | Surface r28 with header, content and hint footer split by dividers; sheet squares its bottom, dialog ≤ 560, quick panel 392 at 24 from the corner |
+| `Hud` / `Toast` / `HoldConfirm` | 280×56 top HUD that fades after `hudDwell`; bottom toast (owner clears after `toastDwell`, errors stay); centered hold card shown only after 600 ms |
+| `Shadow` | Level-2 elevation from the prerendered nine-slice `elevation.png` (magick: blurred r24 rect, 16% alpha, +4 px); never a live blur |
+| `PageHeader` / `Page` | Tool-page title/status with back/action buttons; `Page` slides a new route in from 48 px (100 ms fade with reduced motion) |
+| `ChoicePopup` | Native modal `Popup.Item` dialog with pending/current indexes, confirmation and cancellation; stays in the existing window |
 
-`SettingRow.qml` composes these primitives for settings, host details and the
-quick panel. Its `choice` flag adds a chevron; `toggleState` uses the shared
-switch. Read-only rows remain legible but have no native activation. A parent
-may still let controller navigation select them to explain unavailability.
-All row clicks, including native and accessibility activation, synchronize the
-logical selection before emitting `activated`; pointer press still gives early feedback.
+`ListRow` composes these primitives for settings, host details and the quick panel.
+Read-only rows remain legible but have no native activation; disabled rows keep
+their reason visible and stay reachable by controller focus. All row clicks,
+including native and accessibility activation, synchronize the logical selection
+before emitting `activated`; pointer press still gives early feedback.
+Avoid QML property names that start with `on` and a capital letter: QML reads them
+as signal handlers, so such a token never binds (`themeTokenContrast` rejects them).
 
 ## Choices and navigation
 
@@ -145,7 +155,7 @@ not commit. `activated(index)` leaves the popup open until the caller confirms
 success; a failed save retains the pending choice for retry. B/outside click
 cancels an uncommitted choice and restores previous focus. Cancellation after a
 failed write does not discard feature-owned dirty data; its save guard remains.
-Switch bindings are similarly restored by `SettingRow` after native toggling.
+Switch bindings are similarly restored by `ListRow` after native toggling.
 
 Route controller actions to `choices.dispatch(action, repeated)` **before**
 page/shortcut handling and stop if it returns true. While open, the popup owns
@@ -166,7 +176,10 @@ overlay becomes available. Do not create a second window to implement a menu.
 Durations and the standard/emphasized/exit curves follow the table above and
 [JUME-UI §6](../../../docs/JUME-UI.md#6-动效). Logical selection updates
 immediately. A palette change cross-fades one non-live snapshot for 200 ms and
-switches directly with reduced motion. No bounce, animated full-page layout, blur, shadow stack or new
+switches directly with reduced motion. After the focus ring stops it settles once
+(1 → 1.03 → 1, 260 ms); held keys keep restarting the wait, so repeats never pulse it.
+`bounce(dx, dy)` gives the 6 px edge push. Cards lift with the focus duration and
+press scales take 80 ms; reduced motion keeps the end states without the travel. No bounce, animated full-page layout, blur, shadow stack or new
 per-frame JavaScript loop is added. A focus outline changes its own small
 geometry; it does not relayout cached text. Game art, settings content, keyboard
 keys and the quick panel retain their existing cache boundaries.
@@ -196,9 +209,11 @@ R46H_UI_CAPTURE_DIR="$PWD/mainline/out/.cache/r46h-controls-review" \
   mainline/gaming-shell/run.sh --check standardControlsAndChoices streamingNavigation
 ```
 
-The gallery's `foundations` page mirrors `Foundations.png`; captures cover light
-and night at 100% and 130%, and the check asserts that its blocks and labels never
-overlap or truncate. The check also covers pointer/keyboard activation, disabled state, font sizes,
+The gallery's `foundations` page mirrors `Foundations.png` and its `buttons`,
+`rows` and `cards` pages mirror `Components.png`; captures cover light and night at
+100% and 130%, and the check asserts that blocks and labels never overlap, leave
+the page or truncate. `sharedComponentStates` checks button variants, ring
+geometry and settle, hint ordering, the hold threshold, HUD fade and toast dwell. The check also covers pointer/keyboard activation, disabled state, font sizes,
 viewport-limited delegates, idle repaint, modal isolation, cancellation and
 failed-save recovery. The three review regressions also exercise native and
 accessibility row activation, Tab/Space isolation, outside clicks, scaled popup

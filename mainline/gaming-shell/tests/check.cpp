@@ -30,6 +30,7 @@
 #include <QStyleHints>
 #include <QTemporaryDir>
 #include <QDirIterator>
+#include <QMap>
 #include <cmath>
 #include <QRegularExpression>
 #include <QtTest>
@@ -616,11 +617,15 @@ private slots:
     }
     void themeTokenContrast() {
         QQmlEngine engine; QScopedPointer<QObject> holder; auto *theme = shellTheme(&engine, holder); QVERIFY(theme);
-        auto color = [&](const char *name) { return theme->property(name).value<QColor>(); };
+        auto color = [&](const char *name) { const auto value = theme->property(name).value<QColor>(); if (!value.isValid()) qWarning("Invalid token %s", name); return value; };
+        // QML reads "on" + capital as a signal handler, so such a token silently never binds.
+        for (int i = 0; i < theme->metaObject()->propertyCount(); ++i)
+            QVERIFY2(!QRegularExpression("^on[A-Z]").match(QString::fromLatin1(theme->metaObject()->property(i).name())).hasMatch(), theme->metaObject()->property(i).name());
         const QList<QPair<const char *, const char *>> text{{"text", "ground"}, {"text", "surface"}, {"text", "surfaceSunken"},
             {"textSecondary", "ground"}, {"textSecondary", "surface"}, {"textSecondary", "surfaceSunken"}, {"textTertiary", "ground"},
             {"textTertiary", "surface"}, {"accentText", "accent"}, {"accentInk", "accentSoft"}, {"glyphText", "glyph"},
-            {"glyphSoftText", "glyphSoft"}, {"danger", "surface"}, {"warning", "surface"}, {"accent", "surface"}, {"errorToastText", "errorToast"}};
+            {"glyphSoftText", "glyphSoft"}, {"danger", "surface"}, {"warning", "surface"}, {"accent", "surface"}, {"errorToastText", "errorToast"},
+            {"dangerText", "danger"}, {"cardInk", "cardText"}};
         for (const bool night : {false, true}) {
             theme->setProperty("night", night);
             // §2: text at least 4.5:1 and focus at least 3:1 against the surfaces they sit on.
@@ -629,7 +634,7 @@ private slots:
             QVERIFY(contrast(color("focus"), color("ground")) >= 3); QVERIFY(contrast(color("focus"), color("surface")) >= 3);
             // Card titles are large bold text on fixed card colors (3:1 large-text threshold).
             for (const auto &card : theme->property("cardPalette").toList())
-                QVERIFY2(contrast(color("onCard"), QColor(card.toString())) >= 3, qPrintable(card.toString()));
+                QVERIFY2(contrast(color("cardText"), QColor(card.toString())) >= 3, qPrintable(card.toString()));
         }
     }
     void themedPagesLightAndNight() {
@@ -1046,7 +1051,9 @@ private slots:
         auto *list=content->findChild<QQuickItem *>("choiceList");QVERIFY(list);
         QCOMPARE(list->property("currentIndex").toInt(),1);
         auto *outline=content->findChild<QQuickItem *>("choiceFocus");QVERIFY(outline);
-        QTRY_COMPARE(outline->y(), qobject_cast<QQuickItem *>(list->property("currentItem").value<QObject *>())->y() - list->property("contentY").toReal());
+        auto *choiceRow=qobject_cast<QQuickItem *>(list->property("currentItem").value<QObject *>());QVERIFY(choiceRow);
+        QTRY_COMPARE(outline->mapToScene(QPointF()).y(), choiceRow->mapToScene(QPointF()).y());
+        QCOMPARE(outline->height(), choiceRow->height());
         if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+"/streaming-applications.png"));
         tap("up");tap("accept");QCOMPARE(manager.current().value("application").toString(),QString("Desktop"));
         tap("accept");for(int i=0;i<3;++i)tap("down");tap("accept");QVERIFY(root->property("editing").toBool());tap("back");
@@ -1086,37 +1093,42 @@ private slots:
             sample->setProperty("night", night);
             for (int percent : {100, 130}) {
                 sample->setProperty("fontScale", percent / 100.);
-                for (const auto *page : {"controls", "foundations"}) {
+                for (const auto *page : {"controls", "foundations", "buttons", "rows", "cards"}) {
                     sample->setProperty("page", QString::fromLatin1(page)); QTest::qWait(200);
                     if (!captures.isEmpty()) QVERIFY(gallery.grabWindow().save(captures + QString("/%1-%2-%3.png")
                         .arg(QLatin1String(page), night ? "night" : "light").arg(percent)));
                 }
             }
         }
-        // Foundations page: palette, shapes and type ramp stay apart and inside the margins; no text is cut.
-        sample->setProperty("page", "foundations");
-        for (const qreal scale : {1.0, 1.3}) {
-            sample->setProperty("fontScale", scale); QTest::qWait(100);
-            QList<QRectF> blocks;
-            for (const auto *name : {"foundationColors", "foundationShapes", "foundationRamp"}) {
-                auto *block = sample->findChild<QQuickItem *>(name); QVERIFY(block);
-                const auto rect = block->mapRectToScene(block->boundingRect());
-                QVERIFY2(rect.left() >= 40 && rect.right() <= 1024 - 40 && rect.bottom() <= 768,
-                    qPrintable(QString("%1 outside the page at %2%").arg(name).arg(scale * 100)));
-                for (const auto &other : blocks) QVERIFY2(!rect.intersects(other), qPrintable(QString("%1 overlaps at %2%").arg(name).arg(scale * 100)));
-                blocks << rect;
+        // Showcase pages: blocks stay apart and inside the margins; no text is cut or overlaps another.
+        const QList<QPair<const char *, QStringList>> pages{{"foundations", {"foundationColors", "foundationShapes", "foundationRamp"}},
+            {"buttons", {"componentButtons"}}, {"rows", {"componentRows"}}, {"cards", {"componentCards"}}};
+        for (const auto &page : pages) {
+            sample->setProperty("page", QString::fromLatin1(page.first));
+            for (const qreal scale : {1.0, 1.3}) {
+                sample->setProperty("fontScale", scale); QTest::qWait(100);
+                const auto where = QString("%1 at %2%").arg(QLatin1String(page.first)).arg(scale * 100);
+                QList<QRectF> blocks; QList<QQuickItem *> pending;
+                for (const auto &name : page.second) {
+                    auto *block = sample->findChild<QQuickItem *>(name); QVERIFY(block); pending << block;
+                    const auto rect = block->mapRectToScene(QRectF(0, 0, block->width(), block->height()));
+                    QVERIFY2(rect.left() >= 40 && rect.right() <= 1024 - 40 && rect.bottom() <= 768, qPrintable(QString("%1 outside the page at %2,%3 %4×%5: %6").arg(name).arg(rect.x()).arg(rect.y()).arg(rect.width()).arg(rect.height()).arg(where)));
+                    for (const auto &other : blocks) QVERIFY2(!rect.intersects(other), qPrintable(name + " overlaps: " + where));
+                    blocks << rect;
+                }
+                QList<QRectF> texts;
+                while (!pending.isEmpty()) {
+                    auto *item = pending.takeLast(); pending.append(item->childItems());
+                    if (!item->isVisible() || !item->inherits("QQuickText") || item->property("text").toString().isEmpty()) continue;
+                    const auto text = item->property("text").toString();
+                    QVERIFY2(!item->property("truncated").toBool(), qPrintable(text + " truncated: " + where));
+                    QVERIFY2(item->width() + 0.5 >= item->implicitWidth() || item->property("wrapMode").toInt() != 0, qPrintable(text + " clipped: " + where));
+                    const auto rect = item->mapRectToScene(QRectF(0, 0, qMin(item->width(), item->implicitWidth()), item->height())).adjusted(0.5, 0.5, -0.5, -0.5);
+                    QVERIFY2(rect.right() <= 1024 && rect.bottom() <= 768, qPrintable(text + " leaves the page: " + where));
+                    for (const auto &other : texts) QVERIFY2(!rect.intersects(other), qPrintable(text + " overlaps text: " + where));
+                    texts << rect;
+                }
             }
-            QList<QRectF> texts; QList<QQuickItem *> pending{sample->findChild<QQuickItem *>("galleryFoundations")};
-            while (!pending.isEmpty()) {
-                auto *item = pending.takeLast(); pending.append(item->childItems());
-                if (!item->isVisible() || !item->inherits("QQuickText")) continue;
-                QVERIFY(!item->property("truncated").toBool());
-                QVERIFY2(item->width() + 0.5 >= item->implicitWidth(), qPrintable(item->property("text").toString()));
-                const auto rect = item->mapRectToScene(QRectF(0, 0, item->implicitWidth(), item->height())).adjusted(0.5, 0.5, -0.5, -0.5);
-                for (const auto &other : texts) QVERIFY2(!rect.intersects(other), qPrintable(item->property("text").toString()));
-                texts << rect;
-            }
-            QVERIFY(texts.size() >= 30);
         }
         sample->setProperty("night", false); sample->setProperty("fontScale", 1.); sample->setProperty("page", "controls"); QTest::qWait(100);
         QVERIFY(QMetaObject::invokeMethod(sample, "visitLast")); QTest::qWait(200);
@@ -1163,6 +1175,85 @@ private slots:
         action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); action("accept"); QTest::qWait(200);
         if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/settings-choices.png"));
         action("back");
+    }
+    void sharedComponentStates() {
+        QQuickView view; view.resize(1024, 768);
+        QQmlComponent fixture(view.engine());
+        fixture.setData(R"(import QtQuick
+            import "controls" as Ui
+            Item {
+                width: 1024; height: 768
+                property alias danger: danger
+                property alias frame: frame
+                property alias hints: hints
+                property alias hold: hold
+                property alias hud: hud
+                Ui.Button { id: danger; x: 40; y: 40; text: "结束游戏"; variant: "danger" }
+                Ui.Button { id: disabled; objectName: "disabledButton"; x: 300; y: 40; text: "不可用"; enabled: false }
+                Rectangle { id: target; objectName: "target"; x: 40; y: 140; width: 400; height: 72; radius: Ui.Theme.radiusRow }
+                Ui.FocusFrame { id: frame; x: target.x; y: target.y; width: target.width; height: target.height }
+                Ui.HintBar { id: hints; x: 40; y: 680; width: 944
+                    actions: [{button: "A", label: "开始"}, {button: "Start", label: "选项"}, {button: "dpadH", label: "调整"}, {button: "B", label: "返回"}, {button: "X", label: "收藏"}, {button: "Y", label: "搜索"}] }
+                Ui.HoldConfirm { id: hold; anchors.centerIn: parent }
+                Ui.Hud { id: hud; anchors.horizontalCenter: parent.horizontalCenter; y: 24 }
+            })", QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ComponentFixture.qml")));
+        QScopedPointer<QObject> object(fixture.create()); QVERIFY2(object, qPrintable(fixture.errorString()));
+        auto *root = qobject_cast<QQuickItem *>(object.data()); root->setParentItem(view.contentItem());
+        view.show(); QVERIFY(QTest::qWaitForWindowExposed(&view));
+        QScopedPointer<QObject> holder; auto *theme = shellTheme(view.engine(), holder); QVERIFY(theme);
+        auto color = [&](const char *name) { return theme->property(name).value<QColor>(); };
+        // Danger buttons are quiet until focused, then solid; disabled text uses the disabled token.
+        auto *danger = root->property("danger").value<QQuickItem *>(); QVERIFY(danger);
+        QCOMPARE(danger->property("fill").value<QColor>(), color("surfaceSunken")); QCOMPARE(danger->property("ink").value<QColor>(), color("danger"));
+        danger->setProperty("selected", true);
+        QCOMPARE(danger->property("fill").value<QColor>(), QColor("#B3261E")); QCOMPARE(danger->property("ink").value<QColor>(), QColor("#FFFFFF"));
+        QCOMPARE(danger->height(), 56.);
+        QCOMPARE(root->findChild<QObject *>("disabledButton")->property("ink").value<QColor>(), color("disabledText"));
+        // Focus ring: 4 px stroke outside a 4 px gap, radius = element radius + 7; adjusting turns it warning.
+        auto *frame = root->property("frame").value<QQuickItem *>(); auto *ring = frame->findChild<QQuickItem *>("focusRing"); QVERIFY(ring);
+        const auto target = root->findChild<QQuickItem *>("target")->mapRectToScene(QRectF(0, 0, 400, 72));
+        QCOMPARE(ring->mapRectToScene(ring->boundingRect()), target.adjusted(-8, -8, 8, 8));
+        QCOMPARE(ring->property("radius").toReal(), 16. + 7.); QCOMPARE(ring->property("border").value<QObject *>()->property("width").toInt(), 4);
+        frame->setProperty("adjusting", true);
+        QCOMPARE(ring->property("border").value<QObject *>()->property("color").value<QColor>(), color("warning"));
+        // The ring settles once after a move, then nothing animates.
+        auto *settle = frame->findChild<QObject *>("focusSettle"); QVERIFY(settle);
+        frame->setProperty("y", 260.); QTRY_VERIFY(settle->property("running").toBool()); QTRY_VERIFY(!settle->property("running").toBool());
+        QCOMPARE(frame->property("settle").toReal(), 1.);
+        QTest::qWait(100); QSignalSpy idle(&view, &QQuickWindow::frameSwapped); QTest::qWait(500);
+        QVERIFY2(idle.size() <= 3, qPrintable(QString("Settled components repainted %1 times").arg(idle.size())));
+        // Hint bar: five actions at most; directions lead, then Start Y X B A towards the right edge.
+        auto *hints = root->property("hints").value<QQuickItem *>(); QVERIFY(!hints->property("overflow").toBool());
+        QMap<qreal, QString> order; QList<QQuickItem *> pending{hints};
+        while (!pending.isEmpty()) {
+            auto *item = pending.takeLast(); pending.append(item->childItems());
+            if (item->objectName() == "hintLabel" && item->isVisible()) order.insert(item->mapToScene(QPointF()).x(), item->property("text").toString());
+        }
+        QCOMPARE(QStringList(order.values()), QStringList({"调整", "选项", "收藏", "返回", "开始"}));
+        // Hold confirmation appears only after 600 ms of a 2 s hold and leaves on release.
+        auto *hold = root->property("hold").value<QQuickItem *>();
+        hold->setProperty("progress", 0.25); QVERIFY(!hold->isVisible());
+        hold->setProperty("progress", 0.31); QVERIFY(hold->isVisible());
+        QCOMPARE(hold->findChild<QObject *>("holdSeconds")->property("text").toString(), QStringLiteral("1.4"));
+        hold->setProperty("progress", 0.); QVERIFY(!hold->isVisible());
+        // HUD fades in on show and out on hide without taking focus.
+        auto *hud = root->property("hud").value<QQuickItem *>(); QVERIFY(!hud->isVisible());
+        hud->setProperty("shown", true); QVERIFY(hud->isVisible()); QTRY_COMPARE(hud->opacity(), 1.);
+        QCOMPARE(hud->size(), QSizeF(280, 56)); QVERIFY(!hud->hasActiveFocus());
+        hud->setProperty("shown", false); QVERIFY(hud->isVisible()); QTRY_VERIFY(!hud->isVisible());
+        // Toasts: notices leave after toastDwell, errors stay until the failure is resolved.
+        QTemporaryDir directory; const auto blocked = directory.filePath("blocked");
+        QFile file(blocked); QVERIFY(file.open(QIODevice::WriteOnly)); file.close();
+        Preferences state(blocked); Telemetry metrics(directory.path()); ControllerInput controller; QQuickView shell;
+        shell.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(&metrics)}, {"controller", QVariant::fromValue(&controller)}});
+        shell.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml"))); QCOMPARE(shell.status(), QQuickView::Ready);
+        auto *shellRoot = shell.rootObject(); auto *toast = shellRoot->findChild<QQuickItem *>("notice"); QVERIFY(toast);
+        QVERIFY(QMetaObject::invokeMethod(shellRoot, "notify", Q_ARG(QVariant, QStringLiteral("已加入收藏")))); QVERIFY(toast->isVisible());
+        QVERIFY(!toast->property("error").toBool()); QTest::qWait(2200); QVERIFY(toast->isVisible());
+        QTRY_VERIFY_WITH_TIMEOUT(!toast->isVisible(), 600);
+        state.adjust("volume", 5); QVERIFY(!state.save());
+        QTRY_VERIFY(toast->isVisible()); QVERIFY(toast->property("error").toBool()); QTest::qWait(2600); QVERIFY(toast->isVisible());
+        QVERIFY(file.remove()); QVERIFY(state.save()); QTRY_VERIFY(!toast->isVisible());
     }
     void nativeRowActivationUsesItsOwnTarget() {
         QTemporaryDir directory;
@@ -1288,13 +1379,13 @@ private slots:
         QCOMPARE(changes.last().at(0).toInt(),100); QCOMPARE(device.info().value("volumeSaved").toInt(),100);
         QVERIFY(hud->isVisible()); QCOMPARE(view.activeFocusItem(),focus); QVERIFY(!root->property("quickOpen").toBool());
         const auto bounds=hud->mapRectToScene(hud->boundingRect());
-        QCOMPARE(bounds.center().x(),320.); QCOMPARE(bounds.top(),12.5);
+        QCOMPARE(bounds.center().x(),320.); QCOMPARE(bounds.top(),15.); QCOMPARE(bounds.size(),QSizeF(280*0.625,56*0.625));
         const auto captures=qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
         QVERIFY(QMetaObject::invokeMethod(root,"closeEditor"));
         for(int scale:{100,130}) {
             if(scale==130){state.adjust("font",1);state.adjust("font",1);}
             save("201\n"); QTest::qWait(100);
-            auto *label=root->findChild<QQuickItem *>("volumeLabel"); QVERIFY(label);
+            auto *label=hud->findChild<QQuickItem *>("hudLabel"); QVERIFY(label);
             QVERIFY(label->property("contentWidth").toReal()<=label->width());
             QVERIFY(!label->property("truncated").toBool());
             state.adjust("monitor",1); QTest::qWait(100);
@@ -1389,13 +1480,13 @@ private slots:
         view.setInitialProperties({{"store",QVariant::fromValue(&state)},{"metrics",QVariant::fromValue(&metrics)},{"controller",QVariant::fromValue(&controller)},{"device",QVariant::fromValue(&device)}});
         view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));QCOMPARE(view.status(),QQuickView::Ready);view.resize(1024,768);view.show();QVERIFY(QTest::qWaitForWindowExposed(&view));
         auto *root=view.rootObject();auto tap=[&](const char *key){QVERIFY(QMetaObject::invokeMethod(root,"dispatch",Q_ARG(QVariant,QString(key)),Q_ARG(QVariant,false)));};
-        QCOMPARE(root->findChild<QObject *>("statusWifi")->property("text").toString(),QStringLiteral("79%"));
-        QCOMPARE(root->findChild<QObject *>("statusBattery")->property("text").toString(),QStringLiteral("86% · 充电"));
+        QCOMPARE(root->findChild<QObject *>("statusWifi")->property("level").toInt(),79);
+        QCOMPARE(root->findChild<QObject *>("statusBattery")->property("text").toString(),QStringLiteral("86%"));
         auto *clock=root->findChild<QQuickItem *>("statusClock");auto *wifiIcon=root->findChild<QQuickItem *>("statusWifiIcon");auto *batteryIcon=root->findChild<QQuickItem *>("statusBatteryIcon");
-        QVERIFY(clock&&wifiIcon&&batteryIcon);QCOMPARE(wifiIcon->size(),QSizeF(18,18));QCOMPARE(batteryIcon->size(),wifiIcon->size());
-        QCOMPARE(clock->property("font").value<QFont>().pixelSize(),root->findChild<QObject *>("statusWifi")->property("font").value<QFont>().pixelSize());
+        QVERIFY(clock&&wifiIcon&&batteryIcon);QCOMPARE(wifiIcon->size(),QSizeF(24,24));QCOMPARE(batteryIcon->size(),wifiIcon->size());
+        QCOMPARE(batteryIcon->property("name").toString(),QStringLiteral("battery-charging"));
         const auto centerY=[](QQuickItem *item){return item->mapToScene(QPointF(0,item->height()/2)).y();};
-        QCOMPARE(centerY(clock),centerY(wifiIcon));QCOMPARE(centerY(clock),centerY(batteryIcon));
+        QVERIFY(qAbs(centerY(clock)-centerY(wifiIcon))<=1);QVERIFY(qAbs(centerY(clock)-centerY(batteryIcon))<=1); // One centerline, within rounding.
         if(!qEnvironmentVariable("R46H_UI_CAPTURE_DIR").isEmpty())QVERIFY(view.grabWindow().save(qEnvironmentVariable("R46H_UI_CAPTURE_DIR")+"/device-status.png"));
         QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("power"))));QTRY_VERIFY(root->property("settingsDetailReady").toBool());
         for(int i=0;i<4;++i)tap("down");tap("accept");

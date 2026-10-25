@@ -5,12 +5,12 @@ T.TextField {
     id: control
     property real fontScale: Theme.fontScale
     implicitWidth: 280; implicitHeight: Theme.fieldHeight
-    leftPadding: Theme.padding; rightPadding: Theme.padding; topPadding: 12; bottomPadding: 12
-    color: Theme.text; placeholderTextColor: Theme.muted
+    leftPadding: Theme.space24; rightPadding: Theme.space24; topPadding: Theme.space12; bottomPadding: Theme.space12
+    color: Theme.text; placeholderTextColor: Theme.textTertiary
     selectionColor: Theme.accent; selectedTextColor: Theme.accentText
-    font.pixelSize: Theme.bodySize * fontScale
+    font.pixelSize: Math.round(Theme.type.body.size * fontScale)
     font.family: Theme.fontFamily
     verticalAlignment: TextInput.AlignVCenter
     selectByMouse: true
-    background: Rectangle { color: Theme.raised; radius: Theme.radius; border.width: 2; border.color: control.activeFocus ? Theme.accent : Theme.outline }
+    background: Rectangle { color: Theme.surfaceSunken; radius: Theme.radiusRow; border.width: 2; border.color: control.activeFocus ? Theme.focus : "transparent" }
 }

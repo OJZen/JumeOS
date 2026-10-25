@@ -40,8 +40,8 @@ QtObject {
     readonly property color disabledText: "#8E99A1"
     readonly property color errorToast: "#FBE9E7"
     readonly property color errorToastText: "#8E1D17"
-    readonly property color onCard: "#FFFFFF"
-    readonly property color cardStripe: alpha(onCard, 0.07)
+    readonly property color cardText: "#FFFFFF"
+    readonly property color cardStripe: alpha(cardText, 0.07)
     // Controller pointer keeps a dark outline and light fill on any page.
     readonly property color pointer: "#FFFFFF"
     readonly property color pointerOutline: "#14181B"
@@ -50,8 +50,15 @@ QtObject {
     // Fallback card colors keep their value in both modes (sampled from the v1 references).
     readonly property var cardPalette: ["#C65A3A", "#3D6E9E", "#2F55A4", "#A24D7C", "#6B7F3A"]
     function cardColor(index) { return cardPalette[Math.abs(index) % cardPalette.length] }
+    // Solid danger buttons; night keeps the dark text that the light danger value needs.
+    readonly property color dangerText: night ? "#14181B" : "#FFFFFF"
+    // Badges on fixed-color cards (状态胶囊、收藏星标) look the same in both modes.
+    readonly property color cardInk: "#14181B"
+    readonly property color cardFavorite: "#F2C46D"
     // Translucent variants derive from tokens; pages never spell out a color.
     function alpha(color, opacity) { return Qt.rgba(color.r, color.g, color.b, opacity) }
+    // Press feedback deepens light surfaces and lightens night ones.
+    function pressed(color) { return night ? Qt.lighter(color, 1.15) : Qt.darker(color, 1.08) }
 
     // §3 type ramp: size / line height / weight before fontScale.
     readonly property var type: ({
@@ -117,6 +124,24 @@ QtObject {
     readonly property int trackHeight: 8
     readonly property int iconSize: 24
     readonly property real sliderStep: 0.05
+    readonly property int thumbRing: 3
+    readonly property int tabHeight: 48
+    readonly property int glyphBarSize: 34
+    readonly property int glyphInlineSize: 30
+    readonly property int glyphKeySize: 26
+    readonly property int homeCardSize: 256
+    readonly property int cardBadgeHeight: 32
+    readonly property int stripeWidth: 14
+    readonly property int dockTileSize: 88
+    readonly property int dockIconSize: 40
+    readonly property int dockGap: 48
+    readonly property int hudWidth: 280
+    readonly property int hudHeight: 56
+    readonly property int dialogMaxWidth: 560
+    readonly property int quickPanelWidth: 392
+    readonly property int quickPanelInset: 24
+    readonly property int holdRingSize: 88
+    readonly property int shadowSpread: 24
 
     // §6 motion (ms) and curves; reducedMotion is applied by Motion and callers.
     readonly property int pressDuration: 80
@@ -163,7 +188,7 @@ QtObject {
     readonly property int detailWidth: contentWidth - detailX
     readonly property int toolTop: 100
     readonly property int toolHeight: 576
-    readonly property int contentY: 84
+    readonly property int contentY: 96
     readonly property int titleSize: 26
     readonly property int sectionSize: 20
     readonly property int bodySize: 18

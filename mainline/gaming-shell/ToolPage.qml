@@ -123,7 +123,7 @@ Item {
             id: games; objectName: "toolGames"
             y: Ui.Theme.contentY; width: Ui.Theme.sidebarWidth * 2; height: parent.height - y
             visible: view.sidebar && view.kind !== "usb"; model: view.entries; currentIndex: view.selected
-            delegate: SettingRow {
+            delegate: Ui.ListRow {
                 required property var modelData; required property int index
                 width: games.rowWidth; title: modelData.title
                 iconName: view.kind === "neo" ? "cartridge" : modelData.id === "stardew" ? "leaf" : "car"
@@ -154,7 +154,7 @@ Item {
                     id: details; objectName: "toolRows"
                     y: Ui.Theme.contentY; width: parent.width; height: parent.height - y
                     model: view.rows; currentIndex: view.row
-                    delegate: SettingRow {
+                    delegate: Ui.ListRow {
                         required property var modelData; required property int index
                         width: details.rowWidth; title: modelData.title; value: modelData.value || ""
                         selected: view.row === index; focusOutline: false

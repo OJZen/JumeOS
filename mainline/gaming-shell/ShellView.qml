@@ -69,7 +69,6 @@ Item {
     readonly property bool selectedFavorite: games[selected] ? ((applications || tools) ? store.applicationFavorites.indexOf(games[selected].id) >= 0 : store.favorites.indexOf(selected) >= 0) : false
     property bool keyboardEnabled: false
     readonly property bool keyboardReady: virtualKeyboard.status === Loader.Ready
-    readonly property bool gamepadHints: keyboardEnabled || (controller && controller.deviceName.length > 0)
     readonly property var inputMethod: Qt.inputMethod
     property bool editing: false
     property bool dimmed: false
@@ -127,9 +126,6 @@ Item {
     readonly property int liveWifiSignal: network !== null ? boundedPercent(network.signal) : -1
     readonly property int wifiSignal: hardware ? (liveWifiSignal >= 0 ? liveWifiSignal : boundedPercent(device.info.wifiSignal)) : -1
     readonly property string batteryState: hardware ? String(device.info.batteryStatus || "").toLowerCase() : ""
-    readonly property string batteryText: batteryPercent < 0 ? "—" : batteryPercent + "%" +
-        (batteryState === "charging" ? " · 充电" : batteryState === "full" ? " · 已满" :
-         batteryState === "discharging" ? " · 放电" : Number(device.info.online) === 1 ? " · 外接" : "")
     readonly property var controlHints: quickOpen
         ? [["↑↓", "选择"], [quickIndex < 2 ? "←→" : "A / ↵", quickIndex < 2 ? "调整" : quickIndex < 4 ? "切换" : "确定"], ["B / Esc", "关闭面板"]]
         : toolOpen && toolView.item ? toolView.item.hints
@@ -449,8 +445,8 @@ Item {
     TapHandler { onPressedChanged: if (pressed) root.activity() }
     Timer { interval: 60000; running: !root.screenOff; repeat: true; onTriggered: root.now = new Date() }
     onScreenOffChanged: if (!screenOff) now = new Date()
-    Timer { id: noticeTimer; interval: 2600; onTriggered: root.notice = "" }
-    Timer { id: volumeTimer; interval: 1800; onTriggered: root.volumeVisible = false }
+    Timer { id: noticeTimer; interval: Ui.Theme.toastDwell; onTriggered: root.notice = "" }
+    Timer { id: volumeTimer; interval: Ui.Theme.hudDwell; onTriggered: root.volumeVisible = false }
     Shortcut { sequence: "Ctrl+Tab"; onActivated: if (root.screenOff) root.activity(); else root.backgroundRequested(true) }
     Shortcut { sequence: "Meta+D"; onActivated: if (root.screenOff) root.activity(); else root.backgroundRequested(false) }
     Item {
@@ -466,41 +462,23 @@ Item {
                 onCloseRequested: function(id) { root.tasksVisible=false;root.applications.requestClose(id) }
             }
         }
-        Rectangle {
-            z: 101;anchors.horizontalCenter: parent.horizontalCenter;y: Ui.Theme.padding
-            width: 224;height: Ui.Theme.fieldHeight;radius: height/2;color: Ui.Theme.surface
-            visible: root.taskHoldPercent>0
-            Ui.ProgressBar { anchors.fill: parent;anchors.margins: 12;value: root.taskHoldPercent/100 }
-            Ui.Label { anchors.centerIn: parent;role:"caption";text:"继续按住以强制终止" }
+        Ui.HoldConfirm {
+            objectName: "taskHold"; z: 101; anchors.centerIn: parent
+            progress: root.taskHoldPercent / 100; duration: 2000
+            title: "继续按住以强制结束"; detail: "未保存的进度会丢失"; fontScale: root.fontScale
         }
         Item {
             anchors.fill: parent; visible: !root.editing
             Item {
             anchors.fill: parent; visible: !root.gameOverlay
-            Rectangle { id: brandMark; x: Ui.Theme.margin; y: 30; width: 37; height: 37; radius: 11; color: Ui.Theme.accent
-                Ui.Label { anchors.centerIn: parent; text: "J"; font.pixelSize: 25 * root.fontScale; font.bold: true; color: Ui.Theme.accentText }
+            Ui.TopBar {
+                x: Ui.Theme.margin; width: Ui.Theme.contentWidth; fontScale: root.fontScale
+                statusVisible: !root.store.monitor; note: root.hardware ? "" : "本地界面预览"
+                wifiSignal: root.wifiSignal; batteryPercent: root.batteryPercent
+                charging: root.batteryState === "charging" || root.batteryState === "full"
+                nightIcon: Ui.Theme.night; clock: root.clockText
             }
-            Ui.Label { objectName: "brandName"; anchors.left: brandMark.right; anchors.leftMargin: Ui.Theme.labelGap; y: 35; text: "Jume"; font.pixelSize: 22 * root.fontScale; font.bold: true; font.letterSpacing: 2; color: Ui.Theme.text }
-            Ui.Label { id: statusClock; objectName: "statusClock"; anchors.right: parent.right; anchors.rightMargin: Ui.Theme.margin; anchors.verticalCenter: statusMetrics.verticalCenter; height: Ui.Theme.bodySize; text: root.clockText; color: Ui.Theme.text; font.pixelSize: Ui.Theme.captionSize * root.fontScale; visible: !root.store.monitor }
-            Rectangle { anchors.right: statusClock.left; anchors.rightMargin: Ui.Theme.labelGap; anchors.verticalCenter: statusMetrics.verticalCenter; width: 152; height: 30; radius: 15; color: Ui.Theme.surfaceSunken; visible: !root.store.monitor && !root.hardware
-                Ui.Label { anchors.centerIn: parent; text: root.hardware ? (root.device.info.online === 1 ? "外部供电" : root.device.info.online === 0 ? "电池供电" : "供电状态未知") : "本地界面预览"; color: Ui.Theme.textSecondary; font.pixelSize: 13 }
-            }
-            Row {
-                id: statusMetrics
-                anchors.right: statusClock.left; anchors.rightMargin: Ui.Theme.labelGap; anchors.verticalCenter: brandMark.verticalCenter; spacing: Ui.Theme.labelGap
-                visible: !root.store.monitor && root.hardware
-                Row {
-                    spacing: Ui.Theme.smallGap
-                    Ui.Icon { objectName: "statusWifiIcon"; width: Ui.Theme.bodySize; height: Ui.Theme.bodySize; name: "wifi"; color: root.wifiSignal >= 0 ? Ui.Theme.textSecondary : Ui.Theme.textTertiary }
-                    Ui.Label { objectName: "statusWifi"; anchors.verticalCenter: parent.verticalCenter; height: Ui.Theme.bodySize; text: root.wifiSignal >= 0 ? root.wifiSignal + "%" : "未连接"; color: Ui.Theme.textSecondary; font.pixelSize: Ui.Theme.captionSize * root.fontScale }
-                }
-                Row {
-                    spacing: Ui.Theme.smallGap
-                    Ui.Icon { objectName: "statusBatteryIcon"; width: Ui.Theme.bodySize; height: Ui.Theme.bodySize; name: "battery"; color: root.batteryState === "charging" ? Ui.Theme.accent : Ui.Theme.textSecondary }
-                    Ui.Label { objectName: "statusBattery"; anchors.verticalCenter: parent.verticalCenter; height: Ui.Theme.bodySize; text: root.batteryText; color: Ui.Theme.textSecondary; font.pixelSize: Ui.Theme.captionSize * root.fontScale }
-                }
-            }
-            Ui.NavigationBar {
+            Ui.Tabs {
                 x: Ui.Theme.margin; y: 100; visible: !root.session && !root.streamingOpen && !root.toolOpen
                 model: ["主页", "游戏库", "设置"]; currentIndex: root.page
                 navigationActive: root.tabsFocused && !root.quickOpen
@@ -528,13 +506,12 @@ Item {
                     delegate: Item {
                         id: tile; required property int index
                         width: gameGrid.cellWidth; height: gameGrid.cellHeight
-                        GameCard {
+                        Ui.GameCard {
                             x: 12; y: 12
                             width: parent.width - 23; height: root.page === 0 ? 330 : 178
                             title: root.games[tile.index].title; subtitle: root.games[tile.index].detail
-                            accent: Ui.Theme.cardColor(root.games[tile.index].palette !== undefined ? root.games[tile.index].palette : tile.index); artwork: tile.index
-                            demonstration: !root.tools && !root.applications && !(root.streaming && tile.index === 0)
-                            iconName: root.games[tile.index].icon || ""
+                            cardColor: Ui.Theme.cardColor(root.games[tile.index].palette !== undefined ? root.games[tile.index].palette : tile.index)
+                            iconName: root.games[tile.index].icon || ""; showTitle: true
                             selected: root.selected === tile.index && !root.tabsFocused && !root.quickOpen
                             favorite: (root.applications || root.tools) ? root.store.applicationFavorites.indexOf(root.games[tile.index].id) >= 0 : root.store.favorites.indexOf(tile.index) >= 0
                             reducedMotion: root.store.reducedMotion; fontScale: root.fontScale
@@ -601,31 +578,29 @@ Item {
                 Behavior on opacity { Ui.Motion {} }
                 MouseArea { anchors.fill: parent; enabled: root.quickOpen; onClicked: root.leaveQuick() }
             }
-            Rectangle {
+            Ui.QuickPanel {
                 id: quickPanel
                 objectName: "quickPanel"
-                x: root.quickOpen ? Ui.Theme.canvasWidth - Ui.Theme.margin - width : Ui.Theme.canvasWidth + 12; y: 92; width: 398; height: 588; radius: 25; color: Ui.Theme.surface; border.color: Ui.Theme.outline
-                layer.enabled: true
+                x: root.quickOpen ? Ui.Theme.canvasWidth - Ui.Theme.quickPanelInset - width : Ui.Theme.canvasWidth + Ui.Theme.shadowSpread
+                title: "快捷设置"; fontScale: root.fontScale
                 enabled: root.quickOpen
                 visible: root.quickOpen || x < Ui.Theme.canvasWidth
-                Behavior on x { Ui.Motion { duration: Ui.Theme.reducedMotion ? 0 : Ui.Theme.popupDuration } }
-                // Consume pointer events too, so the covered preview cannot activate.
-                MouseArea { anchors.fill: parent }
-                Ui.Label { x: 24; y: 25; text: "快捷设置"; color: Ui.Theme.text; role: "title" }
+                Behavior on x { Ui.Motion { curve: "emphasized"; duration: Ui.Theme.reducedMotion ? 0 : Ui.Theme.sheetEnterDuration } }
                 Column {
-                    x: 20; y: 85; spacing: 8
+                    width: parent.width; spacing: Ui.Theme.space8
                     Repeater {
                         model: 6
-                        SettingRow {
+                        Ui.ListRow {
                             required property int index
-                            width: 358; fontScale: root.fontScale
+                            readonly property int brightness: root.hardware ? root.device.info.brightnessPercent : root.store.brightness
+                            width: parent.width; fontScale: root.fontScale
                             reducedMotion: root.store.reducedMotion
                             actionable: !root.hardware || index >= 2 || (index === 1 && root.device.controls)
                             toggleState: index === 2 ? Number(root.store.reducedMotion) : index === 3 ? Number(root.store.monitor) : -1
                             title: ["音量", "亮度", "减少动态效果", "性能浮窗", root.gameOverlay ? "继续游戏" : root.session ? "继续演示" : "关闭面板", root.gameOverlay ? "结束游戏" : "返回主页"][index]
-                            description: ""
-                            value: index === 0 ? (root.hardware ? "机身音量键" : root.store.volume + "%") : index === 1 ? (root.hardware ? root.device.info.brightnessPercent : root.store.brightness) + "%" : index === 2 ? (root.store.reducedMotion ? "开" : "关") : index === 3 ? (root.store.monitor ? "开" : "关") : "→"
-                            progress: index === 0 && !root.hardware ? root.store.volume / 100 : index === 1 ? (root.hardware ? root.device.info.brightnessPercent : root.store.brightness) / 100 : -1
+                            value: index === 0 ? (root.hardware ? "机身音量键" : root.store.volume + "%") : index === 1 ? (brightness < 0 ? "—" : brightness + "%") : ""
+                            progress: index === 0 && !root.hardware ? root.store.volume / 100 : index === 1 && brightness >= 0 ? brightness / 100 : -1
+                            chevron: index >= 4
                             selected: root.quickOpen && root.quickIndex === index
                             onFocused: { root.quickIndex = index; root.forceActiveFocus() }
                             onActivated: { root.quickIndex = index; root.dispatch("accept", false) }
@@ -635,9 +610,10 @@ Item {
             }
         }
         Item {
-            x: Ui.Theme.margin; y: 700; width: Ui.Theme.contentWidth; height: 52; visible: !root.editing && (!root.gameOverlay || root.quickOpen)
+            x: Ui.Theme.margin; y: Ui.Theme.canvasHeight - Ui.Theme.hintBarHeight; width: Ui.Theme.contentWidth; height: Ui.Theme.hintBarHeight
+            visible: !root.editing && (!root.gameOverlay || root.quickOpen)
             Rectangle { width: parent.width; height: 1; color: Ui.Theme.outline }
-            ControlHints { objectName: "footerHints"; y: 16; actions: root.controlHints; fontScale: root.fontScale; gamepad: root.gamepadHints }
+            Ui.HintBar { objectName: "footerHints"; anchors.verticalCenter: parent.verticalCenter; width: parent.width; actions: root.controlHints; fontScale: root.fontScale }
         }
         Item {
             anchors.fill: parent; visible: root.editing
@@ -655,7 +631,7 @@ Item {
             }
             Ui.Button { id: doneButton; x: Ui.Theme.margin + Ui.Theme.contentWidth - width; y: 183; width: 152; height: 64; text: "完成"; primary: true; focusPolicy: Qt.NoFocus; Accessible.name: "完成输入"; onClicked: root.finishEditor() }
             Ui.Label { x: Ui.Theme.margin; y: 270; visible: virtualKeyboard.status === Loader.Error; text: "虚拟键盘模块不可用；仍可使用实体键盘。"; color: Ui.Theme.danger; font.pixelSize: 17 }
-            ControlHints { x: Ui.Theme.margin; y: 267; visible: virtualKeyboard.status !== Loader.Error; fontScale: root.fontScale; gamepad: root.gamepadHints; actions: root.keyboardEnabled ? [["方向", "选择按键"], ["A", "输入"], ["Y", "退格"], ["START", "确认"], ["B", "取消"]] : [["键盘", "输入文字"], ["Enter", "确认"], ["Esc", "取消"]] }
+            Ui.HintBar { x: Ui.Theme.margin; y: 267; width: inputField.width; visible: virtualKeyboard.status !== Loader.Error; fontScale: root.fontScale; actions: root.keyboardEnabled ? [["方向", "选择按键"], ["A", "输入"], ["Y", "退格"], ["START", "确认"], ["B", "取消"]] : [["键盘", "输入文字"], ["Enter", "确认"], ["Esc", "取消"]] }
             Loader {
                 id: virtualKeyboard; objectName: "virtualKeyboard"
                 active: root.keyboardEnabled && root.editing
@@ -693,32 +669,24 @@ Item {
             Accessible.name: "屏幕已关闭，按任意键唤醒"
             MouseArea { anchors.fill: parent; onPressed: root.activity() }
         }
-        Rectangle {
+        Ui.Toast {
+            objectName: "notice"
             x: root.quickOpen ? Ui.Theme.margin : (parent.width - width) / 2
-            y: root.editing ? 310 : root.quickOpen ? Math.max(340, performancePanel.visible ? performancePanel.y + performancePanel.height + 12 : 340) : Math.min(632, 690 - height)
-            width: Math.min(root.quickOpen ? 530 : Ui.Theme.contentWidth, message.implicitWidth + 48); height: Math.max(48, message.implicitHeight + 24); radius: 14
-            visible: root.notice !== "" || root.store.error !== ""; color: root.store.error ? Ui.Theme.errorToast : Ui.Theme.glyph
-            Ui.Label { id: message; x: 24; y: 12; width: parent.width - 48; text: root.store.error || root.notice; color: root.store.error ? Ui.Theme.errorToastText : Ui.Theme.glyphText; font.pixelSize: 15 * root.fontScale; wrapMode: Text.Wrap }
+            y: root.editing ? 310 : root.quickOpen ? Math.max(340, performancePanel.visible ? performancePanel.y + performancePanel.height + Ui.Theme.space12 : 340)
+                : Ui.Theme.canvasHeight - Ui.Theme.hintBarHeight - height - Ui.Theme.space16
+            maximumWidth: root.quickOpen ? 530 : Ui.Theme.contentWidth
+            text: root.store.error || root.notice; error: root.store.error !== ""; fontScale: root.fontScale
         }
-        Rectangle {
+        Ui.Hud {
             id: volumeHud; objectName: "volumeHud"
-            anchors.horizontalCenter: parent.horizontalCenter; y: Ui.Theme.padding
-            width: 224; height: Ui.Theme.fieldHeight; radius: height / 2
-            visible: root.volumeVisible; color: Ui.Theme.surface; border.color: Ui.Theme.outline
+            // Top center; a performance overlay in the top-right corner pushes it just far enough left.
+            readonly property bool crowded: performancePanel.visible && performancePanel.y < y + height
+            x: crowded ? Math.min((parent.width - width) / 2, performancePanel.x - Ui.Theme.space16 - width) : (parent.width - width) / 2
+            y: Ui.Theme.space24
+            shown: root.volumeVisible; value: root.volumePercent / 100; fontScale: root.fontScale
+            iconName: root.volumePercent === 0 ? "volume-muted" : "volume"
             Accessible.role: Accessible.Indicator
             Accessible.name: root.volumePercent === 0 ? "静音" : "音量 " + root.volumePercent + "%"
-            Ui.Icon {
-                x: Ui.Theme.labelGap; anchors.verticalCenter: parent.verticalCenter
-                name: root.volumePercent === 0 ? "volume-muted" : "volume"; color: Ui.Theme.text
-            }
-            Ui.ProgressBar {
-                objectName: "volumeProgress"; x: 48; width: 76; anchors.verticalCenter: parent.verticalCenter
-                value: root.volumePercent / 100; Accessible.ignored: true
-            }
-            Ui.Label {
-                objectName: "volumeLabel"; x: 136; width: 76; anchors.verticalCenter: parent.verticalCenter
-                role: "value"; horizontalAlignment: Text.AlignHCenter; text: root.volumePercent + "%"
-            }
         }
     }
     // A sibling of the canvas, so the one-frame capture never contains itself.

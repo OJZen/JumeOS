@@ -125,9 +125,8 @@ Rectangle {
         Ui.Button { x: 14; y: 12; width: 218; text: "A  继续应用"; primary: true; enabled: root.canAct; onClicked: root.activated(root.currentTask.id) }
         Ui.Button { x: 246; y: 12; width: 218; text: "Y  正常关闭"; enabled: root.canAct; onClicked: root.closeSelected() }
         Ui.Button {
-            id: forceButton; x: 478; y: 12; width: 218; text: "X  强制结束"
+            id: forceButton; x: 478; y: 12; width: 218; text: "X  强制结束"; variant: "danger"
             enabled: root.canAct; onClicked: root.forceSelected(this)
-            contentItem: Ui.Label { text: forceButton.text; color: forceButton.enabled ? Ui.Theme.danger : Ui.Theme.muted; font.bold: true; horizontalAlignment: Text.AlignHCenter }
         }
         Ui.Button { x: 710; y: 12; width: 228; text: "B  返回桌面"; onClicked: root.dismissed() }
     }

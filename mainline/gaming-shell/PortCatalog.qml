@@ -85,7 +85,7 @@ Item {
     Ui.ListView {
         id: games; objectName: "catalogGames"; y: Ui.Theme.contentY; width: Ui.Theme.sidebarWidth; height: parent.height - y
         model: view.entries; currentIndex: view.selected
-        delegate: SettingRow {
+        delegate: Ui.ListRow {
             required property var modelData; required property int index
             width: games.rowWidth; title: modelData.title; description: modelData.installed ? "已安装" : ""
             selected: view.selected === index; focusOutline: false
@@ -104,7 +104,7 @@ Item {
         Ui.ListView {
             id: details; objectName: "catalogRows"; y: introduction.height + Ui.Theme.padding; width: parent.width; height: parent.height - y - status.implicitHeight - Ui.Theme.gap
             currentIndex: view.row; model: view.rows
-            delegate: SettingRow {
+            delegate: Ui.ListRow {
                 required property var modelData; required property int index
                 width: details.rowWidth; title: modelData.title; value: modelData.value
                 selected: !view.sidebar && view.row === index; focusOutline: false; actionable: modelData.enabled && !view.tools.busy
@@ -115,13 +115,15 @@ Item {
         Ui.Label { id: status; anchors.bottom: parent.bottom; width: parent.width; role: "caption"; text: !view.detail.compatible ? "尚未确认此游戏的运行条件" : view.detail.installed ? "启动适配尚未完成" : view.detail.readyToRun ? "包含游戏数据" : "需要自行提供原版游戏数据" }
     }
     Ui.Label { x: Ui.Theme.detailX; y: Ui.Theme.contentY; width: parent.width - x; visible: !view.detail.id; role: "caption"; text: view.entries.length ? "选择游戏查看详情" : "START 刷新目录 · X 搜索游戏" }
+    // The clip keeps the ring with the lists while rows scroll; it is widened by the ring itself.
     Item {
-        y: Ui.Theme.contentY; width: parent.width; height: parent.height - y; clip: true
+        readonly property real ring: Ui.Theme.focusGap + Ui.Theme.focusWidth
+        x: -ring; y: Ui.Theme.contentY - ring; width: parent.width + 2 * ring; height: parent.height - Ui.Theme.contentY + 2 * ring; clip: true
         Ui.FocusFrame {
-            x: view.sidebar ? 0 : Ui.Theme.detailX
-            y: view.sidebar ? (games.currentItem ? games.currentItem.y - games.contentY : 0) : details.y + (details.currentItem ? details.currentItem.y - details.contentY : 0)
+            x: parent.ring + (view.sidebar ? 0 : Ui.Theme.detailX)
+            y: parent.ring + (view.sidebar ? (games.currentItem ? games.currentItem.y - games.contentY : 0) : details.y + (details.currentItem ? details.currentItem.y - details.contentY : 0))
             width: view.sidebar ? games.rowWidth : details.rowWidth
-            height: view.sidebar && games.currentItem ? games.currentItem.height : Ui.Theme.rowHeight
+            height: view.sidebar ? (games.currentItem ? games.currentItem.height : Ui.Theme.listRowHeight) : (details.currentItem ? details.currentItem.height : Ui.Theme.listRowHeight)
             active: view.navigationActive && !view.tools.busy && !view.choiceOpen
             visible: view.sidebar ? view.entries.length > 0 : !!view.detail.id
         }

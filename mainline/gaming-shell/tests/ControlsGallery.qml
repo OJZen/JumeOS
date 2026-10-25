@@ -9,7 +9,8 @@ Item {
     property real fontScale: 1
     property bool reducedMotion: false
     property bool night: false
-    // "controls" exercises the shared controls; "foundations" mirrors Foundations.png.
+    // "controls" exercises the shared controls; "foundations" mirrors Foundations.png;
+    // "buttons", "rows" and "cards" mirror the sections of Components.png.
     property string page: "controls"
     property int presses: 0
     component Sample: Text {
@@ -26,7 +27,7 @@ Item {
     Item {
         anchors.fill: parent; visible: gallery.page === "controls"
         Ui.Label { x: 36; y: 30; text: "基础控件"; role: "title" }
-        Ui.NavigationBar { x: 36; y: 88; model: ["常用", "列表", "表格"]; onActivated: function(index) { currentIndex = index } }
+        Ui.Tabs { x: 36; y: 88; model: ["常用", "列表", "表格"]; onActivated: function(index) { currentIndex = index } }
         Ui.Button { objectName: "galleryButton"; x: 36; y: 162; text: "确认"; primary: true; onClicked: gallery.presses++ }
         Ui.Button { x: 160; y: 162; text: "不可用"; enabled: false }
         Ui.Switch { objectName: "gallerySwitch"; x: 310; y: 168; Accessible.name: "测试开关" }
@@ -126,6 +127,140 @@ Item {
                     }
                 }
             }
+        }
+    }
+    Column {
+        objectName: "componentButtons"; visible: gallery.page === "buttons"
+        x: Ui.Theme.margin; y: Ui.Theme.space16; spacing: Ui.Theme.space24
+        Sample { type: "title"; text: "按钮 · 开关 · 滑块 · 标签" }
+        Grid {
+            columns: 5; columnSpacing: Ui.Theme.space24; rowSpacing: Ui.Theme.space24; verticalItemAlignment: Grid.AlignVCenter
+            Item { width: 1; height: 1 } // Positioners skip empty items; this keeps the corner cell.
+            Repeater { model: ["默认", "聚焦", "按下", "禁用"]; Sample { required property string modelData; type: "micro"; color: Ui.Theme.textSecondary; text: modelData } }
+            Repeater {
+                model: 15
+                Loader {
+                    id: cell
+                    required property int index
+                    readonly property var spec: [["主要", "primary", "开始游戏"], ["次要", "secondary", "重新扫描"], ["危险", "danger", "结束游戏"]][Math.floor(index / 5)]
+                    readonly property int column: index % 5
+                    sourceComponent: column === 0 ? rowLabel : variantButton
+                    Component { id: rowLabel; Sample { type: "micro"; text: cell.spec[0] } }
+                    Component {
+                        id: variantButton
+                        Ui.Button {
+                            text: cell.spec[2]; variant: cell.spec[1]
+                            selected: cell.column === 2 || cell.column === 3; down: cell.column === 3 ? true : undefined; enabled: cell.column !== 4
+                        }
+                    }
+                }
+            }
+        }
+        Row {
+            spacing: Ui.Theme.space32
+            Ui.Switch { Accessible.name: "关" }
+            Ui.Switch { checked: true; Accessible.name: "开" }
+            Ui.Switch { checked: true; selected: true; Accessible.name: "聚焦" }
+            Ui.Switch { enabled: false; Accessible.name: "禁用" }
+        }
+        Row {
+            spacing: Ui.Theme.space32
+            Ui.Slider { width: 360; value: 0.55; Accessible.name: "普通" }
+            Ui.Slider { width: 360; value: 0.7; adjusting: true; Accessible.name: "调整中" }
+        }
+        Row {
+            spacing: Ui.Theme.space32
+            Ui.ProgressBar { width: 360; value: 0.6; anchors.verticalCenter: parent.verticalCenter }
+            Ui.ProgressBar { width: 360; indeterminate: true; anchors.verticalCenter: parent.verticalCenter }
+        }
+        Ui.Tabs { model: ["全部", "收藏", "最近"]; currentIndex: 0 }
+        Ui.Tabs { model: ["全部", "收藏", "最近"]; currentIndex: 1; navigationActive: true }
+    }
+    Row {
+        objectName: "componentRows"; visible: gallery.page === "rows"
+        x: Ui.Theme.margin; y: Ui.Theme.space16; spacing: Ui.Theme.space32
+        Column {
+            width: 520; spacing: Ui.Theme.space8
+            Sample { type: "title"; text: "列表行 · 72 / 96" }
+            Ui.ListRow { width: parent.width; title: "基本行 · 进入下一级"; chevron: true }
+            Ui.ListRow { width: parent.width; title: "选择行"; value: "跟随时间"; choice: true }
+            Ui.ListRow { width: parent.width; title: "开关行"; toggleState: 1 }
+            Ui.ListRow { width: parent.width; title: "说明行 · 聚焦"; description: "第二行写结果或影响，不超过一行"; chevron: true; selected: true }
+            Ui.ListRow { width: parent.width; title: "滑块行"; value: "55%"; progress: 0.55; selected: true; focusOutline: false }
+            Ui.ListRow { width: parent.width; title: "只读行"; value: "Linux 6.12"; actionable: false }
+            Ui.ListRow { width: parent.width; title: "禁用行"; disabledReason: "需要先连接 Wi-Fi" }
+        }
+        Column {
+            spacing: Ui.Theme.space16
+            Sample { type: "title"; text: "按键徽标" }
+            Flow {
+                width: 360; spacing: Ui.Theme.space8
+                Repeater { model: ["A", "B", "X", "Y", "L1", "R2", "Start", "Select", "dpad", "R3"]; Ui.GlyphBadge { required property string modelData; button: modelData } }
+            }
+            Row {
+                spacing: Ui.Theme.space4
+                Ui.GlyphBadge { button: "Select" }
+                Sample { type: "micro"; color: Ui.Theme.textTertiary; text: "+"; anchors.verticalCenter: parent.verticalCenter }
+                Ui.GlyphBadge { button: "Start" }
+                Item { width: Ui.Theme.space16; height: 1 }
+                Ui.GlyphBadge { button: "X"; progress: 0.6 }
+            }
+            Flow {
+                width: 360; spacing: Ui.Theme.space8
+                Repeater { model: ["A", "B", "X", "Y", "L1", "R2", "Start", "Select"]; Ui.GlyphBadge { required property string modelData; button: modelData; soft: true; size: Ui.Theme.glyphInlineSize } }
+            }
+            Row {
+                spacing: Ui.Theme.space8
+                Repeater { model: ["X", "B", "Y", "R2", "L2", "Start"]; Ui.GlyphBadge { required property string modelData; button: modelData; size: Ui.Theme.glyphKeySize } }
+            }
+            Ui.HintBar { width: 360; actions: [{button: "A", label: "开始"}, {button: "B", label: "返回"}, {button: "X", label: "收藏"}] }
+        }
+    }
+    Column {
+        objectName: "componentCards"; visible: gallery.page === "cards"
+        x: Ui.Theme.margin; y: Ui.Theme.space16; spacing: Ui.Theme.space12
+        Sample { type: "headline"; text: "卡片 · 入口 · 系统反馈" }
+        Row {
+            spacing: Ui.Theme.space32
+            Repeater {
+                model: [{title: "1944", color: 4, badge: "街机"}, {title: "GTA III", color: 1, badge: "已暂停", icon: "pause", selected: true},
+                        {title: "Moonlight", color: 2, app: "streaming", favorite: true}, {title: "Stardew", available: false, badge: "尚未适配"}]
+                Column {
+                    id: gridCard
+                    required property var modelData
+                    spacing: Ui.Theme.space8
+                    Ui.GameCard {
+                        width: Ui.Theme.gridCard; height: width; title: gridCard.modelData.title
+                        cardColor: Ui.Theme.cardColor(gridCard.modelData.color || 0); badge: gridCard.modelData.badge || ""
+                        badgeIcon: gridCard.modelData.icon || ""; iconName: gridCard.modelData.app || ""; favorite: !!gridCard.modelData.favorite
+                        selected: !!gridCard.modelData.selected; available: gridCard.modelData.available !== false
+                    }
+                    Sample {
+                        type: "label"; text: gridCard.modelData.title
+                        color: gridCard.modelData.available === false ? Ui.Theme.textTertiary : gridCard.modelData.selected ? Ui.Theme.accentInk : Ui.Theme.text
+                    }
+                }
+            }
+        }
+        Row {
+            spacing: Ui.Theme.space32
+            Row {
+                spacing: Ui.Theme.dockGap
+                Ui.DockTile { iconName: "folder"; label: "文件" }
+                Ui.DockTile { iconName: "settings"; label: "设置"; selected: true }
+                Ui.DockTile { iconName: "power"; label: "电源"; available: false }
+            }
+            Ui.HoldConfirm { progress: 0.4; detail: "GTA III · 未存档进度会丢失" }
+        }
+        Row {
+            spacing: Ui.Theme.space32
+            Ui.Hud { shown: true; value: 0.55; iconName: "volume" }
+            Ui.Hud { shown: true; value: 0.7; iconName: "sun" }
+        }
+        Row {
+            spacing: Ui.Theme.space32
+            Ui.Toast { text: "已加入收藏"; maximumWidth: 456 }
+            Ui.Toast { text: "设置未能保存，已保留修改"; error: true; maximumWidth: 456 }
         }
     }
 }

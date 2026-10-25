@@ -69,7 +69,7 @@ Item {
         height: parent.height - y - Ui.Theme.buttonHeight - Ui.Theme.gap
         layer.enabled: true
         model: view.manager.hosts; currentIndex: view.manager.selected
-        delegate: SettingRow {
+        delegate: Ui.ListRow {
             required property var modelData; required property int index
             width: hosts.rowWidth; title: modelData.name; description: modelData.status; iconName: "monitor"
             selected: hosts.currentIndex === index; focusOutline: false
@@ -84,7 +84,7 @@ Item {
         layer.enabled: true
         visible: view.manager.hosts.length > 0
         model: 8; currentIndex: view.row
-        delegate: SettingRow {
+        delegate: Ui.ListRow {
             required property int index
             width: detailRows.rowWidth
             title: ["主机名称", "地址", "应用", "画质", "性能信息", "配对", "开始串流", "从列表移除"][index]
@@ -104,7 +104,7 @@ Item {
         y: view.sidebar ? (hosts.currentItem ? hosts.y + hosts.currentItem.y - hosts.contentY : add.y)
             : detailRows.y + (detailRows.currentItem ? detailRows.currentItem.y - detailRows.contentY : 0)
         width: view.sidebar ? hosts.rowWidth : detailRows.rowWidth
-        height: view.sidebar ? (hosts.currentItem ? hosts.currentItem.height : add.height) : Ui.Theme.rowHeight
+        height: view.sidebar ? (hosts.currentItem ? hosts.currentItem.height : add.height) : (detailRows.currentItem ? detailRows.currentItem.height : Ui.Theme.listRowHeight)
         active: view.navigationActive && !view.manager.busy && !choices.visible
         reducedMotion: view.store.reducedMotion
     }

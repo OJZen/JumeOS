@@ -19,13 +19,14 @@ T.Popup {
     modal: true; focus: true; dim: false; padding: 0; margins: 0
     closePolicy: T.Popup.CloseOnEscape | T.Popup.CloseOnPressOutside
     width: Math.min(parent ? parent.width : 0, popupWidth)
-    height: Math.min(parent ? parent.height : 0, Theme.fieldHeight + Math.min(5, options.length) * (Theme.rowHeight + Theme.gap) + Theme.gap)
+    readonly property real headerHeight: Theme.space16 + Theme.lineHeight("headline") + Theme.space16
+    height: Math.min(parent ? parent.height : 0, headerHeight + Math.min(5, options.length) * (Theme.listRowHeight + Theme.space8) + Theme.space16)
     x: Math.max(0, Math.min(parent ? parent.width - width : 0, origin.x - width))
     y: above ? anchorTop - height - 6 : Math.max(0, Math.min(parent ? parent.height - height : 0, origin.y))
     transformOrigin: above ? Item.BottomRight : Item.TopRight
     enter: Transition {
-        Motion { property: "opacity"; from: 0; to: 1; duration: Theme.reducedMotion ? 0 : Theme.popupDuration }
-        Motion { property: "scale"; from: Theme.reducedMotion ? 1 : 0.98; to: 1; duration: Theme.reducedMotion ? 0 : Theme.popupDuration }
+        Motion { property: "opacity"; from: 0; to: 1; curve: "emphasized"; duration: Theme.reducedMotion ? 0 : Theme.dialogEnterDuration }
+        Motion { property: "scale"; from: Theme.reducedMotion ? 1 : Theme.dialogStartScale; to: 1; curve: "emphasized"; duration: Theme.reducedMotion ? 0 : Theme.dialogEnterDuration }
     }
     // Close immediately so native focus and controller routing resume together.
     function select(index) {
@@ -50,7 +51,7 @@ T.Popup {
         else if (action === "accept" && !repeated) activated(pendingIndex)
         return true
     }
-    background: Rectangle { radius: Theme.radius; color: Theme.background; border.color: Theme.outline; border.width: 1 }
+    background: Rectangle { radius: Theme.radiusPanel; color: Theme.surface; border.color: Theme.outline; border.width: 1; Shadow {} }
     contentItem: FocusScope {
         focus: true
         Keys.onPressed: function(event) {
@@ -62,25 +63,36 @@ T.Popup {
             if (action) popup.dispatch(action, event.isAutoRepeat)
         }
         Keys.onReleased: function(event) { event.accepted = true }
-        Label { x: Theme.padding; y: 12; width: parent.width - 40; height: 32; text: popup.title; font.bold: true }
+        Label { x: Theme.space24; y: Theme.space16; width: parent.width - 2 * Theme.space24; height: Theme.lineHeight("headline"); role: "headline"; text: popup.title }
         Ui.ListView {
-            id: list; objectName: "choiceList"; x: 8; y: Theme.fieldHeight; width: parent.width - 16; height: parent.height - y - Theme.gap
+            id: list; objectName: "choiceList"
+            x: Theme.space16; y: popup.headerHeight; width: parent.width - 2 * Theme.space16; height: parent.height - y - Theme.space16
             model: popup.visible ? popup.options : []
-            delegate: Button {
+            delegate: T.ItemDelegate {
+                id: option
                 required property string modelData; required property int index
-                width: list.rowWidth; height: Theme.rowHeight; text: modelData
-                selected: popup.pendingIndex === index; focusOutline: false; focusPolicy: Qt.NoFocus
+                readonly property bool pending: popup.pendingIndex === index
+                width: list.rowWidth; height: Theme.listRowHeight; text: modelData
+                padding: 0; focusPolicy: Qt.NoFocus
                 onClicked: { popup.select(index); popup.activated(index) }
-                contentItem: Label { text: parent.text; rightPadding: 26 }
-                Icon { name: "check"; color: Theme.accent; visible: parent.index === popup.currentIndex; anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter }
+                background: Rectangle { radius: Theme.radiusRow; color: option.pending ? Theme.accentSoft : option.down ? Theme.pressed(Theme.surface) : "transparent" }
+                contentItem: Item {
+                    Label {
+                        x: Theme.space24; width: parent.width - x - Theme.space24 - Theme.iconSize - Theme.space8; anchors.verticalCenter: parent.verticalCenter
+                        text: option.text; color: option.pending ? Theme.accentInk : Theme.text; font.weight: option.pending ? Font.Bold : Theme.type.body.weight
+                    }
+                    Icon { name: "check"; color: Theme.accent; visible: option.index === popup.currentIndex; anchors.right: parent.right; anchors.rightMargin: Theme.space24; anchors.verticalCenter: parent.verticalCenter }
+                }
             }
         }
+        // The ring sits outside the row; the clip keeps it with the list while rows scroll.
         Item {
-            x: list.x; y: list.y; width: list.width; height: list.height; clip: true
+            readonly property real ring: Theme.focusGap + Theme.focusWidth
+            x: list.x - ring; y: list.y - ring; width: list.width + 2 * ring; height: list.height + 2 * ring; clip: true
             FocusFrame {
                 objectName: "choiceFocus"
-                y: list.currentItem ? list.currentItem.y - list.contentY : 0
-                width: list.rowWidth; height: Theme.rowHeight; active: popup.visible
+                x: parent.ring; y: parent.ring + (list.currentItem ? list.currentItem.y - list.contentY : 0)
+                width: list.rowWidth; height: list.currentItem ? list.currentItem.height : Theme.listRowHeight; active: popup.visible
             }
         }
     }
