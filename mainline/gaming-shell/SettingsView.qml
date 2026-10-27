@@ -28,67 +28,134 @@ Item {
     readonly property real fontScale: store.fontPercent / 100
     readonly property bool choiceOpen: choices.visible
     readonly property bool detailReady: !sidebar && detailLoader.status === Loader.Ready
-    readonly property var categories: ["常用", "网络与 Wi-Fi", "摇杆测试", "声音", "屏幕", "存储", "系统信息", "电量与电源", "字体与输入", "CPU 频率", "内存与 Swap", "关于"]
+    // §8: eight categories; the old 12 merge as 显示 = 屏幕 + 字号 + 夜间 + 减少动态效果,
+    // 控制器 = 摇杆测试 + 文字输入, 性能 = 浮窗 + 帧与串流 + CPU + 内存, 系统 = 系统信息 + 关于.
+    readonly property var categories: ["网络", "显示", "声音", "控制器", "电源", "性能", "存储", "系统"]
+    readonly property var categoryIcons: ["wifi", "display", "volume", "gamepad", "battery", "cpu", "storage", "info"]
+    readonly property var categoryNotes: ["已连接与附近的 Wi-Fi", "亮度、自动息屏、夜间模式与字号", "音量与声音输出", "摇杆测试与文字输入",
+        "变暗、息屏、电池、重启与关机", "性能浮窗、帧与串流、CPU 与内存", "分区与可用空间", "系统状态与关于"]
     readonly property var nightModes: ["off", "on", "auto"]
     readonly property var nightLabels: ["关闭", "开启", "跟随时间"]
-    readonly property var categoryIcons: ["settings", "wifi", "gamepad", "volume", "display", "storage", "info", "battery", "keyboard", "cpu", "memory", "info"]
-    readonly property bool sliderRow: !sidebar && detailReady && !!rows[rowIndex] && valueIsAdjustable(rows[rowIndex].key) && canActivate(rows[rowIndex].key)
-    readonly property string rowAction: !rows[rowIndex] ? "" : ["motion", "monitor", "netRemember"].indexOf(rows[rowIndex].key) >= 0 ? "切换"
-        : rows[rowIndex].key === "storage" ? "刷新" : "打开"
+    // Two panes from 900 wide (§1); narrower canvases show the categories and the detail in turn.
+    readonly property bool twoPane: Ui.Theme.dualPane
+    readonly property var row: rows[rowIndex] || null
+    readonly property bool sliderRow: !sidebar && detailReady && !!row && valueIsAdjustable(row.key) && canActivate(row.key)
+    readonly property string rowAction: !row ? "" : ["motion", "monitor"].indexOf(row.key) >= 0 ? "切换"
+        : row.key === "storage" ? "刷新" : row.key === "tester" ? "开始测试" : row.key === "netActive" ? "详情"
+        : row.key === "netPoint" ? "连接" : row.key === "netScan" ? "扫描" : choiceRow(row.key) ? "选择" : "打开"
     readonly property var hints: choices.visible ? choices.hints
-        : sidebar ? [{button: "A", label: "进入"}, {button: "B", label: "主页"}]
+        : sidebar ? [{button: "A", label: "进入"}, {button: "B", label: "返回"}]
         : tester ? [{button: "B", label: "按住退出", progress: testerHold}]
-        : !detailReady ? [{button: "B", label: "返回"}]
-        : category === 2 ? [{button: "A", label: "开始测试"}, {button: "B", label: "返回"}]
-        : (sliderRow ? [{button: "dpadH", label: "调整"}] : rows[rowIndex] && canActivate(rows[rowIndex].key) ? [{button: "A", label: rowAction}] : [])
-            .concat([{button: "B", label: "返回"}])
+        : !detailReady ? [{button: "B", label: "返回分类"}]
+        : (sliderRow ? [{button: "dpadH", label: "调整"}] : row && canActivate(row.key) ? [{button: "A", label: rowAction}] : [])
+            .concat(row && row.key === "netActive" && canActivate("netDisconnect") ? [{button: "X", label: "断开"}] : [])
+            .concat(openedCategory === 0 ? [{button: "Y", label: "刷新"}] : [])
+            .concat(optionItems().length ? [{button: "Start", label: "选项"}] : [])
+            .concat([{button: "B", label: "返回分类"}])
+    readonly property var activeNetworks: network !== null && network.available ? network.profiles.filter(function(profile) { return profile.active }) : []
+    // Rows carry their section; the detail draws a caption above the first row of each section.
     readonly property var rows: {
-        const volume = {name: "音量", detail: "", key: "volume"}
-        const brightness = {name: "屏幕亮度", detail: "", key: "brightness"}
-        const motion = {name: "减少动态效果", detail: "", key: "motion"}
         switch (openedCategory) {
-        case 0: return [volume, brightness, motion, {name: "性能浮窗", detail: "", key: "monitor"}]
-        case 1: return [{name: "添加 Wi-Fi", detail: "切换网络可能中断远控", key: "netScan"}, {name: "已保存的 Wi-Fi", key: "netProfiles"},
-            {name: "记住新网络", detail: "保存密码，供下次自动连接", key: "netRemember"}, {name: "断开当前 Wi-Fi", key: "netDisconnect"},
-            {name: "忘记网络", key: "netForget"}, {name: "刷新网络状态", key: "netRefresh"}]
-        case 2: return []
-        case 3: return [volume, {name: "声音输出", detail: "扬声器 / 耳机", value: "未接入"}]
-        case 4: return [brightness, {name: "夜间模式", detail: "", key: "night"}, motion, {name: "预览分辨率", detail: "", value: "1024 × 768"}]
-        case 5: return hardware ? [{name: "系统分区", key: "storage0"}, {name: "游戏分区", key: "storage1"}, {name: "启动分区", key: "storage2"}]
-            : [{name: "预览文件所在卷", detail: "", info: "storage", value: "刷新", key: "storage"}]
-        case 6: return [{name: "当前运行环境", detail: "", info: "system", value: "本机"}, {name: "系统 CPU", detail: "", key: "systemCpu"}, {name: "系统内存", detail: "", key: "memory"}, {name: "处理器温度", detail: "", key: "temperature"}, {name: "温控", detail: "", key: "thermal"}, {name: "GPU 频率", detail: "", key: "gpuFrequency"}, {name: "内存压力（10 秒）", detail: "", key: "pressure"}]
-        case 7: return [{name: "空闲变暗", detail: "", key: "dim"}, {name: "自动熄屏", detail: "按键立即唤醒", key: "screenOff"},
-            {name: "立即熄屏", detail: "首个按键仅唤醒", key: "screenOffNow"}, {name: "电池与供电", detail: "", key: "battery"},
-            {name: "关机", detail: "", key: "poweroff"}, {name: "重启", detail: "", key: "reboot"}]
-        case 8: return [{name: "界面字体大小", detail: "", key: "font"}, {name: "文字输入测试", detail: "退出后清空", value: "打开", key: "input"}]
-        case 9: return [{name: "自动调频", detail: "桌面 816 · 游戏 1008 · 熄屏 600 MHz", key: "cpuAuto"},
-            {name: "频率预设", detail: "手动选择会关闭自动调频", key: "cpuPreset"}, {name: "调速器", detail: "", key: "cpuGovernor"},
-            {name: "最低频率", detail: "", key: "cpuMin"}, {name: "最高频率", detail: "", key: "cpuMax"}, {name: "当前频率", detail: "", key: "cpuCurrent"}]
-        case 10: return [{name: "Swap 使用", detail: "", key: "swap"}, {name: "zram 内存压缩", detail: "", key: "zram"}, {name: "压缩算法", detail: "", key: "zramAlgorithms"}, {name: "压缩内存占用", detail: "", key: "zramMemory"}]
-        default: return [{name: "启动器", value: Qt.application.displayName}, {name: "版本", value: Qt.application.version},
-            {name: "项目地址", value: "https://github.com/OJZen/JumeOS"},
-            {name: "浏览器 Qt WebEngine", value: browserVersions.webEngine || "未安装 / 版本未知"},
-            {name: "Chromium 内核", value: browserVersions.chromium || "—"},
-            {name: "Chromium 安全补丁基线", value: browserVersions.securityPatch || "—"}]
+        case 0: {
+            const result = [{name: "Wi-Fi", key: "wifi", section: ""}]
+            activeNetworks.forEach(function(profile) { result.push({name: profile.name, key: "netActive", uuid: profile.id, section: "已连接", icon: "wifi"}) })
+            const names = activeNetworks.map(function(profile) { return profile.name })
+            const points = network !== null && network.available ? network.accessPoints : []
+            points.forEach(function(point, index) {
+                if (!point.active && names.indexOf(point.ssid) < 0)
+                    result.push({name: point.ssid, key: "netPoint", index: index, security: point.security, section: "附近的网络", icon: "wifi"})
+            })
+            if (!result.some(function(entry) { return entry.key === "netPoint" })) result.push({name: "扫描附近的网络", key: "netScan", section: "附近的网络", icon: "search"})
+            return result
+        }
+        case 1: return [{name: "亮度", key: "brightness", section: "屏幕", icon: "sun"}, {name: "自动息屏", key: "screenOff", section: "屏幕"},
+            {name: "夜间模式", key: "night", section: "外观"}, {name: "界面字号", key: "font", section: "外观"}, {name: "减少动态效果", key: "motion", section: "外观"}]
+        case 2: return [{name: "音量", key: "volume", section: "", icon: "volume"}, {name: "声音输出", key: "audioOutput", section: ""}]
+        case 3: return [{name: "摇杆测试", key: "tester", detail: "查看按键、摇杆与扳机读数", section: ""},
+            {name: "文字输入测试", key: "input", detail: "退出后清空", section: ""}]
+        case 4: return [{name: "空闲变暗", key: "dim", section: "节能"}, {name: "立即息屏", key: "screenOffNow", detail: "首个按键仅唤醒", section: "节能"},
+            {name: "电池与供电", key: "battery", section: "电池"}, {name: "重启", key: "reboot", section: "系统电源"}, {name: "关机", key: "poweroff", section: "系统电源"}]
+        case 5: return [{name: "性能浮窗", key: "monitor", section: "性能浮窗"},
+            {name: "帧间隔 P95", key: "p95", section: "帧与串流"}, {name: "串流解码", key: "decode", section: "帧与串流"},
+            {name: "网络丢帧", key: "drop", section: "帧与串流"}, {name: "串流排队", key: "queue", section: "帧与串流"},
+            {name: "音频接收队列", key: "audioQueue", section: "帧与串流"}, {name: "温控", key: "thermal", section: "帧与串流"},
+            {name: "GPU 频率", key: "gpuFrequency", section: "帧与串流"},
+            {name: "自动调频", detail: "桌面 816 · 游戏 1008 · 熄屏 600 MHz", key: "cpuAuto", section: "CPU"},
+            {name: "频率预设", detail: "手动选择会关闭自动调频", key: "cpuPreset", section: "CPU"}, {name: "调速器", key: "cpuGovernor", section: "CPU"},
+            {name: "最低频率", key: "cpuMin", section: "CPU"}, {name: "最高频率", key: "cpuMax", section: "CPU"}, {name: "当前频率", key: "cpuCurrent", section: "CPU"},
+            {name: "Swap 使用", key: "swap", section: "内存"}, {name: "zram 内存压缩", key: "zram", section: "内存"},
+            {name: "压缩算法", key: "zramAlgorithms", section: "内存"}, {name: "压缩内存占用", key: "zramMemory", section: "内存"},
+            {name: "内存压力（10 秒）", key: "pressure", section: "内存"}]
+        case 6: return hardware ? [{name: "系统分区", key: "storage0", section: ""}, {name: "游戏分区", key: "storage1", section: ""}, {name: "启动分区", key: "storage2", section: ""}]
+            : [{name: "预览文件所在卷", info: "storage", value: "刷新", key: "storage", section: ""}]
+        default: return [{name: "当前运行环境", info: "system", value: hardware ? "R46H" : "本机", section: "状态"},
+            {name: "系统 CPU", key: "systemCpu", section: "状态"}, {name: "系统内存", key: "memory", section: "状态"},
+            {name: "处理器温度", key: "temperature", section: "状态"},
+            {name: "启动器", value: Qt.application.displayName, section: "关于"}, {name: "版本", value: Qt.application.version, section: "关于"},
+            {name: "项目地址", value: "https://github.com/OJZen/JumeOS", section: "关于"},
+            {name: "浏览器 Qt WebEngine", key: "browser", value: browserVersions.webEngine || "", section: "关于"},
+            {name: "Chromium 内核", key: "browser", value: browserVersions.chromium || "", section: "关于"},
+            {name: "Chromium 安全补丁基线", key: "browser", value: browserVersions.securityPatch || "", section: "关于"}]
         }
     }
+    // First row of the 关于 section, for the about scene.
+    readonly property int aboutRow: 4
     signal notice(string text)
     signal activity()
     signal screenOffRequested()
     signal editRequested()
     signal wifiPasswordRequested(string name)
+    // Readings return "" when there is no value; the row then shows why instead of "—" (§9.5).
     function metric(key, suffix, divisor) {
-        if (!hardware || device.info[key] === undefined || device.info[key] < 0) return "—"
+        if (!hardware || device.info[key] === undefined || device.info[key] < 0) return ""
         return (device.info[key] / (divisor || 1)).toFixed(divisor ? 1 : 0) + (suffix || "")
     }
+    function reading(source, key, digits, suffix) {
+        const value = source ? source[key] : undefined
+        return typeof value === "number" && isFinite(value) && value >= 0 ? value.toFixed(digits) + suffix : ""
+    }
+    readonly property var readings: ["systemCpu", "memory", "temperature", "thermal", "gpuFrequency", "pressure", "battery", "cpuCurrent", "swap", "zram",
+        "zramAlgorithms", "zramMemory", "p95", "decode", "drop", "queue", "audioQueue", "browser"]
+    function informational(row) { return !row.key || readings.indexOf(row.key) >= 0 }
+    function choiceRow(key) {
+        return ["font", "night", "dim", "screenOff"].indexOf(key) >= 0 || (!!key && key.indexOf("cpu") === 0 && key !== "cpuCurrent" && key !== "cpuAuto")
+    }
     function canActivate(key) {
-        if (!key || ["systemCpu", "memory", "temperature", "thermal", "gpuFrequency", "pressure", "battery", "cpuCurrent", "swap", "zram", "zramAlgorithms", "zramMemory"].indexOf(key) >= 0) return false
-        if (key.indexOf("net") === 0) return network !== null && network.available && !network.busy && (key === "netRefresh" || (hardware && device.controls && network.controls && (key !== "netDisconnect" || network.profiles.filter(function(p){return p.active}).length === 1)))
+        if (!key || readings.indexOf(key) >= 0 || key === "wifi" || key === "audioOutput") return false
+        if (key === "tester" || key === "input" || key === "motion" || key === "monitor" || key === "font" || key === "night") return true
+        if (key.indexOf("net") === 0) return network !== null && network.available && !network.busy && (key === "netRefresh" || (hardware && device.controls && network.controls && (key !== "netDisconnect" || activeNetworks.length === 1)))
         if (["poweroff", "reboot", "cpuAuto", "cpuPreset", "cpuGovernor", "cpuMin", "cpuMax", "screenOffNow"].indexOf(key) >= 0) return !hardware ? key === "screenOffNow" : device.controls
         if (hardware && key === "volume") return false
         if (hardware && (key === "dim" || key === "screenOff")) return device.controls
         if (hardware && key === "brightness") return device.controls && device.info.brightnessPercent >= 0
         return true
+    }
+    // Why a row is disabled: no reading, or an action this device or preview cannot take.
+    function rowReason(row) {
+        if (!row) return ""
+        const key = row.key || ""
+        if (informational(row)) {
+            if (rowValue(row) !== "") return ""
+            if (key === "p95") return "游戏运行时显示"
+            if (["decode", "drop", "queue", "audioQueue"].indexOf(key) >= 0) return "串流时显示"
+            if (key === "browser") return "浏览器未安装或版本未知"
+            return hardware ? "暂无读数" : "预览中不可用"
+        }
+        if (canActivate(key)) return ""
+        if (key === "wifi") return "无线开关尚未接入"
+        if (key === "audioOutput") return "扬声器 / 耳机切换尚未接入"
+        if (key === "volume") return "使用机身音量键调节"
+        if (key.indexOf("net") === 0) return network === null || !network.available ? "网络服务不可用" : network.busy ? "正在处理…" : hardware ? "需要设备控制权限" : "预览中不可用"
+        return hardware ? "需要设备控制权限" : "预览中不可用"
+    }
+    function signalText(percent) { return percent >= 70 ? "信号良好" : percent >= 40 ? "信号一般" : percent >= 0 ? "信号较弱" : "" }
+    function rowDescription(row) {
+        if (row.key === "netActive") return ["已连接", network !== null ? signalText(network.signal) : ""].filter(function(part) { return !!part }).join(" · ")
+        if (hardware && row.key && row.key.indexOf("storage") === 0 && row.key !== "storage") {
+            const value = device.storage[Number(row.key.slice(-1))]
+            return value && value.available ? value.filesystem + " · " + (value.readOnly ? "只读" : "可写") : ""
+        }
+        return row.info === "storage" ? metrics.storage : row.info === "system" ? metrics.system : row.detail || ""
     }
     function rowValue(row) {
         if (row.key && row.key.indexOf("storage") === 0 && row.key !== "storage") {
@@ -96,47 +163,65 @@ Item {
             return value && value.available ? (value.availableBytes / 1073741824).toFixed(1) + " / " + (value.totalBytes / 1073741824).toFixed(1) + " GiB 可用" : "未挂载或不可用"
         }
         switch (row.key) {
-        case "volume": return hardware ? "机身音量键" : store.volume + "%"
+        case "volume": return hardware ? "" : store.volume + "%"
         case "brightness": return hardware ? metric("brightnessPercent", "%") : store.brightness + "%"
         case "font": return store.fontPercent + "%"
         case "night": return nightLabels[nightModes.indexOf(store.nightMode)] || "关闭"
         case "dim": return store.dimSeconds ? store.dimSeconds + " 秒" : "关闭"
         case "screenOff": return store.screenOffSeconds ? store.screenOffSeconds / 60 + " 分钟" : "关闭"
-        case "screenOffNow": return "熄屏"
+        case "screenOffNow": return "息屏"
         case "motion": return store.reducedMotion ? "开启" : "关闭"
         case "monitor": return store.monitor ? "开启" : "关闭"
         case "systemCpu": return metric("systemCpu", "%", 1)
-        case "netScan": return network !== null && network.available ? (network.busy ? network.status : "扫描附近网络") : "不可用"
-        case "netProfiles": return network !== null && network.available ? network.profiles.length + " 个配置" : "不可用"
-        case "netRemember": return ""
-        case "netForget": return "选择…"
-        case "netDisconnect": return canActivate(row.key) ? "确认…" : "—"
-        case "netRefresh": return network !== null && network.busy ? "处理中…" : "刷新"
-        case "memory": return metric("MemAvailable", " MiB 可用", 1024) + " / " + metric("MemTotal", " MiB", 1024)
+        case "netScan": return network !== null && network.busy ? network.status : ""
+        case "memory": { const available = metric("MemAvailable", " MiB 可用", 1024), total = metric("MemTotal", " MiB", 1024); return available && total ? available + " / " + total : "" }
         case "temperature": return metric("temperatureC", " °C", 1)
         case "thermal": {
             const cpu = hardware ? device.info.cpuCoolingState : -1, gpu = hardware ? device.info.gpuCoolingState : -1
-            return !hardware ? "—" : cpu > 0 && gpu > 0 ? "CPU/GPU 限频" : cpu > 0 ? "CPU 限频" : gpu > 0 ? "GPU 限频"
+            return !hardware ? "" : cpu > 0 && gpu > 0 ? "CPU/GPU 限频" : cpu > 0 ? "CPU 限频" : gpu > 0 ? "GPU 限频"
                 : cpu === 0 && gpu === 0 ? "未介入" : "状态未知"
         }
         case "gpuFrequency": return metric("gpuFrequencyHz", " MHz", 1000000)
         case "pressure": return metric("memoryPressurePercent", "%", 1)
-        case "battery": return hardware ? metric("voltageUv", " V", 1000000) + " · " + (device.info.online === 1 ? "外部供电" : device.info.online === 0 ? "电池供电" : "供电未知") : "—"
-        case "poweroff": case "reboot": return hardware && device.controls ? "确认…" : "不可用"
-        case "cpuPreset": return hardware && device.controls ? "选择…" : "不可用"
-        case "cpuAuto": return hardware && device.controls ? (device.automaticCpu ? "开启" : "关闭") : "不可用"
-        case "cpuGovernor": return hardware ? device.info.cpu.governor || "—" : "—"
+        case "p95": return metrics.game && metrics.game.active ? reading(metrics.game, "intervalP95Ms", 1, " ms") : ""
+        case "decode": return metrics.stream && metrics.stream.active ? reading(metrics.stream, "decodeMs", 1, " ms") : ""
+        case "drop": return metrics.stream && metrics.stream.active ? reading(metrics.stream, "networkDropPercent", 1, "%") : ""
+        case "queue": return metrics.stream && metrics.stream.active ? reading(metrics.stream, "queueMs", 1, " ms") : ""
+        case "audioQueue": return metrics.stream && metrics.stream.active ? reading(metrics.stream, "audioNetworkQueueMs", 0, " ms") : ""
+        case "battery": {
+            if (!hardware) return ""
+            const voltage = metric("voltageUv", " V", 1000000), supply = device.info.online === 1 ? "外部供电" : device.info.online === 0 ? "电池供电" : ""
+            return [voltage, supply].filter(function(part) { return !!part }).join(" · ")
+        }
+        case "poweroff": case "reboot": case "cpuPreset": return canActivate(row.key) ? "确认…" : ""
+        case "cpuAuto": return hardware && device.controls ? (device.automaticCpu ? "开启" : "关闭") : ""
+        case "cpuGovernor": return hardware ? device.info.cpu.governor || "" : ""
         case "cpuMin": case "cpuMax": case "cpuCurrent": {
             const field = row.key === "cpuMin" ? "scaling_min_freq" : row.key === "cpuMax" ? "scaling_max_freq" : "scaling_cur_freq"
             const value = hardware ? device.info.cpu[field] : -1
-            return value > 0 ? (value / 1000).toFixed(0) + " MHz" : "—"
+            return value > 0 ? (value / 1000).toFixed(0) + " MHz" : ""
         }
-        case "swap": return metric("SwapFree", " KiB 可用") + " / " + metric("SwapTotal", " KiB")
-        case "zram": return hardware ? (device.info.zramPresent ? metric("zramSize", " MiB", 1048576) : "未启用") : "—"
-        case "zramAlgorithms": return hardware ? device.info.zramAlgorithms || "—" : "—"
+        case "swap": { const free = metric("SwapFree", " KiB 可用"), total = metric("SwapTotal", " KiB"); return free && total ? free + " / " + total : "" }
+        case "zram": return hardware ? (device.info.zramPresent ? metric("zramSize", " MiB", 1048576) : "未启用") : ""
+        case "zramAlgorithms": return hardware ? device.info.zramAlgorithms || "" : ""
         case "zramMemory": return metric("zramMemory", " MiB", 1048576)
-        default: return row.value
+        default: return row.value || ""
         }
+    }
+    // §7.3 Start on the network page: saved networks, forgetting one and the remember switch.
+    readonly property string optionTitle: "网络"
+    function optionItems() {
+        if (sidebar || openedCategory !== 0 || network === null || !network.available) return []
+        const reason = canActivate("netProfiles") ? "" : rowReason({key: "netProfiles"})
+        const empty = network.profiles.length ? "" : "没有已保存的网络"
+        return [{id: "netProfiles", label: "已保存的网络", icon: "wifi", reason: reason || empty},
+                {id: "netForget", label: "忘记网络", icon: "x-circle", reason: reason || empty},
+                {id: "netRemember", label: network.remember ? "不再记住新网络" : "记住新网络", icon: "save", reason: reason},
+                {id: "netRefresh", label: "刷新状态", icon: "restart", reason: canActivate("netRefresh") ? "" : rowReason({key: "netRefresh"})}]
+    }
+    function runOption(id) {
+        if (id === "netRemember") { network.remember = !network.remember; return }
+        activateKey(id, id === "netProfiles" ? "已保存的网络" : id === "netForget" ? "忘记网络" : "")
     }
     function enter() {
         sidebar = true; tester = false; adjustingValue = false; rowIndex = 0
@@ -149,15 +234,17 @@ Item {
         activity()
         return true
     }
-    // From the list (A / →) the controller test starts at once; via L1/R1 it waits for A.
-    function openCategory(index, viaSection) {
+    // Opens a category's detail at the row it was left on; `row` overrides (e.g. the about section).
+    function openCategory(index, viaSection, row) {
         if (!selectCategory(index)) return false
-        openedCategory = category; sidebar = false; tester = category === 2 && !viaSection
-        rowIndex = Math.min(lastRows[category] || 0, Math.max(0, rows.length - 1))
-        if (category === 5) { metrics.refreshStorage(); if (hardware) device.refreshStorage() }
+        openedCategory = category; sidebar = false
+        rowIndex = Math.min(row !== undefined ? row : lastRows[category] || 0, Math.max(0, rows.length - 1))
+        if (category === 6) { metrics.refreshStorage(); if (hardware) device.refreshStorage() }
         activity()
         return true
     }
+    function startTester() { if (openCategory(3, false, 0)) { tester = true; activity() } }
+    function leaveTester() { tester = false; activity() }
     function detailList() { return detailLoader.item ? detailLoader.item.rowsView : null }
     function choiceAnchor() { const list = detailList(); return list && list.currentItem ? list.currentItem : settings }
     function focusRow(index) {
@@ -179,10 +266,10 @@ Item {
     function valueIsAdjustable(key) { return key === "volume" || key === "brightness" }
     function adjust(direction, repeated) {
         const row = rows[rowIndex]
-        if (!row || !canActivate(row.key)) { notice("这项设备功能尚未接入"); return }
+        if (!row || !canActivate(row.key)) { notice(rowReason(row) || "这项设备功能尚未接入"); return }
         if ((row.key === "motion" || row.key === "monitor") && repeated) return
-        if (row.key === "netRemember") { if (!repeated) network.remember = !network.remember; return }
         if (row.key === "input") { if (!repeated) editRequested(); return }
+        if (row.key === "tester") { if (!repeated) startTester(); return }
         if (row.key.indexOf("storage") === 0) { metrics.refreshStorage(); if (hardware) device.refreshStorage(); return }
         if (hardware && row.key === "brightness") {
             if (!device.setBrightness(Math.max(10, Math.min(100, device.info.brightnessPercent + direction * 5)))) notice(device.error)
@@ -193,52 +280,53 @@ Item {
     function activate(repeated) {
         if (repeated || !detailReady) return
         const row = rows[rowIndex]
-        if (!row || !canActivate(row.key)) { notice("这项设备功能尚未接入"); return }
-        choiceKey = row.key
-        if (row.key === "netRefresh") { network.refresh(); return }
-        if (row.key === "screenOffNow") { screenOffRequested(); return }
-        if (row.key === "cpuAuto") { if (!device.setAutomaticCpu(!device.automaticCpu)) notice(device.error); return }
-        if (row.key === "netScan") {
-            if (network.accessPoints.length) showNetworks(); else network.scan()
-        } else if (row.key === "netProfiles" || row.key === "netForget") {
-            if (!network.profiles.length) { notice("没有可用的已保存 Wi-Fi 配置"); return }
+        if (!row || !canActivate(row.key)) { notice(rowReason(row) || "这项设备功能尚未接入"); return }
+        activateKey(row.key, row.name, row)
+    }
+    function activateKey(key, name, row) {
+        if (!canActivate(key)) { notice(rowReason({key: key})); return }
+        choiceKey = key
+        if (key === "netRefresh") { network.refresh(); return }
+        if (key === "screenOffNow") { screenOffRequested(); return }
+        if (key === "cpuAuto") { if (!device.setAutomaticCpu(!device.automaticCpu)) notice(device.error); return }
+        if (key === "netScan") { network.scan(); return }
+        if (key === "netPoint") { connectPoint(row.index); return }
+        if (key === "netActive") {
+            choiceValues = [row.uuid]
+            choices.present(choiceAnchor(), ["关闭", "断开连接", "忘记此网络"], 0, name + " · " + rowDescription(row))
+        } else if (key === "netProfiles" || key === "netForget") {
             choiceValues = network.profiles.map(function(p){return p.id})
             const labels = network.profiles.map(function(p){return p.name + (p.active ? " · 已连接" : "")})
-            choices.present(choiceAnchor(), labels, row.key === "netForget" ? -1 : network.profiles.findIndex(function(p){return p.active}), row.name)
-        } else if (row.key === "netDisconnect") {
+            choices.present(choiceAnchor(), labels, key === "netForget" ? -1 : network.profiles.findIndex(function(p){return p.active}), name)
+        } else if (key === "netDisconnect") {
             choices.present(choiceAnchor(), ["取消", "断开 Wi-Fi"], 0, "断开后远控连接将中断")
-        } else if (row.key === "poweroff" || row.key === "reboot") {
-            choiceValues = ["", row.key]
-            choices.present(choiceAnchor(), ["取消", row.name], 0, "确认" + row.name)
-        } else if (row.key.indexOf("cpu") === 0) {
+        } else if (key === "poweroff" || key === "reboot") {
+            choiceValues = ["", key]
+            choices.present(choiceAnchor(), ["取消", name], 0, "确认" + name)
+        } else if (key.indexOf("cpu") === 0) {
             const cpu = device.info.cpu
             let labels = []; let index = 0
-            if (row.key === "cpuPreset") {
+            if (key === "cpuPreset") {
                 choiceValues = ["original"]; labels = ["恢复原始"]
                 for (const entry of [["schedutil", "balanced", "均衡"], ["performance", "performance", "性能"], ["powersave", "powersave", "省电"]]) {
                     if (cpu.governors.indexOf(entry[0]) >= 0) { choiceValues.push(entry[1]); labels.push(entry[2]) }
                 }
             }
-            else if (row.key === "cpuGovernor") { choiceValues = cpu.governors; labels = cpu.governors; index = labels.indexOf(cpu.governor) }
-            else { choiceValues = cpu.frequencies; labels = choiceValues.map(function(v) { return (v / 1000).toFixed(0) + " MHz" }); index = choiceValues.indexOf(row.key === "cpuMin" ? cpu.scaling_min_freq : cpu.scaling_max_freq) }
-            choices.present(choiceAnchor(), labels, Math.max(0,index), row.name)
-        } else if (row.key === "font" || row.key === "night" || row.key === "dim" || row.key === "screenOff") {
-            const labels = row.key === "font" ? Ui.Theme.fontPercents.map(function(value) { return value + "%" }) : row.key === "night" ? nightLabels
-                : row.key === "dim" ? ["关闭", "30 秒", "60 秒", "120 秒"] : ["关闭", "1 分钟", "3 分钟", "5 分钟", "10 分钟", "15 分钟"]
-            const index = row.key === "font" ? Ui.Theme.fontPercents.indexOf(store.fontPercent) : row.key === "night" ? nightModes.indexOf(store.nightMode)
-                : row.key === "dim" ? [0, 30, 60, 120].indexOf(store.dimSeconds) : [0, 60, 180, 300, 600, 900].indexOf(store.screenOffSeconds)
-            choices.present(choiceAnchor(), labels, index, row.name)
-        } else if (!valueIsAdjustable(row.key)) adjust(1, false)
+            else if (key === "cpuGovernor") { choiceValues = cpu.governors; labels = cpu.governors; index = labels.indexOf(cpu.governor) }
+            else { choiceValues = cpu.frequencies; labels = choiceValues.map(function(v) { return (v / 1000).toFixed(0) + " MHz" }); index = choiceValues.indexOf(key === "cpuMin" ? cpu.scaling_min_freq : cpu.scaling_max_freq) }
+            choices.present(choiceAnchor(), labels, Math.max(0,index), name)
+        } else if (choiceRow(key)) {
+            const labels = key === "font" ? Ui.Theme.fontPercents.map(function(value) { return value + "%" }) : key === "night" ? nightLabels
+                : key === "dim" ? ["关闭", "30 秒", "60 秒", "120 秒"] : ["关闭", "1 分钟", "3 分钟", "5 分钟", "10 分钟", "15 分钟"]
+            const index = key === "font" ? Ui.Theme.fontPercents.indexOf(store.fontPercent) : key === "night" ? nightModes.indexOf(store.nightMode)
+                : key === "dim" ? [0, 30, 60, 120].indexOf(store.dimSeconds) : [0, 60, 180, 300, 600, 900].indexOf(store.screenOffSeconds)
+            choices.present(choiceAnchor(), labels, index, name)
+        } else if (!valueIsAdjustable(key)) adjust(1, false)
     }
-    function showNetworks() {
-        if (!network.accessPoints.length) { notice("未发现可连接的 Wi-Fi，请稍后重试。"); return }
-        choiceKey = "netScan"
-        const labels = network.accessPoints.map(function(ap) { return ap.ssid + " · " + ap.signal + "% · " + (ap.security === "open" ? "开放" : ap.security === "psk" ? "WPA/WPA2" : "暂不支持") })
-        choices.present(choiceAnchor(), labels.concat(["重新扫描"]), -1, "附近 Wi-Fi")
-    }
-    Connections {
-        target: settings.network
-        function onScanReady() { if (settings.visible && settings.category === 1 && !settings.sidebar && settings.choiceKey === "netScan") settings.showNetworks() }
+    function connectPoint(index) {
+        if (!network.selectAccessPoint(index)) { notice("暂不支持此网络的加密方式"); return }
+        if (network.selectedNetwork.security === "psk") wifiPasswordRequested(network.selectedNetwork.ssid)
+        else network.connectSelected("")
     }
     // Returns false only for B on the category list, which leaves settings.
     function dispatch(action, repeated) {
@@ -259,13 +347,14 @@ Item {
             if (action === "up") selectCategory(Math.max(0, category - 1))
             else if (action === "down") selectCategory(Math.min(categories.length - 1, category + 1))
             else if ((action === "right" || action === "accept") && !repeated) openCategory(category)
-        } else if (category === 2) {
-            if (action === "accept" && !repeated) { tester = true; activity() }
-            else if (action === "left") returnToCategories()
         } else if (sliderRow && (action === "left" || action === "right")) {
             // §7.3: ←→ adjust a slider directly; the release saves it.
             adjustingValue = true
             adjust(action === "right" ? 1 : -1, repeated)
+        } else if (action === "itemAction") {
+            if (!repeated && row && row.key === "netActive") activateKey("netDisconnect", "")
+        } else if (action === "pageAction") {
+            if (!repeated && openedCategory === 0 && network !== null) { if (canActivate("netScan")) network.scan(); else if (canActivate("netRefresh")) network.refresh() }
         } else {
             if (action === "left") returnToCategories()
             else if (action === "up") focusRow(Math.max(0, rowIndex - 1))
@@ -286,7 +375,7 @@ Item {
         rememberRow()
         openCategory(next, true)
     }
-    // L2/R2: one screen of rows (held: repeats to the ends).
+    // L2/R2: one screen of rows.
     function turnPage(direction) {
         const list = sidebar ? categoryList : detailList()
         if (!list) return
@@ -301,21 +390,20 @@ Item {
         list.contentY = Math.max(list.originY, Math.min(list.originY + list.contentHeight - list.height, list.contentY + velocity * Ui.Theme.scrollStep))
     }
     onCategoryChanged: if (!sidebar) openedCategory = category
+    // §8 Settings: categories on the left (280), the detail on the right with section captions.
+    // While the categories have focus the detail is not built; the right pane names the category.
     Item {
         anchors.fill: parent
-        Ui.PageHeader {
-            width: parent.width
-            subtitle: settings.sidebar ? "" : settings.categories[settings.category]
-        }
         Ui.ListView {
             id: categoryList; objectName: "settingsCategories"
-            y: Ui.Theme.contentY; width: Ui.Theme.sidebarWidth * 2; height: parent.height - y
-            layer.enabled: true
-            visible: settings.sidebar; currentIndex: settings.category
+            x: 0; y: Ui.Theme.space8; width: settings.twoPane ? Ui.Theme.settingsSidebarWidth : parent.width; height: parent.height - y
+            visible: settings.twoPane || settings.sidebar; currentIndex: settings.category
             model: settings.categories
             delegate: Ui.ListRow {
                 required property string modelData; required property int index
-                width: categoryList.width; title: modelData; iconName: settings.categoryIcons[index]
+                width: categoryList.width; height: Ui.Theme.settingsCategoryHeight; flat: true
+                title: modelData; iconName: settings.categoryIcons[index]; fontScale: settings.fontScale
+                current: !settings.sidebar && settings.category === index
                 selected: settings.category === index; focusOutline: false
                 Accessible.role: Accessible.PageTab
                 onFocused: settings.selectCategory(index)
@@ -324,18 +412,31 @@ Item {
         }
         Ui.FocusFrame {
             id: focusOutline; objectName: "settingsFocus"
-            x: 0
+            x: categoryList.x
             y: categoryList.y + (categoryList.currentItem ? categoryList.currentItem.y - categoryList.contentY : 0)
             width: categoryList.width
-            height: categoryList.currentItem ? categoryList.currentItem.height : Ui.Theme.rowHeight
+            height: categoryList.currentItem ? categoryList.currentItem.height : Ui.Theme.settingsCategoryHeight
             visible: settings.sidebar && (!categoryList.currentItem || categoryList.currentItem.y >= categoryList.contentY)
             active: settings.navigationActive && settings.sidebar && !choices.visible
             reducedMotion: settings.store.reducedMotion
         }
-        Loader {
-            id: detailLoader; anchors.fill: parent
-            active: !settings.sidebar; visible: status === Loader.Ready
-            asynchronous: true; sourceComponent: detailComponent
+        Item {
+            id: detailPane
+            x: settings.twoPane ? Ui.Theme.settingsSidebarWidth + Ui.Theme.space32 : 0
+            width: parent.width - x; height: parent.height
+            visible: settings.twoPane || !settings.sidebar
+            Column {
+                objectName: "settingsPlaceholder"
+                y: Ui.Theme.space24; width: parent.width; spacing: Ui.Theme.space4
+                visible: settings.sidebar
+                Ui.Label { width: parent.width; role: "headline"; fontScale: settings.fontScale; text: settings.categories[settings.category] }
+                Ui.Label { width: parent.width; role: "caption"; fontScale: settings.fontScale; color: Ui.Theme.textSecondary; text: settings.categoryNotes[settings.category] }
+            }
+            Loader {
+                id: detailLoader; anchors.fill: parent
+                active: !settings.sidebar; visible: status === Loader.Ready
+                asynchronous: true; sourceComponent: detailComponent
+            }
         }
         Component {
             id: detailComponent
@@ -343,62 +444,88 @@ Item {
                 property alias rowsView: settingRows
                 Ui.ListView {
                     id: settingRows; objectName: "settingsItems"
-                    y: Ui.Theme.contentY; width: parent.width; height: parent.height - y
-                    visible: settings.category !== 2
+                    width: parent.width; height: parent.height
+                    visible: !settings.tester
                     model: settings.rows; currentIndex: settings.rowIndex
-                    delegate: Ui.ListRow {
+                    delegate: Item {
+                        id: entry
                         required property var modelData; required property int index
-                        width: settingRows.width; fontScale: settings.fontScale
-                        title: modelData.name
-                        description: {
-                            if (settings.hardware && modelData.key && modelData.key.indexOf("storage") === 0) {
-                                const value = settings.device.storage[Number(modelData.key.slice(-1))]
-                                return value && value.available ? value.filesystem + " · " + (value.readOnly ? "只读" : "可写") : ""
-                            }
-                            return modelData.info === "storage" ? settings.metrics.storage : modelData.info === "system" ? settings.metrics.system : modelData.detail || ""
+                        readonly property bool opensSection: modelData.section !== "" && (index === 0 || settings.rows[index - 1].section !== modelData.section)
+                        // The FocusFrame rings the row, not its section caption.
+                        readonly property real rowY: caption.visible ? caption.height : (index === 0 ? Ui.Theme.space8 : 0)
+                        readonly property real rowHeight: row.height
+                        width: settingRows.width; height: rowY + row.height
+                        Ui.Label {
+                            id: caption; objectName: "settingsSection"
+                            x: Ui.Theme.sectionIndent; width: parent.width - x; height: Ui.Theme.lineHeight("caption") + Ui.Theme.space16
+                            verticalAlignment: Text.AlignVCenter
+                            visible: entry.opensSection; text: entry.modelData.section
+                            role: "caption"; fontScale: settings.fontScale; color: Ui.Theme.textSecondary
                         }
-                        value: settings.rowValue(modelData)
-                        actionable: settings.canActivate(modelData.key)
-                        choice: modelData.key === "font" || modelData.key === "night" || modelData.key === "dim" || modelData.key === "screenOff" || ["netProfiles", "netScan", "netForget"].indexOf(modelData.key) >= 0 || (!!modelData.key && modelData.key.indexOf("cpu") === 0 && modelData.key !== "cpuCurrent" && modelData.key !== "cpuAuto")
-                        reducedMotion: settings.store.reducedMotion
-                        toggleState: modelData.key === "motion" ? Number(settings.store.reducedMotion) : modelData.key === "monitor" ? Number(settings.store.monitor) : modelData.key === "netRemember" ? Number(settings.network && settings.network.remember) : -1
-                        progress: modelData.key === "volume" && !settings.hardware ? settings.store.volume / 100 : modelData.key === "brightness" ? (settings.hardware ? settings.device.info.brightnessPercent : settings.store.brightness) / 100 : -1
-                        focusOutline: false; selected: settings.rowIndex === index
-                        onFocused: settings.focusRow(index)
-                        onActivated: if (settings.rowIndex === index) settings.activate(false)
+                        Ui.ListRow {
+                            id: row
+                            y: entry.rowY; width: parent.width; fontScale: settings.fontScale
+                            title: entry.modelData.name; iconName: entry.modelData.icon || ""
+                            description: settings.rowDescription(entry.modelData)
+                            value: settings.rowValue(entry.modelData)
+                            disabledReason: settings.rowReason(entry.modelData)
+                            actionable: settings.canActivate(entry.modelData.key)
+                            choice: settings.choiceRow(entry.modelData.key)
+                            chevron: ["netActive", "tester", "input"].indexOf(entry.modelData.key) >= 0
+                            trailingIcon: entry.modelData.security === "psk" ? "lock" : ""
+                            reducedMotion: settings.store.reducedMotion
+                            toggleState: entry.modelData.key === "motion" ? Number(settings.store.reducedMotion) : entry.modelData.key === "monitor" ? Number(settings.store.monitor)
+                                : entry.modelData.key === "wifi" ? Number(settings.activeNetworks.length > 0) : -1
+                            progress: entry.modelData.key === "volume" && !settings.hardware ? settings.store.volume / 100
+                                : entry.modelData.key === "brightness" && settings.canActivate("brightness") ? (settings.hardware ? settings.device.info.brightnessPercent : settings.store.brightness) / 100 : -1
+                            focusOutline: false; selected: settings.rowIndex === entry.index
+                            adjusting: settings.adjustingValue && selected
+                            onFocused: settings.focusRow(entry.index)
+                            onActivated: if (settings.rowIndex === entry.index) settings.activate(false)
+                        }
                     }
                 }
-                Item {
-                    y: Ui.Theme.contentY; width: parent.width; height: parent.height - y; visible: settings.category === 2
-                    Ui.Label { width: parent.width; elide: Text.ElideRight; text: settings.controller.deviceName || "未检测到手柄"; color: Ui.Theme.text; fontScale: settings.fontScale }
+                Column {
+                    objectName: "controllerTest"
+                    y: Ui.Theme.space8; width: parent.width; spacing: Ui.Theme.space16; visible: settings.tester
+                    Ui.Label { width: parent.width; text: settings.controller.deviceName || "未检测到手柄"; color: Ui.Theme.text; fontScale: settings.fontScale }
                     Row {
-                        y: 55; spacing: 72
+                        spacing: Ui.Theme.space48
                         Repeater {
                             model: 2
-                            Rectangle {
+                            Column {
+                                id: stick
                                 required property int index
-                                width: 220; height: 220; radius: 110; color: Ui.Theme.surfaceSunken; border.color: Ui.Theme.outline
-                                Rectangle { x: 109; y: 0; width: 1; height: 220; color: Ui.Theme.outline }
-                                Rectangle { x: 0; y: 109; width: 220; height: 1; color: Ui.Theme.outline }
+                                spacing: Ui.Theme.space12
                                 Rectangle {
-                                    x: 98 + Number(settings.controller.axes[parent.index * 2]) * 95
-                                    y: 98 + Number(settings.controller.axes[parent.index * 2 + 1]) * 95
-                                    width: 24; height: 24; radius: 12; color: parent.index === 0 ? Ui.Theme.accent : Ui.Theme.warning
+                                    width: 220; height: 220; radius: 110; color: Ui.Theme.surfaceSunken; border.color: Ui.Theme.outline
+                                    Rectangle { x: 109; y: 0; width: 1; height: 220; color: Ui.Theme.outline }
+                                    Rectangle { x: 0; y: 109; width: 220; height: 1; color: Ui.Theme.outline }
+                                    Rectangle {
+                                        x: 98 + Number(settings.controller.axes[stick.index * 2]) * 95
+                                        y: 98 + Number(settings.controller.axes[stick.index * 2 + 1]) * 95
+                                        width: 24; height: 24; radius: 12; color: stick.index === 0 ? Ui.Theme.accent : Ui.Theme.warning
+                                    }
                                 }
-                                Ui.Label { anchors.horizontalCenter: parent.horizontalCenter; y: 233; text: (parent.index === 0 ? "左" : "右") + "  X " + Number(settings.controller.axes[parent.index * 2]).toFixed(2) + " / Y " + Number(settings.controller.axes[parent.index * 2 + 1]).toFixed(2); color: Ui.Theme.textSecondary; role: "caption" }
+                                Ui.Label {
+                                    anchors.horizontalCenter: parent.horizontalCenter; tabular: true; role: "caption"; fontScale: settings.fontScale; color: Ui.Theme.textSecondary
+                                    text: (stick.index === 0 ? "左" : "右") + "  X " + Number(settings.controller.axes[stick.index * 2]).toFixed(2) + " / Y " + Number(settings.controller.axes[stick.index * 2 + 1]).toFixed(2)
+                                }
                             }
                         }
                     }
-                    Ui.Label { y: 323; width: parent.width; elide: Text.ElideRight; text: "按键  " + (settings.controller.buttons || "—") + "     LT " + Number(settings.controller.axes[4]).toFixed(2) + " / RT " + Number(settings.controller.axes[5]).toFixed(2); color: Ui.Theme.text; role: "caption" }
-                    MouseArea { anchors.fill: parent; onClicked: { settings.tester = true; settings.activity() } }
+                    Ui.Label {
+                        width: parent.width; wrapMode: Text.Wrap; color: Ui.Theme.text; role: "caption"; tabular: true; fontScale: settings.fontScale
+                        text: "按键  " + (settings.controller.buttons || "无") + "     LT " + Number(settings.controller.axes[4]).toFixed(2) + " / RT " + Number(settings.controller.axes[5]).toFixed(2)
+                    }
                 }
                 Ui.FocusFrame {
                     objectName: "settingsDetailFocus"
                     x: 0
-                    y: settingRows.y + (settingRows.currentItem ? settingRows.currentItem.y - settingRows.contentY : 0)
+                    y: settingRows.y + (settingRows.currentItem ? settingRows.currentItem.y + settingRows.currentItem.rowY - settingRows.contentY : 0)
                     width: settingRows.width
-                    height: settingRows.currentItem ? settingRows.currentItem.height : Ui.Theme.rowHeight
-                    visible: settings.category !== 2 && (!settingRows.currentItem || settingRows.currentItem.y >= settingRows.contentY)
+                    height: settingRows.currentItem ? settingRows.currentItem.rowHeight : Ui.Theme.listRowHeight
+                    visible: !settings.tester && (!settingRows.currentItem || settingRows.currentItem.y >= settingRows.contentY)
                     adjusting: settings.adjustingValue
                     active: settings.navigationActive && settings.detailReady && !choices.visible
                     reducedMotion: settings.store.reducedMotion
@@ -411,12 +538,14 @@ Item {
         onActivated: function(index) {
             let ok = false
             const key = settings.choiceKey; const device = settings.device
-            if (key === "netScan") {
-                if (index === settings.network.accessPoints.length) { close(); settings.network.scan(); return }
-                if (!settings.network.selectAccessPoint(index)) return
-                close()
-                if (settings.network.selectedNetwork.security === "psk") settings.wifiPasswordRequested(settings.network.selectedNetwork.ssid)
-                else settings.network.connectSelected("")
+            if (key === "netActive") {
+                if (index === 0) { close(); return }
+                if (index === 1) {
+                    if (!settings.canActivate("netDisconnect")) { close(); settings.notice(settings.rowReason({key: "netDisconnect"})); return }
+                    settings.choiceKey = "netDisconnect"; present(settings.choiceAnchor(), ["取消", "断开 Wi-Fi"], 0, "断开后远控连接将中断"); return
+                }
+                settings.choiceKey = "netForgetConfirm"
+                present(settings.choiceAnchor(), ["取消", "忘记网络"], 0, "移除配置并断开连接？")
                 return
             } else if (key === "netForget") {
                 const uuid = settings.choiceValues[index]

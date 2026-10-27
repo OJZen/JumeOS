@@ -231,8 +231,8 @@ private slots:
         QCOMPARE(root->property("dockIndex").toInt(), 5);
         key(Qt::Key_Left); key(Qt::Key_Return); QCOMPARE(root->property("page").toInt(), 2);
         QVERIFY(root->property("settingsSidebar").toBool());
-        key(Qt::Key_Right); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
-        key(Qt::Key_Right); QCOMPARE(state.volume(), 65); QVERIFY(!state.dirty()); // ←→ adjust; the release saves.
+        key(Qt::Key_Down); key(Qt::Key_Right); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); // 显示
+        key(Qt::Key_Right); QCOMPARE(state.brightness(), 70); QVERIFY(!state.dirty()); // ←→ adjust; the release saves.
         key(Qt::Key_Escape); key(Qt::Key_Escape); QCOMPARE(root->property("page").toInt(), 0); QVERIFY(!state.dirty());
         view.resize(640, 480); QTest::qWait(40);
         QVERIFY(!view.grabWindow().isNull());
@@ -254,14 +254,14 @@ private slots:
         };
         auto release = [&](const QString &value) { QVERIFY(QMetaObject::invokeMethod(root, "release", Q_ARG(QVariant, value))); };
         action("down"); for (int i = 0; i < 4; ++i) action("right");
-        action("accept"); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
-        action("right"); QVERIFY(root->property("settingsAdjusting").toBool()); QCOMPARE(state.volume(), 60);
+        action("accept"); action("down"); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); // 显示
+        action("right"); QVERIFY(root->property("settingsAdjusting").toBool()); QCOMPARE(state.brightness(), 75);
         release("right"); QVERIFY(!root->property("settingsAdjusting").toBool()); QVERIFY(state.dirty()); // The save on release failed.
         action("back");
         QVERIFY(!root->property("settingsSidebar").toBool()); QCOMPARE(root->property("page").toInt(), 2); QVERIFY(state.dirty());
         action("quick"); action("back"); QVERIFY(root->property("quickOpen").toBool());
         QVERIFY(file.remove()); action("back"); QVERIFY(!root->property("quickOpen").toBool());
-        root->setProperty("settingsIndex", 2);
+        root->setProperty("settingsIndex", 4); // 减少动态效果
         action("accept"); QVERIFY(state.reducedMotion());
         action("accept", true); QVERIFY(state.reducedMotion());
         action("home"); action("accept", true); QVERIFY(!root->property("session").toBool());
@@ -289,12 +289,13 @@ private slots:
         QVERIFY(root->property("settingsSidebar").toBool()); QCOMPARE(outline->x(), 0.);
         auto *settings = root->findChild<QObject *>("settingsView"); QVERIFY(settings);
         const auto settingsCategories = settings->property("categories").toList();
-        QCOMPARE(settingsCategories.size(), 12); QVERIFY(!settingsCategories.contains(QStringLiteral("蓝牙")));
+        // §8: eight categories; 常用 is gone.
+        QCOMPARE(settings->property("categories").toStringList(), QStringList({"网络", "显示", "声音", "控制器", "电源", "性能", "存储", "系统"}));
         QVERIFY(!root->findChild<QQuickItem *>("settingsItems"));
         for (int i = 0; i < 8; ++i) action("down");
-        QCOMPARE(root->property("settingsCategory").toInt(), 8);
+        QCOMPARE(root->property("settingsCategory").toInt(), 7);
         QCOMPARE(settings->property("openedCategory").toInt(), 0);
-        QVERIFY(!root->findChild<QQuickItem *>("settingsItems"));
+        QVERIFY(!root->findChild<QQuickItem *>("settingsItems")); // Moving through categories builds no detail.
         for (int i = 0; i < 8; ++i) action("up");
         capture("settings-primary");
         action("right"); QVERIFY(!root->property("settingsSidebar").toBool());
@@ -304,7 +305,7 @@ private slots:
         auto *categories = root->findChild<QQuickItem *>("settingsCategories"); QVERIFY(categories);
         auto row = [](QQuickItem *list) { return qobject_cast<QQuickItem *>(list->property("currentItem").value<QObject *>()); };
         QTRY_COMPARE(outline->x(), 0.); QTRY_COMPARE(outline->width(), row(categories)->width());
-        action("right");
+        action("down"); action("right"); // 显示: the brightness slider leads.
         QTRY_VERIFY(root->property("settingsDetailReady").toBool());
         auto *rows = root->findChild<QQuickItem *>("settingsItems"); QVERIFY(rows);
         auto *detailOutline = root->findChild<QQuickItem *>("settingsDetailFocus"); QVERIFY(detailOutline);
@@ -314,19 +315,19 @@ private slots:
         action("down"); QCOMPARE(root->property("settingsIndex").toInt(), 1);
         QTRY_COMPARE(detailOutline->y(), row(rows)->mapToItem(detailOutline->parentItem(), QPointF()).y());
         QCOMPARE(detailOutline->height(), row(rows)->height());
-        action("up"); action("accept"); QVERIFY(!root->property("settingsAdjusting").toBool()); QCOMPARE(state.volume(), 55); // A does not adjust.
-        action("right"); QVERIFY(root->property("settingsAdjusting").toBool()); QCOMPARE(state.volume(), 60);
-        action("left"); action("left", true); QCOMPARE(state.volume(), 50);
+        action("up"); action("accept"); QVERIFY(!root->property("settingsAdjusting").toBool()); QCOMPARE(state.brightness(), 70); // A does not adjust.
+        action("right"); QVERIFY(root->property("settingsAdjusting").toBool()); QCOMPARE(state.brightness(), 75);
+        action("left"); action("left", true); QCOMPARE(state.brightness(), 65);
         QTest::qWait(150); capture("settings-adjusting");
         QVERIFY(QMetaObject::invokeMethod(root, "release", Q_ARG(QVariant, QString("left"))));
         QVERIFY(!root->property("settingsAdjusting").toBool()); QVERIFY(!state.dirty());
-        Preferences saved(directory.path()); QCOMPARE(saved.volume(), 50);
+        Preferences saved(directory.path()); QCOMPARE(saved.brightness(), 65);
         // L1/R1 change category without wrapping and return to the row each one was left on.
         action("down"); QCOMPARE(root->property("settingsIndex").toInt(), 1);
-        action("nextSection"); QCOMPARE(root->property("settingsCategory").toInt(), 1); QVERIFY(!root->property("settingsSidebar").toBool());
+        action("nextSection"); QCOMPARE(root->property("settingsCategory").toInt(), 2); QVERIFY(!root->property("settingsSidebar").toBool());
         QCOMPARE(root->property("settingsIndex").toInt(), 0);
-        action("prevSection"); QCOMPARE(root->property("settingsCategory").toInt(), 0); QCOMPARE(root->property("settingsIndex").toInt(), 1);
-        action("prevSection"); QCOMPARE(root->property("settingsCategory").toInt(), 0);
+        action("prevSection"); QCOMPARE(root->property("settingsCategory").toInt(), 1); QCOMPARE(root->property("settingsIndex").toInt(), 1);
+        action("prevSection"); action("prevSection"); QCOMPARE(root->property("settingsCategory").toInt(), 0);
         action("back"); QVERIFY(root->property("settingsSidebar").toBool());
         // Accessibility preference keeps logical navigation but skips spatial motion.
         state.adjust("motion", 1); action("right");
@@ -337,12 +338,66 @@ private slots:
         action("quick"); QTRY_COMPARE(detailOutline->opacity(), 0.);
         action("back"); QTRY_COMPARE(detailOutline->opacity(), 1.);
         action("back");
-        for (int i = 0; i < 11; ++i) action("down");
-        QCOMPARE(root->property("settingsCategory").toInt(), 11);
-        QVERIFY(outline->y() >= 0 && outline->y() + outline->height() <= 493);
+        for (int i = 0; i < 7; ++i) action("down");
+        QCOMPARE(root->property("settingsCategory").toInt(), 7);
+        QVERIFY(outline->y() >= 0 && outline->y() + outline->height() <= settings->property("height").toReal());
         QTest::qWait(300);
         QSignalSpy idle(&view, &QQuickWindow::frameSwapped); QTest::qWait(500);
         QVERIFY2(idle.size() <= 3, qPrintable(QString("Settled settings repainted %1 times").arg(idle.size())));
+    }
+    void settingsCategoriesAndReasons() {
+        QTemporaryDir directory;
+        Preferences state(directory.path()); Telemetry metrics(directory.path()); ControllerInput controller;
+        QQuickView view;
+        view.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(&metrics)}, {"controller", QVariant::fromValue(&controller)}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready); view.resize(1024, 768); view.show(); QVERIFY(QTest::qWaitForWindowExposed(&view));
+        auto *root = view.rootObject(); auto *settings = root->findChild<QObject *>("settingsView"); QVERIFY(settings);
+        auto action = [&](const char *name) { QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, QString(name)), Q_ARG(QVariant, false))); };
+        auto call = [&](const char *name, const QVariant &row) { QVariant value; QMetaObject::invokeMethod(settings, name, Q_RETURN_ARG(QVariant, value), Q_ARG(QVariant, row)); return value.toString(); };
+        // §8: the old categories merge into eight; every row shows a value or why it has none, never "—".
+        const QList<QStringList> expected{{"wifi", "netScan"}, {"brightness", "screenOff", "night", "font", "motion"}, {"volume", "audioOutput"},
+            {"tester", "input"}, {"dim", "screenOffNow", "battery", "reboot", "poweroff"},
+            {"monitor", "p95", "decode", "drop", "queue", "audioQueue", "thermal", "gpuFrequency", "cpuAuto", "cpuPreset", "cpuGovernor", "cpuMin", "cpuMax", "cpuCurrent",
+             "swap", "zram", "zramAlgorithms", "zramMemory", "pressure"}, {"storage"}, {"", "systemCpu", "memory", "temperature", "", "", "", "browser", "browser", "browser"}};
+        QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString("settings"))));
+        for (int category = 0; category < 8; ++category) {
+            root->setProperty("settingsCategory", category); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+            QStringList keys; const auto rows = settings->property("rows").toList();
+            for (const auto &row : rows) {
+                keys << row.toMap().value("key").toString();
+                const auto value = call("rowValue", row), reason = call("rowReason", row);
+                QVERIFY2(!value.contains(QStringLiteral("—")), qPrintable(row.toMap().value("name").toString()));
+                QVERIFY2(!value.isEmpty() || !reason.isEmpty() || row.toMap().value("key") == "monitor" || call("canActivate", row.toMap().value("key")) == "true",
+                         qPrintable(row.toMap().value("name").toString()));
+            }
+            QCOMPARE(keys, expected[category]);
+            action("back");
+        }
+        // Preview reasons: device rows say so; frame and stream details wait for a game or stream.
+        auto reasonOf = [&](const char *key) { return call("rowReason", QVariantMap{{"key", key}}); };
+        QCOMPARE(reasonOf("cpuPreset"), QStringLiteral("预览中不可用"));
+        QCOMPARE(reasonOf("p95"), QStringLiteral("游戏运行时显示"));
+        QCOMPARE(reasonOf("decode"), QStringLiteral("串流时显示"));
+        QCOMPARE(reasonOf("audioQueue"), QStringLiteral("串流时显示"));
+        QCOMPARE(reasonOf("audioOutput"), QStringLiteral("扬声器 / 耳机切换尚未接入"));
+        // 控制器: A on 摇杆测试 starts the test; the B hold returns to the row.
+        root->setProperty("settingsCategory", 3); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        action("accept"); QVERIFY(root->property("testingController").toBool());
+        // Two panes: the categories stay visible beside the detail, the current one marked.
+        auto *categories = root->findChild<QQuickItem *>("settingsCategories"); QVERIFY(categories && categories->isVisible());
+        QCOMPARE(categories->width(), 280.);
+        // 130%: category names and detail titles keep their full text.
+        QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString("settings"))));
+        QVERIFY(state.choose("font", 3)); root->setProperty("settingsCategory", 5); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        QTest::qWait(100);
+        QList<QQuickItem *> pending{qobject_cast<QQuickItem *>(settings)};
+        while (!pending.isEmpty()) {
+            auto *item = pending.takeLast(); pending.append(item->childItems());
+            if (!item->isVisible() || !item->inherits("QQuickText") || item->objectName() == "settingValue") continue;
+            if (item->mapToItem(root, QPointF(0, item->height())).y() > 704) continue; // Scrolled below the view.
+            QVERIFY2(!item->property("truncated").toBool(), qPrintable(item->property("text").toString()));
+        }
     }
     void navigationGuidanceAndHudLayout() {
         QTemporaryDir directory;
@@ -384,16 +439,20 @@ private slots:
             }
         }
         QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QStringLiteral("about"))));
-        QCOMPARE(root->property("settingsCategory").toInt(), 11);
+        // 系统 › 关于 (rows 4–9); an unknown browser version is a disabled row with its reason, not "—".
+        QCOMPARE(root->property("settingsCategory").toInt(), 7); QCOMPARE(root->property("settingsIndex").toInt(), 4);
         QCOMPARE(root->findChild<QObject *>("brandName")->property("text").toString(), QStringLiteral("Jume"));
-        const auto about = root->findChild<QObject *>("settingsView")->property("rows").toList();
+        auto *settingsObject = root->findChild<QObject *>("settingsView");
+        const auto about = settingsObject->property("rows").toList().mid(4);
         QCOMPARE(about.size(), 6);
         QCOMPARE(about[0].toMap().value("value").toString(), QStringLiteral(JUME_LAUNCHER_NAME));
         QCOMPARE(about[1].toMap().value("value").toString(), QStringLiteral(JUME_LAUNCHER_VERSION));
         QCOMPARE(about[2].toMap().value("value").toString(), QStringLiteral("https://github.com/OJZen/JumeOS"));
-        QCOMPARE(about[3].toMap().value("value").toString(), QStringLiteral("未安装 / 版本未知"));
+        QCOMPARE(about[3].toMap().value("value").toString(), QString());
+        QVariant browserReason; QVERIFY(QMetaObject::invokeMethod(settingsObject, "rowReason", Q_RETURN_ARG(QVariant, browserReason), Q_ARG(QVariant, about[3])));
+        QCOMPARE(browserReason.toString(), QStringLiteral("浏览器未安装或版本未知"));
         root->setProperty("browserVersions", QVariantMap{{"webEngine", "6.10.2"}, {"chromium", "134.0.6998.208"}, {"securityPatch", "144.0.7559.96"}});
-        const auto versions = root->findChild<QObject *>("settingsView")->property("rows").toList();
+        const auto versions = settingsObject->property("rows").toList().mid(4);
         QCOMPARE(versions[3].toMap().value("value").toString(), QStringLiteral("6.10.2"));
         QCOMPARE(versions[4].toMap().value("value").toString(), QStringLiteral("134.0.6998.208"));
         QCOMPARE(versions[5].toMap().value("value").toString(), QStringLiteral("144.0.7559.96"));
@@ -412,10 +471,10 @@ private slots:
         auto *outline = root->findChild<QQuickItem *>("settingsFocus"); QVERIFY(outline);
         QVERIFY(!hud->mapRectToItem(root, hud->boundingRect()).intersects(outline->mapRectToItem(root, outline->boundingRect())));
         if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/settings-hud-120.png"));
-        action("down"); action("right"); QTest::qWait(200);
+        action("right"); QTest::qWait(200); // 网络 in the preview: the Wi-Fi switch is disabled with its reason.
         QVERIFY(!labels().contains("打开")); QVERIFY(!labels().contains("调整"));
         action("accept"); QVERIFY(root->property("notice").toString().contains("尚未接入"));
-        action("left"); root->setProperty("settingsCategory", 0); action("right");
+        action("left"); root->setProperty("settingsCategory", 1); action("right");
         QTRY_VERIFY(root->property("settingsDetailReady").toBool()); QTest::qWait(200);
         QVERIFY(labels().contains("调整")); QVERIFY(footer->width() <= 952); // Sliders: ←→ 调整.
         action("right"); QVERIFY(QMetaObject::invokeMethod(root, "release", Q_ARG(QVariant, QString("right"))));
@@ -455,7 +514,7 @@ private slots:
         action("accept"); QCOMPARE(root->property("page").toInt(), 2); QVERIFY(root->property("settingsSidebar").toBool());
         state.adjust("motion", 1);
         QVERIFY(!pageAnimation->property("running").toBool()); QCOMPARE(pageContent->property("reveal").toReal(), 1.);
-        root->setProperty("settingsCategory", 0); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        root->setProperty("settingsCategory", 1); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); // 显示
         QPointer<QQuickItem> settingsSwitch;
         controls = {root};
         while (!controls.isEmpty()) {
@@ -895,7 +954,10 @@ private slots:
         put("proc/net/wireless", "Inter-| sta-|   Quality        |   Discarded packets               | Missed | WE\n face | tus | link level noise |  nwid  crypt   frag  retry   misc | beacon | 22\n wlan0: 0000   55.  -55.  -256        0      0      0      0      0        0\n");
         put("sys/class/power_supply/rk817-battery/capacity", "82"); put("sys/class/power_supply/rk817-battery/status", "Discharging");
         put("sys/class/power_supply/rk817-charger/online", "0");
-        DeviceState device(directory.path(), false, true);
+        // Fixture backlight at 70% with controls, so 显示 shows its slider.
+        put("sys/class/backlight/backlight/brightness", "111"); put("sys/class/backlight/backlight/actual_brightness", "111");
+        put("sys/class/backlight/backlight/max_brightness", "159");
+        DeviceState device(directory.path(), true, true);
         Preferences state(directory.filePath("state")); Telemetry metrics(directory.path()); ControllerInput controller;
         Applications applications; QVERIFY(applications.load(referenceLibrary(directory.path(), state)));
         Streaming streaming(directory.filePath("streaming"));
@@ -944,7 +1006,11 @@ private slots:
                 scene("library"); root->setProperty("selected", 1); QCOMPARE(root->property("selectedApplication").toString(), QString("native.1944")); capture("library");
                 scene("tools"); capture("tools");
                 scene("settings"); capture("settings");
-                root->setProperty("settingsCategory", 4); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); capture("settings-display");
+                root->setProperty("settingsCategory", 1); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); capture("settings-display");
+                for (const auto &[index, name] : {std::pair{2, "sound"}, {3, "controls"}, {4, "power"}, {5, "performance"}, {6, "storage"}, {7, "system"}}) {
+                    action("back"); root->setProperty("settingsCategory", index); action("right");
+                    QTRY_VERIFY(root->property("settingsDetailReady").toBool()); capture(QString("settings-") + name);
+                }
                 scene("controller"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); capture("controller");
                 action("back"); QTest::qWait(HoldCaptureMs); capture("controller-hold"); release("back");
                 QVERIFY(root->property("testingController").toBool());
@@ -990,10 +1056,13 @@ private slots:
         action("down"); for (int i = 0; i < 4; ++i) action("right");
         action("accept");
         QVERIFY(root->property("settingsSidebar").toBool());
-        for (int i = 0; i < 8; ++i) action("down");
-        QCOMPARE(root->property("settingsCategory").toInt(), 8);
+        // 显示 › 界面字号, then 控制器 › 文字输入测试.
+        action("down"); QCOMPARE(root->property("settingsCategory").toInt(), 1);
         action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        for (int i = 0; i < 3; ++i) action("down");
         action("accept"); action("down"); action("accept"); QCOMPARE(state.fontPercent(), 115);
+        action("back"); action("down"); action("down"); QCOMPARE(root->property("settingsCategory").toInt(), 3);
+        action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
         action("down"); action("accept"); QVERIFY(root->property("editing").toBool());
         auto *editorFocus = view.activeFocusItem(); state.adjust("monitor", 1);
         auto *hud = root->findChild<QQuickItem *>("performancePanel"); QVERIFY(hud);
@@ -1038,7 +1107,8 @@ private slots:
         QTRY_VERIFY(exitHint().value("progress").toReal() > 0.6);
         release("back"); QVERIFY(root->property("testingController").toBool()); QCOMPARE(root->property("holdAction").toString(), QString());
         action("back"); QTRY_VERIFY_WITH_TIMEOUT(!root->property("testingController").toBool(), 1500);
-        release("back"); QVERIFY(root->property("settingsSidebar").toBool()); QCOMPARE(root->property("page").toInt(), 2);
+        release("back"); QCOMPARE(root->property("page").toInt(), 2); // Back on 控制器, at the 摇杆测试 row.
+        QVERIFY(!root->property("settingsSidebar").toBool()); QCOMPARE(root->property("settingsCategory").toInt(), 3); QCOMPARE(root->property("settingsIndex").toInt(), 0);
         QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString("controller"))));
         action("quick"); QVERIFY(root->property("quickOpen").toBool()); QVERIFY(root->property("testingController").toBool());
     }
@@ -1635,10 +1705,10 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(root,"closeEditor"));
         tap("left");tap("back");
         QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("settings"))));
-        tap("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
-        auto *brightness=row(QStringLiteral("屏幕亮度")); QVERIFY(brightness);
+        tap("down"); tap("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); tap("down"); // 显示 › 自动息屏
+        auto *brightness=row(QStringLiteral("亮度")); QVERIFY(brightness);
         QVERIFY(QMetaObject::invokeMethod(brightness,"click"));
-        QCOMPARE(root->property("settingsIndex").toInt(),1); QVERIFY(!root->property("settingsAdjusting").toBool()); // Clicking focuses the slider row.
+        QCOMPARE(root->property("settingsIndex").toInt(),0); QVERIFY(!root->property("settingsAdjusting").toBool()); // Clicking focuses the slider row.
         const auto before=state.brightness(); tap("right"); QVERIFY(root->property("settingsAdjusting").toBool()); QCOMPARE(state.brightness(),before+5);
     }
     void choiceKeyboardFocusStaysModal() {
@@ -1899,11 +1969,11 @@ QtObject {
         for(int i=0;i<4;++i)tap("down");tap("accept");
         QVERIFY(root->property("choicesOpen").toBool());tap("accept");QCOMPARE(power.size(),1); // Default is cancel.
         tap("accept");tap("down");tap("accept");QCOMPARE(power.size(),2); // Confirmation emits only a test signal.
-        root->setProperty("settingsIndex",2);tap("accept");QVERIFY(root->property("screenOff").toBool());
+        root->setProperty("settingsIndex",1);tap("accept");QVERIFY(root->property("screenOff").toBool()); // 立即息屏
         QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("0"));
         tap("accept");QVERIFY(!root->property("screenOff").toBool());
         QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("159"));
-        root->setProperty("settingsCategory",9);root->setProperty("settingsIndex",1);tap("accept");tap("down");tap("down");tap("accept");
+        root->setProperty("settingsCategory",5);root->setProperty("settingsIndex",9);tap("accept");tap("down");tap("down");tap("accept"); // 性能 › 频率预设
         QCOMPARE(get(cpu+"scaling_governor"),QByteArray("performance"));
         const auto captures=qEnvironmentVariable("R46H_UI_CAPTURE_DIR");QTest::qWait(200);
         if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+"/device-cpu.png"));
@@ -1960,23 +2030,51 @@ QtObject {
     void wifiChooserPasswordPrivacyAndForget() {
         QTemporaryDir directory;Preferences state(directory.path());Telemetry metrics(directory.path());ControllerInput controller;
         DeviceState device(directory.path(),true,true);
+        // An nmcli stand-in: the SettingsNight networks, Jume-5G connected.
         QFile program(directory.filePath("nmcli-fixture"));QVERIFY(program.open(QIODevice::WriteOnly));
-        program.write("#!/bin/sh\ncase \"$*\" in *\"device wifi list\"*) cat \"$0.scan\";; *\"connection delete\"*) printf '%s\\n' \"$@\" > \"$0.deleted\";; *) printf '%s\\n' '11111111-2222-4333-8444-555555555555:wifi:Saved:wlan0';; esac\n");program.close();
+        program.write("#!/bin/sh\ncase \"$*\" in *\"device wifi list\"*) cat \"$0.scan\";; *\"connection delete\"*) printf '%s\\n' \"$@\" > \"$0.deleted\";; *) printf '%s\\n' '11111111-2222-4333-8444-555555555555:wifi:Jume-5G:wlan0';; esac\n");program.close();
         QVERIFY(program.setPermissions(QFile::ReadOwner|QFile::WriteOwner|QFile::ExeOwner));
         QFile scan(program.fileName()+".scan");QVERIFY(scan.open(QIODevice::WriteOnly));
-        scan.write("/org/freedesktop/NetworkManager/AccessPoint/1:AA\\:BB\\:CC\\:DD\\:EE\\:FF:Studio\\:5G:80:WPA2:wlan0:*\n");scan.close();
+        scan.write("/org/freedesktop/NetworkManager/AccessPoint/1:AA\\:BB\\:CC\\:DD\\:EE\\:01:Jume-5G:82:WPA2:wlan0:*\n"
+                   "/org/freedesktop/NetworkManager/AccessPoint/2:AA\\:BB\\:CC\\:DD\\:EE\\:02:Home-2.4G:61:WPA2:wlan0:\n"
+                   "/org/freedesktop/NetworkManager/AccessPoint/3:AA\\:BB\\:CC\\:DD\\:EE\\:03:Studio:34:WPA2:wlan0:\n");scan.close();
         NetworkState network(true,true,program.fileName());QTRY_VERIFY(!network.busy());
         QQuickView view;view.setInitialProperties({{"store",QVariant::fromValue(&state)},{"metrics",QVariant::fromValue(&metrics)},
             {"controller",QVariant::fromValue(&controller)},{"device",QVariant::fromValue(&device)},{"network",QVariant::fromValue(&network)}, {"testInputCapture",true}});
         view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));QCOMPARE(view.status(),QQuickView::Ready);
         view.resize(1024,768);view.show();QVERIFY(QTest::qWaitForWindowExposed(&view));auto *root=view.rootObject();
         auto tap=[&](const char *key){QVERIFY(QMetaObject::invokeMethod(root,"dispatch",Q_ARG(QVariant,QString(key)),Q_ARG(QVariant,false)));};
-        QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("settings"))));tap("down");tap("right");
-        QTRY_VERIFY(root->property("settingsDetailReady").toBool());tap("accept");
-        QTRY_VERIFY(root->property("choicesOpen").toBool());QCOMPARE(network.accessPoints().size(),1);
-        const auto captures=qEnvironmentVariable("R46H_UI_CAPTURE_DIR");QTest::qWait(200);
-        if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+"/wifi-chooser.png"));
-        tap("accept");QVERIFY(root->property("editing").toBool());QVERIFY(root->property("sensitiveVisible").toBool());
+        auto *settings=root->findChild<QObject *>("settingsView");QVERIFY(settings);
+        auto keys=[&]{QStringList result;for(const auto &row:settings->property("rows").toList())result<<row.toMap().value("key").toString()+":"+row.toMap().value("name").toString();return result;};
+        auto reason=[&](int index){QVariant value;QMetaObject::invokeMethod(settings,"rowReason",Q_RETURN_ARG(QVariant,value),Q_ARG(QVariant,settings->property("rows").toList()[index]));return value.toString();};
+        // §8 网络: the Wi-Fi switch (disabled with its reason), 已连接 and 附近的网络; Y scans.
+        QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("settings"))));tap("right");
+        QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        QCOMPARE(keys(),QStringList({"wifi:Wi-Fi","netActive:Jume-5G","netScan:扫描附近的网络"}));
+        QCOMPARE(reason(0),QStringLiteral("无线开关尚未接入"));
+        tap("pageAction");QTRY_VERIFY(network.accessPoints().size()==3);QTRY_VERIFY(!network.busy());
+        QCOMPARE(keys(),QStringList({"wifi:Wi-Fi","netActive:Jume-5G","netPoint:Home-2.4G","netPoint:Studio"}));
+        tap("down");QCOMPARE(root->property("settingsIndex").toInt(),1);
+        const auto captures=qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
+        for(const int percent:{100,130}){
+            QVERIFY(state.choose("font",percent==100?1:3));
+            for(const bool night:{false,true}){
+                QVERIFY(state.choose("night",night?1:0));QTest::qWait(250);
+                if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+QString("/settings-network-%1-%2.png").arg(night?"night":"light").arg(percent)));
+            }
+        }
+        // X disconnects the connected network after a confirmation whose default is 取消.
+        tap("itemAction");QVERIFY(root->property("choicesOpen").toBool());tap("accept");QVERIFY(!root->property("choicesOpen").toBool());
+        // A shows its details: close, disconnect or forget (confirmed, 取消 first).
+        tap("accept");QVERIFY(root->property("choicesOpen").toBool());tap("down");tap("down");tap("accept");
+        QVERIFY(root->property("choicesOpen").toBool());tap("accept");QVERIFY(!QFileInfo::exists(program.fileName()+".deleted"));
+        // Start: saved networks, forget, remember new networks and refresh.
+        tap("options");auto *options=root->findChild<QObject *>("optionsMenu");QVERIFY(options->property("open").toBool());
+        QStringList ids;for(const auto &item:options->property("items").toList())ids<<item.toMap().value("id").toString();
+        QCOMPARE(ids,QStringList({"netProfiles","netForget","netRemember","netRefresh"}));
+        tap("down");tap("down");tap("accept");QVERIFY(network.remember());
+        // A nearby protected network asks for its password in a private editor.
+        tap("down");tap("accept");QVERIFY(root->property("editing").toBool());QVERIFY(root->property("sensitiveVisible").toBool());
         QVERIFY(!root->property("testInputVisible").toBool());
         auto *field=root->findChild<QQuickItem *>("inputField");QVERIFY(field);
         QCOMPARE(field->property("echoMode").toInt(),2); // TextInput.Password.
@@ -1987,10 +2085,8 @@ QtObject {
         QVERIFY(root->property("editing").toBool()); // No fixture bus; refusal keeps the edit available.
         tap("back");QCOMPARE(field->property("text").toString(),QString("fixture-passwor")); // B erases on the keyboard.
         tap("quick");QVERIFY(!root->property("editing").toBool());QVERIFY(field->property("text").toString().isEmpty());
-        tap("down");tap("down");tap("accept");QVERIFY(network.remember());
-        tap("down");tap("down");tap("accept");tap("accept");QVERIFY(root->property("choicesOpen").toBool());
-        tap("accept");QVERIFY(!QFileInfo::exists(program.fileName()+".deleted")); // Cancel is the default.
-        tap("accept");tap("accept");tap("down");tap("accept");QTRY_VERIFY(!network.busy());
+        // Forget through the connected row: 忘记此网络, then confirm.
+        tap("up");tap("accept");tap("down");tap("down");tap("accept");tap("down");tap("accept");QTRY_VERIFY(!network.busy());
         QFile deleted(program.fileName()+".deleted");QVERIFY(deleted.open(QIODevice::ReadOnly));
         QVERIFY(deleted.readAll().endsWith("connection\ndelete\nuuid\n11111111-2222-4333-8444-555555555555\n"));
     }

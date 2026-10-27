@@ -183,21 +183,22 @@ def main():
             tap("right"); assert tap("accept")["settingsSidebar"]  # The dock's 设置.
             assert not tap("right")["settingsSidebar"]
             wait_state("settingsDetailReady")
-            assert tap("back")["settingsSidebar"]  # ←→ adjust the first row's slider.
-            for _ in range(8): tap("down")
-            tap("right"); wait_state("settingsDetailReady"); assert tap("accept", True)["choicesOpen"]
+            assert tap("back")["settingsSidebar"]
+            tap("down"); tap("right"); wait_state("settingsDetailReady")  # 显示 › 界面字号
+            for _ in range(3): tap("down")
+            assert tap("accept", True)["choicesOpen"]
             assert tap("down")["fontPercent"] == 100
             assert tap("nextSection")["page"] == 2  # A choice owns input until confirm/cancel.
             assert not tap("back")["choicesOpen"]
             tap("accept"); tap("down"); assert tap("accept", True)["fontPercent"] == 115
+            tap("back"); tap("down"); tap("down"); tap("right"); wait_state("settingsDetailReady")  # 控制器 › 文字输入测试
             tap("down"); assert tap("accept", True)["editing"]
             assert latest["capture"]["status"] == "sensitive_entry" and "png_base64" not in latest["capture"]
             assert set(latest["state"]).isdisjoint({"text", "input", "clipboard", "notice", "error"})
             assert not tap("back", True)["editing"]
             assert control.checked_image(copy.deepcopy(latest))
-            tap("left")
-            for _ in range(6): tap("up")
-            assert tap("right")["testingController"]
+            tap("up")
+            assert tap("accept")["testingController"]  # 控制器 › 摇杆测试
             assert tap("left")["testingController"]
             assert tap("back")["testingController"]  # A short B is test input.
             assert tap("quick")["quickOpen"]
@@ -266,7 +267,7 @@ def main():
             blocked = root / "blocked"; blocked.write_text("preserve")
             failed, failed_path = start("failed", state=blocked)
             state = control.exchange(failed_path, request())
-            for action in ["down", "right", "right", "right", "right", "accept", "right"]:  # The dock's 设置, first category.
+            for action in ["down", "right", "right", "right", "right", "accept", "down", "right"]:  # The dock's 设置, then 显示.
                 state = control.exchange(failed_path, request("tap", action=action, session=state["session"], sequence=state["sequence"], binary_sha256=state["binary_sha256"]))
             deadline = time.monotonic() + 5
             while not state["state"]["settingsDetailReady"]:

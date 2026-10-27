@@ -334,11 +334,11 @@ Item {
         session = name === "session"
         quickOpen = name === "quick"
         if (page === 2) settingsView.enter()
-        if (name === "about") settingsView.openCategory(11)
+        if (name === "about") settingsView.openCategory(7, false, settingsView.aboutRow)
         if (name === "performance" && !store.monitor) store.adjust("monitor", 1)
-        if (name === "controller") settingsView.openCategory(2)
-        if (name === "power") settingsView.openCategory(7)
-        if (name === "input") { settingsView.openCategory(8); openEditor() }
+        if (name === "controller") settingsView.startTester()
+        if (name === "power") settingsView.openCategory(4)
+        if (name === "input") { settingsView.openCategory(3, false, 1); openEditor() }
     }
     function changePage(value) {
         if (externalSession || choicesOpen) return
@@ -489,7 +489,7 @@ Item {
         const action = holdAction
         cancelHold()
         if (action === "taskForce" && tasksVisible && taskPage.item) taskPage.item.forceSelected()
-        else if (action === "testerExit") settingsView.returnToCategories()
+        else if (action === "testerExit") settingsView.leaveTester()
     }
     Timer {
         id: holdTimer; interval: 16; repeat: true
@@ -534,6 +534,8 @@ Item {
             owner = taskPage.item; items = owner.optionItems(); title = owner.currentTask ? owner.currentTask.title : ""
         } else if (toolOpen && toolView.item) {
             owner = toolView.item; items = owner.optionItems(); title = owner.optionTitle
+        } else if (!streamingOpen && !session && page === 2 && settingsView.optionItems().length) {
+            owner = settingsView; items = owner.optionItems(); title = owner.optionTitle
         } else if (!streamingOpen && !session && page < 2 && focusedEntry) {
             owner = root; items = cardOptions(); title = focusedEntry.title
             header = {subtitle: [focusedEntry.system || focusedEntry.detail, focusedEntry.core].filter(function(part) { return !!part }).join(" · "),
@@ -823,7 +825,7 @@ Item {
                 }
             }
             SettingsView {
-                id: settingsView; x: Ui.Theme.margin; y: 178; width: Ui.Theme.contentWidth; height: 493
+                id: settingsView; x: Ui.Theme.margin; y: Ui.Theme.pageTop; width: Ui.Theme.contentWidth; height: Ui.Theme.pageHeight
                 testerHold: root.holdAction === "testerExit" ? root.holdRing : -1
                 navigationActive: root.windowVisible && !root.quickOpen && !root.editing && !root.dimmed
                 visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page === 2

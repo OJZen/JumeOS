@@ -48,13 +48,14 @@ Item {
             Accessible.name: bar.wifiKnown ? "Wi-Fi " + bar.wifiSignal + "%" : "Wi-Fi 未连接"
             Icon { objectName: "statusWifiIcon"; anchors.fill: parent; name: "wifi"; color: bar.wifiKnown ? Theme.textSecondary : Theme.disabledText }
         }
+        // An unknown battery reading is left out rather than shown as "—".
         Row {
-            anchors.verticalCenter: parent.verticalCenter; spacing: Theme.space8; visible: bar.note === ""
+            anchors.verticalCenter: parent.verticalCenter; spacing: Theme.space8; visible: bar.note === "" && bar.batteryPercent >= 0
             Icon { objectName: "statusBatteryIcon"; anchors.verticalCenter: parent.verticalCenter; name: bar.charging ? "battery-charging" : "battery"; color: bar.charging ? Theme.accent : Theme.textSecondary }
             Label {
                 objectName: "statusBattery"; anchors.verticalCenter: parent.verticalCenter
                 role: "label"; tabular: true; fontScale: bar.fontScale; color: Theme.textSecondary; elide: Text.ElideNone
-                text: bar.batteryPercent < 0 ? "—" : bar.batteryPercent + "%"
+                text: bar.batteryPercent + "%"
             }
         }
         Label { objectName: "statusClock"; anchors.verticalCenter: parent.verticalCenter; role: "body"; tabular: true; fontScale: bar.fontScale; text: bar.clock; elide: Text.ElideNone }

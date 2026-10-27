@@ -85,16 +85,22 @@ dock (游戏库、串流、文件、工具、设置、电源). The library filte
 searches with Y; B leaves pages and clears a search first. The remote `home`
 action stands in for the system Select+Start and focuses the newest card.
 
-Entering Settings shows only the category list. Right/A asynchronously opens the
-selected category as a second-level page; Left/B returns to the list and unloads
-it after saving pending values. L1/R1 open the neighbouring category without
+Settings shows the eight categories (网络、显示、声音、控制器、电源、性能、存储、
+系统) in a 280-wide column beside the detail; until a category opens, the detail
+pane only names it. Right/A asynchronously opens the category's rows, grouped
+under section captions; Left/B returns to the column and unloads them after
+saving pending values. A value the device or preview cannot provide is a
+disabled row that says why. 网络 lists the Wi-Fi switch, 已连接 and 附近的网络
+(A details or connect, X disconnects, Y scans; Start holds saved networks,
+forgetting, remembering new networks and refresh); 性能 holds the overlay switch
+and the detail figures the overlay leaves out. L1/R1 open the neighbouring category without
 wrapping, at the row it was left on; L2/R2 move one screen of rows; the right
 stick scrolls the detail. Moving through categories does not construct detail
 rows or refresh storage. Tool game lists follow the same rule; USB remains a
 deliberate single-level page. Volume and brightness adjust directly with ←→ (a
 warning ring while held) and save on release; a failed save keeps the value
-pending and blocks leaving until it succeeds. The controller test takes every key
-except Select as test input; holding B for 1 s leaves (ring after 600 ms). In text
+pending and blocks leaving until it succeeds. 控制器 › 摇杆测试 takes every key
+except Select as test input; holding B for 1 s returns to its row (ring after 600 ms). In text
 entry B erases (a hold stops at empty; a separate press on an empty field
 closes), Y adds a space, X shifts, Start finishes, Select cancels, L1/R1 move the
 cursor, L2 switches 中/英 and R2 symbols. Choice lists preview with Up/Down;

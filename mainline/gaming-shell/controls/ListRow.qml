@@ -20,6 +20,10 @@ T.ItemDelegate {
     property bool current: false
     property bool adjusting: false
     property bool focusOutline: true
+    // A flat row sits on the page (category lists): no surface until current or pressed.
+    property bool flat: false
+    // An informational icon at the end of the row (e.g. a lock on a protected network).
+    property string trailingIcon: ""
     property bool actionable: true
     property string disabledReason: ""
     property bool reducedMotion: Theme.reducedMotion
@@ -38,7 +42,7 @@ T.ItemDelegate {
     onClicked: { focused(); activated() }
     background: Rectangle {
         radius: Theme.radiusRow
-        color: row.current ? Theme.accentSoft : row.down ? Theme.pressed(Theme.surface) : Theme.surface
+        color: row.current ? Theme.accentSoft : row.down ? Theme.pressed(Theme.surface) : row.flat ? "transparent" : Theme.surface
         Rectangle {
             anchors.fill: parent; anchors.margins: -(Theme.focusGap + Theme.focusWidth)
             radius: Theme.radiusRow + Theme.focusRadiusExtra; color: "transparent"
@@ -70,8 +74,10 @@ T.ItemDelegate {
             id: trailing
             anchors.right: parent.right; anchors.rightMargin: Theme.space24
             anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: parent.textCenter
-            width: row.toggleState >= 0 ? Theme.switchWidth : Math.min(parent.width * 0.55, valueLabel.implicitWidth + (marker.visible ? Theme.iconSize + Theme.space8 : 0))
+            // Measured apart from the label, so the label's own width never feeds back into this one.
+            width: row.toggleState >= 0 ? Theme.switchWidth : Math.min(row.availableWidth * 0.55, Math.ceil(valueMetrics.advanceWidth) + (marker.visible ? Theme.iconSize + Theme.space8 : 0))
             height: parent.height
+            TextMetrics { id: valueMetrics; font: valueLabel.font; text: valueLabel.visible ? row.value : "" }
             Label {
                 id: valueLabel; objectName: "settingValue"
                 width: parent.width - (marker.visible ? Theme.iconSize + Theme.space8 : 0)
@@ -84,8 +90,8 @@ T.ItemDelegate {
             Icon {
                 id: marker
                 anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                visible: row.toggleState < 0 && (row.choice || row.chevron || row.disabledRow)
-                name: row.disabledRow ? "lock" : "chevron-right"; color: Theme.textTertiary
+                visible: row.toggleState < 0 && (row.choice || row.chevron || row.disabledRow || row.trailingIcon !== "")
+                name: row.disabledRow ? "lock" : row.trailingIcon || "chevron-right"; color: Theme.textTertiary
             }
         }
         Slider {

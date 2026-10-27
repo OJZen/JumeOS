@@ -85,7 +85,7 @@ if args.keyboard:
                                  binary_sha256=args.binary, screenshot=screenshot))
         return current['state']
     for action in ['down', 'right', 'right', 'right', 'right', 'accept']: tap(action)  # The dock's 设置.
-    for _ in range(8): tap('down')
+    for _ in range(3): tap('down')  # 控制器 › 文字输入测试
     tap('right'); tap('down'); tap('accept')
     assert current['state']['testInputVisible']
     tap('down'); tap('accept',True)

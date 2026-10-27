@@ -98,6 +98,8 @@ QtObject {
     readonly property int dockTop: 548
     readonly property int libraryTabsTop: 82
     readonly property int libraryGridTop: 160
+    readonly property int settingsSidebarWidth: 280
+    readonly property int settingsCategoryHeight: 60
     readonly property int gridCard: 212
     readonly property int gridGap: 32
     readonly property int gridColumns: Math.max(1, Math.floor((contentWidth + gridGap) / (gridCard + gridGap)))

@@ -69,12 +69,12 @@ with tempfile.TemporaryDirectory(prefix='tools-check-',dir=repo/'mainline/out/.c
    for _ in range(4):tap('up')
    tap('accept');assert ask()['state']['toolSaveError'];tap('home');assert ask()['state']['toolRoute']=='usb';assert other.read_text()=='keep'
    settings_file.unlink();tap('back');assert config()['usbSwapAB'] is False;tap('back');tap('right');tap('accept')  # Dock 设置.
-   for _ in range(8):tap('down')
-   tap('accept')
+   tap('down');tap('accept')  # 显示
    deadline=time.monotonic()+5
    while not ask()['state']['settingsDetailReady']:
     assert time.monotonic()<deadline,'settings detail timeout';time.sleep(.02)
-   tap('accept');tap('down');tap('down');tap('accept');assert ask()['state']['fontPercent']==130
+   for _ in range(3):tap('down')
+   tap('accept');tap('down');tap('down');tap('accept');assert ask()['state']['fontPercent']==130  # 界面字号
    tap('home');tap('down');tap('left');assert tap('accept')['page']==3  # The dock remembers 设置; 工具 is left of it.
    tap('accept');wait();wait_detail();capture('usb-130')
    assert not ask()['state']['toolSaveError']
