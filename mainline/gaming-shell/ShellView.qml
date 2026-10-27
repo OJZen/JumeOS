@@ -834,7 +834,7 @@ Item {
             onOpenChanged: if (!open) root.forceActiveFocus()
         }
         Item {
-            anchors.fill: parent; visible: !root.editing
+            anchors.fill: parent
             Item {
             anchors.fill: parent; visible: !root.gameOverlay
             Ui.TopBar {
@@ -982,31 +982,68 @@ Item {
             Rectangle { width: parent.width; height: 1; color: Ui.Theme.outline }
             Ui.HintBar { objectName: "footerHints"; anchors.verticalCenter: parent.verticalCenter; width: parent.width; actions: root.controlHints; context: root.controlContext; fontScale: root.fontScale }
         }
+        // §8 keyboard sheet over the current page: the title, a 64-high field without a ring
+        // (focus lives on the keys), Qt's keyboard and the sheet's own hint bar.
         Item {
             anchors.fill: parent; visible: root.editing
+            Rectangle { anchors.fill: parent; color: Ui.Theme.scrim }
             MouseArea { anchors.fill: parent }
-            Ui.Label { x: Ui.Theme.margin; y: 70; width: Ui.Theme.contentWidth; text: root.editLabel; color: Ui.Theme.text; role: "title" }
-            Ui.Label { x: Ui.Theme.margin; y: 123; width: inputField.width; wrapMode: Text.Wrap; text: root.testInputVisible ? "自动化输入测试允许截图，请勿填写密码" : root.editPurpose === "test" ? "退出后清空输入内容" : root.editPurpose === "wifiPassword" ? "完成后连接 · Select 取消" : "完成后保存 · Select 取消"; role: "caption" }
-            Ui.TextField {
-                id: inputField; objectName: "inputField"; x: Ui.Theme.margin; y: 183; width: Ui.Theme.contentWidth - doneButton.width - Ui.Theme.padding; height: 64
-                fontScale: root.fontScale; maximumLength: root.editPurpose === "wifiPassword" ? 64 : root.editPurpose === "portSearch" ? 80 : 128
-                echoMode: root.editPurpose === "wifiPassword" ? TextInput.Password : TextInput.Normal
-                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhSensitiveData | (root.editPurpose === "wifiPassword" ? Qt.ImhHiddenText | Qt.ImhLatinOnly | Qt.ImhNoAutoUppercase : 0)
-                Accessible.name: root.editLabel
-                Keys.onEscapePressed: root.closeEditor()
-                Keys.onReturnPressed: root.finishEditor()
-            }
-            Ui.Button { id: doneButton; x: Ui.Theme.margin + Ui.Theme.contentWidth - width; y: 183; width: 152; height: 64; text: "完成"; primary: true; focusPolicy: Qt.NoFocus; Accessible.name: "完成输入"; onClicked: root.finishEditor() }
-            Ui.Label { x: Ui.Theme.margin; y: 270; visible: virtualKeyboard.status === Loader.Error; text: "虚拟键盘模块不可用；仍可使用实体键盘。"; color: Ui.Theme.danger; role: "caption" }
-            Ui.HintBar { x: Ui.Theme.margin; y: 267; width: inputField.width; visible: virtualKeyboard.status !== Loader.Error; fontScale: root.fontScale; actions: root.keyboardEnabled
-                    ? [{button: "A", label: "输入"}, {button: "B", label: "退格"}, {button: "X", label: "大小写"}, {button: "Y", label: "空格"}, {button: "Start", label: "完成"}]
-                    : [{button: "A", label: "完成"}, {button: "B", label: "取消"}] }
-            Loader {
-                id: virtualKeyboard; objectName: "virtualKeyboard"
-                active: root.keyboardEnabled && root.editing
-                source: "KeyboardPanel.qml"
-                width: parent.width; height: item ? (item as Item).implicitHeight : 0
-                anchors.bottom: parent.bottom
+            Rectangle {
+                id: editorSheet; objectName: "editorSheet"
+                y: parent.height - height; width: parent.width; height: editorColumn.y + editorColumn.height + Ui.Theme.space16 + Ui.Theme.hintBarHeight
+                radius: Ui.Theme.radiusPanel; color: Ui.Theme.surface
+                Ui.Shadow {}
+                Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: parent.radius; color: parent.color }
+                Column {
+                    id: editorColumn
+                    y: Ui.Theme.space32; width: parent.width; spacing: Ui.Theme.space16
+                    Ui.Label { x: Ui.Theme.margin; width: Ui.Theme.contentWidth; text: root.editLabel; color: Ui.Theme.text; role: "headline"; fontScale: root.fontScale }
+                    Ui.Label {
+                        x: Ui.Theme.margin; width: Ui.Theme.contentWidth; wrapMode: Text.Wrap; role: "caption"; fontScale: root.fontScale
+                        visible: text !== ""
+                        text: root.testInputVisible ? "自动化输入测试允许截图，请勿填写密码" : root.editPurpose === "wifiPassword" ? "完成后连接" : ""
+                    }
+                    Item {
+                        x: Ui.Theme.margin; width: Ui.Theme.contentWidth; height: Ui.Theme.editorFieldHeight
+                        Ui.TextField {
+                            id: inputField; objectName: "inputField"
+                            width: parent.width - (doneButton.visible ? doneButton.width + Ui.Theme.space16 : 0); height: parent.height
+                            focusRing: false; leftPadding: searchIcon.visible ? Ui.Theme.space24 + Ui.Theme.iconSize + Ui.Theme.space12 : Ui.Theme.space24
+                            fontScale: root.fontScale; maximumLength: root.editPurpose === "wifiPassword" ? 64 : root.editPurpose === "portSearch" ? 80 : 128
+                            echoMode: root.editPurpose === "wifiPassword" ? TextInput.Password : TextInput.Normal
+                            inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhSensitiveData | (root.editPurpose === "wifiPassword" ? Qt.ImhHiddenText | Qt.ImhLatinOnly | Qt.ImhNoAutoUppercase : 0)
+                            Accessible.name: root.editLabel
+                            Keys.onEscapePressed: root.closeEditor()
+                            Keys.onReturnPressed: root.finishEditor()
+                            Ui.Icon {
+                                id: searchIcon; x: Ui.Theme.space24; anchors.verticalCenter: parent.verticalCenter
+                                visible: root.editPurpose === "librarySearch" || root.editPurpose === "portSearch"; name: "search"
+                            }
+                        }
+                        // Without the on-screen keyboard (a USB keyboard or the desktop preview) a button finishes.
+                        Ui.Button {
+                            id: doneButton; anchors.right: parent.right; width: 152; height: parent.height; visible: !root.keyboardEnabled
+                            text: "完成"; primary: true; focusPolicy: Qt.NoFocus; Accessible.name: "完成输入"; onClicked: root.finishEditor()
+                        }
+                    }
+                    Ui.Label { x: Ui.Theme.margin; visible: virtualKeyboard.status === Loader.Error; text: "虚拟键盘模块不可用；仍可使用实体键盘。"; color: Ui.Theme.danger; role: "caption"; fontScale: root.fontScale }
+                    Loader {
+                        id: virtualKeyboard; objectName: "virtualKeyboard"
+                        active: root.keyboardEnabled && root.editing
+                        source: "KeyboardPanel.qml"
+                        width: parent.width; height: item ? (item as Item).implicitHeight : 0
+                    }
+                }
+                Item {
+                    x: Ui.Theme.margin; y: parent.height - Ui.Theme.hintBarHeight; width: Ui.Theme.contentWidth; height: Ui.Theme.hintBarHeight
+                    Rectangle { width: parent.width; height: 1; color: Ui.Theme.outline }
+                    Ui.HintBar {
+                        objectName: "editorHints"; anchors.verticalCenter: parent.verticalCenter; width: parent.width; fontScale: root.fontScale
+                        actions: root.keyboardEnabled
+                            ? [{button: "L1+R1", label: "移动光标"}, {button: "Select", label: "取消", leading: false}, {button: "A", label: "输入"}]
+                            : [{button: "A", label: "完成"}, {button: "B", label: "取消"}]
+                    }
+                }
             }
             Binding { target: virtualKeyboard.item; property: "reducedMotion"; value: root.store.reducedMotion; when: virtualKeyboard.status === Loader.Ready }
         }
@@ -1043,7 +1080,7 @@ Item {
         Ui.Toast {
             objectName: "notice"; z: 103 // Above the task page and the options sheet.
             x: root.quickOpen ? Ui.Theme.margin : (parent.width - width) / 2
-            y: root.editing ? 310 : root.quickOpen ? 340 : Ui.Theme.canvasHeight - Ui.Theme.hintBarHeight - height - Ui.Theme.space16
+            y: root.editing ? editorSheet.y - height - Ui.Theme.space16 : root.quickOpen ? 340 : Ui.Theme.canvasHeight - Ui.Theme.hintBarHeight - height - Ui.Theme.space16
             maximumWidth: root.quickOpen ? 530 : Ui.Theme.contentWidth
             text: root.store.error || root.notice; error: root.store.error !== ""; fontScale: root.fontScale
         }

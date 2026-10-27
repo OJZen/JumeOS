@@ -42,7 +42,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_include_directories(r46h-shell PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_link_libraries(r46h-shell PRIVATE PkgConfig::WaylandCapture)
 endif()
-qt_add_resources(r46h-shell keyboard PREFIX "/qt/qml/R46H/Shell" FILES KeyboardPanel.qml)
+qt_add_resources(r46h-shell keyboard PREFIX "/qt/qml/R46H/Shell" FILES KeyboardPanel.qml
+    keyboard/layouts/fallback/main.qml keyboard/layouts/fallback/symbols.qml keyboard/layouts/zh_CN/main.qml
+    keyboard/layouts/zh_CN/symbols.fallback keyboard/layouts/en_GB/main.fallback keyboard/layouts/en_GB/symbols.fallback)
 set_target_properties(r46h-shell PROPERTIES MACOSX_BUNDLE FALSE)
 include(CTest)
 if(BUILD_TESTING)

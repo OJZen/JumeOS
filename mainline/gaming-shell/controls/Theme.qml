@@ -103,6 +103,8 @@ QtObject {
     readonly property int taskCardWidth: 512
     readonly property int taskSideWidth: 420
     readonly property int taskCardTop: 104
+    readonly property int keyHeight: 64
+    readonly property int editorFieldHeight: 64
     readonly property int gridCard: 212
     readonly property int gridGap: 32
     readonly property int gridColumns: Math.max(1, Math.floor((contentWidth + gridGap) / (gridCard + gridGap)))

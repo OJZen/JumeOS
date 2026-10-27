@@ -4,7 +4,8 @@ import QtQuick
 BorderImage {
     property Item target: parent
     anchors.fill: target; anchors.margins: -Theme.shadowSpread
-    source: "elevation.png"
+    // Resolved here, so pages outside controls/ can use it too.
+    source: Qt.resolvedUrl("elevation.png")
     border { left: 40; top: 40; right: 40; bottom: 40 }
     z: -1
 }

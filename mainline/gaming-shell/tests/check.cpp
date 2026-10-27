@@ -1073,8 +1073,10 @@ private slots:
         auto *editorFocus = view.activeFocusItem(); state.adjust("monitor", 1);
         auto *hud = root->findChild<QQuickItem *>("performancePanel"); QVERIFY(hud);
         QTRY_VERIFY(hud->isVisible()); // Hidden until the first sample: no placeholder rows.
-        // Desktop: top right, below the top bar.
+        // Desktop: top right, below the top bar, clear of the keyboard sheet's field.
         QCOMPARE(hud->x() + hud->width(), 992.); QCOMPARE(hud->y(), 80.); QVERIFY(hud->width() <= 360);
+        auto *inputBox = root->findChild<QQuickItem *>("inputField"); QVERIFY(inputBox);
+        QVERIFY(!hud->mapRectToScene(hud->boundingRect()).intersects(inputBox->mapRectToScene(inputBox->boundingRect())));
         QCOMPARE(view.activeFocusItem(), editorFocus); // The overlay never takes focus.
         state.adjust("monitor", 1); QVERIFY(!hud->isVisible());
         for (auto key : {Qt::Key_Q, Qt::Key_X, Qt::Key_BracketLeft, Qt::Key_BracketRight}) QTest::keyClick(&view, key);
@@ -2159,6 +2161,19 @@ QtObject {
         state.adjust("motion", 1); QVERIFY(!keyboard->property("noAnimations").toBool());
         auto *field = root->findChild<QQuickItem *>("inputField"); QVERIFY(field);
         QTRY_VERIFY(field->hasActiveFocus()); QTest::qWait(200);
+        // §8 Jume layouts: the 20-column grid with badged special keys, light and night, 100% and 130%.
+        QCOMPARE(QQmlProperty(keyboard, "style.keyboardDesignWidth").read().toReal(), 1024.);
+        field->setProperty("text", QStringLiteral("metal")); state.adjust("motion", 1); // Settled captures, no theme fade.
+        const auto keyboardCaptures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
+        for (const int percent : {100, 130}) {
+            QVERIFY(state.choose("font", percent == 100 ? 1 : 3));
+            for (const bool night : {false, true}) {
+                QVERIFY(state.choose("night", night ? 1 : 0)); QTest::qWait(300);
+                if (!keyboardCaptures.isEmpty())
+                    QVERIFY(view.grabWindow().save(keyboardCaptures + QString("/keyboard-%1-%2.png").arg(night ? "night" : "light").arg(percent)));
+            }
+        }
+        QVERIFY(state.choose("font", 1)); QVERIFY(state.choose("night", 0)); state.adjust("motion", 1); field->setProperty("text", QString());
         // The same focus-object events sent by SDL must navigate Qt's own keys.
         controller.keyboardAction("down"); controller.keyboardAction("accept");
         QTRY_VERIFY(!field->property("text").toString().isEmpty());
@@ -2224,12 +2239,8 @@ QtObject {
         QTest::qWait(200);
         const auto captures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
         if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/arm64-keyboard-pinyin-130.png"));
-        QObject *hideKey = nullptr;
-        for (auto *item : root->findChildren<QObject *>()) {
-            if (QByteArray(item->metaObject()->className()).startsWith("HideKeyboardKey")) { hideKey = item; break; }
-        }
-        QVERIFY(hideKey); QVERIFY(QMetaObject::invokeMethod(hideKey, "clicked"));
-        QTRY_VERIFY(!root->property("editing").toBool());
+        // §8 has no hide key: Select cancels the entry and closes the keyboard.
+        dispatch("quick"); QTRY_VERIFY(!root->property("editing").toBool());
         QVERIFY(!QGuiApplication::inputMethod()->isVisible());
         QVERIFY(field->property("text").toString().isEmpty());
         QTRY_COMPARE(loader->property("status").toInt(), 0);

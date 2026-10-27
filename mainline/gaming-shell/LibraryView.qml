@@ -29,7 +29,9 @@ Item {
         x: Ui.Theme.margin - Ui.Theme.space16; y: Ui.Theme.libraryGridTop - Ui.Theme.space16
         width: Ui.Theme.gridColumns * cellWidth; height: Ui.Theme.canvasHeight - Ui.Theme.hintBarHeight - y
         cellWidth: Ui.Theme.gridCellWidth + Ui.Theme.gridGap
-        cellHeight: Ui.Theme.gridCellWidth + Ui.Theme.space8 + Ui.Theme.lineHeight("label") + Ui.Theme.space24
+        // Larger font sizes give titles a second line instead of cutting them.
+        readonly property int titleLines: library.fontScale > 1 ? 2 : 1
+        cellHeight: Ui.Theme.gridCellWidth + Ui.Theme.space8 + titleLines * Ui.Theme.lineHeight("label") + Ui.Theme.space24
         clip: true; interactive: false
         model: library.entries.length; currentIndex: library.index
         highlightRangeMode: GridView.ApplyRange
@@ -62,6 +64,7 @@ Item {
                 objectName: "libraryTitle"
                 x: Ui.Theme.space16; y: Ui.Theme.space16 + Ui.Theme.gridCellWidth + Ui.Theme.space8; width: Ui.Theme.gridCellWidth
                 role: "label"; fontScale: library.fontScale; text: cell.game.title
+                wrapMode: Text.Wrap; maximumLineCount: grid.titleLines; verticalAlignment: Text.AlignTop
                 color: cell.game.reason ? Ui.Theme.disabledText : cell.current ? Ui.Theme.accent : Ui.Theme.text
                 font.weight: cell.current ? Font.Bold : Ui.Theme.type.label.weight
             }

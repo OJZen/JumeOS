@@ -175,6 +175,10 @@ The runtime includes Qt/Pinyin license notices and a Chinese fallback font;
 the corresponding Qt source archive remains alongside it. It is opt-in on
 Linux; do not force the input-context plugin into a Wayland client before the
 compositor input-method path is selected. No macOS virtual keyboard is bundled.
+The shell supplies the [JUME-UI §8](../../docs/JUME-UI.md#8-界面) layouts in
+`keyboard/layouts` (the 20-column grid for English and Pinyin, symbols through
+`fallback`) and its own key faces with controller badges; Qt keeps the input
+engine, Pinyin candidates and shift. There is no hide key: Select cancels.
 
 `tuning.py` outputs a read-only Linux CPU/memory snapshot. `--kernel-config`
 accepts a retained config; `--root` allows an isolated fixture. For offline draft
