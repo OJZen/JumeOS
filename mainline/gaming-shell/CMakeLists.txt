@@ -17,13 +17,13 @@ set_source_files_properties(controls/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE 
 qt_add_executable(r46h-shell main.cpp fonts.h input.cpp input.h handheld.cpp handheld.h preferences.cpp preferences.h telemetry.cpp telemetry.h control.cpp control.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
 target_compile_definitions(r46h-shell PRIVATE JUME_LAUNCHER_NAME="Jume Launcher" JUME_LAUNCHER_VERSION="${JUME_LAUNCHER_VERSION}")
 qt_add_qml_module(r46h-shell URI R46H.Shell VERSION 1.0
-    QML_FILES ShellView.qml HomeView.qml LibraryView.qml ToolsView.qml TaskView.qml SettingsView.qml PerformancePanel.qml StreamingView.qml ToolPage.qml PortCatalog.qml
+    QML_FILES ShellView.qml HomeView.qml LibraryView.qml ToolsView.qml QuickPanelView.qml TaskView.qml SettingsView.qml PerformancePanel.qml StreamingView.qml ToolPage.qml PortCatalog.qml
         controls/Theme.qml controls/PageHeader.qml controls/Motion.qml controls/Label.qml controls/Icon.qml controls/FocusFrame.qml
         controls/Button.qml controls/Switch.qml controls/ProgressBar.qml controls/ScrollBar.qml controls/TextField.qml controls/Slider.qml
         controls/ListView.qml controls/TableView.qml controls/Page.qml controls/Tabs.qml controls/ChoicePopup.qml
         controls/ListRow.qml controls/GameCard.qml controls/DockTile.qml controls/GlyphBadge.qml controls/HintBar.qml controls/TopBar.qml
         controls/Hud.qml controls/Toast.qml controls/HoldConfirm.qml controls/Panel.qml controls/Sheet.qml controls/Dialog.qml
-        controls/QuickPanel.qml controls/OptionsSheet.qml controls/Shadow.qml
+        controls/QuickPanel.qml controls/OptionsSheet.qml controls/PowerMenu.qml controls/Shadow.qml
     RESOURCES controls/qmldir controls/elevation.png)
 target_link_libraries(r46h-shell PRIVATE Qt6::Quick Qt6::Network Qt6::DBus SDL2::SDL2)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")

@@ -5,6 +5,8 @@ import QtQuick
 Item {
     id: bar
     property string title: ""
+    // A capsule after the title, e.g. the task count "3 / 4".
+    property string badge: ""
     property bool statusVisible: true
     property int wifiSignal: -1
     property bool wifiKnown: wifiSignal >= 0
@@ -26,9 +28,15 @@ Item {
         }
         Label { objectName: "brandName"; anchors.verticalCenter: parent.verticalCenter; text: "Jume"; role: "headline"; fontScale: bar.fontScale; elide: Text.ElideNone }
     }
-    Label {
-        objectName: "topBarTitle"; anchors.verticalCenter: parent.verticalCenter
-        visible: bar.title !== ""; text: bar.title; role: "title"; fontScale: bar.fontScale; elide: Text.ElideNone
+    Row {
+        anchors.verticalCenter: parent.verticalCenter; spacing: Theme.space16
+        visible: bar.title !== ""
+        Label { objectName: "topBarTitle"; anchors.verticalCenter: parent.verticalCenter; text: bar.title; role: "title"; fontScale: bar.fontScale; elide: Text.ElideNone }
+        Rectangle {
+            objectName: "topBarBadge"; anchors.verticalCenter: parent.verticalCenter; visible: bar.badge !== ""
+            width: badgeLabel.implicitWidth + 2 * Theme.space12; height: badgeLabel.implicitHeight + Theme.space8; radius: height / 2; color: Theme.surface
+            Label { id: badgeLabel; anchors.centerIn: parent; role: "label"; tabular: true; fontScale: bar.fontScale; text: bar.badge; color: Theme.textSecondary; elide: Text.ElideNone }
+        }
     }
     Row {
         id: status

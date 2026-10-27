@@ -78,7 +78,7 @@ Item {
     property bool windowVisible: true
     readonly property real fontScale: store.fontPercent / 100
     readonly property bool motionReduced: store.reducedMotion
-    readonly property bool choicesOpen: gameExitChoice.visible || optionsMenu.open || settingsView.choiceOpen || (streamingView.item !== null && streamingView.item.choiceOpen) || (toolView.item !== null && toolView.item.choiceOpen)
+    readonly property bool choicesOpen: gameExitChoice.visible || optionsMenu.open || powerMenu.open || settingsView.choiceOpen || (streamingView.item !== null && streamingView.item.choiceOpen) || (toolView.item !== null && toolView.item.choiceOpen)
     Binding { target: Ui.Theme; property: "fontScale"; value: root.fontScale }
     // §7.5: held directions speed up after 2 s in lists, never in grids or on the keyboard.
     Binding {
@@ -143,9 +143,50 @@ Item {
     readonly property int wifiSignal: hardware ? (liveWifiSignal >= 0 ? liveWifiSignal : boundedPercent(device.info.wifiSignal)) : -1
     readonly property string batteryState: hardware ? String(device.info.batteryStatus || "").toLowerCase() : ""
     // §7.4 quick panel: sliders adjust with ←→, other rows act with A; its own footer replaces the page's.
-    readonly property var quickHints: (quickIndex >= 2 ? [{button: "A", label: quickIndex < 4 ? "切换" : "确定"}]
-            : !hardware || (quickIndex === 1 && device.controls) ? [{button: "dpadH", label: "调整"}] : [])
+    // §8 quick panel: tiles take A, sliders ←→; its own footer replaces the page's.
+    readonly property var quickHints: (quickId === "brightness" || quickId === "volume" ? [{button: "dpadH", label: "调整"}]
+            : [{button: "A", label: quickId === "wifi" ? "打开" : quickId === "monitor" || quickId === "night" ? "切换" : "确定"}])
         .concat([{button: "B", label: gameOverlay ? "返回游戏" : "关闭"}])
+    // Focus order; 回到主页 and 结束游戏 only over a game, volume only where the panel can set it.
+    readonly property var quickOrder: ["wifi", "monitor", "night", "brightness", "volume", "home", "tasks", "end"]
+    readonly property string quickId: quickOrder[quickIndex] || ""
+    property int quickTile: 1
+    property bool quickAdjusting: false
+    readonly property string activeTitle: {
+        const task = applications ? applications.tasks.find(function(entry) { return entry.foreground }) : null
+        const game = games.find(function(entry) { return entry.id === activeApplication })
+        return task ? task.title : game ? game.title : activeApplication
+    }
+    function quickAvailable(id) {
+        if (id === "volume") return !hardware
+        if (id === "brightness") return !hardware || (device.controls && device.info.brightnessPercent >= 0)
+        if (id === "home" || id === "end") return gameOverlay
+        return true
+    }
+    function quickRow(id) { const index = quickOrder.indexOf(id); return index < 3 ? 0 : index - 2 }
+    function quickTileOn(id) {
+        return id === "wifi" ? wifiSignal >= 0 || (network !== null && network.profiles.some(function(profile) { return profile.active }))
+            : id === "monitor" ? store.monitor : nightActive
+    }
+    function quickLevel(id) { return id === "volume" ? (hardware ? -1 : store.volume) : hardware ? device.info.brightnessPercent : store.brightness }
+    function openQuick() { quickTile = 1; quickIndex = quickAvailable("brightness") ? 3 : 1; quickAdjusting = false; quickOpen = true }
+    function quickMove(step) {
+        for (let row = quickRow(quickId) + step; row >= 0 && row <= 5; row += step) {
+            const id = row === 0 ? quickOrder[quickTile] : quickOrder[row + 2]
+            if (quickAvailable(id)) { quickIndex = quickOrder.indexOf(id); return }
+        }
+    }
+    function quickActivate(id) {
+        quickIndex = quickOrder.indexOf(id); root.forceActiveFocus()
+        if (id === "monitor") store.adjust("monitor", 1)
+        else if (id === "night") store.choose("night", nightActive ? 0 : 1)
+        else if (id === "wifi") {
+            if (gameOverlay) notify("请回到桌面，在设置 › 网络中管理 Wi-Fi")
+            else if (leaveQuick()) { session = false; changePage(2); settingsView.openCategory(0) }
+        } else if (id === "home") { if (leaveQuick()) backgroundRequested(false) }
+        else if (id === "tasks") { if (leaveQuick()) backgroundRequested(true) }
+        else if (id === "end") gameExitChoice.present(quickPanel, ["取消", "结束游戏"], 0, "结束当前游戏？")
+    }
     readonly property var focusedEntry: page < 2 && !dockFocused ? games[selected] || null : null
     readonly property var focusedTask: focusedEntry ? entryTask(focusedEntry) : null
     readonly property string activateLabel: focusedTask ? "继续" : focusedEntry && focusedEntry.route ? "打开" : "开始"
@@ -243,10 +284,17 @@ Item {
         if (!game) return Ui.Theme.cardColor(0)
         if (game.tint) return game.tint
         if (game.palette !== undefined) return Ui.Theme.cardColor(game.palette)
-        const key = game.id || game.title
+        return hashColor(game.id || game.title)
+    }
+    function hashColor(key) {
         let hash = 0
         for (let i = 0; i < key.length; ++i) hash = (hash * 131 + key.charCodeAt(i)) % 2147483647
         return Ui.Theme.cardColor(hash)
+    }
+    // Task cards outside the library (e.g. built-in tools) still get their stable color.
+    function entryColorById(id) {
+        const index = games.findIndex(function(game) { return game.id === id })
+        return index >= 0 ? entryColor(index) : hashColor(id || "")
     }
     function entryCaption(game) {
         const task = entryTask(game)
@@ -286,7 +334,7 @@ Item {
     function openDock(index) {
         const id = dockItems[index].id
         if (id === "library" || id === "settings" || id === "tools") { changePage(["", "library", "settings", "tools"].indexOf(id)); return }
-        if (id === "power") { showScene("power"); return }
+        if (id === "power") { openPowerMenu(); return }
         if (id === "files") {
             if (!filesAvailable) notify("请先安装 Jume Files 运行时")
             else { recordLaunch("builtin.files"); filesRequested(false) }
@@ -296,6 +344,15 @@ Item {
         const moonlight = games.findIndex(function(game) { return game.route === "streaming" || game.id === "moonlight" || game.title === "Moonlight" })
         if (moonlight < 0) { notify("串流尚未配置"); return }
         selected = moonlight; activateSelected()
+    }
+    // §8 power menu: names the background apps; restart and power-off ask once more.
+    function openPowerMenu() {
+        powerMenu.present(applications ? applications.tasks.map(function(task) { return task.title }) : [])
+    }
+    function powerChosen(id) {
+        if (id === "screenOff") { blankScreen(); return }
+        if (!store.save()) return
+        if (!device.requestPower(id)) notify(device.error)
     }
     function openToolEntry(index) {
         const entry = builtinTools[index]
@@ -332,7 +389,7 @@ Item {
         page = name === "library" ? 1 : name === "tools" ? 3 : (["settings", "about", "controller", "power", "input"].indexOf(name) >= 0 ? 2 : 0)
         syncSelected()
         session = name === "session"
-        quickOpen = name === "quick"
+        if (name === "quick") openQuick(); else quickOpen = false
         if (page === 2) settingsView.enter()
         if (name === "about") settingsView.openCategory(7, false, settingsView.aboutRow)
         if (name === "performance" && !store.monitor) store.adjust("monitor", 1)
@@ -500,6 +557,7 @@ Item {
     }
     onTasksVisibleChanged: cancelHold()
     function release(action) {
+        if (quickOpen && (action === "left" || action === "right")) { quickAdjusting = false; return }
         if (holdAction === "taskForce" && action === "itemAction") {
             const tap = Date.now() - holdStarted < Ui.Theme.holdDelay
             cancelHold()
@@ -589,29 +647,25 @@ Item {
         if (activity()) return
         if (gameExitChoice.visible) { gameExitChoice.dispatch(action, repeated); return }
         if (optionsMenu.open) { optionsMenu.dispatch(action, repeated); return }
+        if (powerMenu.open) { powerMenu.dispatch(action, repeated); return }
         if (editing) { editorDispatch(action, repeated); return }
         if (repeated && action === "back") return
         if (quickOpen) {
             root.forceActiveFocus()
             if (action === "back" || action === "quick") leaveQuick()
-            else if (action === "up") quickIndex = Math.max(0, quickIndex - 1)
-            else if (action === "down") quickIndex = Math.min(5, quickIndex + 1)
+            else if (action === "up" || action === "down") quickMove(action === "down" ? 1 : -1)
             else if (action === "left" || action === "right") {
-                if (quickIndex < 2) adjustSetting(quickIndex, action === "left" ? -1 : 1, repeated)
-            } else if (action === "accept") {
-                if (quickIndex < 2) return
-                if (quickIndex < 4) adjustSetting(quickIndex, 1)
-                else if (quickIndex === 4) leaveQuick()
-                else if (gameOverlay) gameExitChoice.present(quickPanel, ["取消", "结束游戏"], 0, "结束当前游戏？")
-                else if (leaveQuick()) { session = false; changePage(0) }
-            }
+                const step = action === "right" ? 1 : -1
+                if (quickRow(quickId) === 0) { quickTile = Math.max(0, Math.min(2, quickTile + step)); quickIndex = quickTile }
+                else if (quickId === "brightness" || quickId === "volume") { quickAdjusting = true; adjustSetting(quickId === "volume" ? 0 : 1, step, repeated) }
+            } else if (action === "accept" && !repeated && quickId !== "brightness" && quickId !== "volume") quickActivate(quickId)
             return
         }
         if (toolOpen && toolView.item && toolView.item.choiceOpen) { toolView.item.dispatch(action, repeated); return }
         if (streamingOpen) { streamingView.dispatch(action, repeated); return }
         if (settingsView.choiceOpen) { settingsView.dispatch(action, repeated); return }
         root.forceActiveFocus()
-        if (action === "quick") { quickIndex = 0; quickOpen = true; return }
+        if (action === "quick") { openQuick(); return }
         if (action === "options") { openOptions(); return }
         if (toolOpen) {
             if (action === "home") { if (closeTool()) { dockFocused = false; homeIndex = 0; changePage(0) } }
@@ -742,8 +796,12 @@ Item {
         Loader {
             id: taskPage; anchors.fill: parent; z: 100; active: root.tasksVisible
             sourceComponent: TaskView {
-                applications: root.applications; fontScale: root.fontScale
+                applications: root.applications; fontScale: root.fontScale; reducedMotion: root.motionReduced
                 holdProgress: root.holdAction === "taskForce" ? root.holdRing : -1
+                wifiSignal: root.wifiSignal; batteryPercent: root.batteryPercent; clock: root.clockText
+                charging: root.batteryState === "charging" || root.batteryState === "full"
+                colorFor: function(id) { return root.entryColorById(id) }
+                entryFor: function(id) { return root.games.find(function(game) { return game.id === id }) || null }
                 onDismissed: root.tasksVisible=false
                 onActivated: function(id) { if(root.applications.activate(id))root.tasksVisible=false }
                 onCloseRequested: function(id) { root.tasksVisible=false;root.applications.requestClose(id) }
@@ -756,6 +814,14 @@ Item {
             progress: Math.max(root.taskHoldPercent / 100, root.holdAction === "taskForce" ? root.holdProgress : 0)
             duration: Ui.Theme.forceHoldDuration
             title: "继续按住以强制结束"; detail: "未保存的进度会丢失"; fontScale: root.fontScale
+        }
+        Ui.PowerMenu {
+            id: powerMenu; objectName: "powerMenuLayer"; anchors.fill: parent; z: 102
+            fontScale: root.fontScale; reducedMotion: root.store.reducedMotion
+            readonly property string deviceReason: !root.hardware ? "预览中不可用" : !root.device.controls ? "需要设备控制权限" : ""
+            reasons: ({reboot: deviceReason, poweroff: deviceReason})
+            onChosen: function(id) { root.powerChosen(id) }
+            onOpenChanged: if (!open) root.forceActiveFocus()
         }
         Ui.OptionsSheet {
             id: optionsMenu; objectName: "optionsMenu"; anchors.fill: parent; z: 102
@@ -876,30 +942,37 @@ Item {
                 id: quickPanel
                 objectName: "quickPanel"
                 x: root.quickOpen ? Ui.Theme.canvasWidth - Ui.Theme.quickPanelInset - width : Ui.Theme.canvasWidth + Ui.Theme.shadowSpread
-                title: "快捷设置"; fontScale: root.fontScale; hints: root.quickHints
+                fontScale: root.fontScale; hints: root.quickHints
                 enabled: root.quickOpen
                 visible: root.quickOpen || x < Ui.Theme.canvasWidth
                 Behavior on x { Ui.Motion { curve: "emphasized"; duration: Ui.Theme.reducedMotion ? 0 : Ui.Theme.sheetEnterDuration } }
-                Column {
-                    width: parent.width; spacing: Ui.Theme.space8
-                    Repeater {
-                        model: 6
-                        Ui.ListRow {
-                            required property int index
-                            readonly property int brightness: root.hardware ? root.device.info.brightnessPercent : root.store.brightness
-                            width: parent.width; fontScale: root.fontScale
-                            reducedMotion: root.store.reducedMotion
-                            actionable: !root.hardware || index >= 2 || (index === 1 && root.device.controls)
-                            toggleState: index === 2 ? Number(root.store.reducedMotion) : index === 3 ? Number(root.store.monitor) : -1
-                            title: ["音量", "亮度", "减少动态效果", "性能浮窗", root.gameOverlay ? "继续游戏" : root.session ? "继续演示" : "关闭面板", root.gameOverlay ? "结束游戏" : "返回主页"][index]
-                            value: index === 0 ? (root.hardware ? "机身音量键" : root.store.volume + "%") : index === 1 ? (brightness < 0 ? "—" : brightness + "%") : ""
-                            progress: index === 0 && !root.hardware ? root.store.volume / 100 : index === 1 && brightness >= 0 ? brightness / 100 : -1
-                            chevron: index >= 4
-                            selected: root.quickOpen && root.quickIndex === index
-                            onFocused: { root.quickIndex = index; root.forceActiveFocus() }
-                            onActivated: { root.quickIndex = index; root.dispatch("accept", false) }
-                        }
+                header: Item {
+                    id: quickHeader
+                    // A long title or large font moves battery and time below the title instead of cutting it.
+                    readonly property bool stacked: quickTitle.implicitWidth + quickChip.width + quickStatus.implicitWidth + 2 * Ui.Theme.space12 > width
+                    width: parent ? parent.width : 0
+                    height: stacked ? quickTitle.implicitHeight + Ui.Theme.space4 + quickStatus.implicitHeight : Math.max(quickTitle.implicitHeight, quickStatus.implicitHeight)
+                    Ui.Label {
+                        id: quickTitle; objectName: "quickTitle"; y: quickHeader.stacked ? 0 : (quickHeader.height - height) / 2
+                        width: Math.min(implicitWidth, parent.width - quickChip.width - Ui.Theme.space12)
+                        role: "headline"; fontScale: root.fontScale; text: root.gameOverlay ? root.activeTitle : "Jume"
                     }
+                    Rectangle {
+                        id: quickChip
+                        x: quickTitle.width + Ui.Theme.space12; anchors.verticalCenter: quickTitle.verticalCenter
+                        width: chipLabel.implicitWidth + 2 * Ui.Theme.space12; height: chipLabel.implicitHeight + Ui.Theme.space4; radius: height / 2
+                        color: Ui.Theme.accentSoft
+                        Ui.Label { id: chipLabel; anchors.centerIn: parent; role: "micro"; fontScale: root.fontScale; color: Ui.Theme.accentInk; elide: Text.ElideNone; text: root.gameOverlay ? "运行中" : "桌面" }
+                    }
+                    Ui.Label {
+                        id: quickStatus
+                        x: quickHeader.stacked ? 0 : parent.width - width; y: quickHeader.stacked ? quickTitle.height + Ui.Theme.space4 : (quickHeader.height - height) / 2
+                        role: "label"; tabular: true; fontScale: root.fontScale; elide: Text.ElideNone
+                        text: (root.batteryPercent >= 0 ? root.batteryPercent + "%  " : "") + root.clockText
+                    }
+                }
+                QuickPanelView {
+                    width: parent.width; shell: root; current: root.quickOpen ? root.quickId : ""; fontScale: root.fontScale
                 }
             }
         }

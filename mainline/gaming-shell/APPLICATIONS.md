@@ -121,7 +121,10 @@ explicit TERM/1.5-second cleanup path; shutdown includes background tasks.
 Screenshots are captured asynchronously before leaving the foreground and scaled
 to at most 320×240. They stay in memory, are replaced on the next successful
 snapshot and removed when the task ends; no disk cache or live video thumbnails.
-Failed/unmapped captures show an icon placeholder. The whole task page is private
+The task page ([JUME-UI §8](../../docs/JUME-UI.md#8-界面)) is a carousel: the focused
+card 512×384 in the middle, its neighbours 420×315 at the sides, the title and
+state (已暂停 / 运行中 / 正在结束…) below and the count beside the 任务 title.
+Failed/unmapped captures show the entry's fallback card. The whole task page is private
 to the local display, including ordinary app thumbnails. Remote capture requests
 cannot join or receive a local snapshot operation. The local image provider does
 not accept file paths; existing editor/browser/transfer capture restrictions remain.
@@ -134,7 +137,10 @@ and abrupt death of the desktop itself still require the outer device cgroup
 deadline/cleanup. This class does not replace that supervisor.
 
 The opt-in [handheld Wayland session](../gaming-wayland/HANDHELD.md) keeps a
-transparent UI above the game and routes L3 + R3 to its quick panel. Ending a game
+transparent UI above the game and routes L3 + R3 to its quick panel: the running
+app and its state, the Wi-Fi, 性能浮窗 and 夜间模式 tiles, brightness (volume
+stays with the device keys and never takes focus), then 回到主页, 任务切换 and
+结束游戏…; the desktop variant leaves out 回到主页 and 结束游戏. Ending a game
 uses a confirmation that defaults to Cancel; router failure stops the game and
 returns a nonzero preview exit status for outer recovery.
 

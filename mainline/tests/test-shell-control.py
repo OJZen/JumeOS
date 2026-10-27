@@ -204,7 +204,7 @@ def main():
             assert tap("quick")["quickOpen"]
             assert latest["state"]["testingController"]  # Select stays the system key.
             tap("back"); tap("home"); tap("quick")
-            for _ in range(3): tap("down")
+            tap("up")  # The quick panel opens on brightness; the 性能浮窗 tile is above it.
             assert tap("accept")["monitor"]
             recorded = subprocess.run([sys.executable, "-B", str(REPO / "mainline/gaming-shell/control.py"),
                 "--socket", str(path), "--output-dir", str(root / "metrics"), "--expect-binary", latest["binary_sha256"],

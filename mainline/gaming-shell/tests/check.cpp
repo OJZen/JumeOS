@@ -34,6 +34,7 @@
 #include <cmath>
 #include <memory>
 #include <tuple>
+#include <algorithm>
 #include <QRegularExpression>
 #include <QtTest>
 #include <sys/stat.h>
@@ -204,8 +205,9 @@ private slots:
         key(Qt::Key_Return); QVERIFY(root->property("session").toBool());
         key(Qt::Key_Right); QCOMPARE(root->property("sessionMoves").toInt(), 1);
         key(Qt::Key_Q); QVERIFY(root->property("quickOpen").toBool());
-        key(Qt::Key_Right); QCOMPARE(state.volume(), 60); QCOMPARE(root->property("sessionMoves").toInt(), 1);
-        key(Qt::Key_Down); key(Qt::Key_Left); QCOMPARE(state.brightness(), 65);
+        // The quick panel opens on brightness; ←→ adjust it, Down reaches the volume row.
+        key(Qt::Key_Right); QCOMPARE(state.brightness(), 75); QCOMPARE(root->property("sessionMoves").toInt(), 1);
+        key(Qt::Key_Down); key(Qt::Key_Left); QCOMPARE(state.volume(), 50);
         key(Qt::Key_Escape); QVERIFY(!root->property("quickOpen").toBool());
         QVERIFY(root->property("session").toBool()); QVERIFY(!state.dirty());
         key(Qt::Key_Left); QCOMPARE(root->property("sessionMoves").toInt(), 2);
@@ -232,7 +234,7 @@ private slots:
         key(Qt::Key_Left); key(Qt::Key_Return); QCOMPARE(root->property("page").toInt(), 2);
         QVERIFY(root->property("settingsSidebar").toBool());
         key(Qt::Key_Down); key(Qt::Key_Right); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); // 显示
-        key(Qt::Key_Right); QCOMPARE(state.brightness(), 70); QVERIFY(!state.dirty()); // ←→ adjust; the release saves.
+        key(Qt::Key_Right); QCOMPARE(state.brightness(), 80); QVERIFY(!state.dirty()); // ←→ adjust; the release saves.
         key(Qt::Key_Escape); key(Qt::Key_Escape); QCOMPARE(root->property("page").toInt(), 0); QVERIFY(!state.dirty());
         view.resize(640, 480); QTest::qWait(40);
         QVERIFY(!view.grabWindow().isNull());
@@ -484,24 +486,16 @@ private slots:
         QVERIFY(labels(quickPanel).contains("调整")); QVERIFY(labels(quickPanel).contains("关闭")); QVERIFY(!labels(quickPanel).contains("收藏"));
         QVERIFY(!hud->isVisible()); // The performance overlay steps aside for the quick panel.
         if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/quick-hud-120.png"));
-        // Use the actual switch, including its native pointer toggle and state binding.
-        QQuickItem *motionSwitch = nullptr;
-        QList<QQuickItem *> controls{quickPanel};
-        while (!controls.isEmpty()) {
-            auto *item = controls.takeLast(); controls.append(item->childItems());
-            if (item->objectName() != "settingSwitch") continue;
-            const auto point = item->mapToItem(root, QPointF());
-            const auto *accessible = QAccessible::queryAccessibleInterface(item);
-            if (item->isVisible() && point.x() > 590 && accessible && accessible->text(QAccessible::Name) == QStringLiteral("减少动态效果")) motionSwitch = item;
-        }
-        QVERIFY(motionSwitch);
-        const auto center = motionSwitch->mapToItem(root, QPointF(motionSwitch->width() / 2, motionSwitch->height() / 2)).toPoint();
+        // The 夜间模式 tile toggles with a pointer as well; desktop panels leave out 回到主页 and 结束游戏.
+        QVERIFY(!findItem(quickPanel, "quickAction-home")->isVisible()); QVERIFY(!findItem(quickPanel, "quickAction-end")->isVisible());
+        auto *nightTile = findItem(quickPanel, "quickTile-night"); QVERIFY(nightTile);
+        const auto center = nightTile->mapToItem(root, QPointF(nightTile->width() / 2, nightTile->height() / 2)).toPoint();
         QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center);
-        QVERIFY(state.reducedMotion()); QVERIFY(motionSwitch->property("checked").toBool());
-        QTest::qWait(150);
+        QCOMPARE(state.nightMode(), QString("on")); QCOMPARE(root->property("quickId").toString(), QString("night"));
+        QTest::qWait(250);
         if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/quick-switches-120.png"));
         QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center);
-        QVERIFY(!state.reducedMotion()); QVERIFY(!motionSwitch->property("checked").toBool());
+        QCOMPARE(state.nightMode(), QString("off"));
         action("back");
         action("home"); QTest::qWait(200);
         auto *pageContent = root->findChild<QQuickItem *>("pageContent"); QVERIFY(pageContent);
@@ -516,7 +510,7 @@ private slots:
         QVERIFY(!pageAnimation->property("running").toBool()); QCOMPARE(pageContent->property("reveal").toReal(), 1.);
         root->setProperty("settingsCategory", 1); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); // 显示
         QPointer<QQuickItem> settingsSwitch;
-        controls = {root};
+        QList<QQuickItem *> controls{root};
         while (!controls.isEmpty()) {
             auto *item = controls.takeLast(); controls.append(item->childItems());
             if (item->objectName() != "settingSwitch" || !item->isVisible()) continue;
@@ -1003,6 +997,7 @@ private slots:
                 QVERIFY(QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, QStringLiteral("已加入收藏")))); capture("notice");
                 QVERIFY(QMetaObject::invokeMethod(root, "clearNotice"));
                 action("down"); capture("home-dock"); action("up");
+                QVERIFY(QMetaObject::invokeMethod(root, "openPowerMenu")); QTest::qWait(250); capture("power-menu"); action("back");
                 scene("library"); root->setProperty("selected", 1); QCOMPARE(root->property("selectedApplication").toString(), QString("native.1944")); capture("library");
                 scene("tools"); capture("tools");
                 scene("settings"); capture("settings");
@@ -1031,6 +1026,17 @@ private slots:
                 QVERIFY(state.choose("night", night ? 1 : 0));
                 mode = QString("%1-%2").arg(night ? "night" : "light").arg(percent);
                 QVERIFY(QMetaObject::invokeMethod(root, "showTasksOrDesktop", Q_ARG(QVariant, true))); capture("tasks");
+                // §8 carousel: the focused card 512×384 centered, its neighbour 420×315 and vertically centered.
+                QList<QQuickItem *> cards; QList<QQuickItem *> pending{root};
+                while (!pending.isEmpty()) {
+                    auto *item = pending.takeLast(); pending.append(item->childItems());
+                    if (item->objectName() == "taskCard" && item->isVisible()) cards << item;
+                }
+                std::sort(cards.begin(), cards.end(), [](QQuickItem *a, QQuickItem *b) { return a->x() < b->x(); });
+                QCOMPARE(cards.size(), 3);
+                QCOMPARE(QRectF(cards[0]->position(), cards[0]->size()), QRectF(256, 104, 512, 384));
+                QCOMPARE(QRectF(cards[1]->position(), cards[1]->size()), QRectF(800, 138.5, 420, 315));
+                QCOMPARE(findItem(root, "topBarBadge")->isVisible(), true);
                 // X held past 600 ms shows the HoldConfirm; releasing before 2 s cancels the force-quit.
                 action("itemAction"); QTest::qWait(HoldCaptureMs); capture("tasks-hold"); release("itemAction");
                 QCOMPARE(applications.tasks().size(), 3);
@@ -1050,7 +1056,7 @@ private slots:
         auto action = [&](const QString &value, bool repeat = false) {
             QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, value), Q_ARG(QVariant, repeat)));
         };
-        action("quick"); action("down"); action("down"); action("down"); action("accept");
+        action("quick"); action("up"); action("accept"); // The 性能浮窗 tile.
         QVERIFY(state.monitor()); QVERIFY(metrics.active()); action("accept", true); QVERIFY(state.monitor());
         action("accept"); QVERIFY(!metrics.active()); action("back");
         action("down"); for (int i = 0; i < 4; ++i) action("right");
@@ -1401,8 +1407,8 @@ private slots:
         QVERIFY(!root->property("editing").toBool()); QCOMPARE(manager.hosts().size(), 1);
         QVERIFY(state.choose("font", 3));
         action("accept"); // Enter details at Start, then move to the overlay switch.
-        root->setProperty("quickIndex", 0); root->setProperty("quickOpen", true);
-        action("down"); QCOMPARE(root->property("quickIndex").toInt(), 1);
+        root->setProperty("quickIndex", 3); root->setProperty("quickOpen", true);
+        action("down"); QCOMPARE(root->property("quickId").toString(), QString("volume"));
         action("back"); QVERIFY(!root->property("quickOpen").toBool()); QVERIFY(root->property("streamingOpen").toBool());
         const auto captures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
         QTest::qWait(200);
@@ -1844,15 +1850,21 @@ private slots:
         fixtures.setData(R"(import QtQuick
 QtObject {
     readonly property QtObject game: QtObject {
-        property bool running: true; property bool hasManifest: false; property var items: []; property var tasks: []
-        property string activeId: "fixture.game"; property string error: ""; property int exitCode: 0
+        property bool running: true; property bool hasManifest: false; property var items: []
+        property var tasks: [{id: "native.gta3", title: "GTA III", icon: "gamepad", foreground: true, paused: false, stopping: false, preview: ""}]
+        property string activeId: "native.gta3"; property string error: ""; property int exitCode: 0
         signal changed()
+        function stop() {}
     }
     readonly property QtObject device: QtObject {
-        property bool target: true; property bool controls: false; property string error: ""
+        property bool target: true; property bool controls: true; property string error: ""
         property var info: ({cpu: {scaling_cur_freq: 1296000}, systemCpu: 45, gpuFrequencyHz: 480000000,
-            socTemperatureC: 55, MemTotal: 1048576, MemAvailable: 786432, capacity: 82, brightnessPercent: 50})
+            socTemperatureC: 55, MemTotal: 1048576, MemAvailable: 786432, capacity: 82, brightnessPercent: 70})
         signal volumeChanged(int percent)
+        function setPowerScene(scene) { return true }
+        function setDimmed(value) { return true }
+        function setScreenOff(value) { return true }
+        function setBrightness(value) { info = Object.assign({}, info, {brightnessPercent: value}); return true }
     }
 })", QUrl());
         std::unique_ptr<QObject> fixture(fixtures.create()); QVERIFY2(fixture, qPrintable(fixtures.errorString()));
@@ -1883,6 +1895,29 @@ QtObject {
             if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + QString("/overlay-game-%1.png").arg(font == 3 ? 130 : 100)));
             root->setProperty("volumeVisible", false);
         }
+        // §8 quick panel over a game: the app and its state, tiles, brightness (volume stays with the
+        // device keys and never takes focus), 回到主页, 任务切换 and 结束游戏.
+        state.adjust("monitor", 1);
+        auto action = [&](const char *name) { QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, QString(name)), Q_ARG(QVariant, false))); };
+        action("quick"); QVERIFY(root->property("quickOpen").toBool()); QCOMPARE(root->property("quickId").toString(), QString("brightness"));
+        QCOMPARE(findItem(root, "quickTitle")->property("text").toString(), QString("GTA III"));
+        action("down"); QCOMPARE(root->property("quickId").toString(), QString("home")); // The device volume row is read-only.
+        action("up"); action("up"); QCOMPARE(root->property("quickId").toString(), QString("monitor"));
+        action("right"); action("right"); QCOMPARE(root->property("quickId").toString(), QString("night"));
+        action("down"); action("right"); QCOMPARE(root->property("quickId").toString(), QString("brightness"));
+        QCOMPARE(device->property("info").toMap().value("brightnessPercent").toInt(), 75);
+        for (int i = 0; i < 4; ++i) action("down");
+        QCOMPARE(root->property("quickId").toString(), QString("end"));
+        action("accept"); QVERIFY(root->property("choicesOpen").toBool()); action("back"); // 结束游戏 asks first; 取消 is the default.
+        for (const int percent : {100, 130}) {
+            QVERIFY(state.choose("font", percent == 100 ? 1 : 3));
+            for (const bool night : {false, true}) {
+                QVERIFY(state.choose("night", night ? 1 : 0)); root->setProperty("quickIndex", 1); QTest::qWait(300);
+                const auto small = smallText(view.contentItem(), percent / 100.); QVERIFY2(small.isEmpty(), qPrintable(small.join(", ")));
+                if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + QString("/quick-game-%1-%2.png").arg(night ? "night" : "light").arg(percent)));
+            }
+        }
+        action("back"); QVERIFY(!root->property("quickOpen").toBool());
         // On the desktop the overlay drops below the top bar and the Hud returns to the center.
         root->setProperty("sharedDisplay", false);
         QCOMPARE(panel->y(), 80.); QCOMPARE(panel->x() + panel->width(), 992.);
@@ -1969,6 +2004,19 @@ QtObject {
         for(int i=0;i<4;++i)tap("down");tap("accept");
         QVERIFY(root->property("choicesOpen").toBool());tap("accept");QCOMPARE(power.size(),1); // Default is cancel.
         tap("accept");tap("down");tap("accept");QCOMPARE(power.size(),2); // Confirmation emits only a test signal.
+        // §8 power menu: 息屏 focused; 重启/关机 ask again with 取消 focused; B steps back.
+        tap("home");QVERIFY(QMetaObject::invokeMethod(root,"openPowerMenu"));
+        auto *powerLayer=root->findChild<QObject *>("powerMenuLayer");QVERIFY(powerLayer&&powerLayer->property("open").toBool());
+        QCOMPARE(powerLayer->property("index").toInt(),0);QVERIFY(root->property("choicesOpen").toBool());
+        QCOMPARE(findItem(root,"powerApps")->property("text").toString(),QStringLiteral("没有后台应用"));
+        tap("down");tap("accept");QCOMPARE(powerLayer->property("confirming").toString(),QString("reboot"));QCOMPARE(powerLayer->property("index").toInt(),0);
+        tap("back");QCOMPARE(powerLayer->property("confirming").toString(),QString());QCOMPARE(powerLayer->property("index").toInt(),1);
+        tap("down");tap("accept");tap("accept");QVERIFY(!powerLayer->property("open").toBool());QCOMPARE(power.size(),2); // 取消
+        QVERIFY(QMetaObject::invokeMethod(root,"openPowerMenu"));tap("down");tap("down");tap("accept");tap("down");tap("accept");QCOMPARE(power.size(),3);
+        QVERIFY(QMetaObject::invokeMethod(root,"openPowerMenu"));tap("quick");QVERIFY(!powerLayer->property("open").toBool());
+        QVERIFY(QMetaObject::invokeMethod(root,"openPowerMenu"));tap("accept");QVERIFY(root->property("screenOff").toBool());
+        tap("accept");QVERIFY(!root->property("screenOff").toBool());
+        QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("power"))));QTRY_VERIFY(root->property("settingsDetailReady").toBool());
         root->setProperty("settingsIndex",1);tap("accept");QVERIFY(root->property("screenOff").toBool()); // 立即息屏
         QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("0"));
         tap("accept");QVERIFY(!root->property("screenOff").toBool());

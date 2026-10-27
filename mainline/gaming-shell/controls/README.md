@@ -114,15 +114,16 @@ posters are loaded for the management pages.
 | `DockTile` | 88×88 surface r28 with 40 icon and caption; focus 1.06, ring, bold label |
 | `GlyphBadge` | A/B/X/Y circles, shoulders r8 squares, Start/Select capsules, d-pad drawings; 34 / 30 / 26; `soft` for content; `progress` hold ring |
 | `HintBar` | Built from `actions` ({button, label[, progress]}; `button` from `knownButtons` or two joined by `+`): A B X Y Start fixed at the right, directions/Select/shoulders lead after `context`; at most five; an unknown button is warned about and not drawn (shell-check fails on the warning); `overflow` reports a cramped bar |
-| `TopBar` | 72 high; Jume mark or `title`; night, Wi-Fi (`statusWifi.level`), battery and clock on one centerline |
+| `TopBar` | 72 high; Jume mark or `title` with an optional `badge` capsule; Wi-Fi (`statusWifi.level`), battery (left out while unknown) and clock on one centerline |
 | `Panel` → `Sheet` / `Dialog` / `QuickPanel` | Surface r28 with header, content and hint footer split by dividers; sheet squares its bottom, dialog ≤ 560, quick panel 392 at 24 from the corner |
+| `PowerMenu` | §8 power dialog: background apps, 息屏 / 重启 / 关机 with 息屏 focused; 重启 and 关机 confirm once more with 取消 focused; `reasons` disable rows, `chosen(id)` |
 | `Hud` / `Toast` / `HoldConfirm` | 280×56 top HUD that fades after `hudDwell`; bottom toast (owner clears after `toastDwell`, errors stay); centered hold card shown only after 600 ms |
 | `Shadow` | Level-2 elevation from the prerendered nine-slice `elevation.png` (magick: blurred r24 rect, 16% alpha, +4 px); never a live blur |
 | `PageHeader` / `Page` | Page status line (caption, danger on error) with a busy progress bar; `Page` slides a new route in from 48 px (100 ms fade with reduced motion) |
 | `ChoicePopup` | Native modal `Popup.Item` dialog with pending/current indexes, confirmation and cancellation (B or Select), Start closes; stays in the existing window |
 | `OptionsSheet` | Start menu of the focused item or page: `present(title, items, header)` with {id, label[, icon][, button][, hold][, reason]} rows, shortcut glyphs on the right ("按住" before a hold), disabled rows keep their reason; the optional header {subtitle, color, icon, plain} adds a 72 thumbnail; A runs, Start/B/Select close, `chosen(id)` |
 
-`ListRow` composes these primitives for settings, host details and the quick panel.
+`ListRow` composes these primitives for settings, host details, menus and dialogs.
 Read-only rows remain legible but have no native activation; disabled rows keep
 their reason visible and stay reachable by controller focus. All row clicks,
 including native and accessibility activation, synchronize the logical selection

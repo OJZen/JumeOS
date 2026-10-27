@@ -240,10 +240,10 @@
 | 游戏库 | [Library](design/jume-ui-v1/Library.png) | 标题 + 筛选标签（全部/收藏/最近/各系统/应用）；4 列网格（212 图 + 22 标题）两整行可见；不可用项禁用并写“尚未适配”；左侧“N 项”。 |
 | 选项菜单 | [GameOptions](design/jume-ui-v1/GameOptions.png) | 底部 Sheet；头部 72 缩略图 + 标题 + 系统/核心；行：开始游戏、收藏(X)、按键与画面 ›、存档管理 ›、从“最近”中移除；有直接快捷键的行在右侧显示 glyphSoft 徽标。后端未就绪的项禁用并写原因。 |
 | 设置 | [Settings](design/jume-ui-v1/Settings.png) | 两级：左分类 280（网络、显示、声音、控制器、电源、性能、存储、系统），右详情。现有 12 类合并为：显示 = 屏幕 + 字号 + 夜间模式 + 减少动态效果；控制器 = 摇杆测试 + 文字输入测试/虚拟键盘；性能 = 性能浮窗 + 帧与串流细项（P95、解码、丢帧、排队、音频队列、温控、GPU）+ CPU 频率 + 内存与 Swap；系统 = 系统状态 + 关于；取消“常用”。详情按分区标题分组；网络 = Wi-Fi 开关 + 已连接 + 附近的网络，已保存网络、忘记网络、记住新网络放进 Start 菜单。分类移动不加载详情（沿用现有异步规则），此时右栏只显示分类名与一句说明。拿不到的值做成禁用行并写原因（如“预览中不可用”），不显示“—”。 |
-| 快捷面板 | [QuickPanel](design/jume-ui-v1/QuickPanel.png) | 右侧 392 面板 + 45% 遮罩；头部当前应用 + 状态 + 电量时间；3 磁贴（Wi-Fi、性能浮窗、夜间模式）；亮度、音量滑块；操作：回到主页（右侧 Select+Start）、任务切换（Select+Y）、结束游戏…（danger，对话框默认取消）。桌面打开时去掉“回到主页”和“结束游戏”。 |
-| 任务 | [Tasks](design/jume-ui-v1/Tasks.png) | 聚焦卡 512×384 居中，两侧 420×315 露出并垂直居中；下方标题 + 状态（已暂停 / 运行中）；右上“n / 4”。 |
+| 快捷面板 | [QuickPanel](design/jume-ui-v1/QuickPanel.png) | 右侧 392 面板 + 45% 遮罩；头部当前应用 + 状态 + 电量时间（放不下时电量时间换到第二行）；3 磁贴（Wi-Fi、性能浮窗、夜间模式；Wi-Fi 在桌面打开设置 › 网络）；亮度、音量滑块，打开时焦点在亮度；真机音量只读（机身音量键），不拿焦点；操作：回到主页（右侧 Select+Start）、任务切换（Select+Y）、结束游戏…（danger，对话框默认取消）。桌面打开时去掉“回到主页”和“结束游戏”。磁贴文字放不下时缩小，但不小于 micro。 |
+| 任务 | [Tasks](design/jume-ui-v1/Tasks.png) | 聚焦卡 512×384 居中，两侧 420×315 露出并垂直居中；下方标题 + 状态（已暂停 / 运行中）；标题“任务”旁“n / 4”。没有截图时显示该应用的回退卡。 |
 | 键盘 | [Keyboard](design/jume-ui-v1/Keyboard.png) | 底部 Sheet 覆盖当前页；headline 标题 + 64 高输入框（surfaceSunken，无焦点框，焦点只在按键上）；按键 64 高 r12，20 栅格（第二行偏移半键）；特殊键角标：⇧ X、⌫ B、空格 Y、123 R2、中/英 L2、完成 Start。密码输入沿用现有隐藏与禁止截屏规则。 |
-| 电源菜单 | [PowerMenu](design/jume-ui-v1/PowerMenu.png) | 居中 Dialog：标题 + 一行后台应用说明；三行只放图标与文字（息屏、重启、关机）；默认焦点“息屏”。 |
+| 电源菜单 | [PowerMenu](design/jume-ui-v1/PowerMenu.png) | 居中 Dialog：标题 + 一行后台应用说明；三行只放图标与文字（息屏、重启、关机）；默认焦点“息屏”。重启、关机再确认一次（默认“取消”，写明会结束的后台应用），B 回到上一步。现由入口栏“电源”打开，电源键在第 5 阶段接入。 |
 | 夜间模式 | [HomeNight](design/jume-ui-v1/HomeNight.png)、[SettingsNight](design/jume-ui-v1/SettingsNight.png) | 同名令牌换值；Wi-Fi 页示例：Y 刷新、X 断开、A 详情。 |
 | 基础与组件 | [Foundations](design/jume-ui-v1/Foundations.png)、[Components](design/jume-ui-v1/Components.png) | 令牌、焦点框、组件状态的视觉对照。 |
 
