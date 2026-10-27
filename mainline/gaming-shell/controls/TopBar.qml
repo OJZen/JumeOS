@@ -1,6 +1,6 @@
 import QtQuick
 
-// Shared 72-high top bar (§4, §8): the Jume mark and name, or a page title, on the left; night,
+// Shared 72-high top bar (§4, §8): the Jume mark and name, or a page title, on the left;
 // Wi-Fi, battery and time on the right, all on one centerline with tabular figures.
 Item {
     id: bar
@@ -10,7 +10,6 @@ Item {
     property bool wifiKnown: wifiSignal >= 0
     property int batteryPercent: -1
     property bool charging: false
-    property bool nightIcon: false
     property string clock: ""
     // Replaces device status when there is none, e.g. "本地界面预览".
     property string note: ""
@@ -35,7 +34,6 @@ Item {
         id: status
         anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: Theme.space16
         visible: bar.statusVisible
-        Icon { anchors.verticalCenter: parent.verticalCenter; visible: bar.nightIcon; name: "moon"; color: Theme.textSecondary }
         Rectangle {
             anchors.verticalCenter: parent.verticalCenter; visible: bar.note !== ""
             width: noteLabel.implicitWidth + 2 * Theme.space16; height: Theme.glyphInlineSize; radius: height / 2; color: Theme.surfaceSunken

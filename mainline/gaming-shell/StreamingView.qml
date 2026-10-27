@@ -71,13 +71,13 @@ Item {
         model: view.manager.hosts; currentIndex: view.manager.selected
         delegate: Ui.ListRow {
             required property var modelData; required property int index
-            width: hosts.rowWidth; title: modelData.name; description: modelData.status; iconName: "monitor"
+            width: hosts.width; title: modelData.name; description: modelData.status; iconName: "monitor"
             selected: hosts.currentIndex === index; focusOutline: false
             onFocused: { view.manager.select(index); view.sidebar = true }
             onActivated: { view.manager.select(index); view.sidebar = false; view.row = 6 }
         }
     }
-    Ui.Button { id: add; anchors.bottom: parent.bottom; width: hosts.rowWidth; text: "添加主机"; iconName: "plus"; selected: view.sidebar && !view.manager.hosts.length; onClicked: view.addHost() }
+    Ui.Button { id: add; anchors.bottom: parent.bottom; width: hosts.width; text: "添加主机"; iconName: "plus"; selected: view.sidebar && !view.manager.hosts.length; onClicked: view.addHost() }
     Ui.ListView {
         id: detailRows; objectName: "streamingRows"
         x: Ui.Theme.detailX; y: Ui.Theme.contentY; width: parent.width - x; height: parent.height - y
@@ -86,7 +86,7 @@ Item {
         model: 8; currentIndex: view.row
         delegate: Ui.ListRow {
             required property int index
-            width: detailRows.rowWidth
+            width: detailRows.width
             title: ["主机名称", "地址", "应用", "画质", "性能信息", "配对", "开始串流", "从列表移除"][index]
             value: index === 0 ? view.host.name || "" : index === 1 ? view.host.address || "" : index === 2 ? view.host.application || ""
                 : index === 3 ? view.presets[view.host.preset || 0] : index === 5 ? (view.host.paired ? "重新配对" : "开始配对") : ""
@@ -103,7 +103,7 @@ Item {
         x: view.sidebar ? 0 : Ui.Theme.detailX
         y: view.sidebar ? (hosts.currentItem ? hosts.y + hosts.currentItem.y - hosts.contentY : add.y)
             : detailRows.y + (detailRows.currentItem ? detailRows.currentItem.y - detailRows.contentY : 0)
-        width: view.sidebar ? hosts.rowWidth : detailRows.rowWidth
+        width: view.sidebar ? hosts.width : detailRows.width
         height: view.sidebar ? (hosts.currentItem ? hosts.currentItem.height : add.height) : (detailRows.currentItem ? detailRows.currentItem.height : Ui.Theme.listRowHeight)
         active: view.navigationActive && !view.manager.busy && !choices.visible
         reducedMotion: view.store.reducedMotion

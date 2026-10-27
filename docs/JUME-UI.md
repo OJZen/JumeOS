@@ -91,6 +91,11 @@
 - **Hud**：音量/亮度 280×56 胶囊，顶部居中，1.8 秒后淡出，不抢焦点，游戏中也显示。
   **Toast**：底部居中 2.4 秒；错误提示（底 #FBE9E7、字 #8E1D17）保留到下一次操作。
 - **HoldConfirm**：屏幕中央卡片，88 环形进度 + 剩余秒数 + 一行后果；按住 0.6 秒后出现，松手即消失。
+- **性能浮窗**：左上角距边 24，r20，surface 92% 不透明 + 1 px outline，无模糊无阴影，宽 ≤ 360，
+  不抢焦点。最多 3 行，数字等宽：第 1 行 label 22 粗体 accent（游戏中“60 FPS · 16.7 ms”，
+  串流“串流 60 FPS · RTT 12 ms”，桌面“界面 12 次/秒”）；第 2 行 micro“CPU 1.30 GHz · 45% · GPU 400 MHz”；
+  第 3 行 micro“52 °C · 内存 380 / 1024 MB”。没有数据的项整项隐藏，不显示“—”。
+  P95、解码、排队、音频队列、温控等细项放在设置 › 性能详情。音量 Hud 与浮窗重叠时右移让开。
 
 ## 6. 动效
 
@@ -255,7 +260,7 @@
 | 2 | 共享组件（第 5 节） | `controls/*`、`SettingRow.qml`、`ControlHints.qml` → HintBar | 现有 controls `--check` |
 | 3 | 页面层输入（7.3–7.6，不含系统层） | `input.cpp/.h`、`ShellView.qml` 的 Keys 与 dispatch | 主机 `--check`、`test-shell-control.py` |
 | 4 | 界面（第 8 节） | `ShellView.qml`、`SettingsView.qml`、`TaskView.qml`、`KeyboardPanel.qml`、`ToolPage.qml`、`PortCatalog.qml`、`StreamingView.qml` | 截图与参考图逐张对照 |
-| 5 | 系统层（7.2、7.5 的组合与游戏中判定） | `handheld.cpp`、`device.cpp` | 需要设备；先探测电源键事件 |
+| 5 | 系统层（7.2、7.5 的组合与游戏中判定）；游戏中合成器遮罩改为放行左上角性能浮窗 | `handheld.cpp`、`device.cpp`、`gaming-wayland/handheld-shell.cpp` | 需要设备；先探测电源键事件 |
 | 6 | 实机验收 | — | 60 Hz 帧间隔、LCD、实体按键；只记录实际观察 |
 
 每个阶段单独提交；旧测试里编码的旧按键在同一提交里改成 v1 行为，不删除测试。

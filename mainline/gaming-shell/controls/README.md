@@ -62,9 +62,10 @@ with “已开启/已关闭”, or use a progress track for a value with unknown
 
 Use `TopBar` and `HintBar` on every page; the hint bar is generated from the page's
 declared actions. Tool pages still use `PageHeader` followed by the smallest
-required `Ui.ListView` until the v1 screens replace them. Use the list's `rowWidth`
-for delegates and give `FocusFrame` the focused delegate's actual position, height
-and radius; do not multiply a hard-coded row stride. Only that frame moves.
+required `Ui.ListView` until the v1 screens replace them. Delegates take the list's
+full `width`; the scrollbar overlays the margin 12 px right of the rows. Give
+`FocusFrame` the focused delegate's actual position, height and radius; do not
+multiply a hard-coded row stride. Only that frame moves.
 The shell owns outer navigation. Category or game lists must not instantiate
 their detail page while focus moves: A/right activates one asynchronous `Loader`,
 and left/B deactivates it and returns to the preserved list selection. USB's
@@ -79,7 +80,7 @@ Ui.ListView {
     model: options
     delegate: Ui.ListRow {
         required property var modelData
-        width: rows.rowWidth; title: modelData.title
+        width: rows.width; title: modelData.title
         toggleState: Number(modelData.enabled)
         onActivated: updateOption(modelData.id)
     }
@@ -100,7 +101,7 @@ posters are loaded for the management pages.
 | `Switch` | Native `checked`/`toggled`; 64×36 track, light 28 thumb, state shown by the track; `selected` draws the ring |
 | `Slider` | Native value/step (5%); 8 track, 28 thumb with a 3 px ring; `adjusting` turns warning and grows the thumb to 36 |
 | `ProgressBar` | 8 high bounded value; indeterminate motion needs a visible item in a shown window; reduced motion shows a fixed segment |
-| `ScrollBar` | Native attached scrollbar with a visible position indicator; no idle animation |
+| `ScrollBar` | Native attached scrollbar with a visible position indicator, overlaid in the right margin 12 px from the rows (`ListView.scrollGap`); no idle animation |
 | `Label` | `role` display / title / headline / body / label / caption / micro (`section`, `value` map to headline, label); `tabular` figures |
 | `TextField` | Native editing/selection/IME; caller owns maximum length, validation and sensitive-input policy |
 | `Icon` | Named 24-unit, 2 px round-stroke icons from `Icon.qml`; `source` accepts custom images without recoloring |

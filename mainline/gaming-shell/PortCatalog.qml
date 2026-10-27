@@ -87,7 +87,7 @@ Item {
         model: view.entries; currentIndex: view.selected
         delegate: Ui.ListRow {
             required property var modelData; required property int index
-            width: games.rowWidth; title: modelData.title; description: modelData.installed ? "已安装" : ""
+            width: games.width; title: modelData.title; description: modelData.installed ? "已安装" : ""
             selected: view.selected === index; focusOutline: false
             onFocused: { view.selected = index; view.sidebar = true }
             onActivated: { view.selected = index; view.openDetail() }
@@ -106,7 +106,7 @@ Item {
             currentIndex: view.row; model: view.rows
             delegate: Ui.ListRow {
                 required property var modelData; required property int index
-                width: details.rowWidth; title: modelData.title; value: modelData.value
+                width: details.width; title: modelData.title; value: modelData.value
                 selected: !view.sidebar && view.row === index; focusOutline: false; actionable: modelData.enabled && !view.tools.busy
                 onFocused: { view.sidebar = false; view.row = index }
                 onActivated: view.activate()
@@ -122,7 +122,7 @@ Item {
         Ui.FocusFrame {
             x: parent.ring + (view.sidebar ? 0 : Ui.Theme.detailX)
             y: parent.ring + (view.sidebar ? (games.currentItem ? games.currentItem.y - games.contentY : 0) : details.y + (details.currentItem ? details.currentItem.y - details.contentY : 0))
-            width: view.sidebar ? games.rowWidth : details.rowWidth
+            width: view.sidebar ? games.width : details.width
             height: view.sidebar ? (games.currentItem ? games.currentItem.height : Ui.Theme.listRowHeight) : (details.currentItem ? details.currentItem.height : Ui.Theme.listRowHeight)
             active: view.navigationActive && !view.tools.busy && !view.choiceOpen
             visible: view.sidebar ? view.entries.length > 0 : !!view.detail.id
@@ -149,8 +149,11 @@ Item {
             Flickable {
                 id: prose; y: Ui.Theme.contentY; width: parent.width; height: parent.height - y; clip: true
                 contentWidth: width; contentHeight: text.implicitHeight; boundsBehavior: Flickable.StopAtBounds
-                Ui.Label { id: text; width: parent.width - Ui.Theme.scrollGutter; wrapMode: Text.Wrap; text: view.detail.instructions || "" }
-                T.ScrollBar.vertical: Ui.ScrollBar {}
+                Ui.Label { id: text; width: parent.width; wrapMode: Text.Wrap; text: view.detail.instructions || "" }
+                T.ScrollBar.vertical: Ui.ScrollBar {
+                    parent: prose.parent; anchors.top: prose.top; anchors.bottom: prose.bottom
+                    anchors.left: prose.right; anchors.leftMargin: Ui.Theme.space12
+                }
             }
         }
     }

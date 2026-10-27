@@ -75,7 +75,7 @@ Item {
         visible: card.favorite && card.badge === ""
         width: Theme.cardBadgeHeight; height: width; radius: width / 2
         color: Theme.alpha(Theme.cardInk, 0.35)
-        Icon { anchors.centerIn: parent; width: 20; height: 20; name: "star"; color: Theme.cardFavorite }
+        Icon { anchors.centerIn: parent; width: 20; height: 20; name: "star"; filled: true; color: Theme.cardFavorite }
     }
     Column {
         x: Theme.space24; width: parent.width - 2 * Theme.space24

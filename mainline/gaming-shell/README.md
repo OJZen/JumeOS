@@ -125,8 +125,10 @@ real backlight/CPU readback and writes, power requests and saved Wi-Fi managemen
 Ordinary R46H previews read actual state but do not offer simulated device controls.
 
 The [performance/power plan](../../docs/PERFORMANCE-POWER.md) owns settings
-semantics and the next CPU, swap, real power and global-overlay gates. The HUD
-uses real process CPU/RSS and UI submissions. The shared Wayland session adds
+semantics and the next CPU, swap, real power and global-overlay gates. The
+top-left HUD ([JUME-UI §5](../../docs/JUME-UI.md#5-组件)) shows UI submissions or the
+game/stream rate, then CPU clock and load, GPU MHz, SoC temperature and memory;
+readings without data are hidden. The shared Wayland session adds
 [game buffer submission metrics](../gaming-wayland/HANDHELD.md#game-frame-metrics);
 its bounded remote wait does not require the HUD. These metrics do not establish
 LCD refresh or GPU render time. Unsupported device
@@ -175,7 +177,8 @@ apply/readback, GTA/thermal use and warm-reboot persistence pass. It is not in t
 frozen v0.18 image; integrate it only in the next p2 successor.
 
 The performance HUD reuses the existing device sample to show current GPU MHz on
-the thermal/status line. It adds no sampler and does not claim GPU utilization.
+its load line; the thermal state moved to the system settings rows. It adds no
+sampler and does not claim GPU utilization.
 R64 target composition showed `GPU 200 MHz` matching the sampled 200000000 Hz.
 A subsequent live minimum-frequency raise caused a Panfrost power-domain panic;
 do not repeat it as a HUD test. Operator reset restored the default policy and
@@ -285,7 +288,7 @@ performance/physical observations below belong to revision 5, retained as fallba
 ## UI performance
 
 The operator reported roughly 14 updates/s in the ordinary interface and below
-10 in the keyboard. The HUD now labels its counter “界面更新 / 次/秒”: a static
+10 in the keyboard. The HUD labels its counter “界面 … 次/秒”: a static
 interface does not repaint continuously, so this counter alone is not animation
 FPS. The report was also reproduced with continuous automated activity.
 

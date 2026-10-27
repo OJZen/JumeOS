@@ -66,13 +66,15 @@ T.Popup {
         Label { x: Theme.space24; y: Theme.space16; width: parent.width - 2 * Theme.space24; height: Theme.lineHeight("headline"); role: "headline"; text: popup.title }
         Ui.ListView {
             id: list; objectName: "choiceList"
+            // The 16 px side margin holds the 8 px scrollbar clear of the focus ring.
+            scrollGap: Theme.space8
             x: Theme.space16; y: popup.headerHeight; width: parent.width - 2 * Theme.space16; height: parent.height - y - Theme.space16
             model: popup.visible ? popup.options : []
             delegate: T.ItemDelegate {
                 id: option
                 required property string modelData; required property int index
                 readonly property bool pending: popup.pendingIndex === index
-                width: list.rowWidth; height: Theme.listRowHeight; text: modelData
+                width: list.width; height: Theme.listRowHeight; text: modelData
                 padding: 0; focusPolicy: Qt.NoFocus
                 onClicked: { popup.select(index); popup.activated(index) }
                 background: Rectangle { radius: Theme.radiusRow; color: option.pending ? Theme.accentSoft : option.down ? Theme.pressed(Theme.surface) : "transparent" }
@@ -92,7 +94,7 @@ T.Popup {
             FocusFrame {
                 objectName: "choiceFocus"
                 x: parent.ring; y: parent.ring + (list.currentItem ? list.currentItem.y - list.contentY : 0)
-                width: list.rowWidth; height: list.currentItem ? list.currentItem.height : Theme.listRowHeight; active: popup.visible
+                width: list.width; height: list.currentItem ? list.currentItem.height : Theme.listRowHeight; active: popup.visible
             }
         }
     }

@@ -223,7 +223,7 @@ Item {
         Row {
             spacing: Ui.Theme.space32
             Repeater {
-                model: [{title: "1944", color: 4, badge: "街机"}, {title: "GTA III", color: 1, badge: "已暂停", icon: "pause", selected: true},
+                model: [{title: "1944", color: 4}, {title: "GTA III", color: 1, badge: "已暂停", icon: "pause", selected: true},
                         {title: "Moonlight", color: 2, app: "streaming", favorite: true}, {title: "Stardew", available: false, badge: "尚未适配"}]
                 Column {
                     id: gridCard

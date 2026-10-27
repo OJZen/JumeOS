@@ -7,6 +7,8 @@ Item {
     property string name: "chevron-right"
     property color color: Theme.textSecondary
     property url source: ""
+    // Closed shapes (the favorite star) can be drawn solid in the icon color.
+    property bool filled: false
     // Original 24-unit line drawings, 2 px round strokes (§4); one geometry path, no font or bitmap dependency.
     readonly property var paths: ({
         "plus": "M5 12H19 M12 5V19",
@@ -69,7 +71,7 @@ Item {
         visible: icon.source.toString() === "" && icon.known
         preferredRendererType: Shape.GeometryRenderer
         ShapePath {
-            strokeColor: icon.color; strokeWidth: 2; fillColor: "transparent"
+            strokeColor: icon.color; strokeWidth: 2; fillColor: icon.filled ? icon.color : "transparent"
             capStyle: ShapePath.RoundCap; joinStyle: ShapePath.RoundJoin
             PathSvg { path: icon.paths[icon.name] || "" }
         }

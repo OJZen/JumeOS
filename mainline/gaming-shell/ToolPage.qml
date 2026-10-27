@@ -125,7 +125,7 @@ Item {
             visible: view.sidebar && view.kind !== "usb"; model: view.entries; currentIndex: view.selected
             delegate: Ui.ListRow {
                 required property var modelData; required property int index
-                width: games.rowWidth; title: modelData.title
+                width: games.width; title: modelData.title
                 iconName: view.kind === "neo" ? "cartridge" : modelData.id === "stardew" ? "leaf" : "car"
                 selected: view.selected === index; focusOutline: false
                 onFocused: view.selected = index
@@ -135,7 +135,7 @@ Item {
         Ui.FocusFrame {
             x: 0
             y: games.y + (games.currentItem ? games.currentItem.y - games.contentY : 0)
-            width: games.rowWidth
+            width: games.width
             height: games.currentItem ? games.currentItem.height : Ui.Theme.rowHeight
             active: view.navigationActive && view.sidebar && !choices.visible && !view.tools.busy
             visible: view.sidebar && view.entries.length > 0
@@ -156,7 +156,7 @@ Item {
                     model: view.rows; currentIndex: view.row
                     delegate: Ui.ListRow {
                         required property var modelData; required property int index
-                        width: details.rowWidth; title: modelData.title; value: modelData.value || ""
+                        width: details.width; title: modelData.title; value: modelData.value || ""
                         selected: view.row === index; focusOutline: false
                         actionable: !!modelData.enabled && !view.tools.busy
                         choice: !!modelData.choice
@@ -168,7 +168,7 @@ Item {
                 Ui.FocusFrame {
                     x: 0
                     y: details.y + (details.currentItem ? details.currentItem.y - details.contentY : 0)
-                    width: details.rowWidth
+                    width: details.width
                     height: details.currentItem ? details.currentItem.height : Ui.Theme.rowHeight
                     active: view.navigationActive && view.detailReady && !choices.visible && !view.tools.busy
                 }

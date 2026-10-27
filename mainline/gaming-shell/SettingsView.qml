@@ -47,7 +47,7 @@ Item {
         case 4: return [brightness, {name: "夜间模式", detail: "", key: "night"}, motion, {name: "预览分辨率", detail: "", value: "1024 × 768"}]
         case 5: return hardware ? [{name: "系统分区", key: "storage0"}, {name: "游戏分区", key: "storage1"}, {name: "启动分区", key: "storage2"}]
             : [{name: "预览文件所在卷", detail: "", info: "storage", value: "刷新", key: "storage"}]
-        case 6: return [{name: "当前运行环境", detail: "", info: "system", value: "本机"}, {name: "系统 CPU", detail: "", key: "systemCpu"}, {name: "系统内存", detail: "", key: "memory"}, {name: "处理器温度", detail: "", key: "temperature"}, {name: "GPU 频率", detail: "", key: "gpuFrequency"}, {name: "内存压力（10 秒）", detail: "", key: "pressure"}]
+        case 6: return [{name: "当前运行环境", detail: "", info: "system", value: "本机"}, {name: "系统 CPU", detail: "", key: "systemCpu"}, {name: "系统内存", detail: "", key: "memory"}, {name: "处理器温度", detail: "", key: "temperature"}, {name: "温控", detail: "", key: "thermal"}, {name: "GPU 频率", detail: "", key: "gpuFrequency"}, {name: "内存压力（10 秒）", detail: "", key: "pressure"}]
         case 7: return [{name: "空闲变暗", detail: "", key: "dim"}, {name: "自动熄屏", detail: "按键立即唤醒", key: "screenOff"},
             {name: "立即熄屏", detail: "首个按键仅唤醒", key: "screenOffNow"}, {name: "电池与供电", detail: "", key: "battery"},
             {name: "关机", detail: "", key: "poweroff"}, {name: "重启", detail: "", key: "reboot"}]
@@ -73,7 +73,7 @@ Item {
         return (device.info[key] / (divisor || 1)).toFixed(divisor ? 1 : 0) + (suffix || "")
     }
     function canActivate(key) {
-        if (!key || ["systemCpu", "memory", "temperature", "gpuFrequency", "pressure", "battery", "cpuCurrent", "swap", "zram", "zramAlgorithms", "zramMemory"].indexOf(key) >= 0) return false
+        if (!key || ["systemCpu", "memory", "temperature", "thermal", "gpuFrequency", "pressure", "battery", "cpuCurrent", "swap", "zram", "zramAlgorithms", "zramMemory"].indexOf(key) >= 0) return false
         if (key.indexOf("net") === 0) return network !== null && network.available && !network.busy && (key === "netRefresh" || (hardware && device.controls && network.controls && (key !== "netDisconnect" || network.profiles.filter(function(p){return p.active}).length === 1)))
         if (["poweroff", "reboot", "cpuAuto", "cpuPreset", "cpuGovernor", "cpuMin", "cpuMax", "screenOffNow"].indexOf(key) >= 0) return !hardware ? key === "screenOffNow" : device.controls
         if (hardware && key === "volume") return false
@@ -105,6 +105,11 @@ Item {
         case "netRefresh": return network !== null && network.busy ? "处理中…" : "刷新"
         case "memory": return metric("MemAvailable", " MiB 可用", 1024) + " / " + metric("MemTotal", " MiB", 1024)
         case "temperature": return metric("temperatureC", " °C", 1)
+        case "thermal": {
+            const cpu = hardware ? device.info.cpuCoolingState : -1, gpu = hardware ? device.info.gpuCoolingState : -1
+            return !hardware ? "—" : cpu > 0 && gpu > 0 ? "CPU/GPU 限频" : cpu > 0 ? "CPU 限频" : gpu > 0 ? "GPU 限频"
+                : cpu === 0 && gpu === 0 ? "未介入" : "状态未知"
+        }
         case "gpuFrequency": return metric("gpuFrequencyHz", " MHz", 1000000)
         case "pressure": return metric("memoryPressurePercent", "%", 1)
         case "battery": return hardware ? metric("voltageUv", " V", 1000000) + " · " + (device.info.online === 1 ? "外部供电" : device.info.online === 0 ? "电池供电" : "供电未知") : "—"
@@ -268,7 +273,7 @@ Item {
             model: settings.categories
             delegate: Ui.ListRow {
                 required property string modelData; required property int index
-                width: categoryList.rowWidth; title: modelData; iconName: settings.categoryIcons[index]
+                width: categoryList.width; title: modelData; iconName: settings.categoryIcons[index]
                 selected: settings.category === index; focusOutline: false
                 Accessible.role: Accessible.PageTab
                 onFocused: settings.selectCategory(index)
@@ -279,7 +284,7 @@ Item {
             id: focusOutline; objectName: "settingsFocus"
             x: 0
             y: categoryList.y + (categoryList.currentItem ? categoryList.currentItem.y - categoryList.contentY : 0)
-            width: categoryList.rowWidth
+            width: categoryList.width
             height: categoryList.currentItem ? categoryList.currentItem.height : Ui.Theme.rowHeight
             visible: settings.sidebar && (!categoryList.currentItem || categoryList.currentItem.y >= categoryList.contentY)
             active: settings.navigationActive && settings.sidebar && !choices.visible
@@ -301,7 +306,7 @@ Item {
                     model: settings.rows; currentIndex: settings.rowIndex
                     delegate: Ui.ListRow {
                         required property var modelData; required property int index
-                        width: settingRows.rowWidth; fontScale: settings.fontScale
+                        width: settingRows.width; fontScale: settings.fontScale
                         title: modelData.name
                         description: {
                             if (settings.hardware && modelData.key && modelData.key.indexOf("storage") === 0) {
@@ -349,7 +354,7 @@ Item {
                     objectName: "settingsDetailFocus"
                     x: 0
                     y: settingRows.y + (settingRows.currentItem ? settingRows.currentItem.y - settingRows.contentY : 0)
-                    width: settingRows.rowWidth
+                    width: settingRows.width
                     height: settingRows.currentItem ? settingRows.currentItem.height : Ui.Theme.rowHeight
                     visible: settings.category !== 2 && (!settingRows.currentItem || settingRows.currentItem.y >= settingRows.contentY)
                     adjusting: settings.adjustingValue

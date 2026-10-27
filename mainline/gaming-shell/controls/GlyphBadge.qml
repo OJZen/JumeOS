@@ -26,7 +26,8 @@ Item {
         color: badge.fill
     }
     Text {
-        id: caption
+        // §3: the only text allowed below micro (16–19 px).
+        id: caption; objectName: "glyphLetter"
         anchors.centerIn: parent; visible: badge.iconName === ""
         text: ({R3: "R", L3: "L"})[badge.button] || badge.button
         color: badge.ink; textFormat: Text.PlainText

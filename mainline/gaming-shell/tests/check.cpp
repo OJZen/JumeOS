@@ -56,6 +56,24 @@ static double contrast(const QColor &first, const QColor &second) {
     return (qMax(a, b) + 0.05) / (qMin(a, b) + 0.05);
 }
 
+// §3 and §9: visible text is never below micro (18 px × font scale); glyph-badge letters are the
+// one exception. Returns "size px "text"" for each offender.
+static QStringList smallText(QQuickItem *root, qreal fontScale) {
+    QStringList result;
+    QList<QQuickItem *> pending{root};
+    while (!pending.isEmpty()) {
+        auto *item = pending.takeLast();
+        if (!item->isVisible() || item->opacity() <= 0 || item->objectName() == "glyphLetter") continue;
+        pending.append(item->childItems());
+        if (!item->inherits("QQuickText") && !item->inherits("QQuickTextInput") && !item->inherits("QQuickTextEdit")) continue;
+        const auto text = item->property("text").toString();
+        const auto font = item->property("font").value<QFont>();
+        const int size = font.pixelSize() > 0 ? font.pixelSize() : QFontInfo(font).pixelSize();
+        if (!text.trimmed().isEmpty() && size + 0.5 < 18 * fontScale) result << QString("%1 px \"%2\"").arg(size).arg(text.left(24));
+    }
+    return result;
+}
+
 class ShellCheck final : public QObject {
     Q_OBJECT
 private slots:
@@ -270,9 +288,9 @@ private slots:
             QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, value), Q_ARG(QVariant, false)));
         };
         auto *footer = root->findChild<QQuickItem *>("footerHints"); QVERIFY(footer);
-        auto labels = [&] {
+        auto labels = [&](QQuickItem *from = nullptr) {
             QStringList result;
-            QList<QQuickItem *> pending{footer};
+            QList<QQuickItem *> pending{from ? from : footer};
             while (!pending.isEmpty()) {
                 auto *item = pending.takeLast();
                 if (item->objectName() == "hintLabel") result << item->property("text").toString();
@@ -289,6 +307,8 @@ private slots:
                 QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString(scene))));
                 QTest::qWait(200);
                 if (footer->isVisible()) QVERIFY2(footer->width() <= 952, qPrintable(QString("Footer overflow: %1 at %2%").arg(scene).arg(scale)));
+                const auto small = smallText(view.contentItem(), scale / 100.);
+                QVERIFY2(small.isEmpty(), qPrintable(QString("%1 at %2%: %3").arg(scene).arg(scale).arg(small.join(", "))));
                 if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + QString("/%1-%2.png").arg(scene).arg(scale)));
                 if (root->property("editing").toBool()) QVERIFY(QMetaObject::invokeMethod(root, "closeEditor"));
                 if (root->property("quickOpen").toBool()) action("back");
@@ -322,12 +342,13 @@ private slots:
         QTRY_VERIFY(root->property("settingsDetailReady").toBool()); action("accept"); QTest::qWait(200);
         QVERIFY(labels().contains("增减数值")); QVERIFY(footer->width() <= 952);
         action("quick"); QTest::qWait(200);
-        QVERIFY(labels().contains("关闭面板")); QVERIFY(!labels().contains("收藏"));
+        auto *quickPanel = root->findChild<QQuickItem *>("quickPanel"); QVERIFY(quickPanel);
+        QVERIFY(!footer->isVisible()); // §7.6 item 4: the panel's own footer replaces the page's.
+        QVERIFY(labels(quickPanel).contains("调整")); QVERIFY(labels(quickPanel).contains("关闭")); QVERIFY(!labels(quickPanel).contains("收藏"));
         QVERIFY(hud->x() + hud->width() < 590); // The active quick panel remains unobstructed.
         if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/quick-hud-120.png"));
         // Use the actual switch, including its native pointer toggle and state binding.
         QQuickItem *motionSwitch = nullptr;
-        auto *quickPanel = root->findChild<QQuickItem *>("quickPanel"); QVERIFY(quickPanel);
         QList<QQuickItem *> controls{quickPanel};
         while (!controls.isEmpty()) {
             auto *item = controls.takeLast(); controls.append(item->childItems());
@@ -664,6 +685,8 @@ private slots:
             const QString mode = night ? "night" : "light";
             auto capture = [&](const QString &name) {
                 QTest::qWait(150);
+                const auto small = smallText(view.contentItem(), state.fontPercent() / 100.);
+                QVERIFY2(small.isEmpty(), qPrintable(name + ": " + small.join(", ")));
                 if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/" + name + "-" + mode + ".png"));
             };
             QCOMPARE(view.color(), QColor(night ? "#0F1316" : "#F2F4F5"));
@@ -715,10 +738,11 @@ private slots:
         action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
         action("accept"); action("down"); action("accept"); QCOMPARE(state.fontPercent(), 115);
         action("down"); action("accept"); QVERIFY(root->property("editing").toBool());
-        state.adjust("monitor", 1);
+        auto *editorFocus = view.activeFocusItem(); state.adjust("monitor", 1);
         auto *hud = root->findChild<QQuickItem *>("performancePanel"); QVERIFY(hud);
-        QVERIFY(hud->isVisible()); QVERIFY(hud->property("compact").toBool());
+        QTRY_VERIFY(hud->isVisible()); // Hidden until the first sample: no placeholder rows. QCOMPARE(hud->position(), QPointF(24, 24)); QVERIFY(hud->width() <= 360);
         QVERIFY(hud->y() + hud->height() < 183); // Above the input field, away from keys.
+        QCOMPARE(view.activeFocusItem(), editorFocus); // The overlay never takes focus.
         state.adjust("monitor", 1); QVERIFY(!hud->isVisible());
         for (auto key : {Qt::Key_Q, Qt::Key_X, Qt::Key_BracketLeft, Qt::Key_BracketRight}) QTest::keyClick(&view, key);
         QTest::keyClick(&view, Qt::Key_Backspace);
@@ -1095,6 +1119,8 @@ private slots:
                 sample->setProperty("fontScale", percent / 100.);
                 for (const auto *page : {"controls", "foundations", "buttons", "rows", "cards"}) {
                     sample->setProperty("page", QString::fromLatin1(page)); QTest::qWait(200);
+                    const auto small = smallText(gallery.contentItem(), percent / 100.);
+                    QVERIFY2(small.isEmpty(), qPrintable(QString("%1 at %2%: %3").arg(QLatin1String(page)).arg(percent).arg(small.join(", "))));
                     if (!captures.isEmpty()) QVERIFY(gallery.grabWindow().save(captures + QString("/%1-%2-%3.png")
                         .arg(QLatin1String(page), night ? "night" : "light").arg(percent)));
                 }
@@ -1196,6 +1222,9 @@ private slots:
                     actions: [{button: "A", label: "开始"}, {button: "Start", label: "选项"}, {button: "dpadH", label: "调整"}, {button: "B", label: "返回"}, {button: "X", label: "收藏"}, {button: "Y", label: "搜索"}] }
                 Ui.HoldConfirm { id: hold; anchors.centerIn: parent }
                 Ui.Hud { id: hud; anchors.horizontalCenter: parent.horizontalCenter; y: 24 }
+                Text { x: 600; y: 300; text: "太小"; font.pixelSize: 16 }
+                Ui.GlyphBadge { x: 700; y: 300; button: "A"; size: Ui.Theme.glyphKeySize }
+                Ui.GameCard { objectName: "favoriteCard"; x: 760; y: 300; width: 212; height: 212; title: "1944"; favorite: true }
             })", QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ComponentFixture.qml")));
         QScopedPointer<QObject> object(fixture.create()); QVERIFY2(object, qPrintable(fixture.errorString()));
         auto *root = qobject_cast<QQuickItem *>(object.data()); root->setParentItem(view.contentItem());
@@ -1230,6 +1259,12 @@ private slots:
             if (item->objectName() == "hintLabel" && item->isVisible()) order.insert(item->mapToScene(QPointF()).x(), item->property("text").toString());
         }
         QCOMPARE(QStringList(order.values()), QStringList({"调整", "选项", "收藏", "返回", "开始"}));
+        // The text-size guard flags raw 16 px text but not the 16 px letter inside a key glyph.
+        QCOMPARE(smallText(root, 1.), QStringList({QStringLiteral("16 px \"太小\"")}));
+        // Favorites are a solid star in cardFavorite on the card's dark disc.
+        auto *star = root->findChild<QQuickItem *>("favoriteCard")->findChild<QQuickItem *>("cardFavorite"); QVERIFY(star && star->isVisible());
+        auto *starIcon = star->childItems().value(0); QVERIFY(starIcon);
+        QVERIFY(starIcon->property("filled").toBool()); QCOMPARE(starIcon->property("color").value<QColor>(), color("cardFavorite"));
         // Hold confirmation appears only after 600 ms of a 2 s hold and leaves on release.
         auto *hold = root->property("hold").value<QQuickItem *>();
         hold->setProperty("progress", 0.25); QVERIFY(!hold->isVisible());
@@ -1390,10 +1425,13 @@ private slots:
             QVERIFY(!label->property("truncated").toBool());
             state.adjust("monitor",1); QTest::qWait(100);
             auto *performance=root->findChild<QQuickItem *>("performancePanel"); QVERIFY(performance);
+            QTRY_VERIFY(performance->isVisible()); // Shown once the first sample exists.
             QVERIFY(!hud->mapRectToScene(hud->boundingRect()).intersects(performance->mapRectToScene(performance->boundingRect())));
             if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+QString("/volume-%1.png").arg(scale)));
             state.adjust("monitor",1);
         }
+        // Waiting for the overlay sample may outlast the dwell; count toggles from a fresh show.
+        QTRY_VERIFY_WITH_TIMEOUT(!hud->isVisible(),2500); visibility.clear(); save("201\n"); QTRY_VERIFY(hud->isVisible());
         QTest::qWait(1000); changes.clear(); save("201\n"); // Repeat at the limit must renew the timeout.
         QTRY_VERIFY(!changes.isEmpty()); QTest::qWait(1000); QVERIFY(hud->isVisible());
         QCOMPARE(visibility.size(),1); // Timer renewal must not toggle compositor visibility.
@@ -1505,13 +1543,20 @@ private slots:
         QVERIFY(state.choose("font",3));state.adjust("monitor",1);root->setProperty("testInputCapture",true);
         QVERIFY(QMetaObject::invokeMethod(root,"openEditor"));
         auto *hud=root->findChild<QQuickItem *>("performancePanel");QVERIFY(hud);
-        QCOMPARE(hud->height(),150.);QVERIFY(hud->y()+hud->height()<183);
-        QVERIFY(hud->findChild<QObject *>("hudMemory")->property("text").toString().contains("768.0 / 1024.0"));
-        QVERIFY(hud->findChild<QObject *>("hudTemperature")->property("text").toString().contains("55.0"));
-        QVERIFY(hud->findChild<QObject *>("hudGpuFrequency")->property("text").toString().contains("GPU 480 MHz"));
-        QVERIFY(hud->property("thermalStatus").toString().contains(QStringLiteral("未介入")));
+        QCOMPARE(hud->position(),QPointF(24,24));QVERIFY(hud->width()<=360);QVERIFY(hud->y()+hud->height()<183);
+        const auto row=[&](const char *name){auto *label=hud->findChild<QQuickItem *>(name);return label&&label->isVisible()?label->property("text").toString().replace(QChar(0xa0),' '):QString();};
+        const auto rate=row("performanceRate");QVERIFY(rate.isEmpty()||(rate.startsWith(QStringLiteral("界面 "))&&rate.endsWith(QStringLiteral(" 次/秒")))); // Shown once measured.
+        QVERIFY(row("performanceLoad").startsWith(QStringLiteral("CPU 1.30 GHz")));QVERIFY(row("performanceLoad").endsWith(QStringLiteral("GPU 480 MHz")));
+        QCOMPARE(row("performanceHealth"),QStringLiteral("55 °C · 内存 256 / 1024 MB"));
+        for(const auto *name:{"performanceRate","performanceLoad","performanceHealth"}){
+            auto *label=hud->findChild<QQuickItem *>(name);QVERIFY(label);
+            QVERIFY(!label->property("text").toString().contains(QStringLiteral("—")));
+            QVERIFY2(!label->property("truncated").toBool(),qPrintable(QString("%1 %2 > %3").arg(label->property("text").toString()).arg(label->implicitWidth()).arg(label->width())));}
+        const auto thermal=[&]{QVariant value;const QVariantMap row{{"key","thermal"}}; // Empty when the call fails.
+            QMetaObject::invokeMethod(root->findChild<QObject *>("settingsView"),"rowValue",Q_RETURN_ARG(QVariant,value),Q_ARG(QVariant,row));return value.toString();};
+        QCOMPARE(thermal(),QStringLiteral("未介入"));
         put("sys/class/thermal/cooling_device0/cur_state","1");device.refresh();
-        QVERIFY(hud->property("thermalStatus").toString().contains(QStringLiteral("CPU 温控限频")));
+        QCOMPARE(thermal(),QStringLiteral("CPU 限频"));
         put("sys/class/thermal/cooling_device0/cur_state","0");device.refresh();
         QTest::qWait(200);if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+"/device-hud-input.png"));
         QVERIFY(QMetaObject::invokeMethod(root,"closeEditor"));
