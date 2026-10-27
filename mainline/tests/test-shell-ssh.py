@@ -38,9 +38,9 @@ def exchange(req, known=None, identity=None):
 initial = exchange(request(screenshot=True))
 assert initial['state']['page'] == 0 and initial['state']['selected'] == 0
 control.save_result(args.evidence, copy.deepcopy(initial))
-changed = exchange(request('tap', action='right', session=initial['session'], sequence=initial['sequence'],
+changed = exchange(request('tap', action='down', session=initial['session'], sequence=initial['sequence'],
                            binary_sha256=args.binary, screenshot=True))
-assert changed['state']['selected'] == 1 and changed['sequence'] == initial['sequence']+1
+assert changed['state']['dockFocused'] and changed['sequence'] == initial['sequence']+1
 assert changed['capture']['sha256'] != initial['capture']['sha256']
 control.save_result(args.evidence, copy.deepcopy(changed))
 try:
@@ -75,8 +75,8 @@ assert forbidden.returncode != 0 and b'R46H_UNRESTRICTED_SHELL' not in forbidden
 forward = subprocess.run([*ssh,'-o','ExitOnForwardFailure=yes','-N','-R','0:127.0.0.1:1','ark@'+args.host], capture_output=True, timeout=8)
 assert forward.returncode != 0
 assert exchange(request())['sequence'] == changed['sequence']
-ended = exchange(request('tap', action='left', session=changed['session'], sequence=changed['sequence'], binary_sha256=args.binary))
-assert ended['state']['selected'] == 0
+ended = exchange(request('tap', action='up', session=changed['session'], sequence=changed['sequence'], binary_sha256=args.binary))
+assert not ended['state']['dockFocused'] and ended['state']['selected'] == 0
 if args.keyboard:
     current = ended
     def tap(action, screenshot=False):
@@ -84,7 +84,7 @@ if args.keyboard:
         current=exchange(request('tap', action=action, session=current['session'], sequence=current['sequence'],
                                  binary_sha256=args.binary, screenshot=screenshot))
         return current['state']
-    tap('up'); tap('right'); tap('right')
+    for action in ['down', 'right', 'right', 'right', 'right', 'accept']: tap(action)  # The dock's 设置.
     for _ in range(8): tap('down')
     tap('right'); tap('down'); tap('accept')
     assert current['state']['testInputVisible']

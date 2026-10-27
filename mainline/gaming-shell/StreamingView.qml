@@ -59,13 +59,12 @@ Item {
         }
     }
     Ui.PageHeader {
-        width: parent.width; title: "Moonlight 串流"; iconName: "monitor"; backVisible: true
-        onBackRequested: view.backRequested()
+        width: parent.width
         subtitle: view.manager.error || view.manager.status || (view.manager.hosts.length ? view.host.status || "" : "添加主机后开始连接")
         error: !!view.manager.error
     }
     Ui.ListView {
-        id: hosts; y: Ui.Theme.contentY; width: Ui.Theme.sidebarWidth
+        id: hosts; y: Ui.Theme.pageStatusHeight; width: Ui.Theme.sidebarWidth
         height: parent.height - y - Ui.Theme.buttonHeight - Ui.Theme.gap
         layer.enabled: true
         model: view.manager.hosts; currentIndex: view.manager.selected
@@ -80,7 +79,7 @@ Item {
     Ui.Button { id: add; anchors.bottom: parent.bottom; width: hosts.width; text: "添加主机"; iconName: "plus"; selected: view.sidebar && !view.manager.hosts.length; onClicked: view.addHost() }
     Ui.ListView {
         id: detailRows; objectName: "streamingRows"
-        x: Ui.Theme.detailX; y: Ui.Theme.contentY; width: parent.width - x; height: parent.height - y
+        x: Ui.Theme.detailX; y: Ui.Theme.pageStatusHeight; width: parent.width - x; height: parent.height - y
         layer.enabled: true
         visible: view.manager.hosts.length > 0
         model: 8; currentIndex: view.row

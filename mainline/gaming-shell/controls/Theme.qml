@@ -90,6 +90,14 @@ QtObject {
     readonly property int contentWidth: canvasWidth - 2 * margin
     readonly property int contentHeight: canvasHeight - topBarHeight - hintBarHeight
     readonly property bool dualPane: canvasWidth >= 900
+    // §8 page geometry: content below the top bar, above the hint bar.
+    readonly property int pageTop: topBarHeight + space8
+    readonly property int pageHeight: canvasHeight - pageTop - hintBarHeight - space8
+    readonly property int pageStatusHeight: 48
+    readonly property int homeRowTop: 100
+    readonly property int dockTop: 548
+    readonly property int libraryTabsTop: 82
+    readonly property int libraryGridTop: 160
     readonly property int gridCard: 212
     readonly property int gridGap: 32
     readonly property int gridColumns: Math.max(1, Math.floor((contentWidth + gridGap) / (gridCard + gridGap)))
@@ -130,6 +138,7 @@ QtObject {
     readonly property int glyphInlineSize: 30
     readonly property int glyphKeySize: 26
     readonly property int homeCardSize: 256
+    readonly property int optionsThumbnail: 72
     readonly property int cardBadgeHeight: 32
     readonly property int stripeWidth: 14
     readonly property int dockTileSize: 88
@@ -197,8 +206,6 @@ QtObject {
     readonly property int sidebarWidth: 256
     readonly property int columnGap: 32
     readonly property int detailX: sidebarWidth + columnGap
-    readonly property int toolTop: 100
-    readonly property int toolHeight: 576
     readonly property int contentY: 96
     readonly property int headerIconSize: 32
     readonly property int popupDuration: sheetEnterDuration

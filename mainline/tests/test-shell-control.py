@@ -139,7 +139,7 @@ def main():
                     if latest["state"][name] == value: return latest["state"]
                     assert time.monotonic() < deadline, f"timeout waiting for {name}={value}"
                     time.sleep(.02)
-            assert tap("right", True)["selected"] == 1
+            assert tap("down", True)["dockFocused"]
             assert latest["capture"]["sha256"] != initial
             prior = copy.deepcopy(latest)
             for bad, reason in [({"session": "expired"}, "stale_session"), ({"sequence": -1}, "stale_sequence"),
@@ -149,7 +149,7 @@ def main():
                 result = raw(path, json.dumps(sent).encode() + b"\n")
                 assert result["ok"] is False and result["error"] == reason
             observed = control.exchange(path, request())
-            assert observed["sequence"] == prior["sequence"] and observed["state"]["selected"] == 1
+            assert observed["sequence"] == prior["sequence"] and observed["state"]["dockFocused"]
             assert raw(path, b"{bad}\n")["error"] == "invalid_request"
             try:
                 assert raw(path, b"x" * 4097 + b"\n")["error"] == "request_too_large"
@@ -172,12 +172,15 @@ def main():
                 dropped.connect(str(path)); dropped.sendall(b"{")
             time.sleep(0.03)
             assert control.exchange(path, request())["sequence"] == prior["sequence"]
+            for _ in range(3): tap("right")
+            assert tap("accept")["page"] == 3  # The dock's 工具; Neo is the first tool.
             assert tap("accept")["toolRoute"] == "neo"
             assert tap("quick")["quickOpen"]
             prior_row = latest["state"]["toolRow"]
             assert tap("right")["toolRow"] == prior_row
             tap("back"); assert not tap("back")["toolOpen"]
-            tap("up"); tap("right"); assert tap("right")["settingsSidebar"]  # Top navigation until the v1 home dock.
+            assert tap("back")["page"] == 0
+            tap("right"); assert tap("accept")["settingsSidebar"]  # The dock's 设置.
             assert not tap("right")["settingsSidebar"]
             wait_state("settingsDetailReady")
             assert tap("back")["settingsSidebar"]  # ←→ adjust the first row's slider.
@@ -263,7 +266,7 @@ def main():
             blocked = root / "blocked"; blocked.write_text("preserve")
             failed, failed_path = start("failed", state=blocked)
             state = control.exchange(failed_path, request())
-            for action in ["up", "right", "right", "right"]:
+            for action in ["down", "right", "right", "right", "right", "accept", "right"]:  # The dock's 设置, first category.
                 state = control.exchange(failed_path, request("tap", action=action, session=state["session"], sequence=state["sequence"], binary_sha256=state["binary_sha256"]))
             deadline = time.monotonic() + 5
             while not state["state"]["settingsDetailReady"]:

@@ -12,17 +12,20 @@ the new input protocol or multitask lifecycle.
 mainline/gaming-shell/run.sh --applications /absolute/external/applications.json
 ```
 
-Without the option, the built-in Moonlight, Neo, PortMaster, USB gamepad, controller
-test, settings and optional [Jume Browser](../gaming-browser/README.md) entries are shown. Their tools use stable `builtin.*` favorite
-IDs and internal routes; see [Tools](TOOLS.md). The explicit manifest replaces
-that default list; the old labelled demos remain only in focused QML fixtures. The manifest is
+Without the option, the library holds the built-in Moonlight, optional
+[Jume Browser](../gaming-browser/README.md) and 文件管理器 apps; Neo, PortMaster,
+USB gamepad, terminal, text editor and file transfer sit behind the home dock's
+工具, and settings (with the controller test) behind 设置. They use stable
+`builtin.*` favorite IDs and internal routes; see [Tools](TOOLS.md). The explicit
+manifest replaces the library's default list and keeps installed built-in apps
+after its entries; the old labelled demos remain only in focused QML fixtures. The manifest is
 read once at startup: up to 512 entries in a 512 KiB JSON file, owned by the user
 or root, regular/non-symlink and not group/world writable. Each entry needs a
 unique stable ID, title, absolute executable path and an argument array:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "applications": [
     {
       "id": "moonlight",
@@ -43,7 +46,11 @@ owns the client and stream parameters. Empty arguments and direct CLI streaming
 have different client-exit behavior. The example is shipped, but never activated
 implicitly. Keep pairing credentials in the client's private state, not here.
 
-`description` and absolute `directory` are optional. IDs use lowercase letters,
+`description` and absolute `directory` are optional. Version 2 adds optional
+`system` and `core` (at most 32 characters; the library filters by system, the
+options menu shows both) and `supported` (`false` keeps the entry in the library,
+disabled as 尚未适配, and refuses launch); version 1 files stay valid and reject
+these fields. IDs use lowercase letters,
 digits, dots, underscores and hyphens, starting with a letter/digit and at most 64 characters. Titles are at most
 64 characters, descriptions 96; unknown fields are rejected. Commands run through
 QProcess with separate arguments, without shell concatenation. Use a wrapper for
@@ -52,8 +59,12 @@ private Qt/SDL library paths, test caches and XDG state overrides from the child
 it retains display/runtime-socket and controller settings. Child standard streams
 are closed/discarded; application-specific safe logging belongs in its wrapper.
 
-Home shows the first three configured entries. The library uses a virtualized,
-scrolling three-column grid. Missing runtime files fail on activation and leave
+Home's card row ([JUME-UI §8](../../docs/JUME-UI.md#8-界面)) shows recent entries,
+newest first, then favorites, topped up to five with the first available
+entries, and ends with 全部游戏. A successful launch records the entry as recent
+(up to 32); the options menu removes it. The library is a scrolling grid with
+filter tabs (全部, 收藏, 最近, each system, 应用 for entries without one) and
+title search. Missing runtime files fail on activation and leave
 the desktop visible. Names render as plain text. Application favorites use stable
 IDs, so reordering the file does not move a favorite to another application.
 Preference schema 5 keeps old demo favorites and migrates versions 1–4 on the next

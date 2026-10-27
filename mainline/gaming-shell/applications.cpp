@@ -83,7 +83,9 @@ bool Applications::load(const QString &path) {
     if (!file.open(QIODevice::ReadOnly)) return fail(QStringLiteral("无法读取应用列表。"));
     const auto document = QJsonDocument::fromJson(file.readAll());
     const auto object = document.object();
-    if (!document.isObject() || object.value("version") != QJsonValue(1) || !object.value("applications").isArray() ||
+    // Version 2 adds the optional system, core and supported fields; version 1 stays valid.
+    const auto version = object.value("version");
+    if (!document.isObject() || (version != QJsonValue(1) && version != QJsonValue(2)) || !object.value("applications").isArray() ||
         object.size() != 2 || object.value("applications").toArray().size() > 512)
         return fail(QStringLiteral("应用列表格式不正确。"));
     QList<Entry> entries; QVariantList items; QSet<QString> ids;
@@ -99,8 +101,12 @@ bool Applications::load(const QString &path) {
             && QDir::isAbsolutePath(item.value("program").toString()) && item.value("arguments").isArray()
             && item.value("arguments").toArray().size() <= 64;
         for (auto it = item.begin(); it != item.end(); ++it)
-            if (!QStringList{"id", "title", "description", "program", "arguments", "directory"}.contains(it.key())) valid = false;
+            if (!QStringList{"id", "title", "description", "program", "arguments", "directory"}.contains(it.key())
+                && (version != QJsonValue(2) || !QStringList{"system", "core", "supported"}.contains(it.key()))) valid = false;
         if (item.contains("description") && !validText(item.value("description"), 96, true)) valid = false;
+        for (const auto *name : {"system", "core"})
+            if (item.contains(name) && !validText(item.value(name), 32)) valid = false;
+        if (item.contains("supported") && !item.value("supported").isBool()) valid = false;
         if (item.contains("directory") && (!validText(item.value("directory"), 4096) || !QDir::isAbsolutePath(item.value("directory").toString()))) valid = false;
         Entry entry{id, item.value("program").toString(), item.value("directory").toString(), {}};
         for (const auto &argument : item.value("arguments").toArray()) {
@@ -110,12 +116,15 @@ bool Applications::load(const QString &path) {
         if (!valid) return fail(QStringLiteral("应用列表第 %1 项无效或标识重复。").arg(entries.size() + 1));
         ids.insert(id); entries.append(entry);
         items.append(QVariantMap{{"id", id}, {"title", item.value("title").toString()},
-            {"detail", item.value("description").toString(QStringLiteral("应用"))}});
+            {"detail", item.value("description").toString(QStringLiteral("应用"))},
+            {"system", item.value("system").toString()}, {"core", item.value("core").toString()},
+            {"supported", item.value("supported").toBool(true)}});
     }
     m_entries = entries; m_items = items; m_hasManifest = true; m_error.clear(); return true;
 }
 bool Applications::launch(int index) {
     if (index < 0 || index >= m_entries.size()) return fail(QStringLiteral("未找到此应用。"));
+    if (!m_items[index].toMap().value("supported").toBool()) return fail(QStringLiteral("尚未适配，无法启动。"));
     const auto &entry = m_entries[index];
     auto environment = QProcessEnvironment::systemEnvironment();
     // Do not inject the shell's private Qt/SDL runtime into another application.

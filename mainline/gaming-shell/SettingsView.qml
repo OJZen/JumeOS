@@ -305,11 +305,7 @@ Item {
         anchors.fill: parent
         Ui.PageHeader {
             width: parent.width
-            title: settings.sidebar ? "设置" : settings.categories[settings.category]
-            subtitle: settings.sidebar ? "选择分类" : "设置"
-            iconName: settings.sidebar ? "settings" : settings.categoryIcons[settings.category]
-            backVisible: !settings.sidebar
-            onBackRequested: settings.returnToCategories()
+            subtitle: settings.sidebar ? "" : settings.categories[settings.category]
         }
         Ui.ListView {
             id: categoryList; objectName: "settingsCategories"

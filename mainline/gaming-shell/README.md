@@ -80,9 +80,10 @@ Page keys follow [JUME-UI §7.3–7.6](../../docs/JUME-UI.md#73-页面层每个�
 Held directions repeat after 380 ms every 90 ms; lists speed up to 50 ms after
 2 s, grids do not. B repeats only as the keyboard's backspace; other keys never
 repeat. Select with another key is a system chord and
-reaches no page. Home B does nothing; until the stage 4 home dock, Up reaches the
-top tabs and Left/Right change page. The remote `home` action stands in for the
-system Select+Start.
+reaches no page. Home B does nothing; Up/Down move between the card row and the
+dock (游戏库、串流、文件、工具、设置、电源). The library filters with L1/R1 and
+searches with Y; B leaves pages and clears a search first. The remote `home`
+action stands in for the system Select+Start and focuses the newest card.
 
 Entering Settings shows only the category list. Right/A asynchronously opens the
 selected category as a second-level page; Left/B returns to the list and unloads

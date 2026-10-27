@@ -60,7 +60,8 @@ Item {
         "leaf": "M20 3Q2 2 3 15Q4 22 11 20Q22 19 20 3Z M3 22L16 8",
         "car": "M4 10L7 4H17L20 10 M2 10H22V18H2Z M5 18V21 M19 18V21 M5 13H7 M17 13H19",
         "play": "M7 3L21 12L7 21Z",
-        "save": "M3 3H17L21 7V21H3Z M7 3V9H16V3 M7 21V14H17V21"
+        "save": "M3 3H17L21 7V21H3Z M7 3V9H16V3 M7 21V14H17V21",
+        "history-off": "M12 3A9 9 0 1 0 12 21A9 9 0 1 0 12 3 M12 7V12L15 14 M5.6 5.6L18.4 18.4"
     })
     readonly property bool known: !!paths[name]
     implicitWidth: Theme.iconSize; implicitHeight: Theme.iconSize

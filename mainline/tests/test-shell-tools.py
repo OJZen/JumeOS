@@ -44,19 +44,20 @@ with tempfile.TemporaryDirectory(prefix='tools-check-',dir=repo/'mainline/out/.c
    def config():return json.loads((state/'tools/settings.json').read_text())['settings']
    assert current['state']['selectedApplication']=='builtin.moonlight'
    tap('itemAction');assert 'builtin.moonlight' in json.loads((state/'preview.json').read_text())['applicationFavorites'];tap('itemAction')
-   tap('right');assert tap('accept')['toolRoute']=='neo';assert not wait()['toolDetailReady']
+   for name in ['down','right','right','right']:tap(name)
+   assert tap('accept')['page']==3;assert tap('accept')['toolRoute']=='neo';assert not wait()['toolDetailReady']  # Dock 工具, first row.
    tap('accept');tap('back');assert not ask()['state']['toolDetailReady']
    tap('accept');wait_detail();capture('neo');tap('accept');assert not ask()['state']['externalSession']
    tap('down');tap('down');tap('accept');assert config()['neoIntegerScale'] is True
    tap('back');tap('back');assert not ask()['state']['toolOpen']
-   tap('right');tap('accept');assert wait()['toolRoute']=='ports';assert not current['state']['toolDetailReady']
+   tap('down');tap('accept');assert wait()['toolRoute']=='ports';assert not current['state']['toolDetailReady']
    tap('down');tap('up');assert not ask()['state']['toolDetailReady']
    tap('accept');wait_detail();capture('ports');tap('down');tap('down');tap('down');tap('down');tap('accept');wait()
    copied=state/'tools/ports/stardew/saves/Saves/farm/save';assert copied.read_text()=='original';copied.write_text('new progress')
    tap('accept');assert copied.read_text()=='new progress'
    tap('down');tap('down');tap('accept');wait();assert len(list((state/'tools/backups').iterdir()))==1
    assert (game/'savedata/Saves/farm/save').read_text()=='original'
-   tap('back');tap('back');tap('up');tap('right');tap('down');tap('down');tap('accept');assert wait()['toolRoute']=='usb';wait_detail()
+   tap('back');tap('back');tap('down');tap('accept');assert wait()['toolRoute']=='usb';wait_detail()
    tap('accept');assert not (state/'tools/usb-profile.json').exists()
    tap('down');tap('accept');assert config()['usbSwapAB'] is True
    tap('down');tap('down');tap('down');assert tap('accept')['choicesOpen']
@@ -67,17 +68,18 @@ with tempfile.TemporaryDirectory(prefix='tools-check-',dir=repo/'mainline/out/.c
    settings_file=state/'tools/settings.json';other=root/'must-not-change';other.write_text('keep');settings_file.unlink();settings_file.symlink_to(other)
    for _ in range(4):tap('up')
    tap('accept');assert ask()['state']['toolSaveError'];tap('home');assert ask()['state']['toolRoute']=='usb';assert other.read_text()=='keep'
-   settings_file.unlink();tap('back');assert config()['usbSwapAB'] is False;tap('up');tap('up');tap('right')
+   settings_file.unlink();tap('back');assert config()['usbSwapAB'] is False;tap('back');tap('right');tap('accept')  # Dock 设置.
    for _ in range(8):tap('down')
    tap('accept')
    deadline=time.monotonic()+5
    while not ask()['state']['settingsDetailReady']:
     assert time.monotonic()<deadline,'settings detail timeout';time.sleep(.02)
    tap('accept');tap('down');tap('down');tap('accept');assert ask()['state']['fontPercent']==130
-   tap('home');tap('up');tap('right');tap('down');tap('down');tap('accept');wait();wait_detail();capture('usb-130')
+   tap('home');tap('down');tap('left');assert tap('accept')['page']==3  # The dock remembers 设置; 工具 is left of it.
+   tap('accept');wait();wait_detail();capture('usb-130')
    assert not ask()['state']['toolSaveError']
-   tap('back');tap('home');tap('right');tap('accept');wait();tap('accept');wait_detail();capture('neo-130')
-   tap('back');tap('back');tap('right');tap('accept');wait();tap('accept');wait_detail();capture('ports-130')
+   tap('back');tap('up');tap('up');tap('accept');wait();tap('accept');wait_detail();capture('neo-130')
+   tap('back');tap('back');tap('down');tap('accept');wait();tap('accept');wait_detail();capture('ports-130')
    completed=True
    result={'status':'SHELL_TOOLS_PASS','actions':actions,'checks':['separate routes','stable favorites','save import without overwrite','backup','USB draft/export only','modal isolation','130% font capture'],'boundary':'host fixtures only; no game execution or USB device writes'}
   finally:

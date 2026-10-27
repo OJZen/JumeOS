@@ -61,8 +61,9 @@ Do not hide unavailable actions behind enabled-looking controls, replace switche
 with “已开启/已关闭”, or use a progress track for a value with unknown bounds.
 
 Use `TopBar` and `HintBar` on every page; the hint bar is generated from the page's
-declared actions. Tool pages still use `PageHeader` followed by the smallest
-required `Ui.ListView` until the v1 screens replace them. Delegates take the list's
+declared actions. The top bar carries the page title and B returns, so pages draw
+no title, breadcrumb or back button; a tool page puts its status in a `PageHeader`
+line followed by the smallest required `Ui.ListView`. Delegates take the list's
 full `width`; the scrollbar overlays the margin 12 px right of the rows. Give
 `FocusFrame` the focused delegate's actual position, height and radius; do not
 multiply a hard-coded row stride. Only that frame moves.
@@ -73,10 +74,10 @@ single list is the deliberate one-level variant. Do not debounce directional
 input; cancellation belongs to the detail loader, not focus movement.
 
 ```qml
-Ui.PageHeader { width: parent.width; title: "工具名称"; iconName: "gamepad" }
+Ui.PageHeader { width: parent.width; subtitle: tools.error || status; error: !!tools.error }
 Ui.ListView {
     id: rows
-    y: Ui.Theme.contentY; width: parent.width; height: parent.height - y
+    y: Ui.Theme.pageStatusHeight; width: parent.width; height: parent.height - y
     model: options
     delegate: Ui.ListRow {
         required property var modelData
@@ -109,7 +110,7 @@ posters are loaded for the management pages.
 | `ListRow` | 72 or 96 high surface; basic (`chevron`), choice (`value` + `choice`), switch (`toggleState`), `description`, slider (`progress`, `adjusting`), read-only, disabled (`disabledReason`, still focusable); `current` = accentSoft |
 | `FocusFrame` | The one moving ring: target rect + `radius`; 4 px stroke outside a 4 px gap, radius + 7; `adjusting`, `lift`, `bounce(dx, dy)`; settles once after it stops |
 | `Tabs` | 48-high capsules between soft L1/R1 badges; current = `text` fill; `navigationActive` rings the current tab |
-| `GameCard` | Fallback = card color + 135° 7% stripes (14 px); `iconName` apps, `badge`/`badgeIcon`, `favorite`, `available`; title on 256 cards only; focus lifts 1.04 with shadow and ring |
+| `GameCard` | Fallback = card color + 135° 7% stripes (14 px); `iconName` apps (`plain` puts the icon in the card color on the surface), `badge`/`badgeIcon`, `favorite`, `available`; title on 256 cards only, 72 thumbnails show only the art; focus lifts 1.04 with shadow and ring |
 | `DockTile` | 88×88 surface r28 with 40 icon and caption; focus 1.06, ring, bold label |
 | `GlyphBadge` | A/B/X/Y circles, shoulders r8 squares, Start/Select capsules, d-pad drawings; 34 / 30 / 26; `soft` for content; `progress` hold ring |
 | `HintBar` | Built from `actions` ({button, label[, progress]}; `button` from `knownButtons` or two joined by `+`): A B X Y Start fixed at the right, directions/Select/shoulders lead after `context`; at most five; an unknown button is warned about and not drawn (shell-check fails on the warning); `overflow` reports a cramped bar |
@@ -117,9 +118,9 @@ posters are loaded for the management pages.
 | `Panel` → `Sheet` / `Dialog` / `QuickPanel` | Surface r28 with header, content and hint footer split by dividers; sheet squares its bottom, dialog ≤ 560, quick panel 392 at 24 from the corner |
 | `Hud` / `Toast` / `HoldConfirm` | 280×56 top HUD that fades after `hudDwell`; bottom toast (owner clears after `toastDwell`, errors stay); centered hold card shown only after 600 ms |
 | `Shadow` | Level-2 elevation from the prerendered nine-slice `elevation.png` (magick: blurred r24 rect, 16% alpha, +4 px); never a live blur |
-| `PageHeader` / `Page` | Tool-page title/status with back/action buttons; `Page` slides a new route in from 48 px (100 ms fade with reduced motion) |
+| `PageHeader` / `Page` | Page status line (caption, danger on error) with a busy progress bar; `Page` slides a new route in from 48 px (100 ms fade with reduced motion) |
 | `ChoicePopup` | Native modal `Popup.Item` dialog with pending/current indexes, confirmation and cancellation (B or Select), Start closes; stays in the existing window |
-| `OptionsSheet` | Start menu of the focused item or page: {id, label[, button][, hold][, reason]} rows, shortcut glyphs on the right ("按住" before a hold), disabled rows keep their reason; A runs, Start/B/Select close, `chosen(id)` |
+| `OptionsSheet` | Start menu of the focused item or page: `present(title, items, header)` with {id, label[, icon][, button][, hold][, reason]} rows, shortcut glyphs on the right ("按住" before a hold), disabled rows keep their reason; the optional header {subtitle, color, icon, plain} adds a 72 thumbnail; A runs, Start/B/Select close, `chosen(id)` |
 
 `ListRow` composes these primitives for settings, host details and the quick panel.
 Read-only rows remain legible but have no native activation; disabled rows keep

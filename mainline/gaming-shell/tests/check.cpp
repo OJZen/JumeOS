@@ -33,6 +33,7 @@
 #include <QMap>
 #include <cmath>
 #include <memory>
+#include <tuple>
 #include <QRegularExpression>
 #include <QtTest>
 #include <sys/stat.h>
@@ -55,6 +56,29 @@ static double contrast(const QColor &first, const QColor &second) {
     };
     const auto a = luminance(first), b = luminance(second);
     return (qMax(a, b) + 0.05) / (qMin(a, b) + 0.05);
+}
+
+// The §8 reference library: a version 2 manifest (an unsupported entry included), recent entries
+// relative to ReferenceClock and one favorite. Returns the manifest path.
+static const QDateTime ReferenceClock(QDate(2026, 10, 27), QTime(16, 39));
+static QString referenceLibrary(const QString &directory, Preferences &state) {
+    QJsonArray entries;
+    for (const auto &[id, title, system] : {std::tuple{"native.mslug", "Metal Slug", "Neo Geo"}, {"native.1944", "1944", "Neo Geo"},
+             {"native.gta3", "GTA III", "Ports"}, {"native.gtavc", "Vice City", "Ports"}, {"native.stardew", "Stardew Valley", "Ports"}}) {
+        QJsonObject entry{{"id", id}, {"title", title}, {"system", system}, {"program", "/bin/sleep"}, {"arguments", QJsonArray{"60"}}};
+        if (QString(system) == "Neo Geo") entry["core"] = "FBNeo";
+        if (QString(id) == "native.stardew") entry["supported"] = false;
+        entries.append(entry);
+    }
+    const auto path = directory + "/applications.json";
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) return {};
+    file.write(QJsonDocument(QJsonObject{{"version", 2}, {"applications", entries}}).toJson()); file.close();
+    QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    for (const auto &[id, days] : {std::pair{"native.gtavc", 5}, {"builtin.moonlight", 3}, {"native.gta3", 2}, {"native.mslug", 1}})
+        state.recordRecent(id, ReferenceClock.addDays(-days).toSecsSinceEpoch());
+    state.toggleApplicationFavorite("native.mslug"); state.save();
+    return path;
 }
 
 // First item named `name` in the visual tree below `root` (Repeater delegates included).
@@ -176,7 +200,7 @@ private slots:
         key(Qt::Key_Down); key(Qt::Key_Return); QVERIFY(!options->property("open").toBool()); QVERIFY(!state.isFavorite(1));
         key(Qt::Key_M); key(Qt::Key_M); QVERIFY(!options->property("open").toBool());
         key(Qt::Key_X); QVERIFY(state.isFavorite(1));
-        key(Qt::Key_Escape); QCOMPARE(root->property("page").toInt(), 0); QVERIFY(!root->property("tabsFocused").toBool()); // Home B does nothing.
+        key(Qt::Key_Escape); QCOMPARE(root->property("page").toInt(), 0); QVERIFY(!root->property("dockFocused").toBool()); // Home B does nothing.
         key(Qt::Key_Return); QVERIFY(root->property("session").toBool());
         key(Qt::Key_Right); QCOMPARE(root->property("sessionMoves").toInt(), 1);
         key(Qt::Key_Q); QVERIFY(root->property("quickOpen").toBool());
@@ -187,17 +211,26 @@ private slots:
         key(Qt::Key_Left); QCOMPARE(root->property("sessionMoves").toInt(), 2);
         key(Qt::Key_Escape); QVERIFY(!root->property("session").toBool()); QCOMPARE(root->property("selected").toInt(), 1);
         QVERIFY(root->property("notice").toString().isEmpty());
-        key(Qt::Key_BracketRight); QCOMPARE(root->property("page").toInt(), 0); // L1/R1 no longer switch pages.
-        key(Qt::Key_Up); QVERIFY(root->property("tabsFocused").toBool());
-        key(Qt::Key_Right); QCOMPARE(root->property("page").toInt(), 1);
-        key(Qt::Key_Down); QVERIFY(!root->property("tabsFocused").toBool());
-        key(Qt::Key_Down); QCOMPARE(root->property("selected").toInt(), 3);
+        key(Qt::Key_BracketRight); QCOMPARE(root->property("page").toInt(), 0); // L1/R1 have no home role.
+        // §8 home: Down reaches the dock; its first tile opens the library.
+        key(Qt::Key_Down); QVERIFY(root->property("dockFocused").toBool()); QCOMPARE(root->property("selected").toInt(), -1);
+        key(Qt::Key_Return); QCOMPARE(root->property("page").toInt(), 1); QCOMPARE(root->property("selected").toInt(), 0);
+        // Library: four columns without wrap, L2/R2 move two rows, L1/R1 filter and return to the filter's last place.
+        key(Qt::Key_Right); key(Qt::Key_Down); QCOMPARE(root->property("selected").toInt(), 5);
+        key(Qt::Key_Down); QCOMPARE(root->property("selected").toInt(), 5);
         key(Qt::Key_PageUp); QCOMPARE(root->property("selected").toInt(), 0);
         key(Qt::Key_PageDown); QCOMPARE(root->property("selected").toInt(), 5);
-        key(Qt::Key_Up); QCOMPARE(root->property("selected").toInt(), 2);
-        key(Qt::Key_Up); QVERIFY(root->property("tabsFocused").toBool());
-        key(Qt::Key_Right); QCOMPARE(root->property("page").toInt(), 2);
-        QVERIFY(root->property("settingsSidebar").toBool()); QVERIFY(!root->property("tabsFocused").toBool());
+        key(Qt::Key_Up); QCOMPARE(root->property("selected").toInt(), 1);
+        key(Qt::Key_Left); key(Qt::Key_Left); QCOMPARE(root->property("selected").toInt(), 0);
+        key(Qt::Key_Right); key(Qt::Key_Right); key(Qt::Key_Right); key(Qt::Key_Right); QCOMPARE(root->property("selected").toInt(), 3);
+        key(Qt::Key_BracketRight); QCOMPARE(root->property("libraryFilter").toInt(), 1); QCOMPARE(root->property("selected").toInt(), 1); // 收藏
+        key(Qt::Key_BracketLeft); key(Qt::Key_BracketLeft); QCOMPARE(root->property("libraryFilter").toInt(), 0);
+        QCOMPARE(root->property("selected").toInt(), 3);
+        key(Qt::Key_Escape); QCOMPARE(root->property("page").toInt(), 0); QVERIFY(root->property("dockFocused").toBool());
+        for (int i = 0; i < 6; ++i) key(Qt::Key_Right);
+        QCOMPARE(root->property("dockIndex").toInt(), 5);
+        key(Qt::Key_Left); key(Qt::Key_Return); QCOMPARE(root->property("page").toInt(), 2);
+        QVERIFY(root->property("settingsSidebar").toBool());
         key(Qt::Key_Right); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
         key(Qt::Key_Right); QCOMPARE(state.volume(), 65); QVERIFY(!state.dirty()); // ←→ adjust; the release saves.
         key(Qt::Key_Escape); key(Qt::Key_Escape); QCOMPARE(root->property("page").toInt(), 0); QVERIFY(!state.dirty());
@@ -220,7 +253,8 @@ private slots:
             QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, value), Q_ARG(QVariant, repeat)));
         };
         auto release = [&](const QString &value) { QVERIFY(QMetaObject::invokeMethod(root, "release", Q_ARG(QVariant, value))); };
-        action("up"); action("right"); action("right"); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        action("down"); for (int i = 0; i < 4; ++i) action("right");
+        action("accept"); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
         action("right"); QVERIFY(root->property("settingsAdjusting").toBool()); QCOMPARE(state.volume(), 60);
         release("right"); QVERIFY(!root->property("settingsAdjusting").toBool()); QVERIFY(state.dirty()); // The save on release failed.
         action("back");
@@ -366,10 +400,13 @@ private slots:
         // §7.6: Select only on the home page, never B there; no L1/R1 or plain up/down hints.
         action("home"); QVERIFY(labels().contains("收藏")); QVERIFY(labels().contains("快捷面板"));
         QVERIFY(!labels().contains("主页")); QVERIFY(!labels().contains("返回")); QVERIFY(!labels().contains("切页"));
-        action("up"); action("right"); action("down"); QTest::qWait(200);
-        QCOMPARE(root->property("page").toInt(), 1); QVERIFY(labels().contains("主页")); QVERIFY(!labels().contains("快捷面板"));
+        action("down"); QTest::qWait(200); // The dock: open, and the quick panel.
+        QVERIFY(labels().contains("打开")); QVERIFY(labels().contains("快捷面板")); QVERIFY(!labels().contains("收藏"));
+        action("accept"); QTest::qWait(200);
+        QCOMPARE(root->property("page").toInt(), 1); QVERIFY(labels().contains("返回")); QVERIFY(labels().contains("搜索")); QVERIFY(!labels().contains("快捷面板"));
         QCOMPARE(footer->property("context").toString(), QStringLiteral("6 项"));
-        action("up"); action("right"); QTest::qWait(200);
+        action("back"); for (int i = 0; i < 4; ++i) action("right");
+        action("accept"); QTest::qWait(200); QCOMPARE(root->property("page").toInt(), 2);
         QVERIFY(!labels().contains("收藏")); QVERIFY(labels().contains("进入")); QVERIFY(!labels().contains("快捷面板"));
         state.adjust("monitor", 1); QTest::qWait(200);
         auto *outline = root->findChild<QQuickItem *>("settingsFocus"); QVERIFY(outline);
@@ -410,11 +447,12 @@ private slots:
         action("home"); QTest::qWait(200);
         auto *pageContent = root->findChild<QQuickItem *>("pageContent"); QVERIFY(pageContent);
         auto *pageAnimation = root->findChild<QObject *>("pageRevealAnimation"); QVERIFY(pageAnimation);
-        action("up"); action("right"); QTest::qWait(40);
+        root->setProperty("dockIndex", 0); action("down"); action("accept"); QTest::qWait(40); // Dock 游戏库.
         const auto current = pageContent->property("reveal").toReal(); QVERIFY(current > 0 && current < 1);
-        action("right"); QCOMPARE(root->property("page").toInt(), 2);
-        QVERIFY(root->property("settingsSidebar").toBool());
+        action("back"); QCOMPARE(root->property("page").toInt(), 0); // A route change mid-reveal retargets.
         QVERIFY(pageContent->property("reveal").toReal() >= current);
+        for (int i = 0; i < 4; ++i) action("right");
+        action("accept"); QCOMPARE(root->property("page").toInt(), 2); QVERIFY(root->property("settingsSidebar").toBool());
         state.adjust("motion", 1);
         QVERIFY(!pageAnimation->property("running").toBool()); QCOMPARE(pageContent->property("reveal").toReal(), 1.);
         root->setProperty("settingsCategory", 0); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
@@ -770,6 +808,84 @@ private slots:
                 QVERIFY2(contrast(color("cardText"), QColor(card.toString())) >= 3, qPrintable(card.toString()));
         }
     }
+    void homeLibraryAndOptions() {
+        QTemporaryDir directory;
+        Preferences state(directory.filePath("state")); Telemetry metrics(directory.path()); ControllerInput controller;
+        Applications applications; QVERIFY(applications.load(referenceLibrary(directory.path(), state)));
+        Streaming streaming(directory.filePath("streaming")); QQuickView view;
+        view.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(&metrics)}, {"controller", QVariant::fromValue(&controller)},
+            {"applications", QVariant::fromValue(&applications)}, {"streaming", QVariant::fromValue(&streaming)}, {"browserAvailable", true}, {"filesAvailable", true}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready); view.resize(1024, 768); view.show(); QVERIFY(QTest::qWaitForWindowExposed(&view));
+        auto *root = view.rootObject(); root->setProperty("now", ReferenceClock);
+        auto action = [&](const char *name) { QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, QString(name)), Q_ARG(QVariant, false))); };
+        auto app = [&] { return root->property("selectedApplication").toString(); };
+        auto hints = [&] {
+            QStringList result; QList<QQuickItem *> pending{root->findChild<QQuickItem *>("footerHints")};
+            while (!pending.isEmpty()) { auto *item = pending.takeLast(); if (item->objectName() == "hintLabel") result << item->property("text").toString(); pending.append(item->childItems()); }
+            return result;
+        };
+        auto text = [&](const char *name) { auto *item = findItem(root, name); return item ? item->property("text").toString() : QString(); };
+        // §8 home: newest recent first, then favorites; the 全部游戏 card ends the row.
+        QCOMPARE(app(), QString("native.mslug")); QCOMPARE(text("homeTitle"), QString("Metal Slug"));
+        QCOMPARE(text("homeCaption"), QStringLiteral("Neo Geo · 上次游玩 昨天"));
+        QVERIFY(hints().contains("取消收藏")); QVERIFY(hints().contains("开始")); QVERIFY(hints().contains("快捷面板"));
+        action("down"); QVERIFY(root->property("dockFocused").toBool()); QVERIFY(hints().contains("打开"));
+        action("up"); QCOMPARE(app(), QString("native.mslug"));
+        action("right"); QCOMPARE(app(), QString("native.gta3"));
+        action("right"); action("right"); QCOMPARE(app(), QString("native.gtavc"));
+        action("right"); QCOMPARE(app(), QString("native.1944")); // Topped up to five with the first available entry.
+        action("right"); QCOMPARE(root->property("selected").toInt(), -1); QVERIFY(findItem(root, "homeAllCard"));
+        action("right"); QCOMPARE(root->property("selected").toInt(), -1); // No wrap.
+        action("accept"); QCOMPARE(root->property("page").toInt(), 1);
+        // Library: filters 全部/收藏/最近/systems/应用 without wrap; each filter keeps its place.
+        QCOMPARE(root->property("libraryFilters").toStringList(), QStringList({"全部", "收藏", "最近", "Neo Geo", "Ports", "应用"}));
+        auto *footer = root->findChild<QQuickItem *>("footerHints");
+        QCOMPARE(footer->property("context").toString(), QStringLiteral("8 项")); QVERIFY(hints().contains("搜索"));
+        action("prevSection"); QCOMPARE(root->property("libraryFilter").toInt(), 0);
+        action("down"); QCOMPARE(app(), QString("native.stardew")); // Four columns.
+        QVERIFY(!hints().contains("开始")); QVERIFY(hints().contains("选项"));
+        action("accept"); QCOMPARE(root->property("notice").toString(), QStringLiteral("尚未适配，无法启动")); QVERIFY(!applications.running());
+        action("right"); QCOMPARE(root->property("selected").toInt(), 5);
+        for (int i = 0; i < 6; ++i) action("nextSection");
+        QCOMPARE(root->property("libraryFilter").toInt(), 5); QCOMPARE(footer->property("context").toString(), QStringLiteral("3 项"));
+        for (int i = 0; i < 3; ++i) action("prevSection");
+        QCOMPARE(root->property("libraryFilter").toInt(), 2); QCOMPARE(app(), QString("native.mslug")); // 最近, newest first.
+        action("prevSection"); action("prevSection"); QCOMPARE(root->property("selected").toInt(), 5);
+        // Y searches by title; B clears the query before leaving.
+        action("pageAction"); QVERIFY(root->property("editing").toBool()); QCOMPARE(root->property("editPurpose").toString(), QString("librarySearch"));
+        QVERIFY(QMetaObject::invokeMethod(root, "remoteText", Q_ARG(QVariant, QString("gta")))); action("options");
+        QCOMPARE(footer->property("context").toString(), QStringLiteral("“gta” · 1 项")); QCOMPARE(app(), QString("native.gta3"));
+        action("back"); QCOMPARE(root->property("page").toInt(), 1); QCOMPARE(footer->property("context").toString(), QStringLiteral("8 项"));
+        // GameOptions: start, favorite (X), per-game rows disabled with a reason, removal from 最近.
+        root->setProperty("selected", 0); action("options");
+        auto *options = root->findChild<QObject *>("optionsMenu");
+        const auto rows = options->property("items").toList();
+        QStringList ids; for (const auto &row : rows) ids << row.toMap().value("id").toString();
+        QCOMPARE(ids, QStringList({"start", "favorite", "controls", "saves", "forget"}));
+        QCOMPARE(rows[1].toMap().value("button").toString(), QString("X"));
+        QCOMPARE(rows[2].toMap().value("reason").toString(), QStringLiteral("每游戏设置尚未接入"));
+        QCOMPARE(text("optionsSubtitle"), QStringLiteral("Neo Geo · FBNeo"));
+        for (int i = 0; i < 4; ++i) action("down");
+        action("accept"); QVERIFY(!options->property("open").toBool());
+        QCOMPARE(state.recentApplications().first().toMap().value("id").toString(), QString("native.gta3"));
+        // Launching records the entry as most recent; a paused task shows its badge and continues.
+        root->setProperty("selected", 1); action("accept"); QTRY_VERIFY(applications.running());
+        QCOMPARE(state.recentApplications().first().toMap().value("id").toString(), QString("native.1944"));
+        applications.background(); QTRY_VERIFY(!applications.running()); action("home");
+        QCOMPARE(app(), QString("native.1944")); QCOMPARE(text("homeCaption"), QStringLiteral("已暂停 · 从上次的位置继续"));
+        QVERIFY(hints().contains("继续"));
+        // 130%: titles and captions keep their full text.
+        QVERIFY(state.choose("font", 3)); QTest::qWait(100);
+        for (const auto *name : {"homeTitle", "homeCaption"}) QVERIFY2(!findItem(root, name)->property("truncated").toBool(), name);
+        action("down"); action("accept"); QTest::qWait(100);
+        QList<QQuickItem *> pending{root};
+        while (!pending.isEmpty()) {
+            auto *item = pending.takeLast(); pending.append(item->childItems());
+            if (item->objectName() == "libraryTitle") QVERIFY2(!item->property("truncated").toBool(), qPrintable(item->property("text").toString()));
+        }
+        applications.stopAll(); QTRY_VERIFY_WITH_TIMEOUT(!applications.hasTasks(), 4000);
+    }
     void themedPagesLightAndNight() {
         QTemporaryDir directory;
         auto put = [&](const QString &name, const QByteArray &text) {
@@ -781,15 +897,23 @@ private slots:
         put("sys/class/power_supply/rk817-charger/online", "0");
         DeviceState device(directory.path(), false, true);
         Preferences state(directory.filePath("state")); Telemetry metrics(directory.path()); ControllerInput controller;
-        Applications applications; QQuickView view;
+        Applications applications; QVERIFY(applications.load(referenceLibrary(directory.path(), state)));
+        Streaming streaming(directory.filePath("streaming"));
+        QQuickView view;
         view.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(&metrics)}, {"controller", QVariant::fromValue(&controller)},
-            {"device", QVariant::fromValue(&device)}, {"applications", QVariant::fromValue(&applications)}});
+            {"device", QVariant::fromValue(&device)}, {"applications", QVariant::fromValue(&applications)}, {"streaming", QVariant::fromValue(&streaming)},
+            {"browserAvailable", true}, {"filesAvailable", true}});
         view.engine()->addImageProvider("tasks", new TaskImages(&applications));
         view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
         QCOMPARE(view.status(), QQuickView::Ready); view.resize(1024, 768); view.show(); QVERIFY(QTest::qWaitForWindowExposed(&view));
-        auto *root = view.rootObject();
+        auto *root = view.rootObject(); root->setProperty("now", ReferenceClock);
+        const auto fixedClock = ReferenceClock;
         auto action = [&](const char *name) { QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, QString(name)), Q_ARG(QVariant, false))); };
         auto scene = [&](const char *name) { action("home"); QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString(name)))); };
+        const auto environment = QProcessEnvironment::systemEnvironment();
+        QVERIFY(applications.launchPrepared("native.gta3", "/bin/sleep", {"60"}, directory.path(), environment));
+        QTRY_VERIFY(applications.processId() > 1); applications.background();
+        QTRY_VERIFY(applications.tasks().value(0).toMap().value("paused").toBool());
         const auto captures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
         auto release = [&](const char *name) { QVERIFY(QMetaObject::invokeMethod(root, "release", Q_ARG(QVariant, QString(name)))); };
         state.adjust("motion", 1); // Captures show settled pages, not transitions.
@@ -807,10 +931,18 @@ private slots:
                 QVERIFY(state.choose("night", night ? 1 : 0));
                 mode = QString("%1-%2").arg(night ? "night" : "light").arg(percent);
                 QCOMPARE(view.color(), QColor(night ? "#0F1316" : "#F2F4F5"));
-                scene("home"); root->setProperty("selected", 1); capture("home");
+                // HomeNight: 22:18, 41% and the paused GTA III focused.
+                root->setProperty("now", night ? fixedClock.addSecs(5 * 3600 + 39 * 60) : fixedClock);
+                put("sys/class/power_supply/rk817-battery/capacity", night ? "41" : "82"); device.refresh();
+                scene("home"); QCOMPARE(root->property("selectedApplication").toString(), QString("native.mslug"));
+                if (night) { action("right"); QCOMPARE(root->property("selectedApplication").toString(), QString("native.gta3")); }
+                capture("home"); if (night) action("left");
+                action("options"); QTest::qWait(300); capture("options"); action("back");
                 QVERIFY(QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, QStringLiteral("已加入收藏")))); capture("notice");
                 QVERIFY(QMetaObject::invokeMethod(root, "clearNotice"));
-                scene("library"); capture("library");
+                action("down"); capture("home-dock"); action("up");
+                scene("library"); root->setProperty("selected", 1); QCOMPARE(root->property("selectedApplication").toString(), QString("native.1944")); capture("library");
+                scene("tools"); capture("tools");
                 scene("settings"); capture("settings");
                 root->setProperty("settingsCategory", 4); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); capture("settings-display");
                 scene("controller"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); capture("controller");
@@ -823,7 +955,6 @@ private slots:
                 root->setProperty("dimmed", true); capture("dimmed"); root->setProperty("dimmed", false);
             }
         }
-        const auto environment = QProcessEnvironment::systemEnvironment();
         for (const auto *id : {"builtin.files", "builtin.text"}) {
             QVERIFY(applications.launchPrepared(id, "/bin/sleep", {"30"}, directory.path(), environment));
             QTRY_VERIFY(applications.processId() > 1); applications.background();
@@ -836,7 +967,7 @@ private slots:
                 QVERIFY(QMetaObject::invokeMethod(root, "showTasksOrDesktop", Q_ARG(QVariant, true))); capture("tasks");
                 // X held past 600 ms shows the HoldConfirm; releasing before 2 s cancels the force-quit.
                 action("itemAction"); QTest::qWait(HoldCaptureMs); capture("tasks-hold"); release("itemAction");
-                QCOMPARE(applications.tasks().size(), 2);
+                QCOMPARE(applications.tasks().size(), 3);
                 action("back");
             }
         }
@@ -856,7 +987,8 @@ private slots:
         action("quick"); action("down"); action("down"); action("down"); action("accept");
         QVERIFY(state.monitor()); QVERIFY(metrics.active()); action("accept", true); QVERIFY(state.monitor());
         action("accept"); QVERIFY(!metrics.active()); action("back");
-        action("up"); action("right"); action("right");
+        action("down"); for (int i = 0; i < 4; ++i) action("right");
+        action("accept");
         QVERIFY(root->property("settingsSidebar").toBool());
         for (int i = 0; i < 8; ++i) action("down");
         QCOMPARE(root->property("settingsCategory").toInt(), 8);
@@ -913,15 +1045,27 @@ private slots:
     void applicationManifestAndForegroundLifecycle() {
         QTemporaryDir directory; QVERIFY(directory.isValid());
         QFile manifest(directory.filePath("applications.json"));
-        auto write = [&](const QJsonArray &items) {
+        auto write = [&](const QJsonArray &items, int version = 1) {
             QVERIFY(manifest.open(QIODevice::WriteOnly | QIODevice::Truncate));
-            manifest.write(QJsonDocument(QJsonObject{{"version", 1}, {"applications", items}}).toJson()); manifest.close();
+            manifest.write(QJsonDocument(QJsonObject{{"version", version}, {"applications", items}}).toJson()); manifest.close();
         };
         const QJsonObject sleeper{{"id", "game-a"}, {"title", "测试应用"}, {"program", "/bin/sleep"}, {"arguments", QJsonArray{"0.1"}}};
         write({sleeper}); Applications apps; QVERIFY(!apps.hasManifest()); QVERIFY(apps.load(manifest.fileName())); QVERIFY(apps.hasManifest()); QCOMPARE(apps.items().size(), 1);
         QSignalSpy ended(&apps, &Applications::finished);
         QVERIFY(apps.launch(0)); QVERIFY(!apps.launch(0));
         QTRY_COMPARE(ended.size(), 1); QVERIFY(!apps.running()); QVERIFY(apps.error().isEmpty()); QCOMPARE(apps.exitCode(), 0);
+        // Version 2 adds optional system, core and supported; version 1 still rejects them.
+        QJsonObject described = sleeper; described["system"] = "Neo Geo"; described["core"] = "FBNeo";
+        write({described}); QVERIFY(!apps.load(manifest.fileName()));
+        write({described}, 2); QVERIFY(apps.load(manifest.fileName()));
+        QCOMPARE(apps.items()[0].toMap().value("system").toString(), QString("Neo Geo"));
+        QCOMPARE(apps.items()[0].toMap().value("core").toString(), QString("FBNeo"));
+        QVERIFY(apps.items()[0].toMap().value("supported").toBool());
+        described["supported"] = false; write({described}, 2); QVERIFY(apps.load(manifest.fileName()));
+        QVERIFY(!apps.launch(0)); QVERIFY(!apps.running()); QVERIFY(apps.error().contains(QStringLiteral("尚未适配")));
+        for (const auto &bad : {QJsonValue("no"), QJsonValue(1)}) { described["supported"] = bad; write({described}, 2); QVERIFY(!apps.load(manifest.fileName())); }
+        described.remove("supported"); described["system"] = QString(33, 'x'); write({described}, 2); QVERIFY(!apps.load(manifest.fileName()));
+        write({sleeper}, 3); QVERIFY(!apps.load(manifest.fileName()));
         write({sleeper, sleeper}); QVERIFY(!apps.load(manifest.fileName())); QCOMPARE(apps.items().size(), 1);
         QJsonObject failed{{"id", "failure"}, {"title", "失败恢复"}, {"program", "/bin/sh"}, {"arguments", QJsonArray{"-c", "exit 7"}}};
         write({failed}); QVERIFY(apps.load(manifest.fileName())); QVERIFY(apps.launch(0));
@@ -1029,7 +1173,7 @@ private slots:
         view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
         QCOMPARE(view.status(), QQuickView::Ready);
         auto *root = view.rootObject(); QSignalSpy request(root, SIGNAL(browserRequested()));
-        root->setProperty("selected", 6);
+        root->setProperty("selected", 1); // The library's apps: Moonlight, Jume Browser, 文件管理器.
         QVERIFY(QMetaObject::invokeMethod(root, "activateSelected")); QCOMPARE(request.size(), 0);
         root->setProperty("browserAvailable", true);
         QVERIFY(QMetaObject::invokeMethod(root, "activateSelected")); QCOMPARE(request.size(), 1);
@@ -1053,9 +1197,10 @@ private slots:
             QKeyEvent press(QEvent::KeyPress,code,modifiers),release(QEvent::KeyRelease,code,modifiers);
             QCoreApplication::sendEvent(root,&press);QCoreApplication::sendEvent(root,&release);
         };
-        for(const auto code:{Qt::Key_Up,Qt::Key_Right,Qt::Key_Down}) key(code); // Library through the top navigation.
-        QCOMPARE(root->property("page").toInt(),1); QVERIFY(!root->property("tabsFocused").toBool());
-        root->setProperty("selected",7); key(Qt::Key_Return); QCOMPARE(request.size(),0);
+        for(const auto code:{Qt::Key_Down,Qt::Key_Right,Qt::Key_Right,Qt::Key_Right,Qt::Key_Return}) key(code); // Dock 工具.
+        QCOMPARE(root->property("page").toInt(),3);
+        for(int i=0;i<3;++i) key(Qt::Key_Down);
+        QCOMPARE(root->property("toolsIndex").toInt(),3); key(Qt::Key_Return); QCOMPARE(request.size(),0);
         root->setProperty("terminalAvailable",true); key(Qt::Key_Return); QCOMPARE(request.size(),1);
         key(Qt::Key_Q,Qt::ControlModifier); QVERIFY(!root->property("quickOpen").toBool());
         key(Qt::Key_Q); QVERIFY(root->property("quickOpen").toBool()); key(Qt::Key_Escape); // Q is Select, decided on release.
@@ -1080,18 +1225,20 @@ private slots:
         view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
         QCOMPARE(view.status(),QQuickView::Ready);
         auto *root=view.rootObject();QSignalSpy request(root,SIGNAL(filesRequested(bool)));
-        root->setProperty("selected",8);QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));QCOMPARE(request.size(),0);
+        // 文件管理器 is a library app; the editor and transfer are tools (dock 工具, rows 4 and 5).
+        root->setProperty("selected",2);QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));QCOMPARE(request.size(),0);
         root->setProperty("filesAvailable",true);
         for(int i=0;i<2;++i) {
-            root->setProperty("selected",8+i);QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));
+            if(i) QVERIFY(QMetaObject::invokeMethod(root,"openToolEntry",Q_ARG(QVariant,4)));
+            else { root->setProperty("selected",2);QVERIFY(QMetaObject::invokeMethod(root,"activateSelected")); }
             QCOMPARE(request.size(),i+1);QCOMPARE(request.last().first().toBool(),bool(i));
             QVERIFY(applications.launchPrepared(i?"builtin.text":"builtin.files","/bin/sleep",{"10"},directory.path(),QProcessEnvironment::systemEnvironment()));
             QTRY_VERIFY(root->property("sensitiveVisible").toBool());
             root->setProperty("quickOpen",true);QVERIFY(root->property("sensitiveVisible").toBool());root->setProperty("quickOpen",false);
             applications.stop();QTRY_VERIFY(!applications.running());QVERIFY(!root->property("sensitiveVisible").toBool());
         }
-        QSignalSpy transferRequest(root,SIGNAL(transferRequested()));root->setProperty("selected",10);
-        QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));QCOMPARE(transferRequest.size(),1);
+        QSignalSpy transferRequest(root,SIGNAL(transferRequested()));
+        QVERIFY(QMetaObject::invokeMethod(root,"openToolEntry",Q_ARG(QVariant,5)));QCOMPARE(transferRequest.size(),1);
         QVERIFY(applications.launchPrepared("builtin.transfer","/bin/sleep",{"10"},directory.path(),QProcessEnvironment::systemEnvironment()));
         QTRY_VERIFY(root->property("sensitiveVisible").toBool());applications.stop();QTRY_VERIFY(!applications.running());
         QFile manifest(directory.filePath("applications.json"));QVERIFY(manifest.open(QIODevice::WriteOnly));
@@ -1103,8 +1250,8 @@ private slots:
         custom.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));QCOMPARE(custom.status(),QQuickView::Ready);
         root=custom.rootObject();QSignalSpy customRequest(root,SIGNAL(filesRequested(bool)));QVERIFY(root->property("customApplications").toBool());
         root->setProperty("selected",1);QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));QCOMPARE(customRequest.size(),1);QVERIFY(!customRequest.last().first().toBool());
-        root->setProperty("selected",2);QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));QCOMPARE(customRequest.size(),2);QVERIFY(customRequest.last().first().toBool());
-        QSignalSpy customTransfer(root,SIGNAL(transferRequested()));root->setProperty("selected",3);QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));QCOMPARE(customTransfer.size(),1);
+        QVERIFY(QMetaObject::invokeMethod(root,"openToolEntry",Q_ARG(QVariant,4)));QCOMPARE(customRequest.size(),2);QVERIFY(customRequest.last().first().toBool());
+        QSignalSpy customTransfer(root,SIGNAL(transferRequested()));QVERIFY(QMetaObject::invokeMethod(root,"openToolEntry",Q_ARG(QVariant,5)));QCOMPARE(customTransfer.size(),1);
     }
     void streamingStatistics() {
         QTemporaryDir directory; Streaming stream(directory.path());

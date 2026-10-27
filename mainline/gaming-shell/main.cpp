@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
     parser.addOptions({
         {"state-dir", "Required preview state directory (use external workspace).", "path"},
         {"capture", "Save this preview window as PNG, then exit.", "path"},
-        {"scene", "Initial scene: home, library, settings, about, quick, session, performance, controller, power, input, streaming, neo, ports or usb.", "name", "home"},
+        {"scene", "Initial scene: home, library, tools, settings, about, quick, session, performance, controller, power, input, streaming, neo, ports or usb.", "name", "home"},
         {"quit-after", "Exit after the specified seconds (1..3600).", "seconds"},
         {"fullscreen", "Show fullscreen; does not establish a global overlay."},
         {"control-dir", "Opt-in private local UI control directory; no network listener.", "path"},
@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
     const auto state = parser.value("state-dir");
     auto scene = parser.value("scene");
     if (state.isEmpty() || !QDir::isAbsolutePath(state) ||
-        !QStringList{"home", "library", "settings", "about", "quick", "session", "performance", "controller", "power", "input", "streaming", "neo", "ports", "usb"}.contains(scene)) {
+        !QStringList{"home", "library", "tools", "settings", "about", "quick", "session", "performance", "controller", "power", "input", "streaming", "neo", "ports", "usb"}.contains(scene)) {
         qCritical("Use --state-dir with an absolute external path and a valid --scene."); return 2;
     }
     bool durationOk = true;

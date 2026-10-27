@@ -4,8 +4,9 @@ import QtQuick.Shapes
 
 // §5 game card. Without a cover it shows the system color with 135° stripes (white 7%, 14 px);
 // apps with an icon use the plain color and a centered white icon; unavailable items are sunken
-// and carry a reason badge. Home cards (256, r24) show the title on the card, grid cards (212, r20)
-// leave it to the label below. Focus lifts the card to 1.04 with a shadow and the focus ring.
+// and carry a reason badge; `plain` apps sit on the surface with the icon in their color. Home cards
+// (256, r24) show the title on the card, grid cards (212, r20) leave it to the label below and
+// thumbnails (72) only show the art. Focus lifts the card to 1.04 with a shadow and the focus ring.
 Item {
     id: card
     required property string title
@@ -18,10 +19,12 @@ Item {
     property bool selected: false
     property bool showTitle: Math.min(width, height) >= Theme.homeCardSize
     property bool available: true
+    property bool plain: false
     property bool focusOutline: true
     property bool reducedMotion: Theme.reducedMotion
     property real fontScale: Theme.fontScale
-    readonly property real cornerRadius: Math.min(width, height) >= Theme.homeCardSize ? Theme.radiusCard : Theme.radiusGridCard
+    readonly property real cornerRadius: Math.min(width, height) >= Theme.homeCardSize ? Theme.radiusCard
+        : Math.min(width, height) >= Theme.gridCard ? Theme.radiusGridCard : Theme.radiusRow
     readonly property real stripePeriod: 2 * Theme.stripeWidth / Math.SQRT2
     signal activated()
     signal focused()
@@ -36,9 +39,9 @@ Item {
         anchors.fill: parent
         preferredRendererType: Shape.CurveRenderer
         ShapePath {
-            strokeWidth: card.available ? -1 : 1; strokeColor: card.available ? "transparent" : Theme.outline
-            fillColor: card.available ? card.cardColor : Theme.surfaceSunken
-            fillGradient: card.available && card.iconName === "" ? stripes : null
+            strokeWidth: card.available && !card.plain ? -1 : 1; strokeColor: card.available && !card.plain ? "transparent" : Theme.outline
+            fillColor: !card.available ? Theme.surfaceSunken : card.plain ? Theme.surface : card.cardColor
+            fillGradient: card.available && !card.plain && card.iconName === "" ? stripes : null
             PathRectangle { width: art.width; height: art.height; radius: card.cornerRadius }
         }
         LinearGradient {
@@ -53,8 +56,9 @@ Item {
     }
     Icon {
         anchors.centerIn: parent; anchors.verticalCenterOffset: card.showTitle ? -Theme.space16 : 0
-        width: 64; height: 64; visible: card.iconName !== ""; name: card.iconName
-        color: card.available ? Theme.cardText : Theme.textTertiary
+        width: Math.min(64, Math.round(card.width * 0.4)); height: width; visible: card.iconName !== ""; name: card.iconName
+        // Night lifts a plain app's icon color off the dark surface.
+        color: !card.available ? Theme.textTertiary : !card.plain ? Theme.cardText : Theme.night ? Qt.lighter(card.cardColor, 1.6) : card.cardColor
     }
     // Status capsule: top right on a card, top left as the reason on an unavailable item.
     Rectangle {
@@ -81,8 +85,8 @@ Item {
         x: Theme.space24; width: parent.width - 2 * Theme.space24
         anchors.bottom: parent.bottom; anchors.bottomMargin: Theme.space24
         visible: card.showTitle; spacing: Theme.space4
-        Label { width: parent.width; role: "title"; fontScale: card.fontScale; text: card.title; color: card.available ? Theme.cardText : Theme.textSecondary }
-        Label { width: parent.width; role: "caption"; fontScale: card.fontScale; visible: card.subtitle !== ""; text: card.subtitle; color: card.available ? Theme.alpha(Theme.cardText, 0.88) : Theme.textTertiary }
+        Label { width: parent.width; role: "title"; fontScale: card.fontScale; text: card.title; color: !card.available ? Theme.textSecondary : card.plain ? Theme.text : Theme.cardText }
+        Label { width: parent.width; role: "caption"; fontScale: card.fontScale; visible: card.subtitle !== ""; text: card.subtitle; color: !card.available ? Theme.textTertiary : card.plain ? Theme.textSecondary : Theme.alpha(Theme.cardText, 0.88) }
     }
     Rectangle {
         objectName: "cardFocus"

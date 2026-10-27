@@ -82,8 +82,8 @@ def main():
             def observe(image=False):
                 nonlocal latest
                 latest = control.exchange(ipc / "control.sock", request(screenshot=image)); remember("observe", latest["state"]); return latest
-            tap("up"); tap("right"); tap("down")  # Library through the top navigation.
-            tap("down"); tap("down"); assert tap("right")["selected"] == 7
+            tap("down"); assert tap("accept")["page"] == 1  # The dock's 游戏库.
+            tap("down"); tap("right"); tap("right"); assert tap("right")["selected"] == 7  # Four columns.
             tap("itemAction")
             assert latest["state"]["selectedFavorite"] and latest["state"]["selectedApplication"] == "app-7"
             saved = json.loads((state / "preview.json").read_text())
@@ -100,7 +100,7 @@ def main():
             assert record.read_text() == "app-7\nliteral $(not-a-command)\n"
             frame = observe(True); assert frame["capture"]["status"] == "ok"
             if args.evidence: control.save_result(args.evidence, frame)
-            tap("right"); assert latest["state"]["selected"] == 8
+            tap("down"); tap("left"); assert latest["state"]["selected"] == 8  # No wrap: down to the last row, then left.
             tap("accept"); deadline = time.monotonic() + 4
             while observe()["state"]["externalSession"]:
                 assert time.monotonic() < deadline; time.sleep(0.1)

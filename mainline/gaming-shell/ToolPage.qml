@@ -114,19 +114,14 @@ Item {
         anchors.fill: parent; visible: !view.catalogOpen
         Ui.PageHeader {
             width: parent.width
-            title: view.sidebar || view.kind === "usb" ? view.heading : view.current.title || view.heading
-            actionText: view.sidebar && view.kind === "ports" && view.tools.catalogAvailable ? "游戏目录" : ""
-            onActionRequested: view.openCatalog()
-            iconName: view.kind === "neo" ? "cartridge" : view.kind === "ports" ? "ports" : "usb"
-            backVisible: true
-            onBackRequested: if (!view.sidebar && view.kind !== "usb") view.returnToList(); else view.backRequested()
-            subtitle: view.tools.error || (view.tools.busy ? "正在处理…" : view.sidebar ? "选择游戏" : view.kind === "usb" ? view.facts.status || "USB 输出尚未启用" : view.current.status || "")
+            subtitle: view.tools.error || (view.tools.busy ? "正在处理…" : view.sidebar ? "" : view.kind === "usb" ? view.facts.status || "USB 输出尚未启用"
+                : [view.current.title, view.current.status].filter(function(part) { return !!part }).join(" · "))
             error: !!view.tools.error
             busy: view.tools.busy
         }
         Ui.ListView {
             id: games; objectName: "toolGames"
-            y: Ui.Theme.contentY; width: Ui.Theme.sidebarWidth * 2; height: parent.height - y
+            y: Ui.Theme.pageStatusHeight; width: Ui.Theme.sidebarWidth * 2; height: parent.height - y
             visible: view.sidebar && view.kind !== "usb"; model: view.entries; currentIndex: view.selected
             delegate: Ui.ListRow {
                 required property var modelData; required property int index
@@ -157,7 +152,7 @@ Item {
                 property alias rowsView: details
                 Ui.ListView {
                     id: details; objectName: "toolRows"
-                    y: Ui.Theme.contentY; width: parent.width; height: parent.height - y
+                    y: Ui.Theme.pageStatusHeight; width: parent.width; height: parent.height - y
                     model: view.rows; currentIndex: view.row
                     delegate: Ui.ListRow {
                         required property var modelData; required property int index

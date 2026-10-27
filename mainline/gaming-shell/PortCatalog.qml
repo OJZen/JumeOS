@@ -95,13 +95,12 @@ Item {
     }
     Component.onCompleted: load()
     Ui.PageHeader {
-        width: parent.width; title: "PortMaster 目录"; iconName: "ports"; backVisible: true
-        actionText: view.installedOnly ? "全部游戏" : "已安装"; onActionRequested: view.filter(); onBackRequested: view.back()
+        width: parent.width
         subtitle: view.tools.error || (view.tools.busy ? "正在处理…" : (view.query ? view.query + " · " : "") + String(view.tools.catalogInfo.total || 0) + " 项")
         error: !!view.tools.error; busy: view.tools.busy; progress: view.tools.progress
     }
     Ui.ListView {
-        id: games; objectName: "catalogGames"; y: Ui.Theme.contentY; width: Ui.Theme.sidebarWidth; height: parent.height - y
+        id: games; objectName: "catalogGames"; y: Ui.Theme.pageStatusHeight; width: Ui.Theme.sidebarWidth; height: parent.height - y
         model: view.entries; currentIndex: view.selected
         delegate: Ui.ListRow {
             required property var modelData; required property int index
@@ -112,7 +111,7 @@ Item {
         }
     }
     Item {
-        id: info; x: Ui.Theme.detailX; y: Ui.Theme.contentY; width: parent.width - x; height: parent.height - y
+        id: info; x: Ui.Theme.detailX; y: Ui.Theme.pageStatusHeight; width: parent.width - x; height: parent.height - y
         visible: !!view.detail.id
         Column {
             id: introduction; width: parent.width; spacing: Ui.Theme.gap
@@ -132,11 +131,11 @@ Item {
         }
         Ui.Label { id: status; anchors.bottom: parent.bottom; width: parent.width; role: "caption"; text: !view.detail.compatible ? "尚未确认此游戏的运行条件" : view.detail.installed ? "启动适配尚未完成" : view.detail.readyToRun ? "包含游戏数据" : "需要自行提供原版游戏数据" }
     }
-    Ui.Label { x: Ui.Theme.detailX; y: Ui.Theme.contentY; width: parent.width - x; visible: !view.detail.id; role: "caption"; text: view.entries.length ? "选择游戏查看详情" : "START 刷新目录 · X 搜索游戏" }
+    Ui.Label { x: Ui.Theme.detailX; y: Ui.Theme.pageStatusHeight; width: parent.width - x; visible: !view.detail.id; role: "caption"; text: view.entries.length ? "选择游戏查看详情" : "START 刷新目录 · X 搜索游戏" }
     // The clip keeps the ring with the lists while rows scroll; it is widened by the ring itself.
     Item {
         readonly property real ring: Ui.Theme.focusGap + Ui.Theme.focusWidth
-        x: -ring; y: Ui.Theme.contentY - ring; width: parent.width + 2 * ring; height: parent.height - Ui.Theme.contentY + 2 * ring; clip: true
+        x: -ring; y: Ui.Theme.pageStatusHeight - ring; width: parent.width + 2 * ring; height: parent.height - Ui.Theme.pageStatusHeight + 2 * ring; clip: true
         Ui.FocusFrame {
             x: parent.ring + (view.sidebar ? 0 : Ui.Theme.detailX)
             y: parent.ring + (view.sidebar ? (games.currentItem ? games.currentItem.y - games.contentY : 0) : details.y + (details.currentItem ? details.currentItem.y - details.contentY : 0))
@@ -163,9 +162,9 @@ Item {
                 if (event.key === Qt.Key_Escape || event.key === Qt.Key_Q || event.key === Qt.Key_M) readme.close()
                 else if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) view.dispatch(event.key === Qt.Key_Up ? "up" : "down", event.isAutoRepeat)
             }
-            Ui.PageHeader { width: parent.width; title: "安装说明"; backVisible: true; onBackRequested: readme.close() }
+            Ui.PageHeader { width: parent.width; subtitle: "安装说明" + (view.detail.title ? " · " + view.detail.title : "") }
             Flickable {
-                id: prose; y: Ui.Theme.contentY; width: parent.width; height: parent.height - y; clip: true
+                id: prose; y: Ui.Theme.pageStatusHeight; width: parent.width; height: parent.height - y; clip: true
                 contentWidth: width; contentHeight: text.implicitHeight; boundsBehavior: Flickable.StopAtBounds
                 Ui.Label { id: text; width: parent.width; wrapMode: Text.Wrap; text: view.detail.instructions || "" }
                 T.ScrollBar.vertical: Ui.ScrollBar {

@@ -54,7 +54,7 @@ Item {
     readonly property bool testInputVisible: editing && testInputCapture && editPurpose === "test"
     readonly property bool portCatalogOpen: toolView.item !== null && toolView.item.catalogOpen
     readonly property int portCatalogTotal: tools ? Number(tools.catalogInfo.total || 0) : 0
-    readonly property bool remoteTextAllowed: editing && !quickOpen && !choicesOpen && !dimmed && !screenOff && !externalSession && (editPurpose === "portSearch" || testInputVisible)
+    readonly property bool remoteTextAllowed: editing && !quickOpen && !choicesOpen && !dimmed && !screenOff && !externalSession && (editPurpose === "portSearch" || editPurpose === "librarySearch" || testInputVisible)
     readonly property int portCatalogIndex: toolView.item ? toolView.item.catalogIndex : 0
     readonly property bool portCatalogSidebar: !toolView.item || toolView.item.catalogSidebar
     readonly property bool sensitiveVisible: tasksVisible || (externalSession && ["builtin.browser", "builtin.terminal", "builtin.files", "builtin.text", "builtin.transfer"].includes(activeApplication)) || (editing && !testInputVisible) || (streaming !== null && streaming.pin.length > 0)
@@ -66,7 +66,7 @@ Item {
     readonly property bool applicationError: applications !== null && applications.error.length > 0
     readonly property int applicationExitCode: applications ? applications.exitCode : 0
     readonly property string selectedApplication: (applications || tools) && games[selected] ? (games[selected].id || "") : ""
-    readonly property bool selectedFavorite: games[selected] ? ((applications || tools) ? store.applicationFavorites.indexOf(games[selected].id) >= 0 : store.favorites.indexOf(selected) >= 0) : false
+    readonly property bool selectedFavorite: entryFavorite(selected)
     property bool keyboardEnabled: false
     readonly property bool keyboardReady: virtualKeyboard.status === Loader.Ready
     readonly property var inputMethod: Qt.inputMethod
@@ -83,7 +83,7 @@ Item {
     // §7.5: held directions speed up after 2 s in lists, never in grids or on the keyboard.
     Binding {
         target: root.controller; property: "fastRepeat"; when: root.controller !== null
-        value: !root.editing && (root.quickOpen || root.choicesOpen || root.toolOpen || root.streamingOpen || root.page === 2)
+        value: !root.editing && (root.quickOpen || root.choicesOpen || root.toolOpen || root.streamingOpen || root.page >= 2)
     }
     // B repeats only as the keyboard's backspace (§7.5); pages take one B per press.
     Binding { target: root.controller; property: "backRepeat"; when: root.controller !== null; value: root.editing }
@@ -98,10 +98,19 @@ Item {
     readonly property bool settingsDetailReady: settingsView.detailReady
     property alias testingController: settingsView.tester
     width: 1024; height: 768; focus: true
+    // Pages: 0 home, 1 library, 2 settings, 3 tools. `selected` is the focused entry of `games`
+    // (-1 on the 全部游戏 card or the dock); the home row, library grid and tools list keep their own position.
     property int page: 0
     property int selected: 0
     property alias settingsIndex: settingsView.rowIndex
-    property bool tabsFocused: false
+    property int homeIndex: 0
+    property bool dockFocused: false
+    property int dockIndex: 0
+    property int libraryFilter: 0
+    property int libraryIndex: 0
+    property var libraryPositions: ({})
+    property string libraryQuery: ""
+    property int toolsIndex: 0
     property bool quickOpen: false
     property int quickIndex: 0
     property bool session: false
@@ -137,59 +146,191 @@ Item {
     readonly property var quickHints: (quickIndex >= 2 ? [{button: "A", label: quickIndex < 4 ? "切换" : "确定"}]
             : !hardware || (quickIndex === 1 && device.controls) ? [{button: "dpadH", label: "调整"}] : [])
         .concat([{button: "B", label: gameOverlay ? "返回游戏" : "关闭"}])
-    readonly property string activateLabel: customApplications ? "启动" : tools ? "打开" : streaming && selected === 0 ? "主机管理" : "打开演示"
+    readonly property var focusedEntry: page < 2 && !dockFocused ? games[selected] || null : null
+    readonly property var focusedTask: focusedEntry ? entryTask(focusedEntry) : null
+    readonly property string activateLabel: focusedTask ? "继续" : focusedEntry && focusedEntry.route ? "打开" : "开始"
     // §7.6: the hint bar comes from declared actions; Select appears only on the home page, B never
     // there, and plain up/down moves are not hinted.
-    readonly property var pageExit: page === 0 ? [{button: "Select", label: "快捷面板"}] : [{button: "B", label: "主页"}]
+    readonly property var pageExit: page === 0 ? [{button: "Select", label: "快捷面板"}] : [{button: "B", label: "返回"}]
+    readonly property var cardHints: !focusedEntry ? [{button: "A", label: "打开"}]
+        : (focusedEntry.reason ? [] : [{button: "A", label: activateLabel}])
+            .concat([{button: "X", label: selectedFavorite ? "取消收藏" : "收藏"}, {button: "Start", label: "选项"}])
     readonly property var controlHints: toolOpen && toolView.item ? toolView.item.hints
         : streamingOpen ? streamingView.hints
         : session ? [{button: "dpad", label: "移动"}, {button: "B", label: "结束演示"}]
         : page === 2 ? settingsView.hints
-        : tabsFocused ? [{button: "dpadH", label: "切换页面"}, {button: "A", label: "进入"}].concat(pageExit)
-        : games.length === 0 ? pageExit
-        : [{button: "A", label: activateLabel}, {button: "X", label: selectedFavorite ? "取消收藏" : "收藏"}, {button: "Start", label: "选项"}].concat(pageExit)
-    readonly property string controlContext: !toolOpen && !streamingOpen && !session && page === 1 ? games.length + " 项" : ""
-    readonly property var games: customApplications ? applications.items.concat(builtinGames.filter(function(entry) {
-        return (["files", "text", "transfer"].includes(entry.route) && root.filesAvailable) || (entry.route === "terminal" && root.terminalAvailable)
-    })) : tools ? builtinGames : demoGames
-    readonly property var builtinGames: [
-        {id: "builtin.moonlight", title: "Moonlight", detail: "电脑游戏串流", palette: 2, route: "streaming", icon: "monitor"},
-        {id: "builtin.neo", title: "Neo 模拟器", detail: "Neo Geo 游戏与配置", palette: 0, route: "neo", icon: "cartridge"},
-        {id: "builtin.ports", title: "PortMaster", detail: "移植游戏与存档", palette: 1, route: "ports", icon: "ports"},
-        {id: "builtin.usb", title: "USB 手柄", detail: "手柄映射与配置", palette: 4, route: "usb", icon: "usb"},
-        {id: "builtin.controller", title: "摇杆测试", detail: "查看按键与摇杆", palette: 3, route: "controller", icon: "gamepad"},
-        {id: "builtin.settings", title: "设置", detail: "设备与界面", palette: 1, route: "settings", icon: "settings"},
-        {id: "builtin.browser", title: "Jume Browser", detail: browserAvailable ? "Chromium 掌机浏览器 · 开发预览" : "浏览器运行时尚未安装", palette: 2, route: "browser", icon: "monitor"},
-        {id: "builtin.terminal", title: "终端", detail: terminalAvailable ? "Bash · 请连接 USB 键盘" : "终端运行时尚未安装", palette: 4, route: "terminal", icon: "terminal"},
-        {id: "builtin.files", title: "文件管理器", detail: filesAvailable ? "分区 · U 盘 · 文件预览" : "文件运行时尚未安装", palette: 4, route: "files", icon: "folder"},
-        {id: "builtin.text", title: "文本编辑器", detail: filesAvailable ? "UTF-8 · 原子保存 · USB 键盘" : "文件运行时尚未安装", palette: 1, route: "text", icon: "document"},
-        {id: "builtin.transfer", title: "文件传输", detail: filesAvailable ? "Wi-Fi · 扫码上传与下载" : "文件运行时尚未安装", palette: 1, route: "transfer", icon: "folder"}
+        : page === 3 ? (builtinTools[toolsIndex] && !builtinTools[toolsIndex].reason ? [{button: "A", label: "打开"}] : []).concat(pageExit)
+        : page === 1 ? (libraryEntries.length ? cardHints : []).concat([{button: "Y", label: "搜索"}]).concat(pageExit)
+        : cardHints.concat(pageExit)
+    readonly property string controlContext: toolOpen || streamingOpen || session || page !== 1 ? ""
+        : (libraryQuery ? "“" + libraryQuery + "” · " : "") + libraryEntries.length + " 项"
+    readonly property string pageTitle: toolOpen ? (portCatalogOpen ? "PortMaster 目录" : ({neo: "Neo 模拟器", ports: "PortMaster", usb: "USB 手柄"})[toolRoute] || "")
+        : streamingOpen ? "串流" : session ? "" : ["", "游戏库", "设置", "工具"][page]
+    // §8 entries: manifest items plus installed built-in apps, the built-in apps alone, or the
+    // labelled demos. Tools sit behind the dock's 工具 and settings behind 设置.
+    readonly property var games: customApplications
+        ? applications.items.map(function(item) { return Object.assign({}, item, {reason: item.supported === false ? "尚未适配" : ""}) })
+            .concat(builtinApps.filter(function(entry) { return entry.route === "streaming" ? root.streaming !== null : !entry.reason }))
+        : tools ? builtinApps : demoGames
+    readonly property var builtinApps: [
+        {id: "builtin.moonlight", title: "Moonlight", detail: "电脑游戏串流", palette: 2, route: "streaming", icon: "streaming"},
+        {id: "builtin.browser", title: "Jume Browser", detail: browserAvailable ? "Chromium 掌机浏览器 · 开发预览" : "浏览器运行时尚未安装",
+            palette: 2, route: "browser", icon: "globe", plain: true, reason: browserAvailable ? "" : "尚未安装"},
+        {id: "builtin.files", title: "文件管理器", detail: filesAvailable ? "分区 · U 盘 · 文件预览" : "文件运行时尚未安装",
+            tint: Ui.Theme.focus, route: "files", icon: "folder", plain: true, reason: filesAvailable ? "" : "尚未安装"}
     ]
+    readonly property var builtinTools: [
+        {id: "builtin.neo", title: "Neo 模拟器", detail: "Neo Geo 游戏与配置", route: "neo", icon: "cartridge"},
+        {id: "builtin.ports", title: "PortMaster", detail: "移植游戏与存档", route: "ports", icon: "ports"},
+        {id: "builtin.usb", title: "USB 手柄", detail: "手柄映射与配置", route: "usb", icon: "usb"},
+        {id: "builtin.terminal", title: "终端", detail: "Bash · 请连接 USB 键盘", route: "terminal", icon: "terminal"},
+        {id: "builtin.text", title: "文本编辑器", detail: "UTF-8 · 原子保存 · USB 键盘", route: "text", icon: "document"},
+        {id: "builtin.transfer", title: "文件传输", detail: "Wi-Fi · 扫码上传与下载", route: "transfer", icon: "folder"}
+    ].map(function(entry) {
+        entry.reason = ["neo", "ports", "usb"].includes(entry.route) ? (tools ? "" : "工具服务未启动")
+            : entry.route === "terminal" ? (terminalAvailable ? "" : "终端运行时尚未安装") : (filesAvailable ? "" : "文件运行时尚未安装")
+        return entry
+    })
+    readonly property var dockItems: [
+        {id: "library", label: "游戏库", icon: "grid"}, {id: "streaming", label: "串流", icon: "streaming"},
+        {id: "files", label: "文件", icon: "folder"}, {id: "tools", label: "工具", icon: "briefcase"},
+        {id: "settings", label: "设置", icon: "settings"}, {id: "power", label: "电源", icon: "power"}
+    ]
+    // Home row: recent entries, newest first, then favorites, topped up to five with the first
+    // available entries so a new device still shows a row.
+    readonly property var homeEntries: {
+        const result = []
+        const add = function(index) { if (index >= 0 && result.indexOf(index) < 0 && result.length < 12) result.push(index) }
+        store.recentApplications.forEach(function(recent) { add(games.findIndex(function(game) { return game.id === recent.id })) })
+        games.forEach(function(game, index) { if (entryFavorite(index)) add(index) })
+        games.forEach(function(game, index) { if (!game.reason && result.length < 5) add(index) })
+        return result
+    }
+    readonly property var libraryFilters: {
+        const systems = []
+        games.forEach(function(game) { if (game.system && systems.indexOf(game.system) < 0) systems.push(game.system) })
+        return ["全部", "收藏", "最近"].concat(systems).concat(games.some(function(game) { return !game.system }) ? ["应用"] : [])
+    }
+    readonly property var libraryEntries: {
+        const filter = libraryFilters[Math.min(libraryFilter, libraryFilters.length - 1)]
+        const query = libraryQuery.toLowerCase()
+        const matches = function(game, index) {
+            return (!query || game.title.toLowerCase().indexOf(query) >= 0)
+                && (filter === "全部" || filter === "最近" || (filter === "收藏" && entryFavorite(index)) || (filter === "应用" && !game.system) || game.system === filter)
+        }
+        if (filter === "最近") return store.recentApplications.map(function(recent) { return games.findIndex(function(game) { return game.id === recent.id }) })
+            .filter(function(index) { return index >= 0 && matches(games[index], index) })
+        const result = []
+        games.forEach(function(game, index) { if (matches(game, index)) result.push(index) })
+        return result
+    }
+    function entryFavorite(index) {
+        const game = games[index]
+        if (!game) return false
+        return (applications || tools) ? store.applicationFavorites.indexOf(game.id) >= 0 : store.favorites.indexOf(index) >= 0
+    }
+    function entryTask(game) {
+        if (!applications || !game || !game.id) return null
+        return applications.tasks.find(function(task) { return task.id === game.id }) || null
+    }
+    function entryBadge(game) {
+        const task = entryTask(game)
+        return !task ? "" : task.paused ? "已暂停" : "运行中"
+    }
+    // Stable color per entry: an explicit tint or palette slot, else a hash of the ID.
+    function entryColor(index) {
+        const game = games[index]
+        if (!game) return Ui.Theme.cardColor(0)
+        if (game.tint) return game.tint
+        if (game.palette !== undefined) return Ui.Theme.cardColor(game.palette)
+        const key = game.id || game.title
+        let hash = 0
+        for (let i = 0; i < key.length; ++i) hash = (hash * 131 + key.charCodeAt(i)) % 2147483647
+        return Ui.Theme.cardColor(hash)
+    }
+    function entryCaption(game) {
+        const task = entryTask(game)
+        const recent = store.recentApplications.find(function(entry) { return entry.id === game.id })
+        if (task) return task.paused ? "已暂停 · 从上次的位置继续" : "运行中 · 在后台继续"
+        return [game.system || game.detail, recent ? "上次游玩 " + playedText(recent.playedAt) : ""].filter(function(part) { return !!part }).join(" · ")
+    }
+    function playedText(seconds) {
+        const day = function(date) { return Math.floor(new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() / 86400000) }
+        const days = day(now) - day(new Date(seconds * 1000))
+        return days <= 0 ? "今天" : days === 1 ? "昨天" : days < 30 ? days + " 天前" : Qt.formatDate(new Date(seconds * 1000), "M月d日")
+    }
+    // The row and grid positions follow `selected`, so tests and remote state can set either.
+    function syncSelected() {
+        selected = page === 1 ? (libraryEntries[libraryIndex] !== undefined ? libraryEntries[libraryIndex] : -1)
+            : page === 0 && !dockFocused && homeIndex < homeEntries.length ? homeEntries[homeIndex] : -1
+    }
+    onSelectedChanged: {
+        if (page === 0 && homeEntries.indexOf(selected) >= 0) { homeIndex = homeEntries.indexOf(selected); dockFocused = false }
+        else if (page === 1 && libraryEntries.indexOf(selected) >= 0) libraryIndex = libraryEntries.indexOf(selected)
+    }
+    onHomeEntriesChanged: if (page === 0 && !dockFocused) {
+        const kept = homeEntries.indexOf(selected)
+        homeIndex = kept >= 0 ? kept : Math.min(homeIndex, homeEntries.length)
+        syncSelected()
+    }
+    onLibraryEntriesChanged: if (page === 1) { libraryIndex = Math.max(0, Math.min(libraryIndex, libraryEntries.length - 1)); syncSelected() }
+    function switchLibraryFilter(index) {
+        if (index < 0 || index >= libraryFilters.length || index === libraryFilter) return
+        const positions = Object.assign({}, libraryPositions)
+        positions[libraryFilters[libraryFilter]] = libraryIndex
+        libraryPositions = positions
+        libraryFilter = index
+        libraryIndex = Math.min(positions[libraryFilters[index]] || 0, Math.max(0, libraryEntries.length - 1))
+        syncSelected()
+    }
+    function openDock(index) {
+        const id = dockItems[index].id
+        if (id === "library" || id === "settings" || id === "tools") { changePage(["", "library", "settings", "tools"].indexOf(id)); return }
+        if (id === "power") { showScene("power"); return }
+        if (id === "files") {
+            if (!filesAvailable) notify("请先安装 Jume Files 运行时")
+            else { recordLaunch("builtin.files"); filesRequested(false) }
+            return
+        }
+        if (streaming) { showScene("streaming"); return }
+        const moonlight = games.findIndex(function(game) { return game.route === "streaming" || game.id === "moonlight" || game.title === "Moonlight" })
+        if (moonlight < 0) { notify("串流尚未配置"); return }
+        selected = moonlight; activateSelected()
+    }
+    function openToolEntry(index) {
+        const entry = builtinTools[index]
+        if (!entry) return
+        if (entry.reason) { notify(entry.reason); return }
+        if (["neo", "ports", "usb"].includes(entry.route)) { openTool(entry.route); return }
+        recordLaunch(entry.id)
+        if (entry.route === "terminal") terminalRequested()
+        else if (entry.route === "transfer") transferRequested()
+        else filesRequested(true)
+    }
+    function recordLaunch(id) { if (id && store.recordRecent(id)) store.save() }
     function openTool(kind) {
         if (!tools || !["neo", "ports", "usb"].includes(kind) || !tools.save()) return
         streamingOpen = false; session = false; toolRoute = kind; clearNotice(); tools.inspect(kind)
     }
     function closeTool() { if (tools && !tools.save()) return false; toolRoute = ""; clearNotice(); root.forceActiveFocus(); return true }
     readonly property var demoGames: [
-        {title: "Moonlight", detail: "电脑游戏串流", palette: 2},
-        {title: "像素远征", detail: "街机 · 示例游戏", palette: 0},
-        {title: "夜航", detail: "Game Gear · 示例游戏", palette: 1},
-        {title: "方块花园", detail: "Game Boy · 示例游戏", palette: 4},
-        {title: "星际快线", detail: "街机 · 示例游戏", palette: 3},
-        {title: "海岛来信", detail: "掌机 · 示例游戏", palette: 1}
+        {title: "Moonlight", detail: "电脑游戏串流", palette: 2, icon: "streaming", route: "streaming"},
+        {title: "像素远征", detail: "示例游戏", system: "街机", palette: 0},
+        {title: "夜航", detail: "示例游戏", system: "Game Gear", palette: 1},
+        {title: "方块花园", detail: "示例游戏", system: "Game Boy", palette: 4},
+        {title: "星际快线", detail: "示例游戏", system: "街机", palette: 3},
+        {title: "海岛来信", detail: "示例游戏", system: "掌机", palette: 1}
     ]
     function showScene(name) {
         toolRoute = ""
         if (["neo", "ports", "usb"].includes(name)) {
-            if (tools && !customApplications) {
-                const entry = games.findIndex(function(game) { return game.route === name })
-                if (entry >= 0) { page = entry < 3 ? 0 : 1; selected = entry }
-            }
+            page = 3; toolsIndex = Math.max(0, builtinTools.findIndex(function(entry) { return entry.route === name }))
             openTool(name); return
         }
         streamingOpen = name === "streaming"
         if (streamingOpen && streaming) streaming.refresh()
-        page = name === "library" ? 1 : (["settings", "about", "controller", "power", "input"].indexOf(name) >= 0 ? 2 : 0)
+        page = name === "library" ? 1 : name === "tools" ? 3 : (["settings", "about", "controller", "power", "input"].indexOf(name) >= 0 ? 2 : 0)
+        syncSelected()
         session = name === "session"
         quickOpen = name === "quick"
         if (page === 2) settingsView.enter()
@@ -205,7 +346,7 @@ Item {
         toolRoute = ""
         if (page === 2 && !store.save()) return
         clearNotice()
-        page = Math.max(0, Math.min(2, value)); selected = 0; tabsFocused = false
+        page = Math.max(0, Math.min(3, value)); syncSelected()
         settingsView.enter()
         root.forceActiveFocus()
     }
@@ -256,6 +397,8 @@ Item {
         const value = inputField.text; const purpose = editPurpose
         if (purpose === "portSearch") {
             if (!toolView.item || !toolView.item.search(value)) return
+        } else if (purpose === "librarySearch") {
+            libraryQuery = value.trim(); libraryIndex = 0; syncSelected()
         } else if (purpose === "wifiPassword") {
             if (!network || !network.connectSelected(value)) return
         } else if (purpose !== "test" && streaming) {
@@ -298,10 +441,13 @@ Item {
     function activateSelected() {
         if (!sharedReady) return
         if (!games[selected]) return
+        if (games[selected].reason === "尚未适配") { notify("尚未适配，无法启动"); return }
+        if (games[selected].route === "streaming" && streaming) { showScene("streaming"); clearNotice(); return }
         if (tools && games[selected].route) {
             const route = games[selected].route
             if (["files", "text", "transfer"].includes(route)) {
                 if (!filesAvailable) { notify("请先安装 Jume Files 运行时"); return }
+                recordLaunch(games[selected].id)
                 if (route === "transfer") transferRequested()
                 else filesRequested(route === "text")
                 return
@@ -312,15 +458,18 @@ Item {
             }
             if (route === "browser") {
                 if (!browserAvailable) { notify("请先安装 Jume Browser 预览运行时"); return }
-                browserRequested(); return
+                recordLaunch(games[selected].id); browserRequested(); return
             }
             if (["neo", "ports", "usb"].includes(route)) openTool(route)
             else showScene(route)
             return
         }
-        if (streaming && !customApplications && selected === 0) { streamingOpen = true; streaming.refresh(); clearNotice(); return }
-        if (customApplications) { if (store.save()) { clearNotice(); applications.launch(selected) }; return }
-        session = true; tabsFocused = false; sessionMoves = 0; avatarX = 480; avatarY = 350
+        if (customApplications) {
+            const id = games[selected].id
+            if (store.save()) { clearNotice(); if (applications.launch(selected)) recordLaunch(id) }
+            return
+        }
+        session = true; sessionMoves = 0; avatarX = 480; avatarY = 350
         notify(selected === 0 ? "串流演示 · 尚未连接电脑" : "交互演示 · 未启动模拟器")
     }
     // §7.5 page-layer holds: the task page's X (2 s force-quit) and the controller test's B (1 s exit).
@@ -366,27 +515,36 @@ Item {
     }
     // §7.3 Start: every action of the focused card, task or tool page, unavailable ones with a reason.
     property var optionsOwner: null
+    // §8 GameOptions: start, favorite (X), per-game controls and saves (disabled until G2 lands)
+    // and removal from 最近; built-in apps skip the per-game rows.
     function cardOptions() {
         const game = games[selected]
         if (!game) return []
-        const items = [{id: "start", label: activateLabel, button: "A"}, {id: "favorite", label: selectedFavorite ? "取消收藏" : "收藏", button: "X"}]
-        if (game.route) return items
-        return items.concat([{id: "controls", label: "按键与画面", reason: "每游戏设置尚未接入"}, {id: "saves", label: "存档管理", reason: "每游戏设置尚未接入"}])
+        const items = [{id: "start", label: focusedTask ? "继续" : game.route ? "打开" : "开始游戏", icon: "play", reason: game.reason || ""},
+                       {id: "favorite", label: selectedFavorite ? "取消收藏" : "收藏", icon: "star", button: "X"}]
+        if (!game.route) items.push({id: "controls", label: "按键与画面", icon: "gamepad", reason: "每游戏设置尚未接入"},
+                                    {id: "saves", label: "存档管理", icon: "save", reason: "每游戏设置尚未接入"})
+        if (store.recentApplications.some(function(recent) { return recent.id === game.id }))
+            items.push({id: "forget", label: "从“最近”中移除", icon: "history-off"})
+        return items
     }
     function openOptions() {
-        let owner = null, title = "", items = []
+        let owner = null, title = "", items = [], header = null
         if (tasksVisible && taskPage.item) {
             owner = taskPage.item; items = owner.optionItems(); title = owner.currentTask ? owner.currentTask.title : ""
         } else if (toolOpen && toolView.item) {
             owner = toolView.item; items = owner.optionItems(); title = owner.optionTitle
-        } else if (!streamingOpen && !session && page < 2 && !tabsFocused && games[selected]) {
-            owner = root; items = cardOptions(); title = games[selected].title
+        } else if (!streamingOpen && !session && page < 2 && focusedEntry) {
+            owner = root; items = cardOptions(); title = focusedEntry.title
+            header = {subtitle: [focusedEntry.system || focusedEntry.detail, focusedEntry.core].filter(function(part) { return !!part }).join(" · "),
+                      color: entryColor(selected), icon: focusedEntry.icon || "", plain: !!focusedEntry.plain}
         }
-        if (owner && optionsMenu.present(title, items)) optionsOwner = owner
+        if (owner && optionsMenu.present(title, items, header)) optionsOwner = owner
     }
     function runOption(id) {
         if (id === "start") activateSelected()
         else if (id === "favorite") toggleFavorite()
+        else if (id === "forget" && games[selected] && store.removeRecent(games[selected].id)) store.save()
     }
     function toggleFavorite() {
         if (!games[selected]) return
@@ -454,13 +612,14 @@ Item {
         if (action === "quick") { quickIndex = 0; quickOpen = true; return }
         if (action === "options") { openOptions(); return }
         if (toolOpen) {
-            if (action === "home") { if (closeTool()) changePage(0) }
+            if (action === "home") { if (closeTool()) { dockFocused = false; homeIndex = 0; changePage(0) } }
             else if (toolView.item && !toolView.item.dispatch(action, repeated)) closeTool()
             return
         }
+        // Back home (Select+Start): the focus returns to the most recent card.
         if (action === "home") {
             if (!store.save()) return
-            session = false; changePage(0); return
+            session = false; dockFocused = false; homeIndex = 0; changePage(0); return
         }
         if (session) {
             if (action === "back") session = false
@@ -477,26 +636,45 @@ Item {
             if (!settingsView.dispatch(action, repeated) && store.save()) changePage(0)
             return
         }
-        // Home B does nothing (§7.4); the library returns home.
-        if (action === "back") { if (page === 1) changePage(0); return }
-        if (tabsFocused) {
-            if (action === "left" || action === "right") {
-                changePage(page + (action === "right" ? 1 : -1)); tabsFocused = page !== 2
-            } else if (action === "down" || action === "accept") tabsFocused = false
+        if (page === 3) {
+            if (action === "back") changePage(0)
+            else if (action === "up") toolsIndex = Math.max(0, toolsIndex - 1)
+            else if (action === "down") toolsIndex = Math.min(builtinTools.length - 1, toolsIndex + 1)
+            else if (action === "pageUp" || action === "pageDown") toolsIndex = action === "pageUp" ? 0 : builtinTools.length - 1
+            else if (action === "accept") openToolEntry(toolsIndex)
             return
         }
-        const columns = 3
-        const count = page === 0 ? Math.min(3, games.length) : games.length
-        if (count === 0) { if (action === "up") tabsFocused = true; return }
-        if (action === "left") selected = Math.max(0, selected - 1)
-        else if (action === "right") selected = Math.min(count - 1, selected + 1)
-        else if (action === "up") { if (selected < columns) tabsFocused = true; else selected -= columns }
-        else if (action === "down") selected = Math.min(count - 1, selected + columns)
-        else if (action === "accept") activateSelected()
-        else if (action === "itemAction") toggleFavorite()
-        // Library pages hold two full rows.
-        else if (page === 1 && (action === "pageUp" || action === "pageDown"))
-            selected = Math.max(0, Math.min(count - 1, selected + (action === "pageDown" ? 2 : -2) * columns))
+        if (page === 1) { libraryDispatch(action); return }
+        // Home (§7.4): the card row and the dock; B does nothing.
+        if (dockFocused) {
+            if (action === "left") dockIndex = Math.max(0, dockIndex - 1)
+            else if (action === "right") dockIndex = Math.min(dockItems.length - 1, dockIndex + 1)
+            else if (action === "up") { dockFocused = false; syncSelected() }
+            else if (action === "accept") openDock(dockIndex)
+            return
+        }
+        if (action === "left" || action === "right") {
+            homeIndex = Math.max(0, Math.min(homeEntries.length, homeIndex + (action === "right" ? 1 : -1))); syncSelected()
+        } else if (action === "down") { dockFocused = true; syncSelected() }
+        else if (action === "accept") { if (homeIndex === homeEntries.length) changePage(1); else activateSelected() }
+        else if (action === "itemAction" && focusedEntry) toggleFavorite()
+    }
+    // Library grid (§7.4): no wrap at the edges; L1/R1 filters, L2/R2 a screen of two rows, Y search.
+    function libraryDispatch(action) {
+        const columns = Ui.Theme.gridColumns, count = libraryEntries.length
+        if (action === "back") { if (libraryQuery) { libraryQuery = ""; libraryIndex = 0; syncSelected() } else changePage(0); return }
+        if (action === "prevSection" || action === "nextSection") { switchLibraryFilter(libraryFilter + (action === "nextSection" ? 1 : -1)); return }
+        if (action === "pageAction") { openTextEditor("搜索游戏", libraryQuery, "librarySearch"); return }
+        if (count === 0) return
+        let index = libraryIndex
+        if (action === "left") { if (index % columns > 0) index-- }
+        else if (action === "right") { if (index % columns < columns - 1 && index < count - 1) index++ }
+        else if (action === "up") { if (index >= columns) index -= columns }
+        else if (action === "down") { if (Math.floor(index / columns) < Math.floor((count - 1) / columns)) index = Math.min(count - 1, index + columns) }
+        else if (action === "pageUp" || action === "pageDown") index = Math.max(0, Math.min(count - 1, index + (action === "pageDown" ? 2 : -2) * columns))
+        else if (action === "accept") { activateSelected(); return }
+        else if (action === "itemAction") { toggleFavorite(); return }
+        libraryIndex = index; syncSelected()
     }
     // §7.8 desktop preview keys; Select (Q) decides on release like the controller.
     readonly property var previewKeys: ({[Qt.Key_Left]: "left", [Qt.Key_Right]: "right", [Qt.Key_Up]: "up", [Qt.Key_Down]: "down",
@@ -592,17 +770,12 @@ Item {
             Item {
             anchors.fill: parent; visible: !root.gameOverlay
             Ui.TopBar {
+                objectName: "topBar"
                 x: Ui.Theme.margin; width: Ui.Theme.contentWidth; fontScale: root.fontScale
-                note: root.hardware ? "" : "本地界面预览"
+                title: root.pageTitle; note: root.hardware ? "" : "本地界面预览"
                 wifiSignal: root.wifiSignal; batteryPercent: root.batteryPercent
                 charging: root.batteryState === "charging" || root.batteryState === "full"
                 clock: root.clockText
-            }
-            Ui.Tabs {
-                x: Ui.Theme.margin; y: 100; visible: !root.session && !root.streamingOpen && !root.toolOpen
-                model: ["主页", "游戏库", "设置"]; currentIndex: root.page; shoulderHints: false
-                navigationActive: root.tabsFocused && !root.quickOpen
-                onActivated: function(index) { root.changePage(index) }
             }
             }
             Ui.Page {
@@ -610,43 +783,37 @@ Item {
                 anchors.fill: parent; enabled: !root.externalSession; visible: !root.gameOverlay
                 route: root.toolOpen ? root.toolRoute : root.streamingOpen ? "streaming" : String(root.page)
                 reducedMotion: root.motionReduced
-            Item {
-                x: Ui.Theme.margin; y: 173; width: Ui.Theme.contentWidth; height: 500; visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page < 2
-                Column {
-                    id: homeHeading; spacing: Ui.Theme.space4
-                    Ui.Label { text: root.page === 0 ? ((root.applications || root.tools) ? "应用与游戏" : "继续游玩") : "游戏库"; color: Ui.Theme.text; role: "title" }
-                    Ui.Label { text: (root.applications || root.tools) ? (root.page === 0 ? "常用入口" : "全部") + " · " + (root.page === 0 ? Math.min(3, root.games.length) : root.games.length) + " 项" : root.page === 0 ? "最近使用 · 3 个演示入口" : "全部 6 项 · 示例内容"; role: "caption"; color: Ui.Theme.textSecondary }
-                }
-                Ui.Label { anchors.centerIn: parent; visible: root.games.length === 0; text: "暂无应用"; color: Ui.Theme.textSecondary; role: "label" }
-                GridView {
-                    id: gameGrid; objectName: "gameGrid"
-                    // Cards start below the heading; larger fonts push them down instead of overlapping.
-                    x: -12; y: Math.max(79, homeHeading.height); width: parent.width + 24; height: 421; clip: true
-                    cellWidth: width / 3; cellHeight: root.page === 0 ? 350 : 198
-                    model: root.page === 0 ? Math.min(3, root.games.length) : root.games.length
-                    currentIndex: root.selected
-                    boundsBehavior: Flickable.StopAtBounds
-                    onCurrentIndexChanged: if (currentIndex >= 0) positionViewAtIndex(currentIndex, GridView.Contain)
-                    delegate: Item {
-                        id: tile; required property int index
-                        width: gameGrid.cellWidth; height: gameGrid.cellHeight
-                        Ui.GameCard {
-                            x: 12; y: 12
-                            width: parent.width - 23; height: root.page === 0 ? 330 : 178
-                            title: root.games[tile.index].title; subtitle: root.games[tile.index].detail
-                            cardColor: Ui.Theme.cardColor(root.games[tile.index].palette !== undefined ? root.games[tile.index].palette : tile.index)
-                            iconName: root.games[tile.index].icon || ""; showTitle: true
-                            selected: root.selected === tile.index && !root.tabsFocused && !root.quickOpen
-                            favorite: (root.applications || root.tools) ? root.store.applicationFavorites.indexOf(root.games[tile.index].id) >= 0 : root.store.favorites.indexOf(tile.index) >= 0
-                            reducedMotion: root.store.reducedMotion; fontScale: root.fontScale
-                            onFocused: { root.selected = tile.index; root.tabsFocused = false; root.forceActiveFocus() }
-                            onActivated: { root.selected = tile.index; root.activateSelected() }
-                        }
-                    }
-                }
+            HomeView {
+                id: homeView; objectName: "homeView"
+                anchors.fill: parent; visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page === 0
+                shell: root; entries: root.homeEntries; index: root.homeIndex; dockFocused: root.dockFocused; dockIndex: root.dockIndex
+                active: !root.quickOpen; fontScale: root.fontScale; reducedMotion: root.motionReduced
+                onIndexChanged: if (root.homeIndex !== index) { root.homeIndex = index; root.syncSelected() }
+                onDockFocusedChanged: if (root.dockFocused !== dockFocused) { root.dockFocused = dockFocused; root.syncSelected() }
+                onDockIndexChanged: root.dockIndex = dockIndex
+                onCardActivated: function(position) { root.forceActiveFocus(); root.dispatch("accept", false) }
+                onDockActivated: function(position) { root.forceActiveFocus(); root.openDock(position) }
+            }
+            LibraryView {
+                id: libraryView; objectName: "libraryView"
+                anchors.fill: parent; visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page === 1
+                shell: root; entries: root.libraryEntries; filters: root.libraryFilters; filter: root.libraryFilter; index: root.libraryIndex
+                active: !root.quickOpen; fontScale: root.fontScale; reducedMotion: root.motionReduced
+                onIndexChanged: if (root.libraryIndex !== index) { root.libraryIndex = index; root.syncSelected() }
+                onCardActivated: function(position) { root.forceActiveFocus(); root.activateSelected() }
+                onFilterActivated: function(position) { root.forceActiveFocus(); root.switchLibraryFilter(position) }
+            }
+            ToolsView {
+                id: toolsView; objectName: "toolsView"
+                x: Ui.Theme.margin; y: Ui.Theme.pageTop; width: Ui.Theme.contentWidth; height: Ui.Theme.pageHeight
+                visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page === 3
+                items: root.builtinTools; index: root.toolsIndex
+                active: !root.quickOpen; fontScale: root.fontScale; reducedMotion: root.motionReduced
+                onIndexChanged: root.toolsIndex = index
+                onActivated: function(position) { root.forceActiveFocus(); root.openToolEntry(position) }
             }
             Loader {
-                id: toolView; objectName: "toolView"; x: Ui.Theme.margin; y: Ui.Theme.toolTop; width: Ui.Theme.contentWidth; height: Ui.Theme.toolHeight
+                id: toolView; objectName: "toolView"; x: Ui.Theme.margin; y: Ui.Theme.pageTop; width: Ui.Theme.contentWidth; height: Ui.Theme.pageHeight
                 active: root.toolOpen && root.tools !== null; visible: active
                 sourceComponent: ToolPage {
                     tools: root.tools; kind: root.toolRoute
@@ -658,7 +825,7 @@ Item {
             SettingsView {
                 id: settingsView; x: Ui.Theme.margin; y: 178; width: Ui.Theme.contentWidth; height: 493
                 testerHold: root.holdAction === "testerExit" ? root.holdRing : -1
-                navigationActive: root.windowVisible && !root.quickOpen && !root.tabsFocused && !root.editing && !root.dimmed
+                navigationActive: root.windowVisible && !root.quickOpen && !root.editing && !root.dimmed
                 visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page === 2
                 store: root.store; metrics: root.metrics; controller: root.controller; device: root.device; network: root.network
                 browserVersions: root.browserVersions
@@ -685,7 +852,7 @@ Item {
                 Rectangle { x: root.avatarX; y: root.avatarY; width: 38; height: 38; radius: 10; color: Ui.Theme.accent }
             }
             Loader {
-                id: streamingView; x: Ui.Theme.margin; y: Ui.Theme.toolTop; width: Ui.Theme.contentWidth; height: Ui.Theme.toolHeight
+                id: streamingView; x: Ui.Theme.margin; y: Ui.Theme.pageTop; width: Ui.Theme.contentWidth; height: Ui.Theme.pageHeight
                 visible: root.streamingOpen && root.streaming !== null
                 active: root.streaming !== null
                 readonly property var hints: item ? item.hints : []
