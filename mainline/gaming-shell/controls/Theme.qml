@@ -15,6 +15,8 @@ QtObject {
     // §2 colors: same token, light or night value.
     readonly property color ground: night ? "#0F1316" : "#F2F4F5"
     readonly property color surface: night ? "#1A2024" : "#FFFFFF"
+    // surface at zero alpha: the start of a fade into surface (no grey band in the gradient).
+    readonly property color surfaceClear: night ? "#001A2024" : "#00FFFFFF"
     readonly property color surfaceSunken: night ? "#252C31" : "#E8ECEE"
     readonly property color outline: night ? "#343D44" : "#D9DEE2"
     readonly property color text: night ? "#EDF1F3" : "#14181B"

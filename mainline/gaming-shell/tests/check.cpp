@@ -300,7 +300,8 @@ private slots:
         QCOMPARE(settings->property("openedCategory").toInt(), 0);
         QVERIFY(!root->findChild<QQuickItem *>("settingsItems")); // Moving through categories builds no detail.
         // Resting 300 ms previews the category's rows from data at hand; the focus stays on the category.
-        QTRY_VERIFY(root->findChild<QQuickItem *>("settingsItems"));
+        QTest::qWait(200); QVERIFY(!root->findChild<QQuickItem *>("settingsItems"));
+        QTRY_VERIFY_WITH_TIMEOUT(root->findChild<QQuickItem *>("settingsItems"), 1000);
         QVERIFY(root->property("settingsSidebar").toBool()); QVERIFY(!root->property("settingsDetailReady").toBool());
         QCOMPARE(settings->property("rows").toList().size(), 12);
         QVERIFY(!root->findChild<QQuickItem *>("settingsDetailFocus")->isVisible());
@@ -366,7 +367,7 @@ private slots:
         // §8: the old categories merge into eight; every row shows a value or why it has none, never "—".
         const QList<QStringList> expected{{"wifi", "netScan"}, {"brightness", "screenOff", "night", "font", "motion"}, {"volume", "audioOutput"},
             {"tester", "input"}, {"dim", "screenOffNow", "battery", "reboot", "poweroff"},
-            {"cpuAuto", "cpuPreset", "cpuGovernor", "cpuMin", "cpuMax", "cpuCurrent", "swap", "zram", "zramAlgorithms", "zramMemory", "pressure", "monitor", "monitorDetail"},
+            {"monitor", "monitorDetail", "cpuAuto", "cpuPreset", "cpuGovernor", "cpuMin", "cpuMax", "cpuCurrent", "swap", "zram", "zramAlgorithms", "zramMemory", "pressure"},
             {"storage"}, {"", "systemCpu", "memory", "temperature", "thermal", "gpuFrequency", "", "", "", "browser", "browser", "browser"}};
         QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString("settings"))));
         for (int category = 0; category < 8; ++category) {
@@ -385,6 +386,8 @@ private slots:
         // Preview reasons: device rows say so; frame and stream details wait for a game or stream.
         auto reasonOf = [&](const char *key) { return call("rowReason", QVariantMap{{"key", key}}); };
         QCOMPARE(reasonOf("cpuPreset"), QStringLiteral("预览中不可用"));
+        // Governor and frequency limits without a reading are disabled as such.
+        for (const char *key : {"cpuGovernor", "cpuMin", "cpuMax"}) QCOMPARE(reasonOf(key), QStringLiteral("暂无读数"));
         QCOMPARE(reasonOf("audioOutput"), QStringLiteral("暂不支持"));
         // 控制器: A on 摇杆测试 starts the test; the B hold returns to the row.
         root->setProperty("settingsCategory", 3); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
@@ -1250,6 +1253,15 @@ private slots:
         auto *options=root->findChild<QObject *>("optionsMenu");QVERIFY(options);
         action("options");QVERIFY(options->property("open").toBool());
         if(!captures.isEmpty()){QTest::qWait(300);QVERIFY(view.grabWindow().save(captures+"/tasks-options.png"));}
+        // A notice while the menu is open sits 16 px above the sheet, clear of it.
+        {
+            QVERIFY(QMetaObject::invokeMethod(root,"notify",Q_ARG(QVariant,QStringLiteral("暂不支持")),Q_ARG(QVariant,false)));
+            auto *toast=root->findChild<QQuickItem *>("notice");QTRY_VERIFY(toast->isVisible());
+            auto *menu=qobject_cast<QQuickItem *>(options);
+            QCOMPARE(toast->parentItem(),menu->parentItem()); // Canvas units, before the window's scale.
+            QTRY_COMPARE(toast->y()+toast->height()+16,options->property("coverTop").toReal());
+            QVERIFY(QMetaObject::invokeMethod(root,"clearNotice"));
+        }
         action("back");QVERIFY(!options->property("open").toBool());QVERIFY(root->property("tasksVisible").toBool());
         // The force row carries a soft "按住 X" badge; choosing it only points at the hold.
         action("options");action("down");action("down");
@@ -1962,6 +1974,10 @@ QtObject {
                 const auto small = smallText(view.contentItem(), percent / 100.); QVERIFY2(small.isEmpty(), qPrintable(small.join(", ")));
                 if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + QString("/quick-game-%1-%2.png").arg(night ? "night" : "light").arg(percent)));
             }
+            // Key combinations show on every action row or on none, never wrapped; all fit at 100%.
+            auto keysShown = [&](const char *id) { return findItem(findItem(root, id), "quickActionKeys")->isVisible(); };
+            QCOMPARE(keysShown("quickAction-home"), keysShown("quickAction-tasks"));
+            if (percent == 100) QVERIFY(keysShown("quickAction-home"));
         }
         action("back"); QVERIFY(!root->property("quickOpen").toBool());
         // On the desktop the overlay drops below the top bar and the Hud returns to the center.
@@ -2068,7 +2084,7 @@ QtObject {
         QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("0"));
         tap("accept");QVERIFY(!root->property("screenOff").toBool());
         QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("159"));
-        root->setProperty("settingsCategory",5);root->setProperty("settingsIndex",1);tap("accept");tap("down");tap("down");tap("accept"); // 性能 › 频率预设
+        root->setProperty("settingsCategory",5);root->setProperty("settingsIndex",3);tap("accept");tap("down");tap("down");tap("accept"); // 性能 › 频率预设
         QCOMPARE(get(cpu+"scaling_governor"),QByteArray("performance"));
         const auto captures=qEnvironmentVariable("R46H_UI_CAPTURE_DIR");QTest::qWait(200);
         if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+"/device-cpu.png"));
@@ -2308,8 +2324,35 @@ QtObject {
             }
         }
         QVERIFY(state.choose("font", 1)); QVERIFY(state.choose("night", 0)); state.adjust("motion", 1);
-        QVERIFY(QMetaObject::invokeMethod(inputMethod.data(), "commitFirst"));
-        QTRY_VERIFY(!field->property("text").toString().isEmpty());
+        // Composing: the hints page and commit. Up from the top row enters the candidate bar (no key
+        // keeps the focus), → picks the second candidate, A commits it and the focus returns to a key.
+        auto *panel = qvariant_cast<QObject *>(root->findChild<QObject *>("virtualKeyboard")->property("item")); QVERIFY(panel);
+        auto *hints = root->findChild<QObject *>("editorHints"); QVERIFY(hints);
+        QTRY_VERIFY(hints->property("composing").toBool());
+        auto *candidateView = keyboard->findChild<QQuickItem *>("wordCandidateView"); QVERIFY(candidateView);
+        QVariant second; QVERIFY(QMetaObject::invokeMethod(panel, "candidateText", Q_RETURN_ARG(QVariant, second), Q_ARG(QVariant, 1)));
+        QVERIFY(!second.toString().isEmpty());
+        for (int i = 0; i < 4 && !panel->property("candidateFocus").toBool(); ++i) dispatch("up");
+        QVERIFY2(panel->property("candidateFocus").toBool(), qPrintable(keyboardState()));
+        QVERIFY(!inputArea->property("initialKey").value<QObject *>());
+        QCOMPARE(candidateView->property("currentIndex").toInt(), 0);
+        dispatch("left"); QCOMPARE(candidateView->property("currentIndex").toInt(), 0); // No wrap.
+        dispatch("right"); QCOMPARE(candidateView->property("currentIndex").toInt(), 1);
+        dispatch("accept");
+        QTRY_COMPARE(field->property("text").toString(), second.toString());
+        QTRY_VERIFY(!panel->property("candidateFocus").toBool());
+        QTRY_VERIFY(!focusedText().isEmpty());
+        QVERIFY(!hints->property("composing").toBool());
+        // Y commits the default candidate; B in the bar returns to the keys without committing.
+        QVERIFY(QMetaObject::invokeMethod(inputMethod.data(), "typePinyin"));
+        QTRY_VERIFY(hints->property("composing").toBool());
+        for (int i = 0; i < 4 && !panel->property("candidateFocus").toBool(); ++i) dispatch("up");
+        QVERIFY(panel->property("candidateFocus").toBool());
+        dispatch("back"); QVERIFY(!panel->property("candidateFocus").toBool()); QVERIFY(!focusedText().isEmpty());
+        QVERIFY(hints->property("composing").toBool());
+        QVariant first; QVERIFY(QMetaObject::invokeMethod(panel, "candidateText", Q_RETURN_ARG(QVariant, first), Q_ARG(QVariant, 0)));
+        dispatch("pageAction");
+        QTRY_COMPARE(field->property("text").toString(), second.toString() + first.toString());
         QVERIFY(field->property("text").toString().front().unicode() > 127);
         state.adjust("font", 1); state.adjust("font", 1); state.adjust("monitor", 1);
         QTest::qWait(200);

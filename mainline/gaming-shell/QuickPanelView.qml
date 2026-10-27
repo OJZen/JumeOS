@@ -10,6 +10,15 @@ Column {
     required property var shell
     property string current: ""
     property real fontScale: Ui.Theme.fontScale
+    // Key combinations show on every action row or on none: one that does not fit beside its label
+    // hides them all, never wrapped.
+    readonly property bool actionKeysShown: {
+        for (let i = 0; i < actionRows.count; ++i) {
+            const row = actionRows.itemAt(i)
+            if (row && row.visible && !row.keysFit) return false
+        }
+        return true
+    }
     spacing: Ui.Theme.space12
     component Ring: Rectangle {
         anchors.fill: parent; anchors.margins: -(Ui.Theme.focusGap + Ui.Theme.focusWidth)
@@ -83,12 +92,12 @@ Column {
     Column {
         width: parent.width
         Repeater {
+            id: actionRows
             model: [{id: "home", label: "回到主页", icon: "home", keys: ["Select", "Start"]}, {id: "tasks", label: "任务切换", icon: "tasks", keys: ["Select", "Y"]},
                     {id: "end", label: "结束游戏…", icon: "x-circle", keys: []}]
             Item {
                 id: action
                 required property var modelData
-                // A key combination that does not fit beside the label is left out as a whole, never wrapped.
                 readonly property bool keysFit: actionLabel.x + actionLabel.implicitWidth + Ui.Theme.space8 + keys.implicitWidth + Ui.Theme.space16 <= width
                 objectName: "quickAction-" + modelData.id
                 visible: content.shell.quickAvailable(modelData.id)
@@ -104,7 +113,7 @@ Column {
                 }
                 Row {
                     id: keys
-                    objectName: "quickActionKeys"; visible: action.keysFit
+                    objectName: "quickActionKeys"; visible: content.actionKeysShown && action.modelData.keys.length > 0
                     x: action.width - width - Ui.Theme.space16; y: (action.height - height) / 2; spacing: Ui.Theme.space4
                     Repeater {
                         model: action.modelData.keys

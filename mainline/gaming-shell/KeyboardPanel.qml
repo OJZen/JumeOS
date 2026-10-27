@@ -8,7 +8,8 @@ import QtQuick.VirtualKeyboard.Styles
 // Keys are 64 high, r12, on a 20-column grid; special keys carry their controller badge
 // (⇧ X, ⌫ B, 空格 Y, 123 R2, 中/英 L2, 完成 Start). The focus ring is the navigation highlight.
 // One key always has the focus: the last one used (q at first), restored after a layout reload,
-// a touch or text typed on a USB keyboard or over IPC.
+// a touch or text typed on a USB keyboard or over IPC. While composing pinyin the focus may rest
+// on the candidate bar instead.
 InputPanel {
     id: panel
     property bool reducedMotion: Ui.Theme.reducedMotion
@@ -17,7 +18,7 @@ InputPanel {
     readonly property Item focusedKey: keyboard.keyboardInputArea.initialKey
     onFocusedKeyChanged: {
         if (focusedKey) { if (focusedKey.text) keyFocused(focusedKey.text) }
-        else Qt.callLater(focusKey, lastKey)
+        else if (!candidateFocus) Qt.callLater(focusKey, lastKey)
     }
     function findKey(item, text) {
         if (!item) return null
@@ -31,7 +32,7 @@ InputPanel {
     }
     function focusKey(text) {
         const area = keyboard.keyboardInputArea, layout = keyboard.keyboardLayoutLoader.item
-        if (area.initialKey || !layout) return
+        if (area.initialKey || !layout || candidateFocus) return
         const key = findKey(layout, text) || findKey(layout, "q") || findKey(layout, "1")
         if (!key) return
         keyboard.navigationModeActive = true
@@ -74,9 +75,68 @@ InputPanel {
                 best = key; row = at.y; distance = Math.abs(at.x - from.x)
             }
         }
-        if (!best) return down || keyboard.wordCandidateView.count === 0
+        if (!best) { if (!down && composing) enterCandidates(); return true }
         area.navigationCursor = best.mapToItem(area, best.width / 2, best.height / 2)
         area.initialKey = best
+        return true
+    }
+    // §8 candidates while composing: Up from the top row enters the bar (the key focus is parked),
+    // ←→ choose without wrapping, A commits, ↓ or B return to the keys. Y commits the highlighted
+    // candidate (the default one unless chosen) and L1/R1 page through the bar.
+    readonly property ListView candidates: keyboard.wordCandidateView
+    readonly property bool composing: candidates.count > 0 && InputContext.preeditText.length > 0
+    property bool candidateFocus: false
+    property Item candidateReturn: null
+    onComposingChanged: if (!composing && candidateFocus) leaveCandidates()
+    function showCandidate(index) {
+        candidates.currentIndex = Math.max(0, Math.min(candidates.count - 1, index))
+        candidates.positionViewAtIndex(candidates.currentIndex, ListView.Contain)
+    }
+    function enterCandidates() {
+        const area = keyboard.keyboardInputArea
+        candidateReturn = area.initialKey
+        candidateFocus = true
+        area.initialKey = null
+        showCandidate(candidates.currentIndex)
+    }
+    function leaveCandidates() {
+        const area = keyboard.keyboardInputArea, key = candidateReturn
+        candidateFocus = false; candidateReturn = null
+        if (key && key.visible) {
+            area.navigationCursor = key.mapToItem(area, key.width / 2, key.height / 2)
+            area.initialKey = key
+        } else focusKey(lastKey)
+    }
+    function commitCandidate(index) {
+        candidates.model.selectItem(Math.max(0, index))
+        if (candidateFocus && !composing) leaveCandidates()
+    }
+    function candidateText(index) { return candidates.model ? String(candidates.model.dataAt(index)) : "" }
+    // A page: the first candidate cut off at the right edge leads the next page; the previous page
+    // ends on the first one now shown.
+    function pageCandidates(step) {
+        const middle = candidates.height / 2
+        if (step > 0) {
+            const next = candidates.indexAt(candidates.contentX + candidates.width - 1, middle)
+            const target = next < 0 ? candidates.count - 1 : next
+            candidates.currentIndex = target
+            candidates.positionViewAtIndex(target, ListView.Beginning)
+        } else {
+            const first = Math.max(0, candidates.indexAt(candidates.contentX + 1, middle))
+            candidates.positionViewAtIndex(first, ListView.End)
+            candidates.currentIndex = Math.max(0, candidates.indexAt(candidates.contentX + 1, middle))
+        }
+    }
+    // The shell's actions while composing; false leaves the action to the keys.
+    function candidateAction(action) {
+        if (!composing) return false
+        if (action === "pageAction") commitCandidate(candidates.currentIndex)
+        else if (action === "prevSection" || action === "nextSection") pageCandidates(action === "nextSection" ? 1 : -1)
+        else if (!candidateFocus) return false
+        else if (action === "left" || action === "right") showCandidate(candidates.currentIndex + (action === "right" ? 1 : -1))
+        else if (action === "down" || action === "back") leaveCandidates()
+        else if (action === "accept") commitCandidate(candidates.currentIndex)
+        else if (action !== "up") return false
         return true
     }
     // §7.4 keyboard keys outside the key grid: X 大小写, L2 中/英, R2 符号. Shift uses the same
@@ -179,6 +239,23 @@ InputPanel {
         id: candidateBackground
         Rectangle { color: Ui.Theme.surface }
     }
+    // More candidates past the right edge: the bar fades out under a "›".
+    Item {
+        readonly property ListView view: panel.candidates
+        objectName: "candidateMore"
+        visible: view.visibleCondition && view.contentWidth > view.width && !view.atXEnd
+        x: panel.keyboard.x + view.x + view.width - width; y: panel.keyboard.y + view.y
+        width: Ui.Theme.space48 + Ui.Theme.space24; height: view.height
+        Rectangle {
+            anchors.fill: parent
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0; color: Ui.Theme.surfaceClear }
+                GradientStop { position: 0.55; color: Ui.Theme.surface }
+            }
+        }
+        Ui.Label { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "›"; role: "headline"; color: Ui.Theme.textSecondary }
+    }
     // Application integration: one panel, no extra EGLFS window.
     Component.onCompleted: {
         // Jume layouts: the §8 grid for en_GB and pinyin, symbols shared through fallback.
@@ -202,6 +279,9 @@ InputPanel {
         style.selectionListHeight = Ui.Theme.minTarget
         style.selectionListDelegate = candidate
         style.selectionListBackground = candidateBackground
+        // The candidate bar lines up with the keys' outer edges.
+        keyboard.wordCandidateView.anchors.leftMargin = Ui.Theme.margin
+        keyboard.wordCandidateView.anchors.rightMargin = Ui.Theme.margin
         // Qt 6.8.2 internal loader: cache keys separately from the moving focus ring.
         // The packaged keyboard check guards this dependency when updating Qt.
         keyboard.keyboardLayoutLoader.layer.enabled = true

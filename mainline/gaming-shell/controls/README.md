@@ -40,7 +40,7 @@ Fallback for glyphs outside the subset. Host runs read `R46H_UI_FONT_DIR`, which
 | Property | Default / allowed variant |
 | --- | --- |
 | Text | display 36/44, title 30/38, headline 26/34, body 24/32, label 22/30, caption 20/26, micro 18/24; `Theme.fontSize(role)` and `lineHeight(role)` apply `fontScale` |
-| Color | `ground`, `surface`, `surfaceSunken`, `outline`; `text`, `textSecondary`, `textTertiary`; `focus`, `accent` (+`accentText`/`accentSoft`/`accentInk`); `glyph`/`glyphSoft`; `danger`, `warning`, `scrim` |
+| Color | `ground`, `surface` (+`surfaceClear` for fades), `surfaceSunken`, `outline`; `text`, `textSecondary`, `textTertiary`; `focus`, `accent` (+`accentText`/`accentSoft`/`accentInk`); `glyph`/`glyphSoft`; `danger`, `warning`, `scrim` |
 | Spacing | `space4` to `space48`; 4 within a group, 8 between rows |
 | Page geometry | top bar 72, hint bar 64, `margin` max(40, 4% of width), `contentWidth` × `contentHeight` (944×632); `gridColumns`, `gridCellWidth` and `dualPane` follow `canvasWidth` |
 | Rows / targets | list row 72, or 96 with a description or slider; focus targets at least 56 high |

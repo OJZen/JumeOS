@@ -29,18 +29,18 @@ Item {
     readonly property bool choiceOpen: choices.visible
     readonly property bool detailReady: !sidebar && detailLoader.status === Loader.Ready
     // §8: eight categories; the old 12 merge as 显示 = 屏幕 + 字号 + 夜间 + 减少动态效果,
-    // 控制器 = 摇杆测试 + 文字输入, 性能 = 浮窗 + 帧与串流 + CPU + 内存, 系统 = 系统信息 + 关于.
+    // 控制器 = 摇杆测试 + 文字输入, 性能 = 浮窗 + CPU + 内存, 系统 = 系统信息 + 关于.
     readonly property var categories: ["网络", "显示", "声音", "控制器", "电源", "性能", "存储", "系统"]
     readonly property var categoryIcons: ["wifi", "display", "volume", "gamepad", "battery", "cpu", "storage", "info"]
     readonly property var categoryNotes: ["已连接与附近的 Wi-Fi", "亮度、自动息屏、夜间模式与字号", "音量与声音输出", "摇杆测试与文字输入",
-        "变暗、息屏、电池、重启与关机", "CPU 频率、内存与性能浮窗", "分区与可用空间", "系统状态与关于"]
+        "变暗、息屏、电池、重启与关机", "性能浮窗、CPU 频率与内存", "分区与可用空间", "系统状态与关于"]
     readonly property var nightModes: ["off", "on", "auto"]
     readonly property var nightLabels: ["关闭", "开启", "跟随时间"]
     // Two panes from 900 wide (§1); narrower canvases show the categories and the detail in turn.
     readonly property bool twoPane: Ui.Theme.dualPane
     readonly property var row: rows[rowIndex] || null
     readonly property bool sliderRow: !sidebar && detailReady && !!row && valueIsAdjustable(row.key) && canActivate(row.key)
-    readonly property string rowAction: !row ? "" : ["motion", "monitor"].indexOf(row.key) >= 0 ? "切换"
+    readonly property string rowAction: !row ? "" : ["motion", "monitor", "cpuAuto"].indexOf(row.key) >= 0 ? "切换"
         : row.key === "storage" ? "刷新" : row.key === "tester" ? "开始测试" : row.key === "netActive" ? "详情"
         : row.key === "netPoint" ? "连接" : row.key === "netScan" ? "扫描" : choiceRow(row.key) ? "选择" : "打开"
     readonly property var hints: choices.visible ? choices.hints
@@ -76,13 +76,13 @@ Item {
             {name: "文字输入测试", key: "input", detail: "退出后清空", section: ""}]
         case 4: return [{name: "空闲变暗", key: "dim", section: "节能"}, {name: "立即息屏", key: "screenOffNow", detail: "首个按键仅唤醒", section: "节能"},
             {name: "电池与供电", key: "battery", section: "电池"}, {name: "重启…", key: "reboot", section: "系统电源"}, {name: "关机…", key: "poweroff", section: "系统电源"}]
-        case 5: return [{name: "自动调频", detail: "桌面 816 · 游戏 1008 · 熄屏 600 MHz", key: "cpuAuto", section: "CPU"},
+        case 5: return [{name: "性能浮窗", key: "monitor", section: "性能浮窗"}, {name: "浮窗内容", key: "monitorDetail", section: "性能浮窗"},
+            {name: "自动调频", detail: "桌面 816 · 游戏 1008 · 熄屏 600 MHz", key: "cpuAuto", section: "CPU"},
             {name: "频率预设", detail: "手动选择会关闭自动调频", key: "cpuPreset", section: "CPU"}, {name: "调速器", key: "cpuGovernor", section: "CPU"},
             {name: "最低频率", key: "cpuMin", section: "CPU"}, {name: "最高频率", key: "cpuMax", section: "CPU"}, {name: "当前频率", key: "cpuCurrent", section: "CPU"},
             {name: "Swap 使用", key: "swap", section: "内存"}, {name: "zram 内存压缩", key: "zram", section: "内存"},
             {name: "压缩算法", key: "zramAlgorithms", section: "内存"}, {name: "压缩内存占用", key: "zramMemory", section: "内存"},
-            {name: "内存压力（10 秒）", key: "pressure", section: "内存"},
-            {name: "性能浮窗", key: "monitor", section: "性能浮窗"}, {name: "浮窗内容", key: "monitorDetail", section: "性能浮窗"}]
+            {name: "内存压力（10 秒）", key: "pressure", section: "内存"}]
         case 6: return hardware ? [{name: "系统分区", key: "storage0", section: ""}, {name: "游戏分区", key: "storage1", section: ""}, {name: "启动分区", key: "storage2", section: ""}]
             : [{name: "预览文件所在卷", info: "storage", value: "刷新", key: "storage", section: ""}]
         default: return [{name: "当前运行环境", info: "system", value: hardware ? "R46H" : "本机", section: "状态"},
@@ -128,6 +128,8 @@ Item {
         if (!key || readings.indexOf(key) >= 0 || key === "wifi" || key === "audioOutput") return false
         if (["tester", "input", "motion", "monitor", "monitorDetail", "font", "night"].indexOf(key) >= 0) return true
         if (key.indexOf("net") === 0) return network !== null && network.available && !network.busy && (key === "netRefresh" || (hardware && device.controls && network.controls && (key !== "netDisconnect" || activeNetworks.length === 1)))
+        // Governor and frequency limits show what is set; without a reading there is nothing to change.
+        if (["cpuGovernor", "cpuMin", "cpuMax"].indexOf(key) >= 0 && rowValue({key: key}) === "") return false
         if (["poweroff", "reboot", "cpuAuto", "cpuPreset", "cpuGovernor", "cpuMin", "cpuMax", "screenOffNow"].indexOf(key) >= 0) return !hardware ? key === "screenOffNow" : device.controls
         if (hardware && key === "volume") return false
         if (hardware && (key === "dim" || key === "screenOff")) return device.controls
@@ -146,6 +148,7 @@ Item {
             return hardware ? "暂无读数" : "预览中不可用"
         }
         if (canActivate(key)) return ""
+        if (["cpuGovernor", "cpuMin", "cpuMax"].indexOf(key) >= 0 && rowValue({key: key}) === "") return "暂无读数"
         if (key === "wifi") return "暂不支持"
         if (key === "audioOutput") return "暂不支持"
         if (key === "volume") return "使用机身音量键调节"
@@ -485,6 +488,7 @@ Item {
                             trailingIcon: entry.modelData.security === "psk" ? "lock" : ""
                             reducedMotion: settings.store.reducedMotion
                             toggleState: entry.modelData.key === "motion" ? Number(settings.store.reducedMotion) : entry.modelData.key === "monitor" ? Number(settings.store.monitor)
+                                : entry.modelData.key === "cpuAuto" ? Number(settings.hardware && settings.device.controls && settings.device.automaticCpu)
                                 : entry.modelData.key === "wifi" ? Number(settings.activeNetworks.length > 0) : -1
                             progress: entry.modelData.key === "volume" && !settings.hardware ? settings.store.volume / 100
                                 : entry.modelData.key === "brightness" && settings.canActivate("brightness") ? (settings.hardware ? settings.device.info.brightnessPercent : settings.store.brightness) / 100 : -1

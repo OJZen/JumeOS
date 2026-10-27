@@ -231,7 +231,7 @@ Item {
         {id: "builtin.text", title: "文本编辑器", detail: "", route: "text", icon: "document"},
         {id: "builtin.transfer", title: "文件传输", detail: "用手机扫码传文件", route: "transfer", icon: "folder"}
     ].map(function(entry) {
-        entry.reason = ["neo", "ports", "usb"].includes(entry.route) ? (tools ? "" : "暂不可用")
+        entry.reason = ["neo", "ports", "usb"].includes(entry.route) ? (tools ? "" : "工具服务未启动")
             : entry.route === "terminal" ? (terminalAvailable ? "" : "尚未安装") : (filesAvailable ? "" : "尚未安装")
         return entry
     })
@@ -624,6 +624,7 @@ Item {
         const keyboard = virtualKeyboard.item
         if (action === "quick") { if (!repeated) closeEditor() }
         else if (action === "options") { if (!repeated) finishEditor() }
+        else if (keyboard && keyboard.candidateAction(action)) return
         else if (action === "back") {
             if (inputField.text.length > 0) controller.keyboardAction("erase")
             else if (!repeated) closeEditor()
@@ -1044,7 +1045,10 @@ Item {
                     Rectangle { width: parent.width; height: 1; color: Ui.Theme.outline }
                     Ui.HintBar {
                         objectName: "editorHints"; anchors.verticalCenter: parent.verticalCenter; width: parent.width; fontScale: root.fontScale
-                        actions: root.keyboardEnabled
+                        readonly property bool composing: !!virtualKeyboard.item && !!virtualKeyboard.item.composing
+                        actions: root.keyboardEnabled && composing
+                            ? [{button: "L1+R1", label: "翻页"}, {button: "Y", label: "上屏"}, {button: "A", label: "输入"}]
+                            : root.keyboardEnabled
                             ? [{button: "L1+R1", label: "移动光标"}, {button: "Select", label: "取消", leading: false}, {button: "A", label: "输入"}]
                             : [{button: "A", label: "完成"}, {button: "B", label: "取消"}]
                     }
