@@ -13,7 +13,7 @@ T.Popup {
     property real anchorTop: 0
     property real popupWidth: 430
     readonly property bool above: parent && origin.y + height > parent.height && anchorTop >= height + 6
-    readonly property var hints: [["↑↓", "选择"], ["A / ↵", "确认"], ["B / Esc", "取消"]]
+    readonly property var hints: [{button: "A", label: "确定"}, {button: "B", label: "取消"}]
     signal activated(int index)
     popupType: T.Popup.Item
     modal: true; focus: true; dim: false; padding: 0; margins: 0
@@ -47,7 +47,8 @@ T.Popup {
         if (!visible) return false
         if (action === "up") select(pendingIndex - 1)
         else if (action === "down") select(pendingIndex + 1)
-        else if (action === "back" || action === "quick") close()
+        // §7.4 menus: B and Select cancel, Start closes; nothing below sees the key.
+        else if (action === "back" || action === "quick" || action === "options") { if (!repeated) close() }
         else if (action === "accept" && !repeated) activated(pendingIndex)
         return true
     }
@@ -58,7 +59,7 @@ T.Popup {
             // Keep native keys and controller taps on the same pending selection.
             const action = ({[Qt.Key_Up]: "up", [Qt.Key_Backtab]: "up", [Qt.Key_Down]: "down", [Qt.Key_Tab]: "down",
                 [Qt.Key_Return]: "accept", [Qt.Key_Enter]: "accept", [Qt.Key_Space]: "accept",
-                [Qt.Key_Escape]: "back", [Qt.Key_Backspace]: "back", [Qt.Key_Q]: "quick"})[event.key]
+                [Qt.Key_Escape]: "back", [Qt.Key_Q]: "quick", [Qt.Key_M]: "options"})[event.key]
             event.accepted = true
             if (action) popup.dispatch(action, event.isAutoRepeat)
         }

@@ -43,7 +43,7 @@ with tempfile.TemporaryDirectory(prefix='tools-check-',dir=repo/'mainline/out/.c
     response=ask(capture=True);control.save_result(evidence,response);(evidence/(label+'.json')).write_text(json.dumps(response,ensure_ascii=False,indent=2)+'\n')
    def config():return json.loads((state/'tools/settings.json').read_text())['settings']
    assert current['state']['selectedApplication']=='builtin.moonlight'
-   tap('favorite');assert 'builtin.moonlight' in json.loads((state/'preview.json').read_text())['applicationFavorites'];tap('favorite')
+   tap('itemAction');assert 'builtin.moonlight' in json.loads((state/'preview.json').read_text())['applicationFavorites'];tap('itemAction')
    tap('right');assert tap('accept')['toolRoute']=='neo';assert not wait()['toolDetailReady']
    tap('accept');tap('back');assert not ask()['state']['toolDetailReady']
    tap('accept');wait_detail();capture('neo');tap('accept');assert not ask()['state']['externalSession']
@@ -56,25 +56,25 @@ with tempfile.TemporaryDirectory(prefix='tools-check-',dir=repo/'mainline/out/.c
    tap('accept');assert copied.read_text()=='new progress'
    tap('down');tap('down');tap('accept');wait();assert len(list((state/'tools/backups').iterdir()))==1
    assert (game/'savedata/Saves/farm/save').read_text()=='original'
-   tap('back');tap('back');tap('nextTab');tap('down');tap('accept');assert wait()['toolRoute']=='usb';wait_detail()
+   tap('back');tap('back');tap('up');tap('right');tap('down');tap('down');tap('accept');assert wait()['toolRoute']=='usb';wait_detail()
    tap('accept');assert not (state/'tools/usb-profile.json').exists()
    tap('down');tap('accept');assert config()['usbSwapAB'] is True
    tap('down');tap('down');tap('down');assert tap('accept')['choicesOpen']
-   tap('nextTab');tap('home');assert ask()['state']['choicesOpen'] and ask()['state']['toolRoute']=='usb'
+   tap('nextSection');tap('home');assert ask()['state']['choicesOpen'] and ask()['state']['toolRoute']=='usb'
    tap('down');tap('back');assert config()['usbDeadzone']==10
    tap('accept');tap('down');tap('accept');assert config()['usbDeadzone']==15
    tap('down');tap('accept');wait();export=json.loads((state/'tools/usb-profile.json').read_text());assert export['usbEnabled'] is False and export['reportLength']==14
    settings_file=state/'tools/settings.json';other=root/'must-not-change';other.write_text('keep');settings_file.unlink();settings_file.symlink_to(other)
    for _ in range(4):tap('up')
    tap('accept');assert ask()['state']['toolSaveError'];tap('home');assert ask()['state']['toolRoute']=='usb';assert other.read_text()=='keep'
-   settings_file.unlink();tap('back');assert config()['usbSwapAB'] is False;tap('nextTab')
+   settings_file.unlink();tap('back');assert config()['usbSwapAB'] is False;tap('up');tap('up');tap('right')
    for _ in range(8):tap('down')
    tap('accept')
    deadline=time.monotonic()+5
    while not ask()['state']['settingsDetailReady']:
     assert time.monotonic()<deadline,'settings detail timeout';time.sleep(.02)
    tap('accept');tap('down');tap('down');tap('accept');assert ask()['state']['fontPercent']==130
-   tap('home');tap('nextTab');tap('down');tap('accept');wait();wait_detail();capture('usb-130')
+   tap('home');tap('up');tap('right');tap('down');tap('down');tap('accept');wait();wait_detail();capture('usb-130')
    assert not ask()['state']['toolSaveError']
    tap('back');tap('home');tap('right');tap('accept');wait();tap('accept');wait_detail();capture('neo-130')
    tap('back');tap('back');tap('right');tap('accept');wait();tap('accept');wait_detail();capture('ports-130')

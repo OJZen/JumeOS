@@ -14,9 +14,9 @@ Item {
     readonly property real fontScale: store.fontPercent / 100
     readonly property var host: manager.current
     readonly property var presets: ["640×480 · 60 FPS · 4 Mbps", "640×480 · 30 FPS · 3 Mbps", "1024×768 · 60 FPS · 8 Mbps"]
-    readonly property var hints: choices.visible ? choices.hints : manager.busy ? [["B / Esc", "取消"]]
-        : sidebar ? [["↑↓", "选择主机"], ["A / ↵", "进入"], ["X", "添加主机"], ["B / Esc", "返回"]]
-        : [["↑↓", "选择项目"], ["← / B", "主机列表"], ["A / ↵", row === 3 ? "选择画质" : "确定"]]
+    readonly property var hints: choices.visible ? choices.hints : manager.busy ? [{button: "B", label: "取消"}]
+        : sidebar ? [{button: "A", label: manager.hosts.length ? "进入" : "添加"}, {button: "B", label: "返回"}, {button: "Y", label: "添加主机"}]
+        : [{button: "A", label: row === 3 ? "选择画质" : "确定"}, {button: "B", label: "主机列表"}]
     signal editRequested(string key, string label, string value)
     signal backRequested()
     function selectionVisible(list) {
@@ -43,7 +43,7 @@ Item {
     function dispatch(action, repeated) {
         if (choices.dispatch(action, repeated)) return
         if (manager.busy) { if (action === "back") manager.cancelPair(); return }
-        if (action === "favorite" && !repeated) { addHost(); return }
+        if (action === "pageAction" && !repeated) { addHost(); return }
         if (action === "back" || (!sidebar && action === "left")) { if (!sidebar) sidebar = true; else backRequested(); return }
         if (sidebar) {
             if (action === "up") manager.select(manager.selected - 1)

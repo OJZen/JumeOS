@@ -84,7 +84,7 @@ with tempfile.TemporaryDirectory(prefix='catalog-ui-', dir=repo / 'mainline/out/
                 ask()
                 return ask('tap', action=action, session=current['session'], sequence=current['sequence'], binary_sha256=current['binary_sha256'])['state']
             wait()
-            assert tap('favorite')['portCatalogOpen']
+            assert tap('pageAction')['portCatalogOpen']
             wait()
             before = ask()
             try:
@@ -106,11 +106,11 @@ with tempfile.TemporaryDirectory(prefix='catalog-ui-', dir=repo / 'mainline/out/
             for _ in range(4): tap('up')
             tap('accept')
             assert current['state']['choicesOpen']
-            tap('home'); tap('nextTab')
+            tap('home'); tap('nextSection')
             assert ask()['state']['choicesOpen'] and current['state']['portCatalogOpen']
             tap('back')  # Do not download from the synthetic URL.
             tap('back')  # Sidebar.
-            assert tap('favorite')['editing']
+            assert tap('pageAction')['editing']
             assert ask()['state']['sensitiveVisible'] and current['state']['remoteTextAllowed']
             before = ask()
             try:
@@ -122,9 +122,9 @@ with tempfile.TemporaryDirectory(prefix='catalog-ui-', dir=repo / 'mainline/out/
             before = ask()
             ask('text', text='-测', session=before['session'], sequence=before['sequence'], binary_sha256=before['binary_sha256'])
             assert ask(screenshot=True)['capture']['status'] == 'sensitive_entry'
-            tap('submit'); wait()
+            tap('options'); wait()  # Start: 完成.
             assert current['state']['portCatalogTotal'] == 1
-            tap('erase'); wait()  # Installed filter.
+            tap('nextSection'); wait()  # R1: installed filter.
             tap('accept'); wait()
             tap('down'); tap('down'); tap('accept')
             assert ask()['state']['choicesOpen']
@@ -133,7 +133,7 @@ with tempfile.TemporaryDirectory(prefix='catalog-ui-', dir=repo / 'mainline/out/
             assert save.read_text() == 'must survive uninstall'
             assert ask()['state']['portCatalogSidebar']
             assert not tap('back')['portCatalogOpen']
-            tap('back'); tap('home'); tap('accept'); tap('favorite')  # Moonlight add-host editor is not writable via text IPC.
+            tap('back'); tap('home'); tap('accept'); tap('pageAction')  # Moonlight add-host editor is not writable via text IPC.
             assert ask()['state']['editing'] and not current['state']['remoteTextAllowed']
             before = ask()
             try:

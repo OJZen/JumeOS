@@ -2,9 +2,10 @@ pragma ComponentBehavior: Bound
 import QtQuick
 
 // §7.6 hint bar, built from the page's declared actions instead of hand-written rows.
-// An action is {button, label[, leading][, progress]}; older ["A / ↵", "确定"] pairs are mapped.
-// A B X Y Start sit at the right edge in that order from the right; directions, Select and shoulder
-// keys lead on the left after the optional context text. At most five actions are shown.
+// An action is {button, label[, leading][, progress]}; `button` is one of `knownButtons`, or two
+// joined by "+". A B X Y Start sit at the right edge in that order from the right; directions,
+// Select and shoulder keys lead on the left after the optional context text. At most five actions
+// are shown. An unknown button is a page bug: it is reported and not drawn.
 Item {
     id: bar
     property var actions: []
@@ -12,17 +13,19 @@ Item {
     property real fontScale: Theme.fontScale
     property bool soft: false
     readonly property var trailingOrder: ["Start", "Y", "X", "B", "A"]
-    readonly property var legacyKeys: ({"A / ↵": ["A"], "Enter": ["A"], "A / B": ["A"], "B / Esc": ["B"], "Esc": ["B"], "← / B": ["B"],
-        "START": ["Start"], "Select / Q": ["Select"], "L1 / R1": ["L1", "R1"], "↑↓": ["dpadV"], "←→": ["dpadH"], "方向": ["dpad"], "方向 / A B": ["dpad"]})
+    readonly property var knownButtons: ["A", "B", "X", "Y", "Start", "Select", "L1", "R1", "L2", "R2", "dpad", "dpadH", "dpadV"]
     readonly property var entries: {
         const list = []
         for (let i = 0; i < actions.length && list.length < 5; ++i) {
             const action = actions[i]
-            const key = Array.isArray(action) ? action[0] : action.button
-            const buttons = legacyKeys[key] || String(key).split("+")
+            const buttons = String(action.button).split("+")
+            if (buttons.some(function(button) { return bar.knownButtons.indexOf(button) < 0 })) {
+                console.warn("HintBar: unknown button " + JSON.stringify(action.button) + " for " + JSON.stringify(action.label))
+                continue
+            }
             const leading = action.leading !== undefined ? action.leading
                 : ["dpad", "dpadH", "dpadV", "Select", "L1", "R1", "L2", "R2"].indexOf(buttons[0]) >= 0
-            list.push({buttons: buttons, label: Array.isArray(action) ? action[1] : action.label, leading: leading,
+            list.push({buttons: buttons, label: action.label, leading: leading,
                        progress: action.progress === undefined ? -1 : action.progress, index: i})
         }
         return list

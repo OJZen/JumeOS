@@ -84,16 +84,16 @@ if args.keyboard:
         current=exchange(request('tap', action=action, session=current['session'], sequence=current['sequence'],
                                  binary_sha256=args.binary, screenshot=screenshot))
         return current['state']
-    tap('nextTab'); tap('nextTab')
+    tap('up'); tap('right'); tap('right')
     for _ in range(8): tap('down')
     tap('right'); tap('down'); tap('accept')
     assert current['state']['testInputVisible']
     tap('down'); tap('accept',True)
     assert control.checked_image(copy.deepcopy(current))
     control.save_result(args.evidence,copy.deepcopy(current))
-    tap('erase',True); control.save_result(args.evidence,copy.deepcopy(current))
-    assert not tap('submit')['editing']
-    tap('home'); tap('accept'); tap('favorite',True)
+    tap('back',True); control.save_result(args.evidence,copy.deepcopy(current))
+    assert not tap('options')['editing']
+    tap('home'); tap('accept'); tap('pageAction',True)
     assert current['state']['editing'] and current['state']['sensitiveVisible']
     assert current['capture']['status']=='sensitive_entry'
     tap('back')

@@ -7,27 +7,36 @@ Rectangle {
     objectName: "taskView"
     property var applications
     property int selected: 0
+    // X: a tap closes normally, a 2 s hold force-quits (the shell tracks the hold; §7.4, §7.7).
+    property real holdProgress: -1
+    property real fontScale: Ui.Theme.fontScale
     readonly property var tasks: applications ? applications.tasks : []
     readonly property var currentTask: tasks.length > selected ? tasks[selected] : null
     readonly property bool canAct: currentTask !== null && !currentTask.stopping
+    readonly property var hints: canAct
+        ? [{button: "A", label: "切换"}, {button: "B", label: "返回"}, {button: "X", label: "关闭", progress: holdProgress}, {button: "Start", label: "选项"}]
+        : [{button: "B", label: "返回"}]
     signal dismissed()
     signal activated(string id)
     signal closeRequested(string id)
     color: Ui.Theme.background
 
     function closeSelected() { if (canAct) closeRequested(currentTask.id) }
-    function forceSelected(anchor) {
-        if (!canAct) return
-        confirm.taskId = currentTask.id
-        confirm.present(anchor || forceButton, ["取消", "强制终止"], 0, "未保存内容将丢失")
+    function forceSelected() { if (canAct && applications) applications.forceKill(currentTask.id) }
+    function optionItems() {
+        if (!currentTask) return []
+        const reason = canAct ? "" : "正在结束"
+        return [{id: "switch", label: "切换过去", button: "A", reason: reason}, {id: "close", label: "关闭", button: "X", reason: reason},
+                {id: "force", label: "强制结束", reason: "按住 X 2 秒强制结束"}]
+    }
+    function runOption(id) {
+        if (id === "switch" && canAct) activated(currentTask.id)
+        else if (id === "close") closeSelected()
     }
     function dispatch(action, repeated) {
-        if (confirm.visible) { confirm.dispatch(action, repeated); return }
         if (action === "up" || action === "left") selected = Math.max(0, selected - 1)
         else if (action === "down" || action === "right") selected = Math.min(tasks.length - 1, selected + 1)
         else if (!repeated && action === "accept" && canAct) activated(currentTask.id)
-        else if (!repeated && action === "erase") closeSelected()
-        else if (!repeated && action === "favorite") forceSelected(null)
         else if (!repeated && (action === "back" || action === "quick" || action === "home")) dismissed()
     }
     onTasksChanged: selected = Math.max(0, Math.min(selected, tasks.length - 1))
@@ -119,19 +128,9 @@ Rectangle {
         Ui.Label { width: parent.width; y: 264; role: "caption"; horizontalAlignment: Text.AlignHCenter; text: "在应用中按 Select + Y，可在这里切换任务" }
     }
 
-    Rectangle {
-        x: Ui.Theme.margin; y: 644; width: Ui.Theme.contentWidth; height: 72; radius: 16
-        color: Ui.Theme.surface; border.color: Ui.Theme.outline
-        Ui.Button { x: 14; y: 12; width: 218; text: "A  继续应用"; primary: true; enabled: root.canAct; onClicked: root.activated(root.currentTask.id) }
-        Ui.Button { x: 246; y: 12; width: 218; text: "Y  正常关闭"; enabled: root.canAct; onClicked: root.closeSelected() }
-        Ui.Button {
-            id: forceButton; x: 478; y: 12; width: 218; text: "X  强制结束"; variant: "danger"
-            enabled: root.canAct; onClicked: root.forceSelected(this)
-        }
-        Ui.Button { x: 710; y: 12; width: 228; text: "B  返回桌面"; onClicked: root.dismissed() }
-    }
-    Ui.ChoicePopup {
-        id: confirm; objectName: "taskKillChoice"; property string taskId: ""
-        onActivated: function(index) { close(); if (index === 1 && root.applications) root.applications.forceKill(taskId) }
+    Item {
+        x: Ui.Theme.margin; y: Ui.Theme.canvasHeight - Ui.Theme.hintBarHeight; width: Ui.Theme.contentWidth; height: Ui.Theme.hintBarHeight
+        Rectangle { width: parent.width; height: 1; color: Ui.Theme.outline }
+        Ui.HintBar { objectName: "taskHints"; anchors.verticalCenter: parent.verticalCenter; width: parent.width; actions: root.hints; fontScale: root.fontScale }
     }
 }

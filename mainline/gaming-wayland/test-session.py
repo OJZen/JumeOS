@@ -111,7 +111,7 @@ with tempfile.TemporaryDirectory(prefix='r46h-session-', dir='/run') as director
             assert 'png_base64' not in response['capture']
             request('back'); wait_for(lambda: not request()['state']['editing'], 'Private editor did not close')
             request('back'); assert not request()['state']['streamingOpen']
-            request('favorite')
+            request('itemAction')
             response = request(capture=True); assert response['capture']['status'] == 'ok'
             (out / 'home.png').write_bytes(base64.b64decode(response['capture']['png_base64']))
             assert 'unavailable' not in (state / 'clients.log').read_text().lower()

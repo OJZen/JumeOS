@@ -78,8 +78,15 @@ Item {
     property bool windowVisible: true
     readonly property real fontScale: store.fontPercent / 100
     readonly property bool motionReduced: store.reducedMotion
-    readonly property bool choicesOpen: gameExitChoice.visible || settingsView.choiceOpen || (streamingView.item !== null && streamingView.item.choiceOpen) || (toolView.item !== null && toolView.item.choiceOpen)
+    readonly property bool choicesOpen: gameExitChoice.visible || optionsMenu.open || settingsView.choiceOpen || (streamingView.item !== null && streamingView.item.choiceOpen) || (toolView.item !== null && toolView.item.choiceOpen)
     Binding { target: Ui.Theme; property: "fontScale"; value: root.fontScale }
+    // §7.5: held directions speed up after 2 s in lists, never in grids or on the keyboard.
+    Binding {
+        target: root.controller; property: "fastRepeat"; when: root.controller !== null
+        value: !root.editing && (root.quickOpen || root.choicesOpen || root.toolOpen || root.streamingOpen || root.page === 2)
+    }
+    // B repeats only as the keyboard's backspace (§7.5); pages take one B per press.
+    Binding { target: root.controller; property: "backRepeat"; when: root.controller !== null; value: root.editing }
     Binding { target: Ui.Theme; property: "reducedMotion"; value: root.motionReduced }
     Binding { target: root.Window.window; property: "color"; value: root.gameOverlay ? "transparent" : Ui.Theme.background; when: root.Window.window !== null }
     // Native popup items live in the window overlay, outside the scaled canvas.
@@ -130,14 +137,18 @@ Item {
     readonly property var quickHints: (quickIndex >= 2 ? [{button: "A", label: quickIndex < 4 ? "切换" : "确定"}]
             : !hardware || (quickIndex === 1 && device.controls) ? [{button: "dpadH", label: "调整"}] : [])
         .concat([{button: "B", label: gameOverlay ? "返回游戏" : "关闭"}])
+    readonly property string activateLabel: customApplications ? "启动" : tools ? "打开" : streaming && selected === 0 ? "主机管理" : "打开演示"
+    // §7.6: the hint bar comes from declared actions; Select appears only on the home page, B never
+    // there, and plain up/down moves are not hinted.
+    readonly property var pageExit: page === 0 ? [{button: "Select", label: "快捷面板"}] : [{button: "B", label: "主页"}]
     readonly property var controlHints: toolOpen && toolView.item ? toolView.item.hints
         : streamingOpen ? streamingView.hints
-        : testingController ? [["方向 / A B", "测试输入"], ["Select / Q", "返回设置"]]
-        : session ? [["方向", "移动"], ["B / Esc", "结束演示"], ["Select / Q", "快捷面板"]]
-        : tabsFocused ? [["←→", "切换页面"], ["A / ↵", "进入"], ["Select / Q", "快捷面板"]]
-        : page === 2 ? (settingsView.choiceOpen ? settingsView.hints : settingsView.hints.concat([["L1 / R1", "切页"], ["Select / Q", "快捷面板"]]))
-        : games.length === 0 ? [["L1 / R1", "切页"], ["Select / Q", "快捷面板"]]
-        : [["A / ↵", customApplications ? "启动" : tools ? "打开" : streaming && selected === 0 ? "主机管理" : "打开演示"], ["B / Esc", page === 0 ? "顶部导航" : "主页"], ["X", "收藏"], ["L1 / R1", "切页"], ["Select / Q", "快捷面板"]]
+        : session ? [{button: "dpad", label: "移动"}, {button: "B", label: "结束演示"}]
+        : page === 2 ? settingsView.hints
+        : tabsFocused ? [{button: "dpadH", label: "切换页面"}, {button: "A", label: "进入"}].concat(pageExit)
+        : games.length === 0 ? pageExit
+        : [{button: "A", label: activateLabel}, {button: "X", label: selectedFavorite ? "取消收藏" : "收藏"}, {button: "Start", label: "选项"}].concat(pageExit)
+    readonly property string controlContext: !toolOpen && !streamingOpen && !session && page === 1 ? games.length + " 项" : ""
     readonly property var games: customApplications ? applications.items.concat(builtinGames.filter(function(entry) {
         return (["files", "text", "transfer"].includes(entry.route) && root.filesAvailable) || (entry.route === "terminal" && root.terminalAvailable)
     })) : tools ? builtinGames : demoGames
@@ -312,29 +323,123 @@ Item {
         session = true; tabsFocused = false; sessionMoves = 0; avatarX = 480; avatarY = 350
         notify(selected === 0 ? "串流演示 · 尚未连接电脑" : "交互演示 · 未启动模拟器")
     }
+    // §7.5 page-layer holds: the task page's X (2 s force-quit) and the controller test's B (1 s exit).
+    // Another key, a release before the end or an input-owner change cancels; a task X released
+    // before the ring appears is a tap and closes normally.
+    property string holdAction: ""
+    property int holdDuration: 0
+    property real holdProgress: 0
+    property double holdStarted: 0
+    readonly property real holdElapsed: holdProgress * holdDuration
+    readonly property real holdRing: holdElapsed >= Ui.Theme.holdDelay ? holdProgress : -1
+    function beginHold(action, duration) {
+        holdAction = action; holdDuration = duration; holdStarted = Date.now(); holdProgress = 0; holdTimer.restart()
+    }
+    function cancelHold() { holdTimer.stop(); holdAction = ""; holdProgress = 0 }
+    function finishHold() {
+        const action = holdAction
+        cancelHold()
+        if (action === "taskForce" && tasksVisible && taskPage.item) taskPage.item.forceSelected()
+        else if (action === "testerExit") settingsView.returnToCategories()
+    }
+    Timer {
+        id: holdTimer; interval: 16; repeat: true
+        onTriggered: {
+            root.holdProgress = Math.min(1, (Date.now() - root.holdStarted) / root.holdDuration)
+            if (root.holdProgress >= 1) root.finishHold()
+        }
+    }
+    onTasksVisibleChanged: cancelHold()
+    function release(action) {
+        if (holdAction === "taskForce" && action === "itemAction") {
+            const tap = Date.now() - holdStarted < Ui.Theme.holdDelay
+            cancelHold()
+            if (tap && tasksVisible && taskPage.item) taskPage.item.closeSelected()
+        } else if (holdAction === "testerExit" && action === "back") cancelHold()
+        else if (!editing && !toolOpen && !streamingOpen && !quickOpen && page === 2) settingsView.release(action)
+    }
+    // Right stick: scrolls the settings detail or long text without moving focus.
+    function scroll(velocity) {
+        if (screenOff || dimmed || tasksVisible || quickOpen || editing || choicesOpen || externalSession) return
+        if (toolOpen && toolView.item) toolView.item.scroll(velocity)
+        else if (!streamingOpen && !session && page === 2) settingsView.scroll(velocity)
+    }
+    // §7.3 Start: every action of the focused card, task or tool page, unavailable ones with a reason.
+    property var optionsOwner: null
+    function cardOptions() {
+        const game = games[selected]
+        if (!game) return []
+        const items = [{id: "start", label: activateLabel, button: "A"}, {id: "favorite", label: selectedFavorite ? "取消收藏" : "收藏", button: "X"}]
+        if (game.route) return items
+        return items.concat([{id: "controls", label: "按键与画面", reason: "每游戏设置尚未接入"}, {id: "saves", label: "存档管理", reason: "每游戏设置尚未接入"}])
+    }
+    function openOptions() {
+        let owner = null, title = "", items = []
+        if (tasksVisible && taskPage.item) {
+            owner = taskPage.item; items = owner.optionItems(); title = owner.currentTask ? owner.currentTask.title : ""
+        } else if (toolOpen && toolView.item) {
+            owner = toolView.item; items = owner.optionItems(); title = owner.optionTitle
+        } else if (!streamingOpen && !session && page < 2 && !tabsFocused && games[selected]) {
+            owner = root; items = cardOptions(); title = games[selected].title
+        }
+        if (owner && optionsMenu.present(title, items)) optionsOwner = owner
+    }
+    function runOption(id) {
+        if (id === "start") activateSelected()
+        else if (id === "favorite") toggleFavorite()
+    }
+    function toggleFavorite() {
+        if (!games[selected]) return
+        if (applications || tools) {
+            if (!store.toggleApplicationFavorite(games[selected].id)) { notify("收藏数量已达上限"); return }
+        } else store.toggleFavorite(selected)
+        store.save()
+    }
+    // The keyboard's B erases and keeps erasing while held, stopping at empty; only a separate
+    // press on an empty field closes the editor (§7.5). Repeats never close it.
+    function editorDispatch(action, repeated) {
+        const keyboard = virtualKeyboard.item
+        if (action === "quick") { if (!repeated) closeEditor() }
+        else if (action === "options") { if (!repeated) finishEditor() }
+        else if (action === "back") {
+            if (inputField.text.length > 0) controller.keyboardAction("erase")
+            else if (!repeated) closeEditor()
+        } else if (action === "pageAction") controller.keyboardAction("space")
+        else if (action === "itemAction") { if (keyboard) keyboard.toggleShift() }
+        else if (action === "prevSection" || action === "nextSection")
+            inputField.cursorPosition = Math.max(0, Math.min(inputField.text.length, inputField.cursorPosition + (action === "nextSection" ? 1 : -1)))
+        else if (action === "pageUp") { if (keyboard && !repeated) keyboard.toggleLanguage() }
+        else if (action === "pageDown") { if (keyboard && !repeated) keyboard.toggleSymbols() }
+        else if ((action === "left" || action === "right") && keyboard && keyboard.navigateHorizontal(action)) return
+        else if (keyboardEnabled && ["up", "down", "left", "right", "accept"].indexOf(action) >= 0) controller.keyboardAction(action)
+    }
     function dispatch(action, repeated) {
         if (screenOff) { activity(); return }
-        if(tasksVisible && taskPage.item) { if (!activity()) taskPage.item.dispatch(action,repeated);return }
-        if (repeated && ["accept", "back", "quick", "favorite", "home"].indexOf(action) >= 0) return
+        if (holdAction !== "" && !repeated) cancelHold()
+        if (repeated && ["accept", "quick", "home", "itemAction", "pageAction", "options", "prevSection", "nextSection"].indexOf(action) >= 0) return
+        if (tasksVisible && taskPage.item) {
+            if (activity()) return
+            if (optionsMenu.open) optionsMenu.dispatch(action, repeated)
+            else if (action === "itemAction") { if (taskPage.item.canAct) beginHold("taskForce", Ui.Theme.forceHoldDuration) }
+            else if (action === "options") openOptions()
+            else taskPage.item.dispatch(action, repeated)
+            return
+        }
         if (externalSession && (!sharedDisplay || (!quickOpen && action !== "quick"))) return
         if (activity()) return
         if (gameExitChoice.visible) { gameExitChoice.dispatch(action, repeated); return }
-        if (editing) {
-            if (action === "back" || action === "quick") closeEditor()
-            else if (action === "submit") finishEditor()
-            else if (action === "erase") controller.keyboardAction("erase")
-            else if ((action === "left" || action === "right") && virtualKeyboard.item && virtualKeyboard.item.navigateHorizontal(action)) return
-            else if (keyboardEnabled) controller.keyboardAction(action)
-            return
-        }
+        if (optionsMenu.open) { optionsMenu.dispatch(action, repeated); return }
+        if (editing) { editorDispatch(action, repeated); return }
+        if (repeated && action === "back") return
         if (quickOpen) {
             root.forceActiveFocus()
             if (action === "back" || action === "quick") leaveQuick()
             else if (action === "up") quickIndex = Math.max(0, quickIndex - 1)
             else if (action === "down") quickIndex = Math.min(5, quickIndex + 1)
             else if (action === "left" || action === "right") {
-                if (quickIndex < 4) adjustSetting(quickIndex, action === "left" ? -1 : 1, repeated)
+                if (quickIndex < 2) adjustSetting(quickIndex, action === "left" ? -1 : 1, repeated)
             } else if (action === "accept") {
+                if (quickIndex < 2) return
                 if (quickIndex < 4) adjustSetting(quickIndex, 1)
                 else if (quickIndex === 4) leaveQuick()
                 else if (gameOverlay) gameExitChoice.present(quickPanel, ["取消", "结束游戏"], 0, "结束当前游戏？")
@@ -346,14 +451,8 @@ Item {
         if (streamingOpen) { streamingView.dispatch(action, repeated); return }
         if (settingsView.choiceOpen) { settingsView.dispatch(action, repeated); return }
         root.forceActiveFocus()
-        if (action === "quick") {
-            if (testingController) {
-                settingsView.enter()
-                return
-            }
-            quickIndex = 0; quickOpen = true
-            return
-        }
+        if (action === "quick") { quickIndex = 0; quickOpen = true; return }
+        if (action === "options") { openOptions(); return }
         if (toolOpen) {
             if (action === "home") { if (closeTool()) changePage(0) }
             else if (toolView.item && !toolView.item.dispatch(action, repeated)) closeTool()
@@ -372,48 +471,53 @@ Item {
             }
             return
         }
-        if (page === 2 && settingsView.tester) return
-        if (action === "previousTab" || action === "nextTab") { changePage(page + (action === "nextTab" ? 1 : -1)); return }
-        if (action === "back") {
-            if (page === 2 && !store.save()) return
-            if (page === 2 && settingsView.dispatch(action, repeated)) return
-            if (page !== 0) changePage(0); else tabsFocused = !tabsFocused
+        if (page === 2) {
+            // Controller test: every key but Select is test input; holding B for 1 s leaves.
+            if (settingsView.tester) { if (action === "back") beginHold("testerExit", Ui.Theme.exitHoldDuration); return }
+            if (!settingsView.dispatch(action, repeated) && store.save()) changePage(0)
             return
         }
+        // Home B does nothing (§7.4); the library returns home.
+        if (action === "back") { if (page === 1) changePage(0); return }
         if (tabsFocused) {
             if (action === "left" || action === "right") {
                 changePage(page + (action === "right" ? 1 : -1)); tabsFocused = page !== 2
             } else if (action === "down" || action === "accept") tabsFocused = false
             return
         }
-        if (page === 2) {
-            settingsView.dispatch(action, repeated)
-        } else {
-            const columns = 3
-            const count = page === 0 ? Math.min(3, games.length) : games.length
-            if (count === 0) { if (action === "up") tabsFocused = true; return }
-            if (action === "left") selected = Math.max(0, selected - 1)
-            else if (action === "right") selected = Math.min(count - 1, selected + 1)
-            else if (action === "up") { if (selected < columns) tabsFocused = true; else selected -= columns }
-            else if (action === "down") selected = Math.min(count - 1, selected + columns)
-            else if (action === "accept") activateSelected()
-            else if (action === "favorite") {
-                if (applications || tools) {
-                    if (!store.toggleApplicationFavorite(games[selected].id)) { notify("收藏数量已达上限"); return }
-                } else store.toggleFavorite(selected)
-                store.save()
-            }
-        }
+        const columns = 3
+        const count = page === 0 ? Math.min(3, games.length) : games.length
+        if (count === 0) { if (action === "up") tabsFocused = true; return }
+        if (action === "left") selected = Math.max(0, selected - 1)
+        else if (action === "right") selected = Math.min(count - 1, selected + 1)
+        else if (action === "up") { if (selected < columns) tabsFocused = true; else selected -= columns }
+        else if (action === "down") selected = Math.min(count - 1, selected + columns)
+        else if (action === "accept") activateSelected()
+        else if (action === "itemAction") toggleFavorite()
+        // Library pages hold two full rows.
+        else if (page === 1 && (action === "pageUp" || action === "pageDown"))
+            selected = Math.max(0, Math.min(count - 1, selected + (action === "pageDown" ? 2 : -2) * columns))
     }
+    // §7.8 desktop preview keys; Select (Q) decides on release like the controller.
+    readonly property var previewKeys: ({[Qt.Key_Left]: "left", [Qt.Key_Right]: "right", [Qt.Key_Up]: "up", [Qt.Key_Down]: "down",
+        [Qt.Key_Return]: "accept", [Qt.Key_Enter]: "accept", [Qt.Key_Escape]: "back", [Qt.Key_X]: "itemAction", [Qt.Key_Y]: "pageAction",
+        [Qt.Key_M]: "options", [Qt.Key_Q]: "quick", [Qt.Key_BracketLeft]: "prevSection", [Qt.Key_BracketRight]: "nextSection",
+        [Qt.Key_PageUp]: "pageUp", [Qt.Key_PageDown]: "pageDown"})
     Keys.onPressed: function(event) {
         if (screenOff) { activity(); event.accepted = true; return }
         if (editing) return
         if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return
-        const actions = ({[Qt.Key_Left]: "left", [Qt.Key_Right]: "right", [Qt.Key_Up]: "up", [Qt.Key_Down]: "down",
-            [Qt.Key_Return]: "accept", [Qt.Key_Enter]: "accept", [Qt.Key_Escape]: "back", [Qt.Key_Backspace]: "back",
-            [Qt.Key_Q]: "quick", [Qt.Key_X]: "favorite", [Qt.Key_Home]: "home", [Qt.Key_BracketLeft]: "previousTab", [Qt.Key_BracketRight]: "nextTab"})
-        const action = actions[event.key]
-        if (action) { dispatch(action, event.isAutoRepeat); event.accepted = true }
+        const action = previewKeys[event.key]
+        if (!action) return
+        event.accepted = true
+        if (action !== "quick") dispatch(action, event.isAutoRepeat)
+    }
+    Keys.onReleased: function(event) {
+        if (editing || event.isAutoRepeat || (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) return
+        const action = previewKeys[event.key]
+        if (!action) return
+        event.accepted = true
+        if (action === "quick") dispatch(action, false); else release(action)
     }
     onSessionChanged: { activity(); clearNotice() }
     onEditingChanged: { activity(); clearNotice() }
@@ -458,16 +562,29 @@ Item {
         Loader {
             id: taskPage; anchors.fill: parent; z: 100; active: root.tasksVisible
             sourceComponent: TaskView {
-                applications: root.applications
+                applications: root.applications; fontScale: root.fontScale
+                holdProgress: root.holdAction === "taskForce" ? root.holdRing : -1
                 onDismissed: root.tasksVisible=false
                 onActivated: function(id) { if(root.applications.activate(id))root.tasksVisible=false }
                 onCloseRequested: function(id) { root.tasksVisible=false;root.applications.requestClose(id) }
             }
         }
+        // Router Select+X holds (stage 5 replaces them) and the task page's X hold share one card.
         Ui.HoldConfirm {
             objectName: "taskHold"; z: 101; anchors.centerIn: parent
-            progress: root.taskHoldPercent / 100; duration: 2000
+            progress: Math.max(root.taskHoldPercent / 100, root.holdAction === "taskForce" ? root.holdProgress : 0)
+            duration: Ui.Theme.forceHoldDuration
             title: "继续按住以强制结束"; detail: "未保存的进度会丢失"; fontScale: root.fontScale
+        }
+        Ui.OptionsSheet {
+            id: optionsMenu; objectName: "optionsMenu"; anchors.fill: parent; z: 102
+            fontScale: root.fontScale; reducedMotion: root.store.reducedMotion
+            onChosen: function(id) {
+                const owner = root.optionsOwner
+                root.optionsOwner = null
+                if (owner) owner.runOption(id)
+            }
+            onOpenChanged: if (!open) root.forceActiveFocus()
         }
         Item {
             anchors.fill: parent; visible: !root.editing
@@ -482,7 +599,7 @@ Item {
             }
             Ui.Tabs {
                 x: Ui.Theme.margin; y: 100; visible: !root.session && !root.streamingOpen && !root.toolOpen
-                model: ["主页", "游戏库", "设置"]; currentIndex: root.page
+                model: ["主页", "游戏库", "设置"]; currentIndex: root.page; shoulderHints: false
                 navigationActive: root.tabsFocused && !root.quickOpen
                 onActivated: function(index) { root.changePage(index) }
             }
@@ -539,6 +656,7 @@ Item {
             }
             SettingsView {
                 id: settingsView; x: Ui.Theme.margin; y: 178; width: Ui.Theme.contentWidth; height: 493
+                testerHold: root.holdAction === "testerExit" ? root.holdRing : -1
                 navigationActive: root.windowVisible && !root.quickOpen && !root.tabsFocused && !root.editing && !root.dimmed
                 visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page === 2
                 store: root.store; metrics: root.metrics; controller: root.controller; device: root.device; network: root.network
@@ -619,13 +737,13 @@ Item {
             x: Ui.Theme.margin; y: Ui.Theme.canvasHeight - Ui.Theme.hintBarHeight; width: Ui.Theme.contentWidth; height: Ui.Theme.hintBarHeight
             visible: !root.editing && !root.gameOverlay && !root.quickOpen
             Rectangle { width: parent.width; height: 1; color: Ui.Theme.outline }
-            Ui.HintBar { objectName: "footerHints"; anchors.verticalCenter: parent.verticalCenter; width: parent.width; actions: root.controlHints; fontScale: root.fontScale }
+            Ui.HintBar { objectName: "footerHints"; anchors.verticalCenter: parent.verticalCenter; width: parent.width; actions: root.controlHints; context: root.controlContext; fontScale: root.fontScale }
         }
         Item {
             anchors.fill: parent; visible: root.editing
             MouseArea { anchors.fill: parent }
             Ui.Label { x: Ui.Theme.margin; y: 70; width: Ui.Theme.contentWidth; text: root.editLabel; color: Ui.Theme.text; role: "title" }
-            Ui.Label { x: Ui.Theme.margin; y: 123; width: inputField.width; wrapMode: Text.Wrap; text: root.testInputVisible ? "自动化输入测试允许截图，请勿填写密码" : root.editPurpose === "test" ? "退出后清空输入内容" : root.editPurpose === "wifiPassword" ? "完成后连接 · B 取消" : "完成后保存 · B 取消"; role: "caption" }
+            Ui.Label { x: Ui.Theme.margin; y: 123; width: inputField.width; wrapMode: Text.Wrap; text: root.testInputVisible ? "自动化输入测试允许截图，请勿填写密码" : root.editPurpose === "test" ? "退出后清空输入内容" : root.editPurpose === "wifiPassword" ? "完成后连接 · Select 取消" : "完成后保存 · Select 取消"; role: "caption" }
             Ui.TextField {
                 id: inputField; objectName: "inputField"; x: Ui.Theme.margin; y: 183; width: Ui.Theme.contentWidth - doneButton.width - Ui.Theme.padding; height: 64
                 fontScale: root.fontScale; maximumLength: root.editPurpose === "wifiPassword" ? 64 : root.editPurpose === "portSearch" ? 80 : 128
@@ -637,7 +755,9 @@ Item {
             }
             Ui.Button { id: doneButton; x: Ui.Theme.margin + Ui.Theme.contentWidth - width; y: 183; width: 152; height: 64; text: "完成"; primary: true; focusPolicy: Qt.NoFocus; Accessible.name: "完成输入"; onClicked: root.finishEditor() }
             Ui.Label { x: Ui.Theme.margin; y: 270; visible: virtualKeyboard.status === Loader.Error; text: "虚拟键盘模块不可用；仍可使用实体键盘。"; color: Ui.Theme.danger; role: "caption" }
-            Ui.HintBar { x: Ui.Theme.margin; y: 267; width: inputField.width; visible: virtualKeyboard.status !== Loader.Error; fontScale: root.fontScale; actions: root.keyboardEnabled ? [["方向", "选择按键"], ["A", "输入"], ["Y", "退格"], ["START", "确认"], ["B", "取消"]] : [["键盘", "输入文字"], ["Enter", "确认"], ["Esc", "取消"]] }
+            Ui.HintBar { x: Ui.Theme.margin; y: 267; width: inputField.width; visible: virtualKeyboard.status !== Loader.Error; fontScale: root.fontScale; actions: root.keyboardEnabled
+                    ? [{button: "A", label: "输入"}, {button: "B", label: "退格"}, {button: "X", label: "大小写"}, {button: "Y", label: "空格"}, {button: "Start", label: "完成"}]
+                    : [{button: "A", label: "完成"}, {button: "B", label: "取消"}] }
             Loader {
                 id: virtualKeyboard; objectName: "virtualKeyboard"
                 active: root.keyboardEnabled && root.editing

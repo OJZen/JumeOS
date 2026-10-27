@@ -166,6 +166,10 @@ QtObject {
     readonly property int hudDwell: 1800
     readonly property int toastDwell: 2400
     readonly property int holdDelay: 600
+    readonly property int forceHoldDuration: 2000
+    readonly property int exitHoldDuration: 1000
+    // Right-stick scrolling at full deflection, per 16 ms controller poll.
+    readonly property int scrollStep: 24
     readonly property int themeDuration: 200
     readonly property var curves: ({
         standard: [0.25, 1, 0.5, 1, 1, 1],

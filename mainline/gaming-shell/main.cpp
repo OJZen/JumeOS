@@ -331,12 +331,23 @@ int main(int argc, char **argv) {
     window.resize(1024, 768);
     window.setMinimumSize(QSize(640, 480));
     QMetaObject::invokeMethod(window.rootObject(), "showScene", Q_ARG(QVariant, scene));
+    const auto controllerOwnsUi = [&] {
+        return handheldMode ? handheld->ready() && (!applications.running() || root->property("quickOpen").toBool())
+                            : window.isActive() && !applications.running();
+    };
     QObject::connect(&controller, &ControllerInput::action, &window,
         [&](const QString &action, bool repeat) {
-            if (handheldMode ? (!handheld->ready() || (applications.running() && !root->property("quickOpen").toBool()))
-                             : (!window.isActive() || applications.running())) return;
+            if (!controllerOwnsUi()) return;
             QMetaObject::invokeMethod(window.rootObject(), "dispatch", Q_ARG(QVariant, action), Q_ARG(QVariant, repeat));
         });
+    // Releases finish taps and holds; cancellation always reaches the page so no hold outlives its key.
+    QObject::connect(&controller, &ControllerInput::released, &window, [&](const QString &action) {
+        if (controllerOwnsUi()) QMetaObject::invokeMethod(window.rootObject(), "release", Q_ARG(QVariant, action));
+    });
+    QObject::connect(&controller, &ControllerInput::cancelled, &window, [&] { QMetaObject::invokeMethod(window.rootObject(), "cancelHold"); });
+    QObject::connect(&controller, &ControllerInput::scrolled, &window, [&](double velocity) {
+        if (controllerOwnsUi()) QMetaObject::invokeMethod(window.rootObject(), "scroll", Q_ARG(QVariant, velocity));
+    });
     QObject::connect(&applications, &Applications::started, &window, [&] {
         controller.suppressUntilNeutral();
         if (!handheldMode) window.hide();

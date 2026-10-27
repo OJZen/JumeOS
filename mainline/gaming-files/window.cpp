@@ -829,9 +829,9 @@ void FileWindow::controllerAction(const QString &name) {
             storeView();
         } else
             navigate(QFileInfo(folder).absolutePath());
-    } else if (name == "favorite") {
+    } else if (name == "itemAction") {
         showActions();
-    } else if (name == "erase") {
+    } else if (name == "pageAction") {
         views->setCurrentIndex(1 - views->currentIndex());
         findChild<QAction *>("detailsView")->setChecked(views->currentIndex() == 1);
         storeView();
@@ -839,13 +839,13 @@ void FileWindow::controllerAction(const QString &name) {
         multiSelect = !multiSelect;
         statusBar()->showMessage(multiSelect ? "多选：方向移动焦点 · B 勾选 · Select 结束"
                                              : "Y 菜单 · B 打开 · Select 多选");
-    } else if (name == "submit" && worker.isRunning()) {
+    } else if (name == "options" && worker.isRunning()) {
         *cancel = true;
         taskInfo->setText("正在取消，请稍候…");
-    } else if (name == "previousTab" || name == "nextTab") {
+    } else if (name == "prevSection" || name == "nextSection") {
         sidebar->show();
         findChild<QAction *>("showPlaces")->setChecked(true);
-        sidebar->setCurrentRow(qBound(0, sidebar->currentRow() + (name == "nextTab" ? 1 : -1), sidebar->count() - 1));
+        sidebar->setCurrentRow(qBound(0, sidebar->currentRow() + (name == "nextSection" ? 1 : -1), sidebar->count() - 1));
         sidebar->setFocus();
     } else {
         auto *focus = QApplication::focusWidget();

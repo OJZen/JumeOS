@@ -68,7 +68,7 @@ entries were temporarily removed from the list.
 | Select + Y | Background current app and show task cards |
 | Select + Start, release before 2 seconds | Background current app and return Home |
 | Select + Start, held for 2 seconds | Kill the app that was foreground when the hold began |
-| Select + X | Request the current app's normal window close; on the task page, close the selected task |
+| Select + X | Request the current app's normal window close; on the task page, close the selected task. Stage 5 removes it ([JUME-UI §7.8](../../docs/JUME-UI.md#78-从现行映射迁移)) |
 
 Press Select first or simultaneously with the other key. An unrelated face-button
 press is never delayed to guess a future shortcut. Select alone delivers its
@@ -78,8 +78,10 @@ transition, and never retargets a kill to a newly activated process.
 
 The selected task gets a large last-visible screenshot; a four-row queue keeps
 every task's thumbnail, icon, title and running/paused state visible. D-pad
-selects; A resumes, B returns, Y requests normal close, X opens a Cancel-first
-force-quit confirmation. Pointer actions use the same footer controls. Opening
+selects; A resumes and B or Select returns. X is decided on release: a tap requests
+normal close, while holding it shows a HoldConfirm after 600 ms and force-quits the
+selected task at 2 s; releasing earlier cancels. Start lists the task's actions.
+Y is unassigned. The hint bar replaces the former footer buttons. Opening
 an existing app ID resumes the same process; it does not launch a duplicate. Ctrl+Tab / Meta+D are
 local launcher keyboard equivalents, not global keyboard hooks in other apps.
 

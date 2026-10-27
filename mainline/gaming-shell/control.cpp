@@ -72,7 +72,9 @@ int runControlCall(const QString &directory) {
 
 namespace {
 constexpr int RequestLimit = 4096;
-const QStringList Actions = {"left", "right", "up", "down", "accept", "back", "quick", "favorite", "home", "previousTab", "nextTab", "erase", "submit"};
+// JUME-UI §7.3 page actions; "home" stands in for the system Select+Start until stage 5.
+const QStringList Actions = {"left", "right", "up", "down", "accept", "back", "itemAction", "pageAction", "options", "quick",
+    "prevSection", "nextSection", "pageUp", "pageDown", "home"};
 bool sameUser(qintptr descriptor) {
 #ifdef Q_OS_LINUX
     struct ucred peer{};
@@ -229,7 +231,8 @@ void ControlServer::receive(QLocalSocket *socket) {
         if (op == "text") {
             QVariant applied;
             if (!QMetaObject::invokeMethod(m_view->rootObject(), "remoteText", Q_RETURN_ARG(QVariant, applied), Q_ARG(QVariant, text)) || !applied.toBool()) { fail("dispatch_failed"); return; }
-        } else if (!QMetaObject::invokeMethod(m_view->rootObject(), "dispatch", Q_ARG(QVariant, action), Q_ARG(QVariant, false))) { fail("dispatch_failed"); return; }
+        } else if (!QMetaObject::invokeMethod(m_view->rootObject(), "dispatch", Q_ARG(QVariant, action), Q_ARG(QVariant, false))
+                   || !QMetaObject::invokeMethod(m_view->rootObject(), "release", Q_ARG(QVariant, action))) { fail("dispatch_failed"); return; } // A tap is a press and an immediate release.
     }
     const bool screenshot = request.value("screenshot").toBool();
     // Short bounded settling for the existing <=200 ms transitions. Never blocks input.

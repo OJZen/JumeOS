@@ -29,10 +29,15 @@ Item {
     readonly property bool detailReady: (kind === "usb" || !sidebar) && detailLoader.status === Loader.Ready
     readonly property string heading: kind === "neo" ? "Neo 模拟器管理" : kind === "ports" ? "PortMaster 管理" : "USB 手柄配置"
     readonly property var localHints: choices.visible ? choices.hints : sidebar
-        ? [["↑↓", "选择游戏"], ["A / ↵", "进入"], ["B / Esc", "返回"]]
-        : !detailReady ? [["← / B", "返回游戏列表"]]
-        : [["↑↓", "选择项目"]].concat(rows[row] && rows[row].enabled && !tools.busy ? [["A / ↵", "操作"]] : []).concat([[kind === "usb" ? "B / Esc" : "← / B", kind === "usb" ? "返回" : "游戏列表"]])
-    readonly property var hints: catalogOpen && catalogPage.item ? catalogPage.item.hints : localHints.concat(kind === "ports" && tools.catalogAvailable && !choices.visible ? [["X", "游戏目录"]] : [])
+        ? [{button: "A", label: "进入"}, {button: "B", label: "返回"}]
+        : !detailReady ? [{button: "B", label: "返回"}]
+        : (rows[row] && rows[row].enabled && !tools.busy ? [{button: "A", label: "操作"}] : []).concat([{button: "B", label: kind === "usb" ? "返回" : "游戏列表"}])
+    readonly property var hints: catalogOpen && catalogPage.item ? catalogPage.item.hints
+        : localHints.concat(kind === "ports" && tools.catalogAvailable && !choices.visible ? [{button: "Y", label: "游戏目录"}] : [])
+    readonly property string optionTitle: catalogOpen && catalogPage.item ? catalogPage.item.optionTitle : heading
+    function optionItems() { return catalogOpen && catalogPage.item ? catalogPage.item.optionItems() : [] }
+    function runOption(id) { if (catalogOpen && catalogPage.item) catalogPage.item.runOption(id) }
+    function scroll(velocity) { if (catalogOpen && catalogPage.item) catalogPage.item.scroll(velocity) }
     signal backRequested()
     signal searchRequested(string value)
     function search(value) { return catalogPage.item && catalogPage.item.search(value) }
@@ -85,7 +90,7 @@ Item {
     }
     function dispatch(action, repeated) {
         if (catalogOpen && catalogPage.item) return catalogPage.item.dispatch(action, repeated)
-        if (kind === "ports" && action === "favorite" && !repeated) { openCatalog(); return true }
+        if (kind === "ports" && action === "pageAction" && !repeated) { openCatalog(); return true }
         if (choices.dispatch(action, repeated)) return true
         if (action === "back" || (!sidebar && action === "left")) {
             if (sidebar || kind === "usb") return false

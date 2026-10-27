@@ -63,28 +63,40 @@ was not installed in `/Applications` or the system package manager. The CMake
 AGL workaround follows Qt's [upstream fix](https://github.com/qt/qtbase/commit/42b0903c34bd049729f85fcd6236e64f28898b34)
 for the older SDK's obsolete link dependency on current macOS.
 
-| Action | Keyboard | SDL controller, preview only |
-| --- | --- | --- |
-| Navigate / adjust | Arrows | D-pad / left stick |
-| Confirm / back | Enter / Esc | A / B |
-| Delete / confirm text | Backspace / Enter | Y / START |
-| Favorite | X | X |
-| Quick panel; leave controller test | Q | Select / Guide |
-| Change page | `[` / `]` | L1 / R1 individually |
-| Home | Home | Use panel's Home action |
+Page keys follow [JUME-UI §7.3–7.6](../../docs/JUME-UI.md#73-页面层每个键只有一种角色).
 
-Entering Settings shows only the category list, including entry by tabs,
-shoulder buttons or pointer. Right/A asynchronously opens the selected category
-as a second-level page; Left/B returns to the category list and unloads it after
-saving pending values. Moving through categories does not construct detail rows
-or refresh storage. Tool game lists follow the same rule; USB remains a deliberate
-single-level page. For volume and brightness,
-A/Enter starts adjustment, Up/Down increases/decreases, and A/Enter or B/Esc
-finishes; Left also saves and returns to categories. Save failure retains the
-editor and its pending value. Controller-test and text-entry modes keep their
-own directional inputs; Select leaves the controller test, B leaves text entry.
-Font size and idle timing open a choice list: Up/Down previews a selection,
-A confirms, B cancels. Page shortcuts cannot escape an open choice list.
+| Action | Keyboard (desktop preview) | Controller |
+| --- | --- | --- |
+| Move; ←→ adjust a focused slider | Arrows | D-pad / left stick (55% engages, below 35% releases) |
+| Confirm / back | Enter / Esc | A / B |
+| Item action (favorite; task close, hold 2 s to force-quit) | X | X |
+| Page action (add host, game catalog, search) | Y | Y |
+| Options menu of the focused item | M | Start |
+| Quick panel, decided on release | Q | Select / Guide |
+| Previous / next section | `[` / `]` | L1 / R1 |
+| Page up / down | PgUp / PgDn | L2 / R2 (analog past 50%) |
+| Scroll without moving focus | — | Right stick |
+
+Held directions, L2/R2 and B repeat after 380 ms every 90 ms; lists speed up to
+50 ms after 2 s, grids do not. Select with another key is a system chord and
+reaches no page. Home B does nothing; until the stage 4 home dock, Up reaches the
+top tabs and Left/Right change page. The remote `home` action stands in for the
+system Select+Start.
+
+Entering Settings shows only the category list. Right/A asynchronously opens the
+selected category as a second-level page; Left/B returns to the list and unloads
+it after saving pending values. L1/R1 open the neighbouring category without
+wrapping, at the row it was left on; L2/R2 move one screen of rows; the right
+stick scrolls the detail. Moving through categories does not construct detail
+rows or refresh storage. Tool game lists follow the same rule; USB remains a
+deliberate single-level page. Volume and brightness adjust directly with ←→ (a
+warning ring while held) and save on release; a failed save keeps the value
+pending and blocks leaving until it succeeds. The controller test takes every key
+except Select as test input; holding B for 1 s leaves (ring after 600 ms). In text
+entry B erases (a hold stops at empty; a separate press on an empty field
+closes), Y adds a space, X shifts, Start finishes, Select cancels, L1/R1 move the
+cursor, L2 switches 中/英 and R2 symbols. Choice lists preview with Up/Down;
+A confirms, B or Select cancels and Start closes; page keys cannot escape them.
 
 The [shared controls](controls/README.md) own typography, palette, spacing and
 motion. Settings and Moonlight now share their row/switch/scrollbar styling and

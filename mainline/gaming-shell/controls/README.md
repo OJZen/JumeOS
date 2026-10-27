@@ -112,13 +112,14 @@ posters are loaded for the management pages.
 | `GameCard` | Fallback = card color + 135° 7% stripes (14 px); `iconName` apps, `badge`/`badgeIcon`, `favorite`, `available`; title on 256 cards only; focus lifts 1.04 with shadow and ring |
 | `DockTile` | 88×88 surface r28 with 40 icon and caption; focus 1.06, ring, bold label |
 | `GlyphBadge` | A/B/X/Y circles, shoulders r8 squares, Start/Select capsules, d-pad drawings; 34 / 30 / 26; `soft` for content; `progress` hold ring |
-| `HintBar` | Built from `actions` ({button, label} or older pairs): A B X Y Start fixed at the right, directions/Select/shoulders lead after `context`; at most five; `overflow` reports a cramped bar |
+| `HintBar` | Built from `actions` ({button, label[, progress]}; `button` from `knownButtons` or two joined by `+`): A B X Y Start fixed at the right, directions/Select/shoulders lead after `context`; at most five; an unknown button is warned about and not drawn (shell-check fails on the warning); `overflow` reports a cramped bar |
 | `TopBar` | 72 high; Jume mark or `title`; night, Wi-Fi (`statusWifi.level`), battery and clock on one centerline |
 | `Panel` → `Sheet` / `Dialog` / `QuickPanel` | Surface r28 with header, content and hint footer split by dividers; sheet squares its bottom, dialog ≤ 560, quick panel 392 at 24 from the corner |
 | `Hud` / `Toast` / `HoldConfirm` | 280×56 top HUD that fades after `hudDwell`; bottom toast (owner clears after `toastDwell`, errors stay); centered hold card shown only after 600 ms |
 | `Shadow` | Level-2 elevation from the prerendered nine-slice `elevation.png` (magick: blurred r24 rect, 16% alpha, +4 px); never a live blur |
 | `PageHeader` / `Page` | Tool-page title/status with back/action buttons; `Page` slides a new route in from 48 px (100 ms fade with reduced motion) |
-| `ChoicePopup` | Native modal `Popup.Item` dialog with pending/current indexes, confirmation and cancellation; stays in the existing window |
+| `ChoicePopup` | Native modal `Popup.Item` dialog with pending/current indexes, confirmation and cancellation (B or Select), Start closes; stays in the existing window |
+| `OptionsSheet` | Start menu of the focused item or page: {id, label[, button][, reason]} rows, shortcut glyphs on the right, disabled rows keep their reason; A runs, Start/B/Select close, `chosen(id)` |
 
 `ListRow` composes these primitives for settings, host details and the quick panel.
 Read-only rows remain legible but have no native activation; disabled rows keep
@@ -153,8 +154,8 @@ Ui.ChoicePopup {
 
 The feature implements `saveSelection` and owns `savedIndex`. Highlighting does
 not commit. `activated(index)` leaves the popup open until the caller confirms
-success; a failed save retains the pending choice for retry. B/outside click
-cancels an uncommitted choice and restores previous focus. Cancellation after a
+success; a failed save retains the pending choice for retry. B, Select or an
+outside click cancels an uncommitted choice and restores previous focus. Cancellation after a
 failed write does not discard feature-owned dirty data; its save guard remains.
 Switch bindings are similarly restored by `ListRow` after native toggling.
 

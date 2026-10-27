@@ -23,7 +23,7 @@ qt_add_qml_module(r46h-shell URI R46H.Shell VERSION 1.0
         controls/ListView.qml controls/TableView.qml controls/Page.qml controls/Tabs.qml controls/ChoicePopup.qml
         controls/ListRow.qml controls/GameCard.qml controls/DockTile.qml controls/GlyphBadge.qml controls/HintBar.qml controls/TopBar.qml
         controls/Hud.qml controls/Toast.qml controls/HoldConfirm.qml controls/Panel.qml controls/Sheet.qml controls/Dialog.qml
-        controls/QuickPanel.qml controls/Shadow.qml
+        controls/QuickPanel.qml controls/OptionsSheet.qml controls/Shadow.qml
     RESOURCES controls/qmldir controls/elevation.png)
 target_link_libraries(r46h-shell PRIVATE Qt6::Quick Qt6::Network Qt6::DBus SDL2::SDL2)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")

@@ -276,6 +276,6 @@ void TransferWindow::controllerAction(const QString &action) {
         close();
     else if (action == "accept")
         start->click();
-    else if (action == "favorite" && choose->isEnabled())
+    else if (action == "itemAction" && choose->isEnabled())
         choose->click();
 }

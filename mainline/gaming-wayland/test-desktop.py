@@ -299,7 +299,7 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
         press(0); assert not observe()['state']['quickOpen']
         # Stop only this test's compositor after queuing a new capture. Kernel input
         # remains live, so opening a private editor must cancel the in-flight frame.
-        observe(action='nextTab'); observe(action='nextTab')
+        observe(action='up'); observe(action='right'); observe(action='right')
         category = observe()['state']['settingsCategory']
         for _ in range(abs(8 - category)): observe(action='down' if category < 8 else 'up')
         observe(action='accept')

@@ -264,8 +264,13 @@ before its error response. Request parameters and text values are never logged.
 | `text` | The same identity/sequence fields plus `text`; only public game search or the explicitly enabled disposable input test |
 | `game-input` | Shared-session identity fields plus `application`, `input_sequence`, `duration_ms`, `buttons`, `axes`; see the bounded input contract below |
 
-Actions are `left`, `right`, `up`, `down`, `accept`, `back`, `quick`, `favorite`,
-`home`, `previousTab`, `nextTab`, `erase` (Y), `submit` (START). Unknown fields/actions are refused. Sequence
+Actions are the [JUME-UI §7.3](JUME-UI.md#73-页面层每个键只有一种角色) page actions `left`, `right`, `up`,
+`down`, `accept` (A), `back` (B), `itemAction` (X), `pageAction` (Y), `options` (Start), `quick` (Select),
+`prevSection`/`nextSection` (L1/R1) and `pageUp`/`pageDown` (L2/R2), plus `home` for the system
+Select+Start. A tap is a press followed by an immediate release, so it is always a short press: it
+cannot hold the task page's X or the controller test's B. The pre-v1 names (`favorite`, `erase`,
+`submit`, `previousTab`, `nextTab`) are refused. Frozen r6–r9 binaries accept only those older
+names; drive them with the scripts from their own commits. Unknown fields/actions are refused. Sequence
 checking rejects stale/replayed actions; the generation rejects commands for a
 restarted process. There is no automatic action retry after transport failure:
 observe again before deciding whether to repeat it. An accepted tap means the
@@ -297,7 +302,7 @@ input contents, clipboard, credentials and raw error text. `remoteTextAllowed`
 reports whether the narrow `text` operation is available. It replaces at most
 80 characters, rejects control characters and does not submit the field. Host
 editors, Wi-Fi passwords, PINs and other real editors refuse it; search-editor
-captures remain blocked. Use `submit` separately to confirm a public search.
+captures remain blocked. Use `options` (Start) separately to confirm a public search.
 Missing/hidden/oversized windows are explicit capture
 failures; no alternative screen is captured.
 

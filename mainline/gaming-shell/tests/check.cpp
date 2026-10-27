@@ -58,6 +58,8 @@ static double contrast(const QColor &first, const QColor &second) {
 
 // §3 and §9: visible text is never below micro (18 px × font scale); glyph-badge letters are the
 // one exception. Returns "size px "text"" for each offender.
+// Hold captures land past the 600 ms ring delay and before the 1 s exit (capture() adds 150 ms).
+static constexpr int HoldCaptureMs = 650;
 static QStringList smallText(QQuickItem *root, qreal fontScale) {
     QStringList result;
     QList<QQuickItem *> pending{root};
@@ -83,6 +85,10 @@ private slots:
         QGuiApplication::styleHints()->setTabFocusBehavior(Qt::TabFocusAllControls);
         // Noto Sans SC when R46H_UI_FONT_DIR or the packaged copy exists; captures record which one ran.
         qInfo("INTERFACE_FONT %s", registerInterfaceFonts() ? "noto-sans-sc" : "fallback");
+    }
+    void init() {
+        // §7.6: a hint naming an unknown button is a page bug; HintBar reports it instead of drawing it.
+        QTest::failOnWarning(QRegularExpression(QStringLiteral("HintBar: unknown button")));
     }
     void preferencesRoundtripAndFailure() {
         QTemporaryDir directory;
@@ -152,6 +158,13 @@ private slots:
         auto key = [&](Qt::Key key) { QTest::keyClick(&view, key); QCoreApplication::processEvents(); };
         key(Qt::Key_Right); QCOMPARE(root->property("selected").toInt(), 1);
         key(Qt::Key_X); QVERIFY(state.isFavorite(1));
+        // Start (M) lists the card's actions, X included; the menu owns the keys until it closes.
+        auto *options = root->findChild<QObject *>("optionsMenu"); QVERIFY(options);
+        key(Qt::Key_M); QVERIFY(options->property("open").toBool());
+        key(Qt::Key_Down); key(Qt::Key_Return); QVERIFY(!options->property("open").toBool()); QVERIFY(!state.isFavorite(1));
+        key(Qt::Key_M); key(Qt::Key_M); QVERIFY(!options->property("open").toBool());
+        key(Qt::Key_X); QVERIFY(state.isFavorite(1));
+        key(Qt::Key_Escape); QCOMPARE(root->property("page").toInt(), 0); QVERIFY(!root->property("tabsFocused").toBool()); // Home B does nothing.
         key(Qt::Key_Return); QVERIFY(root->property("session").toBool());
         key(Qt::Key_Right); QCOMPARE(root->property("sessionMoves").toInt(), 1);
         key(Qt::Key_Q); QVERIFY(root->property("quickOpen").toBool());
@@ -162,14 +175,19 @@ private slots:
         key(Qt::Key_Left); QCOMPARE(root->property("sessionMoves").toInt(), 2);
         key(Qt::Key_Escape); QVERIFY(!root->property("session").toBool()); QCOMPARE(root->property("selected").toInt(), 1);
         QVERIFY(root->property("notice").toString().isEmpty());
-        key(Qt::Key_BracketRight); QCOMPARE(root->property("page").toInt(), 1);
+        key(Qt::Key_BracketRight); QCOMPARE(root->property("page").toInt(), 0); // L1/R1 no longer switch pages.
+        key(Qt::Key_Up); QVERIFY(root->property("tabsFocused").toBool());
+        key(Qt::Key_Right); QCOMPARE(root->property("page").toInt(), 1);
+        key(Qt::Key_Down); QVERIFY(!root->property("tabsFocused").toBool());
         key(Qt::Key_Down); QCOMPARE(root->property("selected").toInt(), 3);
-        key(Qt::Key_Up); QCOMPARE(root->property("selected").toInt(), 0);
+        key(Qt::Key_PageUp); QCOMPARE(root->property("selected").toInt(), 0);
+        key(Qt::Key_PageDown); QCOMPARE(root->property("selected").toInt(), 5);
+        key(Qt::Key_Up); QCOMPARE(root->property("selected").toInt(), 2);
         key(Qt::Key_Up); QVERIFY(root->property("tabsFocused").toBool());
         key(Qt::Key_Right); QCOMPARE(root->property("page").toInt(), 2);
         QVERIFY(root->property("settingsSidebar").toBool()); QVERIFY(!root->property("tabsFocused").toBool());
         key(Qt::Key_Right); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
-        key(Qt::Key_Return); key(Qt::Key_Up); key(Qt::Key_Return); QCOMPARE(state.volume(), 65);
+        key(Qt::Key_Right); QCOMPARE(state.volume(), 65); QVERIFY(!state.dirty()); // ←→ adjust; the release saves.
         key(Qt::Key_Escape); key(Qt::Key_Escape); QCOMPARE(root->property("page").toInt(), 0); QVERIFY(!state.dirty());
         view.resize(640, 480); QTest::qWait(40);
         QVERIFY(!view.grabWindow().isNull());
@@ -189,14 +207,14 @@ private slots:
         auto action = [&](const QString &value, bool repeat = false) {
             QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, value), Q_ARG(QVariant, repeat)));
         };
-        action("nextTab"); action("nextTab"); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
-        action("accept"); action("up"); action("left");
-        QVERIFY(!root->property("settingsSidebar").toBool()); QVERIFY(root->property("settingsAdjusting").toBool());
+        auto release = [&](const QString &value) { QVERIFY(QMetaObject::invokeMethod(root, "release", Q_ARG(QVariant, value))); };
+        action("up"); action("right"); action("right"); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        action("right"); QVERIFY(root->property("settingsAdjusting").toBool()); QCOMPARE(state.volume(), 60);
+        release("right"); QVERIFY(!root->property("settingsAdjusting").toBool()); QVERIFY(state.dirty()); // The save on release failed.
         action("back");
-        QCOMPARE(root->property("page").toInt(), 2); QVERIFY(state.dirty());
+        QVERIFY(!root->property("settingsSidebar").toBool()); QCOMPARE(root->property("page").toInt(), 2); QVERIFY(state.dirty());
         action("quick"); action("back"); QVERIFY(root->property("quickOpen").toBool());
         QVERIFY(file.remove()); action("back"); QVERIFY(!root->property("quickOpen").toBool());
-        action("accept"); // Finish the value editor after saving becomes possible.
         root->setProperty("settingsIndex", 2);
         action("accept"); QVERIFY(state.reducedMotion());
         action("accept", true); QVERIFY(state.reducedMotion());
@@ -250,15 +268,20 @@ private slots:
         action("down"); QCOMPARE(root->property("settingsIndex").toInt(), 1);
         QTRY_COMPARE(detailOutline->y(), row(rows)->mapToItem(detailOutline->parentItem(), QPointF()).y());
         QCOMPARE(detailOutline->height(), row(rows)->height());
-        action("up"); action("accept"); QVERIFY(root->property("settingsAdjusting").toBool());
-        action("up"); QCOMPARE(state.volume(), 60);
-        action("down"); action("down"); QCOMPARE(state.volume(), 50);
+        action("up"); action("accept"); QVERIFY(!root->property("settingsAdjusting").toBool()); QCOMPARE(state.volume(), 55); // A does not adjust.
+        action("right"); QVERIFY(root->property("settingsAdjusting").toBool()); QCOMPARE(state.volume(), 60);
+        action("left"); action("left", true); QCOMPARE(state.volume(), 50);
         QTest::qWait(150); capture("settings-adjusting");
-        action("left"); QVERIFY(root->property("settingsSidebar").toBool());
-        QVERIFY(!root->property("settingsAdjusting").toBool()); QCOMPARE(state.volume(), 50);
+        QVERIFY(QMetaObject::invokeMethod(root, "release", Q_ARG(QVariant, QString("left"))));
+        QVERIFY(!root->property("settingsAdjusting").toBool()); QVERIFY(!state.dirty());
         Preferences saved(directory.path()); QCOMPARE(saved.volume(), 50);
-        action("right"); action("previousTab"); action("nextTab");
-        QVERIFY(root->property("settingsSidebar").toBool());
+        // L1/R1 change category without wrapping and return to the row each one was left on.
+        action("down"); QCOMPARE(root->property("settingsIndex").toInt(), 1);
+        action("nextSection"); QCOMPARE(root->property("settingsCategory").toInt(), 1); QVERIFY(!root->property("settingsSidebar").toBool());
+        QCOMPARE(root->property("settingsIndex").toInt(), 0);
+        action("prevSection"); QCOMPARE(root->property("settingsCategory").toInt(), 0); QCOMPARE(root->property("settingsIndex").toInt(), 1);
+        action("prevSection"); QCOMPARE(root->property("settingsCategory").toInt(), 0);
+        action("back"); QVERIFY(root->property("settingsSidebar").toBool());
         // Accessibility preference keeps logical navigation but skips spatial motion.
         state.adjust("motion", 1); action("right");
         QTRY_VERIFY(root->property("settingsDetailReady").toBool());
@@ -267,7 +290,7 @@ private slots:
         QCOMPARE(detailOutline->x(), 0.); QCOMPARE(detailOutline->width(), row(rows)->width());
         action("quick"); QTRY_COMPARE(detailOutline->opacity(), 0.);
         action("back"); QTRY_COMPARE(detailOutline->opacity(), 1.);
-        action("left");
+        action("back");
         for (int i = 0; i < 11; ++i) action("down");
         QCOMPARE(root->property("settingsCategory").toInt(), 11);
         QVERIFY(outline->y() >= 0 && outline->y() + outline->height() <= 493);
@@ -328,9 +351,14 @@ private slots:
         QCOMPARE(versions[3].toMap().value("value").toString(), QStringLiteral("6.10.2"));
         QCOMPARE(versions[4].toMap().value("value").toString(), QStringLiteral("134.0.6998.208"));
         QCOMPARE(versions[5].toMap().value("value").toString(), QStringLiteral("144.0.7559.96"));
-        action("home"); QVERIFY(labels().contains("收藏"));
-        action("nextTab"); action("nextTab"); QTest::qWait(200);
-        QVERIFY(!labels().contains("收藏")); QVERIFY(labels().contains("选择分类"));
+        // §7.6: Select only on the home page, never B there; no L1/R1 or plain up/down hints.
+        action("home"); QVERIFY(labels().contains("收藏")); QVERIFY(labels().contains("快捷面板"));
+        QVERIFY(!labels().contains("主页")); QVERIFY(!labels().contains("返回")); QVERIFY(!labels().contains("切页"));
+        action("up"); action("right"); action("down"); QTest::qWait(200);
+        QCOMPARE(root->property("page").toInt(), 1); QVERIFY(labels().contains("主页")); QVERIFY(!labels().contains("快捷面板"));
+        QCOMPARE(footer->property("context").toString(), QStringLiteral("6 项"));
+        action("up"); action("right"); QTest::qWait(200);
+        QVERIFY(!labels().contains("收藏")); QVERIFY(labels().contains("进入")); QVERIFY(!labels().contains("快捷面板"));
         state.adjust("monitor", 1); QTest::qWait(200);
         auto *outline = root->findChild<QQuickItem *>("settingsFocus"); QVERIFY(outline);
         QVERIFY(!hud->mapRectToItem(root, hud->boundingRect()).intersects(outline->mapRectToItem(root, outline->boundingRect())));
@@ -339,8 +367,9 @@ private slots:
         QVERIFY(!labels().contains("打开")); QVERIFY(!labels().contains("调整"));
         action("accept"); QVERIFY(root->property("notice").toString().contains("尚未接入"));
         action("left"); root->setProperty("settingsCategory", 0); action("right");
-        QTRY_VERIFY(root->property("settingsDetailReady").toBool()); action("accept"); QTest::qWait(200);
-        QVERIFY(labels().contains("增减数值")); QVERIFY(footer->width() <= 952);
+        QTRY_VERIFY(root->property("settingsDetailReady").toBool()); QTest::qWait(200);
+        QVERIFY(labels().contains("调整")); QVERIFY(footer->width() <= 952); // Sliders: ←→ 调整.
+        action("right"); QVERIFY(QMetaObject::invokeMethod(root, "release", Q_ARG(QVariant, QString("right"))));
         action("quick"); QTest::qWait(200);
         auto *quickPanel = root->findChild<QQuickItem *>("quickPanel"); QVERIFY(quickPanel);
         QVERIFY(!footer->isVisible()); // §7.6 item 4: the panel's own footer replaces the page's.
@@ -369,9 +398,9 @@ private slots:
         action("home"); QTest::qWait(200);
         auto *pageContent = root->findChild<QQuickItem *>("pageContent"); QVERIFY(pageContent);
         auto *pageAnimation = root->findChild<QObject *>("pageRevealAnimation"); QVERIFY(pageAnimation);
-        action("nextTab"); QTest::qWait(40);
+        action("up"); action("right"); QTest::qWait(40);
         const auto current = pageContent->property("reveal").toReal(); QVERIFY(current > 0 && current < 1);
-        action("nextTab"); QCOMPARE(root->property("page").toInt(), 2);
+        action("right"); QCOMPARE(root->property("page").toInt(), 2);
         QVERIFY(root->property("settingsSidebar").toBool());
         QVERIFY(pageContent->property("reveal").toReal() >= current);
         state.adjust("motion", 1);
@@ -394,63 +423,131 @@ private slots:
         action("left"); QVERIFY(root->property("settingsSidebar").toBool()); QVERIFY(!state.dirty());
     }
     void virtualControllerEvents() {
-        QCOMPARE(ControllerInput::axisAction(8000, -9000), QString());
-        QCOMPARE(ControllerInput::axisAction(-32768, 0), QString("left"));
-        QCOMPARE(ControllerInput::axisAction(32767, 0), QString("right"));
-        QCOMPARE(ControllerInput::axisAction(0, -32768), QString("up"));
-        QCOMPARE(ControllerInput::axisAction(0, 32767), QString("down"));
+        // §7.5: 55% of full scale engages the stick's primary axis; it releases below 35%.
+        QCOMPARE(ControllerInput::stickDirection(8000, -9000), QString());
+        QCOMPARE(ControllerInput::stickDirection(17000, 0), QString());
+        QCOMPARE(ControllerInput::stickDirection(18100, 0), QString("right"));
+        QCOMPARE(ControllerInput::stickDirection(12000, 0, "right"), QString("right"));
+        QCOMPARE(ControllerInput::stickDirection(11000, 0, "right"), QString());
+        QCOMPARE(ControllerInput::stickDirection(-32768, 0), QString("left"));
+        QCOMPARE(ControllerInput::stickDirection(0, -32768), QString("up"));
+        QCOMPARE(ControllerInput::stickDirection(0, 32767), QString("down"));
+        QCOMPARE(ControllerInput::stickDirection(30000, 31000), QString("down"));
         ControllerInput input;
         const int device = SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
         QVERIFY2(device >= 0, SDL_GetError());
         SDL_Joystick *joystick = SDL_JoystickOpen(device); QVERIFY(joystick);
-        QSignalSpy actions(&input, &ControllerInput::action);
+        QSignalSpy actions(&input, &ControllerInput::action), releases(&input, &ControllerInput::released);
+        QSignalSpy scrolls(&input, &ControllerInput::scrolled);
         input.poll();
         QVERIFY(SDL_JoystickSetVirtualAxis(joystick, SDL_CONTROLLER_AXIS_LEFTX, -32768) == 0);
         input.poll(); QVERIFY(!actions.isEmpty()); QCOMPARE(actions.last().at(0).toString(), QString("left"));
         QVERIFY(!input.deviceName().isEmpty()); QCOMPARE(input.axes()[0].toDouble(), -1.);
-        actions.clear(); QTest::qWait(430); QVERIFY(!actions.isEmpty()); QVERIFY(actions.last().at(1).toBool());
+        actions.clear(); QTest::qWait(430); QCOMPARE(actions.size(), 1); QVERIFY(actions.last().at(1).toBool()); // 380 ms, then 90 ms.
         SDL_JoystickSetVirtualAxis(joystick, SDL_CONTROLLER_AXIS_LEFTX, 0); input.poll();
+        QCOMPARE(releases.last().at(0).toString(), QString("left"));
         actions.clear(); QTest::qWait(160); QVERIFY(actions.isEmpty());
-        input.suppressUntilNeutral();
+        // Lists speed up to 50 ms after 2 s; grids stay at 90 ms.
+        auto heldRate = [&](bool list) {
+            input.setFastRepeat(list);
+            SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_DPAD_DOWN, 1); input.poll();
+            QTest::qWait(2100); actions.clear(); QTest::qWait(400);
+            const auto count = actions.size();
+            SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_DPAD_DOWN, 0); input.poll();
+            return count;
+        };
+        const auto fast = heldRate(true), steady = heldRate(false);
+        QVERIFY2(fast >= 6 && steady <= 5, qPrintable(QString("list %1, grid %2 repeats in 400 ms").arg(fast).arg(steady)));
+        input.setFastRepeat(false);
+        input.suppressUntilNeutral(); actions.clear();
         SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, 1); input.poll();
         QVERIFY(actions.isEmpty());
         SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, 0); input.poll();
         SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, 1); input.poll();
         QVERIFY(!actions.isEmpty()); QCOMPARE(actions.last().at(0).toString(), QString("accept"));
         SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, 0); input.poll();
-        for (const auto &button : {qMakePair(SDL_CONTROLLER_BUTTON_Y,QString("erase")), qMakePair(SDL_CONTROLLER_BUTTON_START,QString("submit"))}) {
-            actions.clear(); SDL_JoystickSetVirtualButton(joystick,button.first,1); input.poll();
-            QCOMPARE(actions.size(),1); QCOMPARE(actions.first().at(0).toString(),button.second);
-            SDL_JoystickSetVirtualButton(joystick,button.first,0); input.poll();
+        QCOMPARE(releases.last().at(0).toString(), QString("accept"));
+        // §7.3 page actions, each with its release.
+        for (const auto &button : {qMakePair(SDL_CONTROLLER_BUTTON_B, QString("back")), qMakePair(SDL_CONTROLLER_BUTTON_X, QString("itemAction")),
+                 qMakePair(SDL_CONTROLLER_BUTTON_Y, QString("pageAction")), qMakePair(SDL_CONTROLLER_BUTTON_START, QString("options")),
+                 qMakePair(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, QString("prevSection")), qMakePair(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, QString("nextSection"))}) {
+            actions.clear(); releases.clear(); SDL_JoystickSetVirtualButton(joystick, button.first, 1); input.poll();
+            QCOMPARE(actions.size(), 1); QCOMPARE(actions.first().at(0).toString(), button.second);
+            SDL_JoystickSetVirtualButton(joystick, button.first, 0); input.poll();
+            QCOMPARE(releases.size(), 1); QCOMPARE(releases.first().at(0).toString(), button.second);
         }
+        // Analog L2/R2 page past half travel.
+        for (const auto &trigger : {qMakePair(SDL_CONTROLLER_AXIS_TRIGGERLEFT, QString("pageUp")), qMakePair(SDL_CONTROLLER_AXIS_TRIGGERRIGHT, QString("pageDown"))}) {
+            actions.clear(); releases.clear(); SDL_JoystickSetVirtualAxis(joystick, trigger.first, 32767); input.poll();
+            QCOMPARE(actions.size(), 1); QCOMPARE(actions.first().at(0).toString(), trigger.second);
+            SDL_JoystickSetVirtualAxis(joystick, trigger.first, -32768); input.poll();
+            QCOMPARE(releases.size(), 1); QCOMPARE(releases.first().at(0).toString(), trigger.second);
+            SDL_JoystickSetVirtualAxis(joystick, trigger.first, 0); input.poll();
+        }
+        // Select decides on release; with another key it is a chord and neither reaches the page.
+        actions.clear(); releases.clear();
+        SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_BACK, 1); input.poll(); QVERIFY(actions.isEmpty());
+        SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_BACK, 0); input.poll();
+        QCOMPARE(actions.size(), 1); QCOMPARE(actions.first().at(0).toString(), QString("quick"));
+        actions.clear();
+        SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_BACK, 1); input.poll();
+        SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, 1); input.poll();
+        SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, 0); input.poll();
+        SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_BACK, 0); input.poll();
+        QVERIFY(actions.isEmpty()); QVERIFY(releases.isEmpty());
+        // Right stick scrolls, faster the further it is pushed.
+        SDL_JoystickSetVirtualAxis(joystick, SDL_CONTROLLER_AXIS_RIGHTY, 32767); input.poll();
+        QVERIFY(!scrolls.isEmpty()); QVERIFY(qAbs(scrolls.last().at(0).toDouble() - 1.) < 0.01);
+        SDL_JoystickSetVirtualAxis(joystick, SDL_CONTROLLER_AXIS_RIGHTY, -19661); input.poll();
+        QVERIFY(qAbs(scrolls.last().at(0).toDouble() + 0.5) < 0.01);
+        SDL_JoystickSetVirtualAxis(joystick, SDL_CONTROLLER_AXIS_RIGHTY, 0); scrolls.clear(); input.poll(); QVERIFY(scrolls.isEmpty());
         SDL_JoystickClose(joystick); QVERIFY(SDL_JoystickDetachVirtual(device) == 0); input.poll();
         QVERIFY(input.deviceName().isEmpty()); QVERIFY(input.buttons().isEmpty()); QCOMPARE(input.axes()[0].toDouble(), 0.);
     }
     void routedControllerEvents() {
         ControllerInput input(nullptr, true);
-        QSignalSpy actions(&input, &ControllerInput::action);
+        QSignalSpy actions(&input, &ControllerInput::action), releases(&input, &ControllerInput::released);
+        QSignalSpy cancels(&input, &ControllerInput::cancelled), scrolls(&input, &ControllerInput::scrolled);
         qint32 axes[4]{};
         input.routedState(0, axes);
         QCOMPARE(input.deviceName(), QString("R46H Routed Gamepad"));
-        for (const auto &item : {qMakePair(1, QString("accept")), qMakePair(0, QString("back")),
-             qMakePair(2, QString("favorite")), qMakePair(3, QString("erase")), qMakePair(9, QString("submit"))}) {
-            actions.clear(); input.routedState(1U << item.first, axes);
+        for (const auto &item : {qMakePair(1, QString("accept")), qMakePair(0, QString("back")), qMakePair(2, QString("itemAction")),
+             qMakePair(3, QString("pageAction")), qMakePair(9, QString("options")), qMakePair(4, QString("prevSection")),
+             qMakePair(5, QString("nextSection")), qMakePair(6, QString("pageUp")), qMakePair(7, QString("pageDown"))}) {
+            actions.clear(); releases.clear(); input.routedState(1U << item.first, axes);
             QCOMPARE(actions.size(), 1); QCOMPARE(actions.first().at(0).toString(), item.second);
             input.routedState(0, axes);
+            QCOMPARE(releases.size(), 1); QCOMPARE(releases.first().at(0).toString(), item.second);
         }
+        // The router delivers a lone Select as a press and release; Select + X stays with the system layer.
+        actions.clear(); input.routedState(1U << 8, axes); QVERIFY(actions.isEmpty());
+        input.routedState(0, axes); QCOMPARE(actions.size(), 1); QCOMPARE(actions.first().at(0).toString(), QString("quick"));
+        actions.clear(); releases.clear();
+        input.routedState(1U << 8, axes); input.routedState(1U << 8 | 1U << 2, axes); input.routedState(0, axes);
+        QVERIFY(actions.isEmpty()); QVERIFY(releases.isEmpty());
+        // B repeats only as the keyboard's backspace; Files and Browser keep one B per press.
+        actions.clear(); input.routedState(1U << 0, axes); QTest::qWait(430); QCOMPARE(actions.size(), 1);
+        input.routedState(0, axes); input.setBackRepeat(true); actions.clear();
+        input.routedState(1U << 0, axes); QTest::qWait(430); QVERIFY(actions.size() >= 2); QVERIFY(actions.last().at(1).toBool());
+        input.routedState(0, axes); input.setBackRepeat(false);
         actions.clear(); axes[0] = -32767; input.routedState(0, axes);
         QCOMPARE(actions.last().at(0).toString(), QString("left"));
         QCOMPARE(input.axes()[0].toDouble(), -1.);
         QTest::qWait(430); QVERIFY(actions.last().at(1).toBool());
-        input.suppressUntilNeutral(); actions.clear();
+        releases.clear(); axes[0] = -12000; input.routedState(0, axes); QVERIFY(releases.isEmpty()); // 37% keeps the direction.
+        axes[0] = -11000; input.routedState(0, axes); QCOMPARE(releases.size(), 1);
+        axes[0] = -32767; input.routedState(0, axes);
+        input.suppressUntilNeutral(); actions.clear(); QCOMPARE(cancels.size(), 1); // A held key ends any page hold.
         input.routedState(1U << 1, axes); QTest::qWait(120); QVERIFY(actions.isEmpty());
         axes[0] = 0; input.routedState(0, axes); input.routedState(1U << 1, axes);
         QCOMPARE(actions.size(), 1); QCOMPARE(actions.first().at(0).toString(), QString("accept"));
         input.routedState(0, axes); actions.clear();
         input.routedState(1U << 6 | 1U << 7, axes);
         QCOMPARE(input.axes()[4].toDouble(), 1.); QCOMPARE(input.axes()[5].toDouble(), 1.);
-        QVERIFY(actions.isEmpty());
-        input.routedState(0, axes); actions.clear(); axes[0] = 40000;
+        QCOMPARE(actions.size(), 2);
+        input.routedState(0, axes); axes[3] = 32767; scrolls.clear(); input.routedState(0, axes);
+        QCOMPARE(scrolls.size(), 1); QVERIFY(qAbs(scrolls.first().at(0).toDouble() - 1.) < 0.01);
+        axes[3] = 0; input.routedState(0, axes); actions.clear(); axes[0] = 40000;
         input.routedState(1U << 1, axes); QVERIFY(actions.isEmpty()); // Reject invalid IPC values.
         QCOMPARE(input.axes()[0].toDouble(), 0.);
     }
@@ -679,41 +776,54 @@ private slots:
         auto action = [&](const char *name) { QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, QString(name)), Q_ARG(QVariant, false))); };
         auto scene = [&](const char *name) { action("home"); QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString(name)))); };
         const auto captures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
+        auto release = [&](const char *name) { QVERIFY(QMetaObject::invokeMethod(root, "release", Q_ARG(QVariant, QString(name)))); };
         state.adjust("motion", 1); // Captures show settled pages, not transitions.
-        for (const bool night : {false, true}) {
-            QVERIFY(state.choose("night", night ? 1 : 0));
-            const QString mode = night ? "night" : "light";
-            auto capture = [&](const QString &name) {
-                QTest::qWait(150);
-                const auto small = smallText(view.contentItem(), state.fontPercent() / 100.);
-                QVERIFY2(small.isEmpty(), qPrintable(name + ": " + small.join(", ")));
-                if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/" + name + "-" + mode + ".png"));
-            };
-            QCOMPARE(view.color(), QColor(night ? "#0F1316" : "#F2F4F5"));
-            scene("home"); root->setProperty("selected", 1); capture("home");
-            QVERIFY(QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, QStringLiteral("已加入收藏")))); capture("notice");
-            QVERIFY(QMetaObject::invokeMethod(root, "clearNotice"));
-            scene("library"); capture("library");
-            scene("settings"); capture("settings");
-            root->setProperty("settingsCategory", 4); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); capture("settings-display");
-            scene("controller"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); capture("controller");
-            if (!state.monitor()) state.adjust("monitor", 1);
-            scene("quick"); capture("quick-hud");
-            action("back"); state.adjust("monitor", 1);
-            scene("input"); capture("input"); QVERIFY(QMetaObject::invokeMethod(root, "closeEditor"));
-            scene("session"); capture("session");
-            root->setProperty("dimmed", true); capture("dimmed"); root->setProperty("dimmed", false);
+        // Light and night at 100% and 130%: every page keeps 18 px text and its own hint footer.
+        QString mode;
+        auto capture = [&](const QString &name) {
+            QTest::qWait(150);
+            const auto small = smallText(view.contentItem(), state.fontPercent() / 100.);
+            QVERIFY2(small.isEmpty(), qPrintable(name + ": " + small.join(", ")));
+            if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/" + name + "-" + mode + ".png"));
+        };
+        for (const int percent : {100, 130}) {
+            QVERIFY(state.choose("font", percent == 100 ? 1 : 3));
+            for (const bool night : {false, true}) {
+                QVERIFY(state.choose("night", night ? 1 : 0));
+                mode = QString("%1-%2").arg(night ? "night" : "light").arg(percent);
+                QCOMPARE(view.color(), QColor(night ? "#0F1316" : "#F2F4F5"));
+                scene("home"); root->setProperty("selected", 1); capture("home");
+                QVERIFY(QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, QStringLiteral("已加入收藏")))); capture("notice");
+                QVERIFY(QMetaObject::invokeMethod(root, "clearNotice"));
+                scene("library"); capture("library");
+                scene("settings"); capture("settings");
+                root->setProperty("settingsCategory", 4); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); capture("settings-display");
+                scene("controller"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); capture("controller");
+                action("back"); QTest::qWait(HoldCaptureMs); capture("controller-hold"); release("back");
+                QVERIFY(root->property("testingController").toBool());
+                scene("quick"); capture("quick");
+                action("back"); state.adjust("monitor", 1);
+                scene("session"); capture("session-hud"); state.adjust("monitor", 1);
+                scene("input"); capture("input"); QVERIFY(QMetaObject::invokeMethod(root, "closeEditor"));
+                root->setProperty("dimmed", true); capture("dimmed"); root->setProperty("dimmed", false);
+            }
         }
         const auto environment = QProcessEnvironment::systemEnvironment();
         for (const auto *id : {"builtin.files", "builtin.text"}) {
             QVERIFY(applications.launchPrepared(id, "/bin/sleep", {"30"}, directory.path(), environment));
             QTRY_VERIFY(applications.processId() > 1); applications.background();
         }
-        for (const bool night : {false, true}) {
-            QVERIFY(state.choose("night", night ? 1 : 0));
-            QVERIFY(QMetaObject::invokeMethod(root, "showTasksOrDesktop", Q_ARG(QVariant, true))); QTest::qWait(150);
-            if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/tasks-" + (night ? "night" : "light") + ".png"));
-            action("back");
+        for (const int percent : {100, 130}) {
+            QVERIFY(state.choose("font", percent == 100 ? 1 : 3));
+            for (const bool night : {false, true}) {
+                QVERIFY(state.choose("night", night ? 1 : 0));
+                mode = QString("%1-%2").arg(night ? "night" : "light").arg(percent);
+                QVERIFY(QMetaObject::invokeMethod(root, "showTasksOrDesktop", Q_ARG(QVariant, true))); capture("tasks");
+                // X held past 600 ms shows the HoldConfirm; releasing before 2 s cancels the force-quit.
+                action("itemAction"); QTest::qWait(HoldCaptureMs); capture("tasks-hold"); release("itemAction");
+                QCOMPARE(applications.tasks().size(), 2);
+                action("back");
+            }
         }
         applications.stopAll(); QTRY_VERIFY_WITH_TIMEOUT(!applications.hasTasks(), 4000);
     }
@@ -731,7 +841,7 @@ private slots:
         action("quick"); action("down"); action("down"); action("down"); action("accept");
         QVERIFY(state.monitor()); QVERIFY(metrics.active()); action("accept", true); QVERIFY(state.monitor());
         action("accept"); QVERIFY(!metrics.active()); action("back");
-        action("nextTab"); action("nextTab"); action("up");
+        action("up"); action("right"); action("right");
         QVERIFY(root->property("settingsSidebar").toBool());
         for (int i = 0; i < 8; ++i) action("down");
         QCOMPARE(root->property("settingsCategory").toInt(), 8);
@@ -740,7 +850,8 @@ private slots:
         action("down"); action("accept"); QVERIFY(root->property("editing").toBool());
         auto *editorFocus = view.activeFocusItem(); state.adjust("monitor", 1);
         auto *hud = root->findChild<QQuickItem *>("performancePanel"); QVERIFY(hud);
-        QTRY_VERIFY(hud->isVisible()); // Hidden until the first sample: no placeholder rows. QCOMPARE(hud->position(), QPointF(24, 24)); QVERIFY(hud->width() <= 360);
+        QTRY_VERIFY(hud->isVisible()); // Hidden until the first sample: no placeholder rows.
+        QCOMPARE(hud->position(), QPointF(24, 24)); QVERIFY(hud->width() <= 360);
         QVERIFY(hud->y() + hud->height() < 183); // Above the input field, away from keys.
         QCOMPARE(view.activeFocusItem(), editorFocus); // The overlay never takes focus.
         state.adjust("monitor", 1); QVERIFY(!hud->isVisible());
@@ -763,13 +874,26 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(root->property("screenOff").toBool(), 1000);
         action("accept"); QVERIFY(!root->property("screenOff").toBool()); QVERIFY(!root->property("session").toBool());
         QVERIFY(state.choose("screenOff",0));
-        action("nextTab"); action("nextTab"); root->setProperty("settingsCategory", 2); root->setProperty("testingController", true);
-        action("back"); action("nextTab"); action("right"); action("left"); QCOMPARE(root->property("page").toInt(), 2);
+        // Controller test (§7.4): every key but Select is test input; only a 1 s B hold leaves.
+        auto release = [&](const QString &value) { QVERIFY(QMetaObject::invokeMethod(root, "release", Q_ARG(QVariant, value))); };
+        QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString("controller"))));
         QVERIFY(root->property("testingController").toBool());
-        action("quick");
-        QCOMPARE(root->property("page").toInt(), 2); QVERIFY(!root->property("testingController").toBool());
-        QVERIFY(root->property("settingsSidebar").toBool()); QVERIFY(!root->property("quickOpen").toBool());
-        action("quick"); QVERIFY(root->property("quickOpen").toBool());
+        for (const auto *key : {"back", "nextSection", "right", "left", "options", "pageAction", "itemAction", "pageDown"}) { action(key); release(key); }
+        QCOMPARE(root->property("page").toInt(), 2); QVERIFY(root->property("testingController").toBool());
+        QVERIFY(!root->property("choicesOpen").toBool());
+        auto *footer = root->findChild<QQuickItem *>("footerHints"); QVERIFY(footer);
+        const auto exitHint = [&] {
+            const auto hints = footer->property("actions").toList();
+            return hints.size() == 1 ? hints.first().toMap() : QVariantMap();
+        };
+        QCOMPARE(exitHint().value("label").toString(), QStringLiteral("按住退出"));
+        action("back"); QTest::qWait(300); QCOMPARE(exitHint().value("progress").toReal(), -1.); // No ring before 600 ms.
+        QTRY_VERIFY(exitHint().value("progress").toReal() > 0.6);
+        release("back"); QVERIFY(root->property("testingController").toBool()); QCOMPARE(root->property("holdAction").toString(), QString());
+        action("back"); QTRY_VERIFY_WITH_TIMEOUT(!root->property("testingController").toBool(), 1500);
+        release("back"); QVERIFY(root->property("settingsSidebar").toBool()); QCOMPARE(root->property("page").toInt(), 2);
+        QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString("controller"))));
+        action("quick"); QVERIFY(root->property("quickOpen").toBool()); QVERIFY(root->property("testingController").toBool());
     }
     void applicationManifestAndForegroundLifecycle() {
         QTemporaryDir directory; QVERIFY(directory.isValid());
@@ -856,10 +980,22 @@ private slots:
         action("down");QCOMPARE(tasks->property("selected").toInt(),1);
         if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+"/tasks-selected.png"));
         action("up");QCOMPARE(tasks->property("selected").toInt(),0);
-        action("favorite");auto *choice=root->findChild<QObject *>("taskKillChoice");QVERIFY(choice);QVERIFY(choice->property("visible").toBool());
-        action("accept");QVERIFY(!choice->property("visible").toBool());QCOMPARE(apps.tasks().size(),3); // Cancel is the default.
-        action("favorite");action("down");action("accept");QTRY_COMPARE(apps.tasks().size(),2);
+        auto release=[&](const QString &name){QVERIFY(QMetaObject::invokeMethod(root,"release",Q_ARG(QVariant,name)));};
+        auto *hold=root->findChild<QQuickItem *>("taskHold");QVERIFY(hold);
+        // X held: HoldConfirm after 600 ms; releasing before 2 s cancels without closing (§7.5, §7.7).
+        action("itemAction");QTest::qWait(300);QVERIFY(!hold->isVisible());
+        QTRY_VERIFY(hold->isVisible());release("itemAction");QVERIFY(!hold->isVisible());
+        QCOMPARE(apps.tasks().size(),3);QVERIFY(root->property("tasksVisible").toBool());
+        // Start lists the task's actions; force-quit there only names the X hold.
+        auto *options=root->findChild<QObject *>("optionsMenu");QVERIFY(options);
+        action("options");QVERIFY(options->property("open").toBool());
+        if(!captures.isEmpty()){QTest::qWait(300);QVERIFY(view.grabWindow().save(captures+"/tasks-options.png"));}
+        action("back");QVERIFY(!options->property("open").toBool());QVERIFY(root->property("tasksVisible").toBool());
+        action("itemAction");QTRY_COMPARE_WITH_TIMEOUT(apps.tasks().size(),2,3500);release("itemAction");
         QVERIFY(!apps.contains("builtin.files"));
+        // A tap closes normally and leaves the task page.
+        QSignalSpy closing(&apps,&Applications::closeRequested);
+        action("itemAction");release("itemAction");QCOMPARE(closing.size(),1);QVERIFY(!root->property("tasksVisible").toBool());
         apps.stopAll();QTRY_VERIFY_WITH_TIMEOUT(!apps.hasTasks(),4000);QVERIFY(apps.thumbnail("builtin.files").isNull());
     }
     void browserEntryAndPrivacy() {
@@ -890,10 +1026,17 @@ private slots:
         view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
         QCOMPARE(view.status(),QQuickView::Ready); view.show(); QVERIFY(QTest::qWaitForWindowExposed(&view));
         auto *root=view.rootObject(); QSignalSpy request(root,SIGNAL(terminalRequested()));
-        QTest::keyClick(&view,Qt::Key_BracketRight); QCOMPARE(root->property("page").toInt(),1);
-        root->setProperty("selected",7); QTest::keyClick(&view,Qt::Key_Return); QCOMPARE(request.size(),0);
-        root->setProperty("terminalAvailable",true); QTest::keyClick(&view,Qt::Key_Return); QCOMPARE(request.size(),1);
-        QTest::keyClick(&view,Qt::Key_Q,Qt::ControlModifier); QVERIFY(!root->property("quickOpen").toBool());
+        // Keys go to the shell item itself: this check must not depend on the host granting window activation.
+        auto key=[&](Qt::Key code,Qt::KeyboardModifiers modifiers=Qt::NoModifier){
+            QKeyEvent press(QEvent::KeyPress,code,modifiers),release(QEvent::KeyRelease,code,modifiers);
+            QCoreApplication::sendEvent(root,&press);QCoreApplication::sendEvent(root,&release);
+        };
+        for(const auto code:{Qt::Key_Up,Qt::Key_Right,Qt::Key_Down}) key(code); // Library through the top navigation.
+        QCOMPARE(root->property("page").toInt(),1); QVERIFY(!root->property("tabsFocused").toBool());
+        root->setProperty("selected",7); key(Qt::Key_Return); QCOMPARE(request.size(),0);
+        root->setProperty("terminalAvailable",true); key(Qt::Key_Return); QCOMPARE(request.size(),1);
+        key(Qt::Key_Q,Qt::ControlModifier); QVERIFY(!root->property("quickOpen").toBool());
+        key(Qt::Key_Q); QVERIFY(root->property("quickOpen").toBool()); key(Qt::Key_Escape); // Q is Select, decided on release.
         QQuickItem *card=nullptr; QList<QQuickItem *> pending{root};
         while(!pending.isEmpty()) {
             auto *item=pending.takeLast(); pending.append(item->childItems());
@@ -1080,7 +1223,7 @@ private slots:
         QCOMPARE(outline->height(), choiceRow->height());
         if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+"/streaming-applications.png"));
         tap("up");tap("accept");QCOMPARE(manager.current().value("application").toString(),QString("Desktop"));
-        tap("accept");for(int i=0;i<3;++i)tap("down");tap("accept");QVERIFY(root->property("editing").toBool());tap("back");
+        tap("accept");for(int i=0;i<3;++i)tap("down");tap("accept");QVERIFY(root->property("editing").toBool());tap("quick"); // Select cancels input.
         QFile slow(client.fileName()+".slow");QVERIFY(slow.open(QIODevice::WriteOnly));slow.close();
         manager.refreshApplications();QVERIFY(manager.busy());const auto oldAddress=manager.current().value("address");
         QVERIFY(!manager.edit("address","127.0.0.2"));QCOMPARE(manager.current().value("address"),oldAddress);
@@ -1182,7 +1325,7 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString("power"))));
         QTRY_VERIFY(root->property("settingsDetailReady").toBool());
         action("accept"); QVERIFY(root->property("choicesOpen").toBool());
-        action("down"); action("nextTab"); action("home");
+        action("down"); action("nextSection"); action("pageDown"); action("home");
         QCOMPARE(root->property("page").toInt(), 2); QCOMPARE(state.dimSeconds(), 0);
         action("back"); QVERIFY(!root->property("choicesOpen").toBool()); QCOMPARE(state.dimSeconds(), 0);
         action("accept"); action("down"); action("accept"); QCOMPARE(state.dimSeconds(), 30);
@@ -1225,7 +1368,9 @@ private slots:
                 Text { x: 600; y: 300; text: "太小"; font.pixelSize: 16 }
                 Ui.GlyphBadge { x: 700; y: 300; button: "A"; size: Ui.Theme.glyphKeySize }
                 Ui.GameCard { objectName: "favoriteCard"; x: 760; y: 300; width: 212; height: 212; title: "1944"; favorite: true }
+                Ui.HintBar { objectName: "badHints"; x: 40; y: 620; width: 400; actions: [{button: "Home", label: "主页"}, {button: "A", label: "开始"}] }
             })", QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ComponentFixture.qml")));
+        QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("HintBar: unknown button \"Home\"")));
         QScopedPointer<QObject> object(fixture.create()); QVERIFY2(object, qPrintable(fixture.errorString()));
         auto *root = qobject_cast<QQuickItem *>(object.data()); root->setParentItem(view.contentItem());
         view.show(); QVERIFY(QTest::qWaitForWindowExposed(&view));
@@ -1259,6 +1404,7 @@ private slots:
             if (item->objectName() == "hintLabel" && item->isVisible()) order.insert(item->mapToScene(QPointF()).x(), item->property("text").toString());
         }
         QCOMPARE(QStringList(order.values()), QStringList({"调整", "选项", "收藏", "返回", "开始"}));
+        QCOMPARE(root->findChild<QObject *>("badHints")->property("entries").toList().size(), 1); // Unknown buttons are not drawn.
         // The text-size guard flags raw 16 px text but not the 16 px letter inside a key glyph.
         QCOMPARE(smallText(root, 1.), QStringList({QStringLiteral("16 px \"太小\"")}));
         // Favorites are a solid star in cardFavorite on the card's dark disc.
@@ -1323,7 +1469,8 @@ private slots:
         tap("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
         auto *brightness=row(QStringLiteral("屏幕亮度")); QVERIFY(brightness);
         QVERIFY(QMetaObject::invokeMethod(brightness,"click"));
-        QCOMPARE(root->property("settingsIndex").toInt(),1); QVERIFY(root->property("settingsAdjusting").toBool());
+        QCOMPARE(root->property("settingsIndex").toInt(),1); QVERIFY(!root->property("settingsAdjusting").toBool()); // Clicking focuses the slider row.
+        const auto before=state.brightness(); tap("right"); QVERIFY(root->property("settingsAdjusting").toBool()); QCOMPARE(state.brightness(),before+5);
     }
     void choiceKeyboardFocusStaysModal() {
         QTemporaryDir directory;
@@ -1616,7 +1763,8 @@ private slots:
         QVERIFY(field->property("inputMethodHints").toInt()&Qt::ImhNoAutoUppercase);
         field->setProperty("text","fixture-password");QVERIFY(QMetaObject::invokeMethod(root,"finishEditor"));
         QVERIFY(root->property("editing").toBool()); // No fixture bus; refusal keeps the edit available.
-        tap("back");QVERIFY(!root->property("editing").toBool());QVERIFY(field->property("text").toString().isEmpty());
+        tap("back");QCOMPARE(field->property("text").toString(),QString("fixture-passwor")); // B erases on the keyboard.
+        tap("quick");QVERIFY(!root->property("editing").toBool());QVERIFY(field->property("text").toString().isEmpty());
         tap("down");tap("down");tap("accept");QVERIFY(network.remember());
         tap("down");tap("down");tap("accept");tap("accept");QVERIFY(root->property("choicesOpen").toBool());
         tap("accept");QVERIFY(!QFileInfo::exists(program.fileName()+".deleted")); // Cancel is the default.
@@ -1665,9 +1813,15 @@ private slots:
             }
             QVERIFY(wrapped);
         }
+        auto dispatch=[&](const char *name,bool repeated=false){QVERIFY(QMetaObject::invokeMethod(root,"dispatch",Q_ARG(QVariant,QString(name)),Q_ARG(QVariant,repeated)));};
         field->setProperty("text",QStringLiteral("ab中")); field->setProperty("cursorPosition",3);
-        QVERIFY(QMetaObject::invokeMethod(root,"dispatch",Q_ARG(QVariant,QString("erase")),Q_ARG(QVariant,false)));
-        QCOMPARE(field->property("text").toString(),QString("ab"));
+        dispatch("back"); QCOMPARE(field->property("text").toString(),QString("ab")); // §7.4: B erases.
+        dispatch("pageAction"); QCOMPARE(field->property("text").toString(),QString("ab ")); // Y space.
+        dispatch("prevSection"); QCOMPARE(field->property("cursorPosition").toInt(),2); // L1/R1 cursor.
+        dispatch("nextSection"); QCOMPARE(field->property("cursorPosition").toInt(),3);
+        // Holding B erases to empty and stops; only a separate press on the empty field closes.
+        dispatch("back"); for(int i=0;i<4;++i) dispatch("back",true);
+        QVERIFY(field->property("text").toString().isEmpty()); QVERIFY(root->property("editing").toBool());
         QQmlComponent ime(view.engine());
         ime.setData(R"(import QtQuick
             import QtQuick.VirtualKeyboard
@@ -1675,6 +1829,8 @@ private slots:
             QtObject {
                 property bool chineseAvailable: VirtualKeyboardSettings.availableLocales.indexOf("zh_CN") >= 0
                 property int candidates: InputContext.inputEngine.wordCandidateListModel.count
+                property bool shift: InputContext.shiftActive
+                property string locale: VirtualKeyboardSettings.locale
                 function chinese() { VirtualKeyboardSettings.locale = "zh_CN" }
                 function typePinyin() {
                     InputContext.inputEngine.virtualKeyClick(Qt.Key_N, "n", Qt.NoModifier)
@@ -1684,6 +1840,14 @@ private slots:
             })", QUrl());
         QScopedPointer<QObject> inputMethod(ime.create()); QVERIFY2(inputMethod, qPrintable(ime.errorString()));
         QVERIFY(inputMethod->property("chineseAvailable").toBool());
+        // X shift, L2 中/英 and R2 symbols act on the keyboard without moving the key focus.
+        const bool shifted = inputMethod->property("shift").toBool();
+        dispatch("itemAction"); QTRY_COMPARE(inputMethod->property("shift").toBool(), !shifted);
+        dispatch("itemAction"); QTRY_COMPARE(inputMethod->property("shift").toBool(), shifted);
+        dispatch("pageUp"); QCOMPARE(inputMethod->property("locale").toString(), QString("zh_CN"));
+        dispatch("pageUp"); QCOMPARE(inputMethod->property("locale").toString(), QString("en_GB"));
+        dispatch("pageDown"); QVERIFY(keyboard->property("symbolMode").toBool());
+        dispatch("pageDown"); QVERIFY(!keyboard->property("symbolMode").toBool());
         field->setProperty("text", ""); QVERIFY(QMetaObject::invokeMethod(inputMethod.data(), "chinese"));
         QTest::qWait(100); QVERIFY(QMetaObject::invokeMethod(inputMethod.data(), "typePinyin"));
         QTRY_VERIFY(inputMethod->property("candidates").toInt() > 0);
@@ -1714,8 +1878,10 @@ private slots:
         QTest::qWait(200); // Match initial entry: finish keyboard layout/observer registration.
         controller.keyboardAction("down"); controller.keyboardAction("accept");
         QTRY_VERIFY(!field->property("text").toString().isEmpty());
-        QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, QString("submit")), Q_ARG(QVariant, false)));
+        dispatch("options"); // Start: 完成.
         QVERIFY(!root->property("editing").toBool()); QVERIFY(field->property("text").toString().isEmpty());
+        QVERIFY(QMetaObject::invokeMethod(root, "openEditor")); QTRY_COMPARE(loader->property("status").toInt(), 1);
+        dispatch("back"); QVERIFY(!root->property("editing").toBool()); // B on an empty field closes.
     }
 };
 QTEST_MAIN(ShellCheck)

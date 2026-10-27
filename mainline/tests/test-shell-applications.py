@@ -61,15 +61,16 @@ def main():
             def observe(image=False):
                 nonlocal latest
                 latest = control.exchange(ipc / "control.sock", request(screenshot=image)); return latest
-            tap("nextTab"); tap("down"); tap("down"); assert tap("right")["selected"] == 7
-            tap("favorite")
+            tap("up"); tap("right"); tap("down")  # Library through the top navigation.
+            tap("down"); tap("down"); assert tap("right")["selected"] == 7
+            tap("itemAction")
             assert latest["state"]["selectedFavorite"] and latest["state"]["selectedApplication"] == "app-7"
             saved = json.loads((state / "preview.json").read_text())
             assert saved["version"] == 5 and saved["screenOffSeconds"] == 300 and saved["applicationFavorites"] == ["app-7"] and saved["nightMode"] == "off"
             if args.evidence: control.save_result(args.evidence, observe(True))
             assert tap("accept")["externalSession"]
             # The parent ignores controls while another application owns the session.
-            assert tap("nextTab")["page"] == 1
+            assert tap("back")["page"] == 1
             hidden = observe(True); assert hidden["state"]["externalSession"] and hidden["capture"]["status"] == "window_unavailable"
             deadline = time.monotonic() + 4
             while observe()["state"]["externalSession"]:

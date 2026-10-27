@@ -21,6 +21,10 @@ Item {
     property bool adjustingValue: false
     property bool navigationActive: true
     property bool tester: false
+    // The shell's B-hold progress while the controller test runs (-1 before the ring shows).
+    property real testerHold: -1
+    // §7.3: L1/R1 return to the row each category had when it was left.
+    property var lastRows: ({})
     readonly property real fontScale: store.fontPercent / 100
     readonly property bool choiceOpen: choices.visible
     readonly property bool detailReady: !sidebar && detailLoader.status === Loader.Ready
@@ -28,11 +32,16 @@ Item {
     readonly property var nightModes: ["off", "on", "auto"]
     readonly property var nightLabels: ["关闭", "开启", "跟随时间"]
     readonly property var categoryIcons: ["settings", "wifi", "gamepad", "volume", "display", "storage", "info", "battery", "keyboard", "cpu", "memory", "info"]
-    readonly property var hints: choices.visible ? choices.hints : sidebar ? [["↑↓", "选择分类"], ["A / ↵", "进入"], ["B / Esc", "主页"]]
-        : !detailReady ? [["← / B", "返回分类"]]
-        : adjustingValue ? [["↑↓", "增减数值"], ["A / B", "完成调整"], ["←", "返回分类"]]
-        : [["↑↓", "选择项目"], ["← / B", "返回分类"]].concat(rows[rowIndex] && canActivate(rows[rowIndex].key)
-            ? [["A / ↵", valueIsAdjustable(rows[rowIndex].key) ? "调整" : ["motion", "monitor", "netRemember"].indexOf(rows[rowIndex].key) >= 0 ? "切换" : rows[rowIndex].key === "storage" ? "刷新" : "打开"]] : [])
+    readonly property bool sliderRow: !sidebar && detailReady && !!rows[rowIndex] && valueIsAdjustable(rows[rowIndex].key) && canActivate(rows[rowIndex].key)
+    readonly property string rowAction: !rows[rowIndex] ? "" : ["motion", "monitor", "netRemember"].indexOf(rows[rowIndex].key) >= 0 ? "切换"
+        : rows[rowIndex].key === "storage" ? "刷新" : "打开"
+    readonly property var hints: choices.visible ? choices.hints
+        : sidebar ? [{button: "A", label: "进入"}, {button: "B", label: "主页"}]
+        : tester ? [{button: "B", label: "按住退出", progress: testerHold}]
+        : !detailReady ? [{button: "B", label: "返回"}]
+        : category === 2 ? [{button: "A", label: "开始测试"}, {button: "B", label: "返回"}]
+        : (sliderRow ? [{button: "dpadH", label: "调整"}] : rows[rowIndex] && canActivate(rows[rowIndex].key) ? [{button: "A", label: rowAction}] : [])
+            .concat([{button: "B", label: "返回"}])
     readonly property var rows: {
         const volume = {name: "音量", detail: "", key: "volume"}
         const brightness = {name: "屏幕亮度", detail: "", key: "brightness"}
@@ -140,9 +149,11 @@ Item {
         activity()
         return true
     }
-    function openCategory(index) {
+    // From the list (A / →) the controller test starts at once; via L1/R1 it waits for A.
+    function openCategory(index, viaSection) {
         if (!selectCategory(index)) return false
-        openedCategory = category; sidebar = false; tester = category === 2
+        openedCategory = category; sidebar = false; tester = category === 2 && !viaSection
+        rowIndex = Math.min(lastRows[category] || 0, Math.max(0, rows.length - 1))
         if (category === 5) { metrics.refreshStorage(); if (hardware) device.refreshStorage() }
         activity()
         return true
@@ -154,8 +165,13 @@ Item {
         if (rowIndex !== index) adjustingValue = false
         rowIndex = index; sidebar = false; activity()
     }
+    function rememberRow() {
+        if (sidebar) return
+        const remembered = lastRows; remembered[openedCategory] = rowIndex; lastRows = remembered
+    }
     function returnToCategories() {
         if (!store.save()) return false
+        rememberRow()
         sidebar = true; tester = false; adjustingValue = false
         categoryList.positionViewAtIndex(category, ListView.Contain)
         return true
@@ -212,10 +228,7 @@ Item {
             const index = row.key === "font" ? Ui.Theme.fontPercents.indexOf(store.fontPercent) : row.key === "night" ? nightModes.indexOf(store.nightMode)
                 : row.key === "dim" ? [0, 30, 60, 120].indexOf(store.dimSeconds) : [0, 60, 180, 300, 600, 900].indexOf(store.screenOffSeconds)
             choices.present(choiceAnchor(), labels, index, row.name)
-        } else if (row && valueIsAdjustable(row.key)) {
-            if (adjustingValue && !store.save()) return
-            adjustingValue = !adjustingValue
-        } else adjust(1, false)
+        } else if (!valueIsAdjustable(row.key)) adjust(1, false)
     }
     function showNetworks() {
         if (!network.accessPoints.length) { notice("未发现可连接的 Wi-Fi，请稍后重试。"); return }
@@ -227,32 +240,65 @@ Item {
         target: settings.network
         function onScanReady() { if (settings.visible && settings.category === 1 && !settings.sidebar && settings.choiceKey === "netScan") settings.showNetworks() }
     }
+    // Returns false only for B on the category list, which leaves settings.
     function dispatch(action, repeated) {
         if (choices.dispatch(action, repeated)) return true
         if (tester) return true
-        if (!sidebar && !detailReady) {
-            if (action === "back" || action === "left") returnToCategories()
-            return true
-        }
-        if (!sidebar && action === "left") { returnToCategories(); return true }
+        if (action === "prevSection" || action === "nextSection") { switchCategory(action === "nextSection" ? 1 : -1); return true }
         if (action === "back") {
-            if (adjustingValue) { if (store.save()) adjustingValue = false; return true }
+            if (repeated) return true
             if (!sidebar) { returnToCategories(); return true }
             return false
         }
+        if (!sidebar && !detailReady) {
+            if (action === "left") returnToCategories()
+            return true
+        }
+        if (action === "pageUp" || action === "pageDown") { turnPage(action === "pageDown" ? 1 : -1); return true }
         if (sidebar) {
             if (action === "up") selectCategory(Math.max(0, category - 1))
             else if (action === "down") selectCategory(Math.min(categories.length - 1, category + 1))
             else if ((action === "right" || action === "accept") && !repeated) openCategory(category)
-        } else if (adjustingValue) {
-            if (action === "up" || action === "down") adjust(action === "up" ? 1 : -1, repeated)
-            else if (action === "accept") activate(repeated)
+        } else if (category === 2) {
+            if (action === "accept" && !repeated) { tester = true; activity() }
+            else if (action === "left") returnToCategories()
+        } else if (sliderRow && (action === "left" || action === "right")) {
+            // §7.3: ←→ adjust a slider directly; the release saves it.
+            adjustingValue = true
+            adjust(action === "right" ? 1 : -1, repeated)
         } else {
-            if (action === "up") { if (rowIndex === 0) returnToCategories(); else rowIndex-- }
-            else if (action === "down") rowIndex = Math.min(rows.length - 1, rowIndex + 1)
+            if (action === "left") returnToCategories()
+            else if (action === "up") focusRow(Math.max(0, rowIndex - 1))
+            else if (action === "down") focusRow(Math.min(rows.length - 1, rowIndex + 1))
             else if (action === "accept") activate(repeated)
         }
         return true
+    }
+    function release(action) {
+        if (adjustingValue && (action === "left" || action === "right")) { adjustingValue = false; store.save() }
+    }
+    // L1/R1: neighbouring category, no wrap; an open detail opens the next one at its last row.
+    function switchCategory(direction) {
+        const next = Math.max(0, Math.min(categories.length - 1, category + direction))
+        if (next === category) return
+        if (sidebar) { selectCategory(next); return }
+        if (!store.save()) return
+        rememberRow()
+        openCategory(next, true)
+    }
+    // L2/R2: one screen of rows (held: repeats to the ends).
+    function turnPage(direction) {
+        const list = sidebar ? categoryList : detailList()
+        if (!list) return
+        const step = Math.max(1, Math.floor(list.height / (Ui.Theme.listRowHeight + list.spacing)))
+        if (sidebar) selectCategory(Math.max(0, Math.min(categories.length - 1, category + direction * step)))
+        else focusRow(Math.max(0, Math.min(rows.length - 1, rowIndex + direction * step)))
+    }
+    // Right stick: scroll the detail without moving the focused row.
+    function scroll(velocity) {
+        const list = detailList()
+        if (tester || sidebar || !list || list.contentHeight <= list.height) return
+        list.contentY = Math.max(list.originY, Math.min(list.originY + list.contentHeight - list.height, list.contentY + velocity * Ui.Theme.scrollStep))
     }
     onCategoryChanged: if (!sidebar) openedCategory = category
     Item {
@@ -315,7 +361,7 @@ Item {
                             }
                             return modelData.info === "storage" ? settings.metrics.storage : modelData.info === "system" ? settings.metrics.system : modelData.detail || ""
                         }
-                        value: settings.adjustingValue && selected ? "↑  " + settings.rowValue(modelData) + "  ↓" : settings.rowValue(modelData)
+                        value: settings.rowValue(modelData)
                         actionable: settings.canActivate(modelData.key)
                         choice: modelData.key === "font" || modelData.key === "night" || modelData.key === "dim" || modelData.key === "screenOff" || ["netProfiles", "netScan", "netForget"].indexOf(modelData.key) >= 0 || (!!modelData.key && modelData.key.indexOf("cpu") === 0 && modelData.key !== "cpuCurrent" && modelData.key !== "cpuAuto")
                         reducedMotion: settings.store.reducedMotion

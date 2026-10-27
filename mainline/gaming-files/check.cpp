@@ -683,7 +683,7 @@ class Check : public QObject {
         const auto captures = qEnvironmentVariable("JUME_FILES_CAPTURE_DIR");
         if (!captures.isEmpty())
             QVERIFY(window.grab().save(captures + "/files-list.png"));
-        window.controllerAction("erase");
+        window.controllerAction("pageAction");
         QVERIFY(table->isVisible());
         if (!captures.isEmpty())
             QVERIFY(window.grab().save(captures + "/files-table.png"));

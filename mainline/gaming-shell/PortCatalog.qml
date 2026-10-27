@@ -19,9 +19,27 @@ Item {
     readonly property var entries: tools.catalogInfo.ports || []
     readonly property var detail: tools.catalogDetail.id === requestedId ? tools.catalogDetail : ({})
     readonly property bool choiceOpen: choices.visible || readme.visible
-    readonly property var hints: readme.visible ? [["↑↓", "滚动"], ["B", "返回"]] : choices.visible ? choices.hints : tools.busy ? [["B", "取消"]]
-        : sidebar ? [["↑↓", "游戏"], ["A", "详情"], ["X", "搜索"], ["Y", installedOnly ? "全部" : "已安装"], ["START", "刷新"], ["L1 / R1", "翻页"], ["B", "返回"]]
-        : [["↑↓", "项目"], ["A", "操作"], ["← / B", "游戏列表"]]
+    // L1/R1 switch the 全部 / 已安装 filter and L2/R2 turn 50-entry pages; neither is hinted (§7.6).
+    readonly property var hints: readme.visible ? [{button: "dpadV", label: "滚动"}, {button: "B", label: "返回"}]
+        : choices.visible ? choices.hints : tools.busy ? [{button: "B", label: "取消"}]
+        : sidebar ? [{button: "A", label: "详情"}, {button: "B", label: "返回"}, {button: "Y", label: "搜索"}, {button: "Start", label: "选项"}]
+        : [{button: "A", label: "操作"}, {button: "B", label: "游戏列表"}]
+    readonly property string optionTitle: "PortMaster 目录"
+    function optionItems() {
+        if (!sidebar || readme.visible || choices.visible) return []
+        const busy = tools.busy ? "正在处理" : ""
+        return [{id: "search", label: "搜索", button: "Y", reason: busy}, {id: "refresh", label: "刷新目录", reason: busy},
+                {id: "filter", label: installedOnly ? "显示全部游戏" : "只看已安装", button: installedOnly ? "L1" : "R1", reason: busy}]
+    }
+    function runOption(id) {
+        if (tools.busy) return
+        if (id === "search") searchRequested(query)
+        else if (id === "refresh") tools.catalogAction("refresh")
+        else if (id === "filter") filter()
+    }
+    function scroll(velocity) {
+        if (readme.visible) prose.contentY = Math.max(0, Math.min(prose.contentHeight - prose.height, prose.contentY + velocity * Ui.Theme.scrollStep))
+    }
     readonly property var rows: [
         {title: detail.installed ? (detail.updateAvailable ? "更新游戏" : "重新安装") : "安装游戏", key: "install", enabled: !!detail.compatible, value: detail.bytes ? (detail.bytes / 1048576).toFixed(1) + " MiB" : ""},
         {title: "回退上一版本", key: "rollback", enabled: !!detail.rollbackAvailable, value: ""},
@@ -34,6 +52,7 @@ Item {
     function load() { return tools.catalog(query, offset, installedOnly) }
     function search(value) { query = value; offset = 0; selected = 0; sidebar = true; return load() }
     function filter() { installedOnly = !installedOnly; offset = 0; selected = 0; sidebar = true; load() }
+    function showInstalled(value) { if (installedOnly !== value) filter() }
     function openDetail() {
         if (!entries[selected]) return
         requestedId = entries[selected].id; row = 0; sidebar = false
@@ -50,7 +69,7 @@ Item {
     }
     function dispatch(action, repeated) {
         if (readme.visible) {
-            if (action === "back" || action === "quick") readme.close()
+            if (action === "back" || action === "quick" || action === "options") { if (!repeated) readme.close() }
             else if (action === "up" || action === "down") prose.contentY = Math.max(0, Math.min(prose.contentHeight - prose.height, prose.contentY + (action === "down" ? 60 : -60)))
             return true
         }
@@ -58,14 +77,13 @@ Item {
         if (tools.busy) { if (action === "back") tools.cancel(); return true }
         if (action === "back" || (!sidebar && action === "left")) { if (sidebar) backRequested(); else sidebar = true; return true }
         if (sidebar) {
-            if (action === "favorite" && !repeated) searchRequested(query)
-            else if (action === "erase" && !repeated) filter()
-            else if (action === "submit" && !repeated) tools.catalogAction("refresh")
+            if (action === "pageAction" && !repeated) searchRequested(query)
+            else if ((action === "prevSection" || action === "nextSection") && !repeated) showInstalled(action === "nextSection")
             else if (action === "up") selected = Math.max(0, selected - 1)
             else if (action === "down") selected = Math.min(entries.length - 1, selected + 1)
             else if (action === "accept" || action === "right") openDetail()
-            else if (action === "previousTab" || action === "nextTab") {
-                const next = Math.max(0, offset + (action === "nextTab" ? 50 : -50))
+            else if (action === "pageUp" || action === "pageDown") {
+                const next = Math.max(0, offset + (action === "pageDown" ? 50 : -50))
                 if (next !== offset && next < Number(tools.catalogInfo.total || 0)) { offset = next; selected = 0; load() }
             }
         } else {
@@ -142,7 +160,7 @@ Item {
         contentItem: FocusScope {
             Keys.onPressed: function(event) {
                 event.accepted = true
-                if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace) readme.close()
+                if (event.key === Qt.Key_Escape || event.key === Qt.Key_Q || event.key === Qt.Key_M) readme.close()
                 else if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) view.dispatch(event.key === Qt.Key_Up ? "up" : "down", event.isAutoRepeat)
             }
             Ui.PageHeader { width: parent.width; title: "安装说明"; backVisible: true; onBackRequested: readme.close() }
@@ -151,7 +169,7 @@ Item {
                 contentWidth: width; contentHeight: text.implicitHeight; boundsBehavior: Flickable.StopAtBounds
                 Ui.Label { id: text; width: parent.width; wrapMode: Text.Wrap; text: view.detail.instructions || "" }
                 T.ScrollBar.vertical: Ui.ScrollBar {
-                    parent: prose.parent; anchors.top: prose.top; anchors.bottom: prose.bottom
+                    parent: prose.parent; visible: prose.visible; anchors.top: prose.top; anchors.bottom: prose.bottom
                     anchors.left: prose.right; anchors.leftMargin: Ui.Theme.space12
                 }
             }

@@ -156,14 +156,14 @@ def main():
             prior_row = latest["state"]["toolRow"]
             assert tap("right")["toolRow"] == prior_row
             tap("back"); assert not tap("back")["toolOpen"]
-            tap("nextTab"); assert tap("nextTab")["settingsSidebar"]
+            tap("up"); tap("right"); assert tap("right")["settingsSidebar"]  # Top navigation until the v1 home dock.
             assert not tap("right")["settingsSidebar"]
             wait_state("settingsDetailReady")
-            assert tap("left")["settingsSidebar"]
+            assert tap("back")["settingsSidebar"]  # ←→ adjust the first row's slider.
             for _ in range(8): tap("down")
             tap("right"); wait_state("settingsDetailReady"); assert tap("accept", True)["choicesOpen"]
             assert tap("down")["fontPercent"] == 100
-            assert tap("nextTab")["page"] == 2  # A choice owns input until confirm/cancel.
+            assert tap("nextSection")["page"] == 2  # A choice owns input until confirm/cancel.
             assert not tap("back")["choicesOpen"]
             tap("accept"); tap("down"); assert tap("accept", True)["fontPercent"] == 115
             tap("down"); assert tap("accept", True)["editing"]
@@ -174,9 +174,9 @@ def main():
             tap("left")
             for _ in range(6): tap("up")
             assert tap("right")["testingController"]
-            assert tap("left")["testingController"]
-            assert not tap("quick")["testingController"]
-            tap("home"); tap("quick")
+            assert tap("left")["testingController"] and tap("back")["testingController"]  # A short B is test input.
+            assert tap("quick")["quickOpen"] and latest["state"]["testingController"]  # Select stays the system key.
+            tap("back"); tap("home"); tap("quick")
             for _ in range(3): tap("down")
             assert tap("accept")["monitor"]
             recorded = subprocess.run([sys.executable, "-B", str(REPO / "mainline/gaming-shell/control.py"),
@@ -206,7 +206,7 @@ def main():
             preview, preview_socket = start("ime", seconds=30, extra=("--scene", "input", "--test-input-capture"))
             preview_state = control.exchange(preview_socket, request(screenshot=True))
             assert preview_state['state']['testInputVisible'] and control.checked_image(copy.deepcopy(preview_state))
-            for action in ('back','home','accept','favorite'):
+            for action in ('back','home','accept','pageAction'):
                 preview_state = control.exchange(preview_socket, request('tap',action=action,
                     session=preview_state['session'], sequence=preview_state['sequence'], binary_sha256=preview_state['binary_sha256'], screenshot=True))
             assert preview_state['state']['editing'] and preview_state['state']['sensitiveVisible']
@@ -240,16 +240,16 @@ def main():
             blocked = root / "blocked"; blocked.write_text("preserve")
             failed, failed_path = start("failed", state=blocked)
             state = control.exchange(failed_path, request())
-            for action in ["nextTab", "nextTab", "right"]:
+            for action in ["up", "right", "right", "right"]:
                 state = control.exchange(failed_path, request("tap", action=action, session=state["session"], sequence=state["sequence"], binary_sha256=state["binary_sha256"]))
             deadline = time.monotonic() + 5
             while not state["state"]["settingsDetailReady"]:
                 assert time.monotonic() < deadline, "settings detail timeout"
                 state = control.exchange(failed_path, request())
                 time.sleep(.02)
-            for action in ["accept", "up", "left"]:
+            for action in ["right", "back"]:  # A slider step saves on release; leaving retries and stays.
                 state = control.exchange(failed_path, request("tap", action=action, session=state["session"], sequence=state["sequence"], binary_sha256=state["binary_sha256"]))
-            assert state["state"]["save_error"] and state["state"]["settingsAdjusting"] and not state["state"]["settingsSidebar"]
+            assert state["state"]["save_error"] and not state["state"]["settingsAdjusting"] and not state["state"]["settingsSidebar"]
             assert blocked.read_text() == "preserve"
             failed.terminate(); failed.wait(timeout=5)
             # Short repeat sample: report RSS, without claiming a device memory budget.
@@ -258,7 +258,7 @@ def main():
             repeat_start = time.monotonic()
             samples = [{"cycle":0, "rss_kib":rss_start}]
             for cycle in range(args.cycles):
-                for action in ["home", "nextTab", "nextTab", "right", "left", "quick", "back"]:
+                for action in ["home", "up", "right", "right", "right", "back", "quick", "back"]:
                     tap(action)
                     if args.action_delay_ms: time.sleep(args.action_delay_ms / 1000)
                 if (cycle + 1) % 100 == 0: samples.append({"cycle":cycle + 1, "rss_kib":rss()})
