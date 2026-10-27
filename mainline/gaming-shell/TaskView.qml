@@ -19,6 +19,7 @@ Rectangle {
     signal dismissed()
     signal activated(string id)
     signal closeRequested(string id)
+    signal notice(string text)
     color: Ui.Theme.background
 
     function closeSelected() { if (canAct) closeRequested(currentTask.id) }
@@ -27,11 +28,13 @@ Rectangle {
         if (!currentTask) return []
         const reason = canAct ? "" : "正在结束"
         return [{id: "switch", label: "切换过去", button: "A", reason: reason}, {id: "close", label: "关闭", button: "X", reason: reason},
-                {id: "force", label: "强制结束", reason: "按住 X 2 秒强制结束"}]
+                {id: "force", label: "强制结束", button: "X", hold: true, reason: reason}]
     }
+    // Force quit is immediate and irreversible (§7.7): only the X hold runs it, so the row points there.
     function runOption(id) {
         if (id === "switch" && canAct) activated(currentTask.id)
         else if (id === "close") closeSelected()
+        else if (id === "force") notice("按住 X 2 秒强制结束")
     }
     function dispatch(action, repeated) {
         if (action === "up" || action === "left") selected = Math.max(0, selected - 1)

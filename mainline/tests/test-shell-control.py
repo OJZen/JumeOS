@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 import uuid
 
 REPO = Path(__file__).resolve().parents[2]
@@ -32,6 +33,25 @@ def raw(path, data):
             result.extend(chunk)
             assert len(result) <= control.MAX_RESPONSE
         return json.loads(result)
+
+
+# Shell state and actions seen last, printed with a failed assertion.
+LAST = {"actions": [], "state": {}}
+
+
+def remember(action, state):
+    LAST["actions"] = (LAST["actions"] + [action])[-8:]; LAST["state"] = state
+
+
+def report_failure(error):
+    """Name the failed assertion: line, source, message, recent actions and the last shell state."""
+    frames = traceback.extract_tb(error.__traceback__)
+    here = [frame for frame in frames if Path(frame.filename).resolve() == Path(__file__).resolve()]
+    where = (here or frames)[-1]
+    message = f" ({error})" if str(error) else ""
+    print(f"ASSERTION FAILED {Path(where.filename).name}:{where.lineno}: {where.line}{message}", file=sys.stderr)
+    print("recent actions: " + " ".join(LAST["actions"]), file=sys.stderr)
+    print("last state: " + json.dumps(LAST["state"], ensure_ascii=False, sort_keys=True)[:4000], file=sys.stderr)
 
 
 def main():
@@ -109,12 +129,13 @@ def main():
                 if args.evidence and screenshot: control.save_result(args.evidence, result)
                 else: control.checked_image(result)
                 trace.append({"request": sent, "result": result})
+                remember(action, latest["state"])
                 return latest["state"]
             def wait_state(name, value=True):
                 nonlocal latest
                 deadline = time.monotonic() + 5
                 while True:
-                    latest = control.exchange(path, request())
+                    latest = control.exchange(path, request()); remember("observe", latest["state"])
                     if latest["state"][name] == value: return latest["state"]
                     assert time.monotonic() < deadline, f"timeout waiting for {name}={value}"
                     time.sleep(.02)
@@ -174,8 +195,10 @@ def main():
             tap("left")
             for _ in range(6): tap("up")
             assert tap("right")["testingController"]
-            assert tap("left")["testingController"] and tap("back")["testingController"]  # A short B is test input.
-            assert tap("quick")["quickOpen"] and latest["state"]["testingController"]  # Select stays the system key.
+            assert tap("left")["testingController"]
+            assert tap("back")["testingController"]  # A short B is test input.
+            assert tap("quick")["quickOpen"]
+            assert latest["state"]["testingController"]  # Select stays the system key.
             tap("back"); tap("home"); tap("quick")
             for _ in range(3): tap("down")
             assert tap("accept")["monitor"]
@@ -284,4 +307,7 @@ def main():
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except AssertionError as error:
+        report_failure(error); raise

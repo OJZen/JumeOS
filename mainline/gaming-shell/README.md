@@ -77,8 +77,9 @@ Page keys follow [JUME-UI §7.3–7.6](../../docs/JUME-UI.md#73-页面层每个�
 | Page up / down | PgUp / PgDn | L2 / R2 (analog past 50%) |
 | Scroll without moving focus | — | Right stick |
 
-Held directions, L2/R2 and B repeat after 380 ms every 90 ms; lists speed up to
-50 ms after 2 s, grids do not. Select with another key is a system chord and
+Held directions repeat after 380 ms every 90 ms; lists speed up to 50 ms after
+2 s, grids do not. B repeats only as the keyboard's backspace; other keys never
+repeat. Select with another key is a system chord and
 reaches no page. Home B does nothing; until the stage 4 home dock, Up reaches the
 top tabs and Left/Right change page. The remote `home` action stands in for the
 system Select+Start.
@@ -138,7 +139,8 @@ Ordinary R46H previews read actual state but do not offer simulated device contr
 
 The [performance/power plan](../../docs/PERFORMANCE-POWER.md) owns settings
 semantics and the next CPU, swap, real power and global-overlay gates. The
-top-left HUD ([JUME-UI §5](../../docs/JUME-UI.md#5-组件)) shows UI submissions or the
+top-right HUD ([JUME-UI §5](../../docs/JUME-UI.md#5-组件)) stays inside the compositor's
+in-game region and below the top bar on the desktop; it shows UI submissions or the
 game/stream rate, then CPU clock and load, GPU MHz, SoC temperature and memory;
 readings without data are hidden. The shared Wayland session adds
 [game buffer submission metrics](../gaming-wayland/HANDHELD.md#game-frame-metrics);

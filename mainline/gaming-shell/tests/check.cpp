@@ -32,6 +32,7 @@
 #include <QDirIterator>
 #include <QMap>
 #include <cmath>
+#include <memory>
 #include <QRegularExpression>
 #include <QtTest>
 #include <sys/stat.h>
@@ -54,6 +55,17 @@ static double contrast(const QColor &first, const QColor &second) {
     };
     const auto a = luminance(first), b = luminance(second);
     return (qMax(a, b) + 0.05) / (qMin(a, b) + 0.05);
+}
+
+// First item named `name` in the visual tree below `root` (Repeater delegates included).
+static QQuickItem *findItem(QQuickItem *root, const QString &name) {
+    QList<QQuickItem *> pending{root};
+    while (!pending.isEmpty()) {
+        auto *item = pending.takeFirst();
+        if (item->objectName() == name) return item;
+        pending.append(item->childItems());
+    }
+    return nullptr;
 }
 
 // §3 and §9: visible text is never below micro (18 px × font scale); glyph-badge letters are the
@@ -374,7 +386,7 @@ private slots:
         auto *quickPanel = root->findChild<QQuickItem *>("quickPanel"); QVERIFY(quickPanel);
         QVERIFY(!footer->isVisible()); // §7.6 item 4: the panel's own footer replaces the page's.
         QVERIFY(labels(quickPanel).contains("调整")); QVERIFY(labels(quickPanel).contains("关闭")); QVERIFY(!labels(quickPanel).contains("收藏"));
-        QVERIFY(hud->x() + hud->width() < 590); // The active quick panel remains unobstructed.
+        QVERIFY(!hud->isVisible()); // The performance overlay steps aside for the quick panel.
         if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/quick-hud-120.png"));
         // Use the actual switch, including its native pointer toggle and state binding.
         QQuickItem *motionSwitch = nullptr;
@@ -530,6 +542,9 @@ private slots:
         input.routedState(0, axes); input.setBackRepeat(true); actions.clear();
         input.routedState(1U << 0, axes); QTest::qWait(430); QVERIFY(actions.size() >= 2); QVERIFY(actions.last().at(1).toBool());
         input.routedState(0, axes); input.setBackRepeat(false);
+        // Only directions and the keyboard's B repeat (§7.5): a held R2 pages once.
+        actions.clear(); input.routedState(1U << 7, axes); QTest::qWait(430); QCOMPARE(actions.size(), 1);
+        input.routedState(0, axes);
         actions.clear(); axes[0] = -32767; input.routedState(0, axes);
         QCOMPARE(actions.last().at(0).toString(), QString("left"));
         QCOMPARE(input.axes()[0].toDouble(), -1.);
@@ -851,8 +866,8 @@ private slots:
         auto *editorFocus = view.activeFocusItem(); state.adjust("monitor", 1);
         auto *hud = root->findChild<QQuickItem *>("performancePanel"); QVERIFY(hud);
         QTRY_VERIFY(hud->isVisible()); // Hidden until the first sample: no placeholder rows.
-        QCOMPARE(hud->position(), QPointF(24, 24)); QVERIFY(hud->width() <= 360);
-        QVERIFY(hud->y() + hud->height() < 183); // Above the input field, away from keys.
+        // Desktop: top right, below the top bar.
+        QCOMPARE(hud->x() + hud->width(), 992.); QCOMPARE(hud->y(), 80.); QVERIFY(hud->width() <= 360);
         QCOMPARE(view.activeFocusItem(), editorFocus); // The overlay never takes focus.
         state.adjust("monitor", 1); QVERIFY(!hud->isVisible());
         for (auto key : {Qt::Key_Q, Qt::Key_X, Qt::Key_BracketLeft, Qt::Key_BracketRight}) QTest::keyClick(&view, key);
@@ -991,6 +1006,13 @@ private slots:
         action("options");QVERIFY(options->property("open").toBool());
         if(!captures.isEmpty()){QTest::qWait(300);QVERIFY(view.grabWindow().save(captures+"/tasks-options.png"));}
         action("back");QVERIFY(!options->property("open").toBool());QVERIFY(root->property("tasksVisible").toBool());
+        // The force row carries a soft "按住 X" badge; choosing it only points at the hold.
+        action("options");action("down");action("down");
+        auto *force=findItem(qobject_cast<QQuickItem *>(options),"option-force");QVERIFY(force);
+        auto *forceHold=findItem(force,"optionHold");QVERIFY(forceHold&&forceHold->isVisible());
+        QCOMPARE(forceHold->property("text").toString(),QStringLiteral("按住"));
+        action("accept");QVERIFY(!options->property("open").toBool());QCOMPARE(apps.tasks().size(),3);
+        QCOMPARE(root->findChild<QObject *>("notice")->property("text").toString(),QStringLiteral("按住 X 2 秒强制结束"));
         action("itemAction");QTRY_COMPARE_WITH_TIMEOUT(apps.tasks().size(),2,3500);release("itemAction");
         QVERIFY(!apps.contains("builtin.files"));
         // A tap closes normally and leaves the task page.
@@ -1595,6 +1617,59 @@ private slots:
         QTest::qWait(100); QVERIFY(changes.isEmpty()); QVERIFY(ignored.isEmpty());
         QTRY_VERIFY_WITH_TIMEOUT(!hud->isVisible(),2200);
     }
+    void performanceOverlayInGameRegion() {
+        // §5: in game the compositor shows the shell only inside x 624–992, y 16–276, widened to
+        // x 396 while the volume Hud is up (gaming-wayland/handheld-shell.cpp). Both must fit.
+        QTemporaryDir directory;
+        Preferences state(directory.path()); Telemetry metrics(directory.path()); ControllerInput controller;
+        QQuickView view;
+        QQmlComponent fixtures(view.engine());
+        fixtures.setData(R"(import QtQuick
+QtObject {
+    readonly property QtObject game: QtObject {
+        property bool running: true; property bool hasManifest: false; property var items: []; property var tasks: []
+        property string activeId: "fixture.game"; property string error: ""; property int exitCode: 0
+        signal changed()
+    }
+    readonly property QtObject device: QtObject {
+        property bool target: true; property bool controls: false; property string error: ""
+        property var info: ({cpu: {scaling_cur_freq: 1296000}, systemCpu: 45, gpuFrequencyHz: 480000000,
+            socTemperatureC: 55, MemTotal: 1048576, MemAvailable: 786432, capacity: 82, brightnessPercent: 50})
+        signal volumeChanged(int percent)
+    }
+})", QUrl());
+        std::unique_ptr<QObject> fixture(fixtures.create()); QVERIFY2(fixture, qPrintable(fixtures.errorString()));
+        auto *game = fixture->property("game").value<QObject *>(), *device = fixture->property("device").value<QObject *>();
+        view.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(&metrics)},
+            {"controller", QVariant::fromValue(&controller)}, {"applications", QVariant::fromValue(game)},
+            {"device", QVariant::fromValue(device)}, {"sharedDisplay", true}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready); view.resize(1024, 768); view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+        auto *root = view.rootObject(); QVERIFY(root->property("gameOverlay").toBool());
+        auto *panel = root->findChild<QQuickItem *>("performancePanel"); QVERIFY(panel);
+        auto *hud = root->findChild<QQuickItem *>("volumeHud"); QVERIFY(hud);
+        const QRectF region(624, 16, 368, 260), volumeRegion(396, 16, 596, 260);
+        const auto captures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
+        state.adjust("monitor", 1);
+        for (int font : {1, 3}) {
+            QVERIFY(state.choose("font", font)); QTRY_VERIFY(panel->isVisible());
+            root->setProperty("volumePercent", 40); root->setProperty("volumeVisible", true); QTest::qWait(250);
+            const auto box = panel->mapRectToScene(panel->boundingRect()), volume = hud->mapRectToScene(hud->boundingRect());
+            const auto where = QString("%1% panel %2,%3 %4x%5").arg(font == 3 ? 130 : 100).arg(box.x()).arg(box.y()).arg(box.width()).arg(box.height());
+            QVERIFY2(region.contains(box), qPrintable(where));
+            QCOMPARE(box.right(), 992.); QCOMPARE(box.top(), 24.); QVERIFY(box.width() <= 360); QVERIFY2(box.height() <= 252, qPrintable(where));
+            QVERIFY2(volumeRegion.contains(volume) && !volume.intersects(box), qPrintable(where));
+            auto *load = panel->findChild<QQuickItem *>("performanceLoad"); QVERIFY(load);
+            // At 130% the CPU row wraps only between "·" items: four rows, nothing cut.
+            QCOMPARE(load->property("lineCount").toInt(), font == 3 ? 2 : 1); QVERIFY(!load->property("truncated").toBool());
+            if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + QString("/overlay-game-%1.png").arg(font == 3 ? 130 : 100)));
+            root->setProperty("volumeVisible", false);
+        }
+        // On the desktop the overlay drops below the top bar and the Hud returns to the center.
+        root->setProperty("sharedDisplay", false);
+        QCOMPARE(panel->y(), 80.); QCOMPARE(panel->x() + panel->width(), 992.);
+    }
     void deviceSettingsReadbackAndGuards() {
         QTemporaryDir directory;
         auto put=[&](const QString &name,const QByteArray &text){QFile file(directory.filePath(name));QDir().mkpath(QFileInfo(file).absolutePath());QVERIFY(file.open(QIODevice::WriteOnly));QCOMPARE(file.write(text),text.size());};
@@ -1690,7 +1765,7 @@ private slots:
         QVERIFY(state.choose("font",3));state.adjust("monitor",1);root->setProperty("testInputCapture",true);
         QVERIFY(QMetaObject::invokeMethod(root,"openEditor"));
         auto *hud=root->findChild<QQuickItem *>("performancePanel");QVERIFY(hud);
-        QCOMPARE(hud->position(),QPointF(24,24));QVERIFY(hud->width()<=360);QVERIFY(hud->y()+hud->height()<183);
+        QCOMPARE(hud->x()+hud->width(),992.);QCOMPARE(hud->y(),80.);QVERIFY(hud->width()<=360);
         const auto row=[&](const char *name){auto *label=hud->findChild<QQuickItem *>(name);return label&&label->isVisible()?label->property("text").toString().replace(QChar(0xa0),' '):QString();};
         const auto rate=row("performanceRate");QVERIFY(rate.isEmpty()||(rate.startsWith(QStringLiteral("界面 "))&&rate.endsWith(QStringLiteral(" 次/秒")))); // Shown once measured.
         QVERIFY(row("performanceLoad").startsWith(QStringLiteral("CPU 1.30 GHz")));QVERIFY(row("performanceLoad").endsWith(QStringLiteral("GPU 480 MHz")));

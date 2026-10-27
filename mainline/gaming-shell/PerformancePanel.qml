@@ -2,7 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import "controls" as Ui
 
-// §5 performance overlay: top left, at most three rows of tabular figures, never focused.
+// §5 performance overlay: top right, at most three rows of tabular figures, never focused.
 // A reading without data is left out entirely (no "—"); the detailed figures (P95, decode,
 // queue, audio queue, thermal state) belong to 设置 › 性能. Readings keep non-breaking spaces,
 // so a row that outgrows 360 at a large font size wraps only between "·" items.

@@ -19,7 +19,6 @@ static QString buttonAction(SDL_GameControllerButton button) {
     }
 }
 static bool direction(const QString &name) { return name == "up" || name == "down" || name == "left" || name == "right"; }
-static bool repeats(const QString &name) { return direction(name) || name == "pageUp" || name == "pageDown"; }
 ControllerInput::ControllerInput(QObject *parent, bool routed) : QObject(parent), m_routed(routed) {
     connect(&m_timer, &QTimer::timeout, this, &ControllerInput::poll);
     if (m_routed) { m_timer.start(16); return; }
@@ -66,7 +65,7 @@ void ControllerInput::press(const QString &name) {
     // Select + another key belongs to the system layer; the page sees neither (§7.2).
     if (m_down.contains("quick")) { m_selectChord = true; m_swallowed.insert(name); return; }
     emit action(name, false);
-    if (repeats(name) || (name == "back" && m_backRepeat)) { m_held = name; m_heldClock.restart(); m_nextRepeat = RepeatDelay; }
+    if (direction(name) || (name == "back" && m_backRepeat)) { m_held = name; m_heldClock.restart(); m_nextRepeat = RepeatDelay; }
 }
 void ControllerInput::release(const QString &name) {
     if (!m_down.remove(name)) return;

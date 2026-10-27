@@ -2,9 +2,9 @@ pragma ComponentBehavior: Bound
 import QtQuick
 
 // §7.3 Start options menu: a bottom sheet listing every action of the focused item or page,
-// including the X and Y shortcuts (soft glyphs on the right). Unavailable rows stay focusable
-// and give their reason. A runs a row; Start, B or Select closes; the page below sees nothing.
-// Items are {id, label[, button][, reason]}.
+// including the X and Y shortcuts (soft glyphs on the right; "按住" before a hold shortcut).
+// Unavailable rows stay focusable and give their reason. A runs a row; Start, B or Select closes;
+// the page below sees nothing. Items are {id, label[, button][, hold][, reason]}.
 Item {
     id: menu
     property string title: ""
@@ -66,9 +66,14 @@ Item {
                     selected: menu.index === index
                     onFocused: menu.index = index
                     onActivated: menu.dispatch("accept", false)
-                    GlyphBadge {
+                    Row {
                         anchors.right: parent.right; anchors.rightMargin: Theme.space24; anchors.verticalCenter: parent.verticalCenter
-                        visible: !!option.modelData.button; button: option.modelData.button || "A"; soft: true; size: Theme.glyphInlineSize
+                        spacing: Theme.space8; visible: !!option.modelData.button
+                        Label {
+                            objectName: "optionHold"; anchors.verticalCenter: parent.verticalCenter; visible: !!option.modelData.hold
+                            text: "按住"; role: "micro"; color: Theme.textSecondary; fontScale: menu.fontScale
+                        }
+                        GlyphBadge { button: option.modelData.button || "A"; soft: true; size: Theme.glyphInlineSize }
                     }
                 }
             }

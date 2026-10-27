@@ -10,11 +10,31 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 import uuid
 
 REPO = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("control", REPO / "mainline/gaming-shell/control.py")
 control = importlib.util.module_from_spec(spec); spec.loader.exec_module(control)
+
+
+# Shell state and actions seen last, printed with a failed assertion.
+LAST = {"actions": [], "state": {}}
+
+
+def remember(action, state):
+    LAST["actions"] = (LAST["actions"] + [action])[-8:]; LAST["state"] = state
+
+
+def report_failure(error):
+    """Name the failed assertion: line, source, message, recent actions and the last shell state."""
+    frames = traceback.extract_tb(error.__traceback__)
+    here = [frame for frame in frames if Path(frame.filename).resolve() == Path(__file__).resolve()]
+    where = (here or frames)[-1]
+    message = f" ({error})" if str(error) else ""
+    print(f"ASSERTION FAILED {Path(where.filename).name}:{where.lineno}: {where.line}{message}", file=sys.stderr)
+    print("recent actions: " + " ".join(LAST["actions"]), file=sys.stderr)
+    print("last state: " + json.dumps(LAST["state"], ensure_ascii=False, sort_keys=True)[:4000], file=sys.stderr)
 
 
 def main():
@@ -57,10 +77,11 @@ def main():
                 nonlocal latest
                 latest = control.exchange(ipc / "control.sock", request("tap", action=action, session=latest["session"],
                     binary_sha256=latest["binary_sha256"], sequence=latest["sequence"]))
+                remember(action, latest["state"])
                 return latest["state"]
             def observe(image=False):
                 nonlocal latest
-                latest = control.exchange(ipc / "control.sock", request(screenshot=image)); return latest
+                latest = control.exchange(ipc / "control.sock", request(screenshot=image)); remember("observe", latest["state"]); return latest
             tap("up"); tap("right"); tap("down")  # Library through the top navigation.
             tap("down"); tap("down"); assert tap("right")["selected"] == 7
             tap("itemAction")
@@ -110,4 +131,7 @@ def main():
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except AssertionError as error:
+        report_failure(error); raise

@@ -567,6 +567,7 @@ Item {
                 onDismissed: root.tasksVisible=false
                 onActivated: function(id) { if(root.applications.activate(id))root.tasksVisible=false }
                 onCloseRequested: function(id) { root.tasksVisible=false;root.applications.requestClose(id) }
+                onNotice: function(text) { root.notify(text) }
             }
         }
         // Router Select+X holds (stage 5 replaces them) and the task page's X hold share one card.
@@ -592,7 +593,7 @@ Item {
             anchors.fill: parent; visible: !root.gameOverlay
             Ui.TopBar {
                 x: Ui.Theme.margin; width: Ui.Theme.contentWidth; fontScale: root.fontScale
-                statusVisible: !root.store.monitor; note: root.hardware ? "" : "本地界面预览"
+                note: root.hardware ? "" : "本地界面预览"
                 wifiSignal: root.wifiSignal; batteryPercent: root.batteryPercent
                 charging: root.batteryState === "charging" || root.batteryState === "full"
                 clock: root.clockText
@@ -770,9 +771,11 @@ Item {
         PerformancePanel {
             id: performancePanel
             objectName: "performancePanel"
-            x: Ui.Theme.perfPanelInset; y: Ui.Theme.perfPanelInset
+            x: Ui.Theme.canvasWidth - Ui.Theme.perfPanelRight - width
+            y: root.gameOverlay ? Ui.Theme.perfPanelTop : Ui.Theme.perfPanelDesktopTop
             metrics: root.metrics; device: root.device; fontScale: root.fontScale
-            visible: root.store.monitor && !empty
+            // The quick panel covers the same corner; it owns the screen while open.
+            visible: root.store.monitor && !empty && !root.quickOpen
         }
         Ui.ChoicePopup {
             id: gameExitChoice; objectName: "gameExitChoice"; parent: root.T.Overlay.overlay
@@ -796,7 +799,7 @@ Item {
             MouseArea { anchors.fill: parent; onPressed: root.activity() }
         }
         Ui.Toast {
-            objectName: "notice"
+            objectName: "notice"; z: 103 // Above the task page and the options sheet.
             x: root.quickOpen ? Ui.Theme.margin : (parent.width - width) / 2
             y: root.editing ? 310 : root.quickOpen ? 340 : Ui.Theme.canvasHeight - Ui.Theme.hintBarHeight - height - Ui.Theme.space16
             maximumWidth: root.quickOpen ? 530 : Ui.Theme.contentWidth
@@ -804,9 +807,12 @@ Item {
         }
         Ui.Hud {
             id: volumeHud; objectName: "volumeHud"
-            // Top center; a wide performance overlay in the top-left corner pushes it just far enough right.
-            x: Math.max((parent.width - width) / 2, performancePanel.visible ? performancePanel.x + performancePanel.width + Ui.Theme.space16 : 0)
-            y: Ui.Theme.space24
+            // Top center. In game it stays inside the compositor region, and below the performance
+            // overlay (right-aligned with it) when both are up; on the desktop the overlay starts lower.
+            readonly property bool belowPanel: root.gameOverlay && performancePanel.visible
+            x: belowPanel ? performancePanel.x + performancePanel.width - width
+                : Math.max((parent.width - width) / 2, root.gameOverlay ? Ui.Theme.gameOverlayVolumeLeft : 0)
+            y: belowPanel ? performancePanel.y + performancePanel.height + Ui.Theme.space16 : Ui.Theme.space24
             shown: root.volumeVisible; value: root.volumePercent / 100; fontScale: root.fontScale
             iconName: root.volumePercent === 0 ? "volume-muted" : "volume"
             Accessible.role: Accessible.Indicator

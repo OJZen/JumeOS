@@ -119,7 +119,7 @@ posters are loaded for the management pages.
 | `Shadow` | Level-2 elevation from the prerendered nine-slice `elevation.png` (magick: blurred r24 rect, 16% alpha, +4 px); never a live blur |
 | `PageHeader` / `Page` | Tool-page title/status with back/action buttons; `Page` slides a new route in from 48 px (100 ms fade with reduced motion) |
 | `ChoicePopup` | Native modal `Popup.Item` dialog with pending/current indexes, confirmation and cancellation (B or Select), Start closes; stays in the existing window |
-| `OptionsSheet` | Start menu of the focused item or page: {id, label[, button][, reason]} rows, shortcut glyphs on the right, disabled rows keep their reason; A runs, Start/B/Select close, `chosen(id)` |
+| `OptionsSheet` | Start menu of the focused item or page: {id, label[, button][, hold][, reason]} rows, shortcut glyphs on the right ("按住" before a hold), disabled rows keep their reason; A runs, Start/B/Select close, `chosen(id)` |
 
 `ListRow` composes these primitives for settings, host details and the quick panel.
 Read-only rows remain legible but have no native activation; disabled rows keep

@@ -141,7 +141,14 @@ QtObject {
     readonly property int quickPanelWidth: 392
     readonly property int quickPanelInset: 24
     readonly property int holdRingSize: 88
-    readonly property int perfPanelInset: 24
+    // §5 performance overlay: top right. In game the compositor shows the shell only inside
+    // gameOverlayRegion (gaming-wayland/handheld-shell.cpp), widened to gameOverlayVolumeLeft while
+    // the volume Hud is up; on the desktop the overlay sits below the top bar.
+    readonly property rect gameOverlayRegion: Qt.rect(624, 16, 368, 260)
+    readonly property int gameOverlayVolumeLeft: 396
+    readonly property int perfPanelTop: 24
+    readonly property int perfPanelDesktopTop: 80
+    readonly property int perfPanelRight: 32
     readonly property int perfPanelWidth: 360
     readonly property int perfPanelRadius: 20
     readonly property real perfPanelOpacity: 0.92

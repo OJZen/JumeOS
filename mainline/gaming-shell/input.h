@@ -8,9 +8,9 @@
 
 // Page-layer controller input (docs/JUME-UI.md §7.3–7.5). Presses emit `action`
 // immediately; Select ("quick") is decided on release and swallows chords.
-// Directions and L2/R2 repeat after 380 ms every 90 ms; with `fastRepeat` (lists)
-// a direction held for 2 s speeds up to 50 ms. B repeats only with `backRepeat`
-// (the keyboard's backspace), so Files and Browser keep a single B press.
+// Only directions repeat: after 380 ms every 90 ms; with `fastRepeat` (lists) a
+// direction held for 2 s speeds up to 50 ms. B repeats only with `backRepeat` (the
+// keyboard's backspace), so Files and Browser keep a single B press; other keys never.
 class ControllerInput final : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString deviceName READ deviceName NOTIFY stateChanged)
