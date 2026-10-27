@@ -59,6 +59,7 @@ Item {
     readonly property bool portCatalogSidebar: !toolView.item || toolView.item.catalogSidebar
     readonly property bool sensitiveVisible: tasksVisible || (externalSession && ["builtin.browser", "builtin.terminal", "builtin.files", "builtin.text", "builtin.transfer"].includes(activeApplication)) || (editing && !testInputVisible) || (streaming !== null && streaming.pin.length > 0)
     property string editPurpose: "test"
+    property string keyboardLastKey: "q"
     property string editLabel: "文字输入测试"
     readonly property bool externalSession: applications !== null && applications.running
     readonly property bool customApplications: applications !== null && applications.hasManifest
@@ -633,6 +634,7 @@ Item {
         else if (action === "pageUp") { if (keyboard && !repeated) keyboard.toggleLanguage() }
         else if (action === "pageDown") { if (keyboard && !repeated) keyboard.toggleSymbols() }
         else if ((action === "left" || action === "right") && keyboard && keyboard.navigateHorizontal(action)) return
+        else if ((action === "up" || action === "down") && keyboard && keyboard.navigateVertical(action)) return
         else if (keyboardEnabled && ["up", "down", "left", "right", "accept"].indexOf(action) >= 0) controller.keyboardAction(action)
     }
     function dispatch(action, repeated) {
@@ -1049,6 +1051,12 @@ Item {
                 }
             }
             Binding { target: virtualKeyboard.item; property: "reducedMotion"; value: root.store.reducedMotion; when: virtualKeyboard.status === Loader.Ready }
+            // The keyboard reopens on the key last used.
+            Binding { target: virtualKeyboard.item; property: "lastKey"; value: root.keyboardLastKey; when: virtualKeyboard.status === Loader.Ready }
+            Connections {
+                target: virtualKeyboard.status === Loader.Ready ? virtualKeyboard.item : null
+                function onKeyFocused(text) { root.keyboardLastKey = text }
+            }
         }
         PerformancePanel {
             id: performancePanel

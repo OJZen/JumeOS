@@ -2219,9 +2219,28 @@ QtObject {
             }
         }
         QVERIFY(state.choose("font", 1)); QVERIFY(state.choose("night", 0)); state.adjust("motion", 1); field->setProperty("text", QString());
+        // One key always has the focus: q at first, kept when text arrives over IPC or from a USB keyboard.
+        auto *inputArea = root->findChild<QQuickItem *>("keyboardInputArea"); QVERIFY(inputArea);
+        const auto focusedText = [&] { auto *key = inputArea->property("initialKey").value<QObject *>(); return key ? key->property("text").toString() : QString(); };
+        QTRY_COMPARE(focusedText(), QString("q"));
+        root->setProperty("testInputCapture", true);
+        const auto keyboardState = [&] {
+            return QString("editing=%1 visible=%2 navigation=%3 focused=%4 text=%5").arg(root->property("editing").toBool())
+                .arg(QGuiApplication::inputMethod()->isVisible()).arg(keyboard->property("navigationModeActive").toBool())
+                .arg(focusedText(), field->property("text").toString());
+        };
+        QVERIFY(QMetaObject::invokeMethod(root, "remoteText", Q_ARG(QVariant, QString("ipc")))); QTest::qWait(100);
+        QVERIFY2(focusedText() == "q" && root->property("editing").toBool(), qPrintable(keyboardState()));
+        QTest::keyClick(&view, Qt::Key_Z); QTest::qWait(100);
+        QVERIFY2(focusedText() == "q" && root->property("editing").toBool(), qPrintable(keyboardState()));
+        field->setProperty("text", QString());
         // The same focus-object events sent by SDL must navigate Qt's own keys.
-        controller.keyboardAction("down"); controller.keyboardAction("accept");
-        QTRY_VERIFY(!field->property("text").toString().isEmpty());
+        // Down goes to the nearest key of the offset row (q ↓ a); A types it through Qt's own key
+        // (capitalized at the start of an empty field).
+        QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, QString("down")), Q_ARG(QVariant, false)));
+        QVERIFY2(focusedText() == "a", qPrintable(keyboardState()));
+        controller.keyboardAction("accept");
+        QTRY_VERIFY2(field->property("text").toString().toLower() == "a", qPrintable(keyboardState()));
         QVERIFY(root->property("editing").toBool());
         const auto before = field->property("text").toString();
         controller.keyboardAction("right"); controller.keyboardAction("accept");
@@ -2277,6 +2296,18 @@ QtObject {
         field->setProperty("text", ""); QVERIFY(QMetaObject::invokeMethod(inputMethod.data(), "chinese"));
         QTest::qWait(100); QVERIFY(QMetaObject::invokeMethod(inputMethod.data(), "typePinyin"));
         QTRY_VERIFY(inputMethod->property("candidates").toInt() > 0);
+        // Composing pinyin with the candidate bar, light and night, 100% and 130%.
+        state.adjust("motion", 1);
+        for (const int percent : {100, 130}) {
+            QVERIFY(state.choose("font", percent == 100 ? 1 : 3));
+            for (const bool night : {false, true}) {
+                QVERIFY(state.choose("night", night ? 1 : 0)); QTest::qWait(300);
+                QVERIFY(inputMethod->property("candidates").toInt() > 0);
+                if (!keyboardCaptures.isEmpty())
+                    QVERIFY(view.grabWindow().save(keyboardCaptures + QString("/keyboard-pinyin-%1-%2.png").arg(night ? "night" : "light").arg(percent)));
+            }
+        }
+        QVERIFY(state.choose("font", 1)); QVERIFY(state.choose("night", 0)); state.adjust("motion", 1);
         QVERIFY(QMetaObject::invokeMethod(inputMethod.data(), "commitFirst"));
         QTRY_VERIFY(!field->property("text").toString().isEmpty());
         QVERIFY(field->property("text").toString().front().unicode() > 127);
@@ -2286,6 +2317,8 @@ QtObject {
         if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/arm64-keyboard-pinyin-130.png"));
         // §8 has no hide key: Select cancels the entry and closes the keyboard.
         dispatch("quick"); QTRY_VERIFY(!root->property("editing").toBool());
+        // Reopening returns to the key used last.
+        const auto lastKey = root->property("keyboardLastKey").toString(); QVERIFY(!lastKey.isEmpty());
         QVERIFY(!QGuiApplication::inputMethod()->isVisible());
         QVERIFY(field->property("text").toString().isEmpty());
         QTRY_COMPARE(loader->property("status").toInt(), 0);
@@ -2298,7 +2331,11 @@ QtObject {
         auto *reopenedLayout = root->findChild<QQuickItem *>("keyboardLayoutLoader"); QVERIFY(reopenedLayout);
         QTRY_COMPARE(reopenedLayout->property("status").toInt(), 1);
         QTest::qWait(200); // Match initial entry: finish keyboard layout/observer registration.
-        controller.keyboardAction("down"); controller.keyboardAction("accept");
+        auto *reopenedArea = root->findChild<QQuickItem *>("keyboardInputArea"); QVERIFY(reopenedArea);
+        QTRY_VERIFY(reopenedArea->property("initialKey").value<QObject *>());
+        QCOMPARE(reopenedArea->property("initialKey").value<QObject *>()->property("text").toString(), lastKey);
+        for (int i = 0; i < 3; ++i) dispatch("up"); // The top row holds letters only.
+        controller.keyboardAction("accept");
         QTRY_VERIFY(!field->property("text").toString().isEmpty());
         dispatch("options"); // Start: 完成.
         QVERIFY(!root->property("editing").toBool()); QVERIFY(field->property("text").toString().isEmpty());

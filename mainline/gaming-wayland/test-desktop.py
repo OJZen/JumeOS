@@ -99,6 +99,13 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
         pad.emit((1, fixture.KEYS[index], 1)); time.sleep(duration)
         pad.emit((1, fixture.KEYS[index], 0)); time.sleep(.07)
 
+    def quick_to(target, key=11):
+        # §8 quick panel: move with Down (or Up) until the named row has the focus.
+        for _ in range(8):
+            if observe()['state']['quickId'] == target: return
+            press(key)
+        assert observe()['state']['quickId'] == target, observe()['state']['quickId']
+
     def chord():
         pad.emit((1, fixture.KEYS[14], 1), (1, fixture.KEYS[15], 1)); time.sleep(.04)
         pad.emit((1, fixture.KEYS[14], 0), (1, fixture.KEYS[15], 0))
@@ -224,14 +231,14 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
         wait_for(lambda: observe()['state']['quickOpen'] and ready(), 'Physical chord did not open real quick panel')
         wait_for(lambda: all(x == 0 for x in game()['buttons']) and abs(game()['axes'][0]) < 2, 'Game did not receive neutral on panel open')
         # Keep the original A/stick held across handoff. They must not move the panel.
-        assert observe()['state']['quickIndex'] == 0
+        assert observe()['state']['quickId'] == 'brightness'  # The panel opens on brightness.
         pad.emit((3, 0, 0), (1, fixture.KEYS[1], 0)); time.sleep(.05)
-        press(11); assert observe()['state']['quickIndex'] == 1
+        press(11); assert observe()['state']['quickId'] != 'brightness'
         assert all(x == 0 for x in game()['buttons'])
         response = observe(True); assert response['capture']['status'] == 'ok'
         (out / 'panel-composed.png').write_bytes(base64.b64decode(response['capture']['png_base64']))
         subprocess.run(['/out/test-client', '--check-panel', str(out / 'panel-composed.png')], check=True, timeout=3)
-        press(11); press(11); assert observe()['state']['quickIndex'] == 3
+        quick_to('monitor', 10)
         press(1); assert observe()['state']['monitor']
         press(0)  # B resumes the game without closing it.
         wait_for(lambda: not observe()['state']['quickOpen'] and ready(), 'B did not resume game')
@@ -275,11 +282,12 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
         assert observe()['state']['monitorVisible']
         (out / 'frame-metrics.json').write_text(json.dumps(samples, indent=2) + '\n')
         chord(); wait_for(lambda: observe()['state']['quickOpen'] and ready(), 'HUD control panel did not open')
-        assert observe()['state']['quickIndex'] == 3
+        quick_to('monitor', 10)
         press(1); press(0)
         time.sleep(1.1)
         assert not observe()['state']['monitorVisible'] and frame_metrics()['active'], 'Hidden HUD stopped game-frame readiness sampling'
         chord(); wait_for(lambda: observe()['state']['quickOpen'] and ready(), 'HUD control panel did not reopen')
+        quick_to('monitor', 10)
         press(1); press(0)
         wait_for(lambda: frame_metrics().get('submissions') == 0, 'HUD toggle disturbed game-frame sampling')
         print('GAME_FRAME_METRICS_PASS: independent client/compositor frame counts, changing cadence, stale intervals and HUD-independent readiness sampling')
@@ -287,8 +295,7 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
         wait_for(lambda: game()['buttons'][9] == game()['buttons'][10] == 1, 'Shoulder chord was not forwarded')
         pad.emit((1, fixture.KEYS[4], 0), (1, fixture.KEYS[5], 0)); time.sleep(.04)
         chord(); wait_for(lambda: observe()['state']['quickOpen'] and ready(), 'Second chord did not reopen panel')
-        for _ in range(5 - observe()['state']['quickIndex']): press(11)
-        assert observe()['state']['quickIndex'] == 5
+        quick_to('end')
         press(1); assert observe()['state']['choicesOpen']
         press(1); assert not observe()['state']['choicesOpen'] and observe()['state']['externalSession'], 'Default cancellation stopped game'
         press(1); press(11); press(1)
@@ -299,13 +306,14 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
         press(0); assert not observe()['state']['quickOpen']
         # Stop only this test's compositor after queuing a new capture. Kernel input
         # remains live, so opening a private editor must cancel the in-flight frame.
-        observe(action='up'); observe(action='right'); observe(action='right')
+        observe(action='home')  # The dock's 设置, then 控制器 › 文字输入测试.
+        for action in ('down', 'right', 'right', 'right', 'right', 'accept'): observe(action=action)
         category = observe()['state']['settingsCategory']
-        for _ in range(abs(8 - category)): observe(action='down' if category < 8 else 'up')
+        for _ in range(abs(3 - category)): observe(action='down' if category < 3 else 'up')
         observe(action='accept')
         wait_for(lambda:observe()['state']['settingsDetailReady'],'Async settings detail did not load')
         observe(action='down')
-        assert observe()['state']['settingsCategory'] == 8 and observe()['state']['settingsIndex'] == 1,observe()['state']
+        assert observe()['state']['settingsCategory'] == 3 and observe()['state']['settingsIndex'] == 1,observe()['state']
         time.sleep(.15); wait_for(ready, 'Settings not ready for privacy race')
         compositor = int(os.environ['R46H_TEST_WESTON_PID'])
         assert b'--shell=/out/handheld-shell.so' in Path(f'/proc/{compositor}/cmdline').read_bytes()
@@ -441,7 +449,9 @@ with tempfile.TemporaryDirectory(prefix='r46h-ui-', dir='/run') as directory:
         observe(action='accept')
         wait_for(lambda: observe()['state']['externalSession'] and ready() and 'buttons' in game(), 'Stream relaunch failed')
         stopped_pid = game()['pid']; chord(); wait_for(lambda: observe()['state']['quickOpen'] and ready(), 'Stop panel missing')
-        for _ in range(5 - observe()['state']['quickIndex']): observe(action='down')
+        for _ in range(8):
+            if observe()['state']['quickId'] == 'end': break
+            observe(action='down')
         observe(action='accept'); observe(action='down'); observe(action='accept')
         wait_for(lambda: not observe()['state']['externalSession'] and ready(), 'Panel stop left stream running')
         assert not Path(f'/proc/{stopped_pid}').exists()
