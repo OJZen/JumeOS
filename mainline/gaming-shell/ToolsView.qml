@@ -7,7 +7,7 @@ Item {
     id: toolsView
     required property var items
     property int index: 0
-    property bool active: true
+    property bool ringVisible: true
     property real fontScale: Ui.Theme.fontScale
     property bool reducedMotion: Ui.Theme.reducedMotion
     signal activated(int position)
@@ -24,7 +24,7 @@ Item {
             x: list.ring; width: list.width - 2 * list.ring; fontScale: toolsView.fontScale; reducedMotion: toolsView.reducedMotion
             title: modelData.title; description: modelData.reason ? "" : modelData.detail
             iconName: modelData.icon; disabledReason: modelData.reason || ""; chevron: true
-            selected: toolsView.active && toolsView.index === index
+            selected: toolsView.index === index; focusOutline: toolsView.ringVisible
             onFocused: toolsView.index = index
             onActivated: toolsView.activated(index)
         }

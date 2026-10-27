@@ -33,7 +33,7 @@ Item {
     readonly property var categories: ["网络", "显示", "声音", "控制器", "电源", "性能", "存储", "系统"]
     readonly property var categoryIcons: ["wifi", "display", "volume", "gamepad", "battery", "cpu", "storage", "info"]
     readonly property var categoryNotes: ["已连接与附近的 Wi-Fi", "亮度、自动息屏、夜间模式与字号", "音量与声音输出", "摇杆测试与文字输入",
-        "变暗、息屏、电池、重启与关机", "性能浮窗、帧与串流、CPU 与内存", "分区与可用空间", "系统状态与关于"]
+        "变暗、息屏、电池、重启与关机", "CPU 频率、内存与性能浮窗", "分区与可用空间", "系统状态与关于"]
     readonly property var nightModes: ["off", "on", "auto"]
     readonly property var nightLabels: ["关闭", "开启", "跟随时间"]
     // Two panes from 900 wide (§1); narrower canvases show the categories and the detail in turn.
@@ -55,7 +55,8 @@ Item {
     readonly property var activeNetworks: network !== null && network.available ? network.profiles.filter(function(profile) { return profile.active }) : []
     // Rows carry their section; the detail draws a caption above the first row of each section.
     readonly property var rows: {
-        switch (openedCategory) {
+        if (shownCategory < 0) return []
+        switch (shownCategory) {
         case 0: {
             const result = [{name: "Wi-Fi", key: "wifi", section: ""}]
             activeNetworks.forEach(function(profile) { result.push({name: profile.name, key: "netActive", uuid: profile.id, section: "已连接", icon: "wifi"}) })
@@ -71,26 +72,23 @@ Item {
         case 1: return [{name: "亮度", key: "brightness", section: "屏幕", icon: "sun"}, {name: "自动息屏", key: "screenOff", section: "屏幕"},
             {name: "夜间模式", key: "night", section: "外观"}, {name: "界面字号", key: "font", section: "外观"}, {name: "减少动态效果", key: "motion", section: "外观"}]
         case 2: return [{name: "音量", key: "volume", section: "", icon: "volume"}, {name: "声音输出", key: "audioOutput", section: ""}]
-        case 3: return [{name: "摇杆测试", key: "tester", detail: "查看按键、摇杆与扳机读数", section: ""},
+        case 3: return [{name: "摇杆测试", key: "tester", section: ""},
             {name: "文字输入测试", key: "input", detail: "退出后清空", section: ""}]
         case 4: return [{name: "空闲变暗", key: "dim", section: "节能"}, {name: "立即息屏", key: "screenOffNow", detail: "首个按键仅唤醒", section: "节能"},
-            {name: "电池与供电", key: "battery", section: "电池"}, {name: "重启", key: "reboot", section: "系统电源"}, {name: "关机", key: "poweroff", section: "系统电源"}]
-        case 5: return [{name: "性能浮窗", key: "monitor", section: "性能浮窗"},
-            {name: "帧间隔 P95", key: "p95", section: "帧与串流"}, {name: "串流解码", key: "decode", section: "帧与串流"},
-            {name: "网络丢帧", key: "drop", section: "帧与串流"}, {name: "串流排队", key: "queue", section: "帧与串流"},
-            {name: "音频接收队列", key: "audioQueue", section: "帧与串流"}, {name: "温控", key: "thermal", section: "帧与串流"},
-            {name: "GPU 频率", key: "gpuFrequency", section: "帧与串流"},
-            {name: "自动调频", detail: "桌面 816 · 游戏 1008 · 熄屏 600 MHz", key: "cpuAuto", section: "CPU"},
+            {name: "电池与供电", key: "battery", section: "电池"}, {name: "重启…", key: "reboot", section: "系统电源"}, {name: "关机…", key: "poweroff", section: "系统电源"}]
+        case 5: return [{name: "自动调频", detail: "桌面 816 · 游戏 1008 · 熄屏 600 MHz", key: "cpuAuto", section: "CPU"},
             {name: "频率预设", detail: "手动选择会关闭自动调频", key: "cpuPreset", section: "CPU"}, {name: "调速器", key: "cpuGovernor", section: "CPU"},
             {name: "最低频率", key: "cpuMin", section: "CPU"}, {name: "最高频率", key: "cpuMax", section: "CPU"}, {name: "当前频率", key: "cpuCurrent", section: "CPU"},
             {name: "Swap 使用", key: "swap", section: "内存"}, {name: "zram 内存压缩", key: "zram", section: "内存"},
             {name: "压缩算法", key: "zramAlgorithms", section: "内存"}, {name: "压缩内存占用", key: "zramMemory", section: "内存"},
-            {name: "内存压力（10 秒）", key: "pressure", section: "内存"}]
+            {name: "内存压力（10 秒）", key: "pressure", section: "内存"},
+            {name: "性能浮窗", key: "monitor", section: "性能浮窗"}, {name: "浮窗内容", key: "monitorDetail", section: "性能浮窗"}]
         case 6: return hardware ? [{name: "系统分区", key: "storage0", section: ""}, {name: "游戏分区", key: "storage1", section: ""}, {name: "启动分区", key: "storage2", section: ""}]
             : [{name: "预览文件所在卷", info: "storage", value: "刷新", key: "storage", section: ""}]
         default: return [{name: "当前运行环境", info: "system", value: hardware ? "R46H" : "本机", section: "状态"},
             {name: "系统 CPU", key: "systemCpu", section: "状态"}, {name: "系统内存", key: "memory", section: "状态"},
-            {name: "处理器温度", key: "temperature", section: "状态"},
+            {name: "处理器温度", key: "temperature", section: "状态"}, {name: "温控", key: "thermal", section: "状态"},
+            {name: "GPU 频率", key: "gpuFrequency", section: "状态"},
             {name: "启动器", value: Qt.application.displayName, section: "关于"}, {name: "版本", value: Qt.application.version, section: "关于"},
             {name: "项目地址", value: "https://github.com/OJZen/JumeOS", section: "关于"},
             {name: "浏览器 Qt WebEngine", key: "browser", value: browserVersions.webEngine || "", section: "关于"},
@@ -98,8 +96,14 @@ Item {
             {name: "Chromium 安全补丁基线", key: "browser", value: browserVersions.securityPatch || "", section: "关于"}]
         }
     }
+    // §8: a category the focus rests on for 300 ms shows its detail as a preview from data already
+    // at hand (no scan, storage or other refresh) and cannot take focus; quick moves show the title.
+    property int previewCategory: -1
+    readonly property bool previewing: sidebar && twoPane && previewCategory === category
+    readonly property int shownCategory: sidebar ? (previewing ? previewCategory : -1) : openedCategory
+    Timer { id: previewTimer; interval: Ui.Theme.settingsPreviewDelay; onTriggered: settings.previewCategory = settings.category }
     // First row of the 关于 section, for the about scene.
-    readonly property int aboutRow: 4
+    readonly property int aboutRow: 6
     signal notice(string text)
     signal activity()
     signal screenOffRequested()
@@ -118,11 +122,11 @@ Item {
         "zramAlgorithms", "zramMemory", "p95", "decode", "drop", "queue", "audioQueue", "browser"]
     function informational(row) { return !row.key || readings.indexOf(row.key) >= 0 }
     function choiceRow(key) {
-        return ["font", "night", "dim", "screenOff"].indexOf(key) >= 0 || (!!key && key.indexOf("cpu") === 0 && key !== "cpuCurrent" && key !== "cpuAuto")
+        return ["font", "night", "dim", "screenOff", "monitorDetail"].indexOf(key) >= 0 || (!!key && key.indexOf("cpu") === 0 && key !== "cpuCurrent" && key !== "cpuAuto")
     }
     function canActivate(key) {
         if (!key || readings.indexOf(key) >= 0 || key === "wifi" || key === "audioOutput") return false
-        if (key === "tester" || key === "input" || key === "motion" || key === "monitor" || key === "font" || key === "night") return true
+        if (["tester", "input", "motion", "monitor", "monitorDetail", "font", "night"].indexOf(key) >= 0) return true
         if (key.indexOf("net") === 0) return network !== null && network.available && !network.busy && (key === "netRefresh" || (hardware && device.controls && network.controls && (key !== "netDisconnect" || activeNetworks.length === 1)))
         if (["poweroff", "reboot", "cpuAuto", "cpuPreset", "cpuGovernor", "cpuMin", "cpuMax", "screenOffNow"].indexOf(key) >= 0) return !hardware ? key === "screenOffNow" : device.controls
         if (hardware && key === "volume") return false
@@ -138,15 +142,15 @@ Item {
             if (rowValue(row) !== "") return ""
             if (key === "p95") return "游戏运行时显示"
             if (["decode", "drop", "queue", "audioQueue"].indexOf(key) >= 0) return "串流时显示"
-            if (key === "browser") return "浏览器未安装或版本未知"
+            if (key === "browser") return "未安装"
             return hardware ? "暂无读数" : "预览中不可用"
         }
         if (canActivate(key)) return ""
-        if (key === "wifi") return "无线开关尚未接入"
-        if (key === "audioOutput") return "扬声器 / 耳机切换尚未接入"
+        if (key === "wifi") return "暂不支持"
+        if (key === "audioOutput") return "暂不支持"
         if (key === "volume") return "使用机身音量键调节"
-        if (key.indexOf("net") === 0) return network === null || !network.available ? "网络服务不可用" : network.busy ? "正在处理…" : hardware ? "需要设备控制权限" : "预览中不可用"
-        return hardware ? "需要设备控制权限" : "预览中不可用"
+        if (key.indexOf("net") === 0) return network === null || !network.available ? "暂不可用" : network.busy ? "正在处理…" : hardware ? "暂不可用" : "预览中不可用"
+        return hardware ? "暂不可用" : "预览中不可用"
     }
     function signalText(percent) { return percent >= 70 ? "信号良好" : percent >= 40 ? "信号一般" : percent >= 0 ? "信号较弱" : "" }
     function rowDescription(row) {
@@ -169,9 +173,9 @@ Item {
         case "night": return nightLabels[nightModes.indexOf(store.nightMode)] || "关闭"
         case "dim": return store.dimSeconds ? store.dimSeconds + " 秒" : "关闭"
         case "screenOff": return store.screenOffSeconds ? store.screenOffSeconds / 60 + " 分钟" : "关闭"
-        case "screenOffNow": return "息屏"
         case "motion": return store.reducedMotion ? "开启" : "关闭"
         case "monitor": return store.monitor ? "开启" : "关闭"
+        case "monitorDetail": return store.monitorDetail ? "详细" : "简洁"
         case "systemCpu": return metric("systemCpu", "%", 1)
         case "netScan": return network !== null && network.busy ? network.status : ""
         case "memory": { const available = metric("MemAvailable", " MiB 可用", 1024), total = metric("MemTotal", " MiB", 1024); return available && total ? available + " / " + total : "" }
@@ -193,7 +197,6 @@ Item {
             const voltage = metric("voltageUv", " V", 1000000), supply = device.info.online === 1 ? "外部供电" : device.info.online === 0 ? "电池供电" : ""
             return [voltage, supply].filter(function(part) { return !!part }).join(" · ")
         }
-        case "poweroff": case "reboot": case "cpuPreset": return canActivate(row.key) ? "确认…" : ""
         case "cpuAuto": return hardware && device.controls ? (device.automaticCpu ? "开启" : "关闭") : ""
         case "cpuGovernor": return hardware ? device.info.cpu.governor || "" : ""
         case "cpuMin": case "cpuMax": case "cpuCurrent": {
@@ -224,13 +227,16 @@ Item {
         activateKey(id, id === "netProfiles" ? "已保存的网络" : id === "netForget" ? "忘记网络" : "")
     }
     function enter() {
-        sidebar = true; tester = false; adjustingValue = false; rowIndex = 0
+        sidebar = true; tester = false; adjustingValue = false; rowIndex = 0; previewCategory = -1
         categoryList.positionViewAtIndex(category, ListView.Contain)
+        previewTimer.restart()
     }
     function selectCategory(index) {
         if (adjustingValue && !store.save()) return false
+        if (index !== category) previewCategory = -1
         category = index; tester = false; adjustingValue = false; rowIndex = 0
         categoryList.positionViewAtIndex(category, ListView.Contain)
+        if (sidebar && previewCategory !== category) previewTimer.restart()
         activity()
         return true
     }
@@ -259,14 +265,14 @@ Item {
     function returnToCategories() {
         if (!store.save()) return false
         rememberRow()
-        sidebar = true; tester = false; adjustingValue = false
+        sidebar = true; tester = false; adjustingValue = false; previewCategory = category
         categoryList.positionViewAtIndex(category, ListView.Contain)
         return true
     }
     function valueIsAdjustable(key) { return key === "volume" || key === "brightness" }
     function adjust(direction, repeated) {
         const row = rows[rowIndex]
-        if (!row || !canActivate(row.key)) { notice(rowReason(row) || "这项设备功能尚未接入"); return }
+        if (!row || !canActivate(row.key)) { notice(rowReason(row) || "暂不可用"); return }
         if ((row.key === "motion" || row.key === "monitor") && repeated) return
         if (row.key === "input") { if (!repeated) editRequested(); return }
         if (row.key === "tester") { if (!repeated) startTester(); return }
@@ -280,7 +286,7 @@ Item {
     function activate(repeated) {
         if (repeated || !detailReady) return
         const row = rows[rowIndex]
-        if (!row || !canActivate(row.key)) { notice(rowReason(row) || "这项设备功能尚未接入"); return }
+        if (!row || !canActivate(row.key)) { notice(rowReason(row) || "暂不可用"); return }
         activateKey(row.key, row.name, row)
     }
     function activateKey(key, name, row) {
@@ -301,8 +307,9 @@ Item {
         } else if (key === "netDisconnect") {
             choices.present(choiceAnchor(), ["取消", "断开 Wi-Fi"], 0, "断开后远控连接将中断")
         } else if (key === "poweroff" || key === "reboot") {
+            const action = name.replace("…", "")
             choiceValues = ["", key]
-            choices.present(choiceAnchor(), ["取消", name], 0, "确认" + name)
+            choices.present(choiceAnchor(), ["取消", action], 0, "确认" + action)
         } else if (key.indexOf("cpu") === 0) {
             const cpu = device.info.cpu
             let labels = []; let index = 0
@@ -317,8 +324,10 @@ Item {
             choices.present(choiceAnchor(), labels, Math.max(0,index), name)
         } else if (choiceRow(key)) {
             const labels = key === "font" ? Ui.Theme.fontPercents.map(function(value) { return value + "%" }) : key === "night" ? nightLabels
+                : key === "monitorDetail" ? ["简洁", "详细"]
                 : key === "dim" ? ["关闭", "30 秒", "60 秒", "120 秒"] : ["关闭", "1 分钟", "3 分钟", "5 分钟", "10 分钟", "15 分钟"]
             const index = key === "font" ? Ui.Theme.fontPercents.indexOf(store.fontPercent) : key === "night" ? nightModes.indexOf(store.nightMode)
+                : key === "monitorDetail" ? Number(store.monitorDetail)
                 : key === "dim" ? [0, 30, 60, 120].indexOf(store.dimSeconds) : [0, 60, 180, 300, 600, 900].indexOf(store.screenOffSeconds)
             choices.present(choiceAnchor(), labels, index, name)
         } else if (!valueIsAdjustable(key)) adjust(1, false)
@@ -428,13 +437,14 @@ Item {
             Column {
                 objectName: "settingsPlaceholder"
                 y: Ui.Theme.space24; width: parent.width; spacing: Ui.Theme.space4
-                visible: settings.sidebar
+                visible: settings.sidebar && !settings.previewing
                 Ui.Label { width: parent.width; role: "headline"; fontScale: settings.fontScale; text: settings.categories[settings.category] }
                 Ui.Label { width: parent.width; role: "caption"; fontScale: settings.fontScale; color: Ui.Theme.textSecondary; text: settings.categoryNotes[settings.category] }
             }
             Loader {
                 id: detailLoader; anchors.fill: parent
-                active: !settings.sidebar; visible: status === Loader.Ready
+                active: !settings.sidebar || settings.previewing; visible: status === Loader.Ready
+                enabled: !settings.sidebar
                 asynchronous: true; sourceComponent: detailComponent
             }
         }
@@ -478,7 +488,7 @@ Item {
                                 : entry.modelData.key === "wifi" ? Number(settings.activeNetworks.length > 0) : -1
                             progress: entry.modelData.key === "volume" && !settings.hardware ? settings.store.volume / 100
                                 : entry.modelData.key === "brightness" && settings.canActivate("brightness") ? (settings.hardware ? settings.device.info.brightnessPercent : settings.store.brightness) / 100 : -1
-                            focusOutline: false; selected: settings.rowIndex === entry.index
+                            focusOutline: false; selected: !settings.sidebar && settings.rowIndex === entry.index
                             adjusting: settings.adjustingValue && selected
                             onFocused: settings.focusRow(entry.index)
                             onActivated: if (settings.rowIndex === entry.index) settings.activate(false)
@@ -525,7 +535,7 @@ Item {
                     y: settingRows.y + (settingRows.currentItem ? settingRows.currentItem.y + settingRows.currentItem.rowY - settingRows.contentY : 0)
                     width: settingRows.width
                     height: settingRows.currentItem ? settingRows.currentItem.rowHeight : Ui.Theme.listRowHeight
-                    visible: !settings.tester && (!settingRows.currentItem || settingRows.currentItem.y >= settingRows.contentY)
+                    visible: !settings.sidebar && !settings.tester && (!settingRows.currentItem || settingRows.currentItem.y >= settingRows.contentY)
                     adjusting: settings.adjustingValue
                     active: settings.navigationActive && settings.detailReady && !choices.visible
                     reducedMotion: settings.store.reducedMotion

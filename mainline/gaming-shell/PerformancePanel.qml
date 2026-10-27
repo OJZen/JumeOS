@@ -2,16 +2,17 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import "controls" as Ui
 
-// §5 performance overlay: top right, at most three rows of tabular figures, never focused.
-// A reading without data is left out entirely (no "—"); the detailed figures (P95, decode,
-// queue, audio queue, thermal state) belong to 设置 › 性能. Readings keep non-breaking spaces,
-// so a row that outgrows 360 at a large font size wraps only between "·" items.
+// §5 performance overlay: top right, three rows of tabular figures (详细 adds a fourth: the game's
+// P95 or the stream's decode time and drops), never focused. A reading without data is left out
+// entirely (no "—"). Readings keep non-breaking spaces, so a row that outgrows 360 at a large font
+// size wraps only between "·" items.
 Rectangle {
     id: panel
     required property var metrics
     property var device: null
     readonly property bool hardware: device !== null && device.target
     property real fontScale: Ui.Theme.fontScale
+    property bool detail: false
     readonly property bool game: metrics.game && metrics.game.active === true
     readonly property bool streaming: metrics.stream && metrics.stream.active === true
     readonly property var info: hardware ? device.info : ({})
@@ -35,7 +36,10 @@ Rectangle {
             ? ["内存", ((info.MemTotal - info.MemAvailable) / 1024).toFixed(0), "/", (info.MemTotal / 1024).toFixed(0), "MB"].join(space) : ""
         return join([fixed(info.socTemperatureC, 0, " °C"), memory])
     }
-    readonly property bool empty: rate === "" && load === "" && health === ""
+    readonly property string detailRow: !detail ? ""
+        : streaming ? join([prefixed("解码", fixed(metrics.stream.decodeMs, 1, " ms")), prefixed("丢帧", fixed(metrics.stream.networkDropPercent, 1, "%"))])
+        : game ? prefixed("P95", fixed(metrics.game.intervalP95Ms, 1, " ms")) : ""
+    readonly property bool empty: rate === "" && load === "" && health === "" && detailRow === ""
     readonly property real textWidth: Ui.Theme.perfPanelWidth - 2 * Ui.Theme.space16
     width: Math.min(Ui.Theme.perfPanelWidth, rows.implicitWidth + 2 * Ui.Theme.space16)
     height: rows.implicitHeight + 2 * Ui.Theme.space12
@@ -53,5 +57,6 @@ Rectangle {
         Reading { objectName: "performanceRate"; role: "label"; font.weight: Font.Bold; color: Ui.Theme.accent; text: panel.rate }
         Reading { objectName: "performanceLoad"; role: "micro"; color: Ui.Theme.textSecondary; text: panel.load }
         Reading { objectName: "performanceHealth"; role: "micro"; color: Ui.Theme.textSecondary; text: panel.health }
+        Reading { objectName: "performanceDetail"; role: "micro"; color: Ui.Theme.textSecondary; text: panel.detailRow }
     }
 }

@@ -98,8 +98,10 @@ QtObject {
     readonly property int dockTop: 548
     readonly property int libraryTabsTop: 82
     readonly property int libraryGridTop: 160
+    readonly property int libraryCardMin: 200
     readonly property int settingsSidebarWidth: 280
     readonly property int settingsCategoryHeight: 60
+    readonly property int settingsPreviewDelay: 300
     readonly property int taskCardWidth: 512
     readonly property int taskSideWidth: 420
     readonly property int taskCardTop: 104

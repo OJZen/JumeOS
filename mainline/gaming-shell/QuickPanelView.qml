@@ -88,24 +88,24 @@ Column {
             Item {
                 id: action
                 required property var modelData
-                // At large font sizes the key combination moves below the label instead of cutting it.
-                readonly property bool stacked: actionLabel.x + actionLabel.implicitWidth + Ui.Theme.space8 + keys.width + Ui.Theme.space16 > width
+                // A key combination that does not fit beside the label is left out as a whole, never wrapped.
+                readonly property bool keysFit: actionLabel.x + actionLabel.implicitWidth + Ui.Theme.space8 + keys.implicitWidth + Ui.Theme.space16 <= width
                 objectName: "quickAction-" + modelData.id
                 visible: content.shell.quickAvailable(modelData.id)
-                width: content.width; height: !visible ? 0 : stacked ? actionLabel.implicitHeight + keys.height + 3 * Ui.Theme.space8 : Ui.Theme.minTarget
+                width: content.width; height: !visible ? 0 : Math.max(Ui.Theme.minTarget, actionLabel.implicitHeight + Ui.Theme.space16)
                 Accessible.role: Accessible.Button; Accessible.name: modelData.label
                 Rectangle { anchors.fill: parent; radius: Ui.Theme.radiusRow; color: content.current === action.modelData.id ? Ui.Theme.accentSoft : "transparent" }
                 Ui.Icon { id: actionIcon; x: Ui.Theme.space16; y: actionLabel.y + (actionLabel.height - height) / 2; name: action.modelData.icon; color: action.modelData.id === "end" ? Ui.Theme.danger : Ui.Theme.text }
                 Ui.Label {
                     id: actionLabel
-                    x: actionIcon.x + actionIcon.width + Ui.Theme.space16; y: action.stacked ? Ui.Theme.space8 : (action.height - height) / 2
-                    width: action.stacked ? action.width - x - Ui.Theme.space16 : keys.x - x - Ui.Theme.space8
+                    x: actionIcon.x + actionIcon.width + Ui.Theme.space16; y: (action.height - height) / 2
+                    width: (keys.visible ? keys.x - Ui.Theme.space8 : action.width - Ui.Theme.space16) - x
                     text: action.modelData.label; fontScale: content.fontScale; color: action.modelData.id === "end" ? Ui.Theme.danger : Ui.Theme.text
                 }
                 Row {
                     id: keys
-                    x: action.stacked ? actionLabel.x : action.width - width - Ui.Theme.space16
-                    y: action.stacked ? actionLabel.y + actionLabel.height + Ui.Theme.space8 : (action.height - height) / 2; spacing: Ui.Theme.space4
+                    objectName: "quickActionKeys"; visible: action.keysFit
+                    x: action.width - width - Ui.Theme.space16; y: (action.height - height) / 2; spacing: Ui.Theme.space4
                     Repeater {
                         model: action.modelData.keys
                         Row {

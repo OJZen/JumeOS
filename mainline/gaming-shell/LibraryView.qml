@@ -12,7 +12,8 @@ Item {
     property var filters: []
     property int filter: 0
     property int index: 0
-    property bool active: true
+    // Off while an overlay owns the focus: the card stays lifted without its ring (§4).
+    property bool ringVisible: true
     property real fontScale: Ui.Theme.fontScale
     property bool reducedMotion: Ui.Theme.reducedMotion
     signal cardActivated(int position)
@@ -29,9 +30,12 @@ Item {
         x: Ui.Theme.margin - Ui.Theme.space16; y: Ui.Theme.libraryGridTop - Ui.Theme.space16
         width: Ui.Theme.gridColumns * cellWidth; height: Ui.Theme.canvasHeight - Ui.Theme.hintBarHeight - y
         cellWidth: Ui.Theme.gridCellWidth + Ui.Theme.gridGap
-        // Larger font sizes give titles a second line instead of cutting them.
-        readonly property int titleLines: library.fontScale > 1 ? 2 : 1
-        cellHeight: Ui.Theme.gridCellWidth + Ui.Theme.space8 + titleLines * Ui.Theme.lineHeight("label") + Ui.Theme.space24
+        // Two full rows at every font size: 16 between rows, a title line that follows the font size,
+        // and art that shrinks (to 200 at most) only when two rows would still not fit.
+        readonly property real titleHeight: Math.round(Ui.Theme.type.label.line * library.fontScale)
+        readonly property real cardSize: Math.max(Ui.Theme.libraryCardMin, Math.min(Ui.Theme.gridCellWidth,
+            (Ui.Theme.canvasHeight - Ui.Theme.hintBarHeight - Ui.Theme.libraryGridTop + Ui.Theme.space16) / 2 - Ui.Theme.space8 - titleHeight - Ui.Theme.space16))
+        cellHeight: cardSize + Ui.Theme.space8 + titleHeight + Ui.Theme.space16
         clip: true; interactive: false
         model: library.entries.length; currentIndex: library.index
         highlightRangeMode: GridView.ApplyRange
@@ -43,11 +47,11 @@ Item {
             required property int index
             readonly property int entry: library.entries[index]
             readonly property var game: library.shell.games[entry]
-            readonly property bool current: library.active && library.index === index
+            readonly property bool current: library.index === index
             width: grid.cellWidth; height: grid.cellHeight
             Ui.GameCard {
                 objectName: "libraryCard"
-                x: Ui.Theme.space16; y: Ui.Theme.space16; width: Ui.Theme.gridCellWidth; height: width
+                x: Ui.Theme.space16; y: Ui.Theme.space16; width: grid.cardSize; height: width
                 title: cell.game.title; showTitle: false
                 plain: !!cell.game.plain; cardColor: library.shell.entryColor(cell.entry)
                 iconName: cell.game.icon || ""
@@ -55,16 +59,17 @@ Item {
                 badgeIcon: badge === "已暂停" ? "pause" : ""
                 available: !cell.game.reason
                 favorite: library.shell.entryFavorite(cell.entry)
-                selected: cell.current
+                selected: cell.current; focusOutline: library.ringVisible
                 fontScale: library.fontScale; reducedMotion: library.reducedMotion
                 onFocused: library.index = cell.index
                 onActivated: library.cardActivated(cell.index)
             }
             Ui.Label {
                 objectName: "libraryTitle"
-                x: Ui.Theme.space16; y: Ui.Theme.space16 + Ui.Theme.gridCellWidth + Ui.Theme.space8; width: Ui.Theme.gridCellWidth
+                x: Ui.Theme.space16; y: Ui.Theme.space16 + grid.cardSize + Ui.Theme.space8; width: grid.cardSize; height: grid.titleHeight
                 role: "label"; fontScale: library.fontScale; text: cell.game.title
-                wrapMode: Text.Wrap; maximumLineCount: grid.titleLines; verticalAlignment: Text.AlignTop
+                // One line; a long title may shrink, never below micro (§3).
+                fontSizeMode: Text.HorizontalFit; minimumPixelSize: Math.round(Ui.Theme.type.micro.size * library.fontScale)
                 color: cell.game.reason ? Ui.Theme.disabledText : cell.current ? Ui.Theme.accent : Ui.Theme.text
                 font.weight: cell.current ? Font.Bold : Ui.Theme.type.label.weight
             }

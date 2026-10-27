@@ -12,7 +12,8 @@ Item {
     property int index: 0
     property bool dockFocused: false
     property int dockIndex: 0
-    property bool active: true
+    // Off while an overlay owns the focus: the card stays lifted without its ring (§4).
+    property bool ringVisible: true
     property real fontScale: Ui.Theme.fontScale
     property bool reducedMotion: Ui.Theme.reducedMotion
     readonly property var game: !dockFocused && index < entries.length ? shell.games[entries[index]] : null
@@ -48,7 +49,7 @@ Item {
                 badgeIcon: badge === "已暂停" ? "pause" : ""
                 available: slot.all || !slot.game.reason
                 favorite: !slot.all && home.shell.entryFavorite(home.entries[slot.index])
-                selected: home.active && !home.dockFocused && home.index === slot.index
+                selected: !home.dockFocused && home.index === slot.index; focusOutline: home.ringVisible
                 fontScale: home.fontScale; reducedMotion: home.reducedMotion
                 onFocused: { home.dockFocused = false; home.index = slot.index }
                 onActivated: home.cardActivated(slot.index)
@@ -75,7 +76,7 @@ Item {
                 objectName: "dock-" + modelData.id
                 width: Ui.Theme.dockTileSize
                 iconName: modelData.icon; label: modelData.label
-                selected: home.active && home.dockFocused && home.dockIndex === index
+                selected: home.dockFocused && home.dockIndex === index; focusOutline: home.ringVisible
                 fontScale: home.fontScale; reducedMotion: home.reducedMotion
                 onFocused: { home.dockFocused = true; home.dockIndex = index }
                 onActivated: home.dockActivated(index)

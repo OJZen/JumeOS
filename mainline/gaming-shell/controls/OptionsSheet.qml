@@ -13,6 +13,8 @@ Item {
     property var items: []
     property int index: 0
     property bool open: false
+    // The sheet's top edge, for placing a toast above it.
+    readonly property real coverTop: sheet.y
     property real fontScale: Theme.fontScale
     property bool reducedMotion: Theme.reducedMotion
     signal chosen(string id)

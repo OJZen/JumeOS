@@ -78,6 +78,8 @@ Item {
     property bool windowVisible: true
     readonly property real fontScale: store.fontPercent / 100
     readonly property bool motionReduced: store.reducedMotion
+    // §4 one focus ring on screen: any sheet, dialog or panel hides the page's ring (cards stay lifted).
+    readonly property bool overlayOpen: quickOpen || editing || choicesOpen
     readonly property bool choicesOpen: gameExitChoice.visible || optionsMenu.open || powerMenu.open || settingsView.choiceOpen || (streamingView.item !== null && streamingView.item.choiceOpen) || (toolView.item !== null && toolView.item.choiceOpen)
     Binding { target: Ui.Theme; property: "fontScale"; value: root.fontScale }
     // §7.5: held directions speed up after 2 s in lists, never in grids or on the keyboard.
@@ -215,21 +217,21 @@ Item {
         : tools ? builtinApps : demoGames
     readonly property var builtinApps: [
         {id: "builtin.moonlight", title: "Moonlight", detail: "电脑游戏串流", palette: 2, route: "streaming", icon: "streaming"},
-        {id: "builtin.browser", title: "Jume Browser", detail: browserAvailable ? "Chromium 掌机浏览器 · 开发预览" : "浏览器运行时尚未安装",
+        {id: "builtin.browser", title: "Jume Browser", detail: "网页浏览",
             palette: 2, route: "browser", icon: "globe", plain: true, reason: browserAvailable ? "" : "尚未安装"},
-        {id: "builtin.files", title: "文件管理器", detail: filesAvailable ? "分区 · U 盘 · 文件预览" : "文件运行时尚未安装",
+        {id: "builtin.files", title: "文件管理器", detail: "浏览和管理文件",
             tint: Ui.Theme.focus, route: "files", icon: "folder", plain: true, reason: filesAvailable ? "" : "尚未安装"}
     ]
     readonly property var builtinTools: [
-        {id: "builtin.neo", title: "Neo 模拟器", detail: "Neo Geo 游戏与配置", route: "neo", icon: "cartridge"},
-        {id: "builtin.ports", title: "PortMaster", detail: "移植游戏与存档", route: "ports", icon: "ports"},
-        {id: "builtin.usb", title: "USB 手柄", detail: "手柄映射与配置", route: "usb", icon: "usb"},
-        {id: "builtin.terminal", title: "终端", detail: "Bash · 请连接 USB 键盘", route: "terminal", icon: "terminal"},
-        {id: "builtin.text", title: "文本编辑器", detail: "UTF-8 · 原子保存 · USB 键盘", route: "text", icon: "document"},
-        {id: "builtin.transfer", title: "文件传输", detail: "Wi-Fi · 扫码上传与下载", route: "transfer", icon: "folder"}
+        {id: "builtin.neo", title: "Neo 模拟器", detail: "Neo Geo 游戏", route: "neo", icon: "cartridge"},
+        {id: "builtin.ports", title: "PortMaster", detail: "移植游戏", route: "ports", icon: "ports"},
+        {id: "builtin.usb", title: "USB 手柄", detail: "把掌机当作电脑手柄", route: "usb", icon: "usb"},
+        {id: "builtin.terminal", title: "终端", detail: "需要连接 USB 键盘", route: "terminal", icon: "terminal"},
+        {id: "builtin.text", title: "文本编辑器", detail: "", route: "text", icon: "document"},
+        {id: "builtin.transfer", title: "文件传输", detail: "用手机扫码传文件", route: "transfer", icon: "folder"}
     ].map(function(entry) {
-        entry.reason = ["neo", "ports", "usb"].includes(entry.route) ? (tools ? "" : "工具服务未启动")
-            : entry.route === "terminal" ? (terminalAvailable ? "" : "终端运行时尚未安装") : (filesAvailable ? "" : "文件运行时尚未安装")
+        entry.reason = ["neo", "ports", "usb"].includes(entry.route) ? (tools ? "" : "暂不可用")
+            : entry.route === "terminal" ? (terminalAvailable ? "" : "尚未安装") : (filesAvailable ? "" : "尚未安装")
         return entry
     })
     readonly property var dockItems: [
@@ -336,7 +338,7 @@ Item {
         if (id === "library" || id === "settings" || id === "tools") { changePage(["", "library", "settings", "tools"].indexOf(id)); return }
         if (id === "power") { openPowerMenu(); return }
         if (id === "files") {
-            if (!filesAvailable) notify("请先安装 Jume Files 运行时")
+            if (!filesAvailable) notify("文件管理器尚未安装")
             else { recordLaunch("builtin.files"); filesRequested(false) }
             return
         }
@@ -407,7 +409,9 @@ Item {
         settingsView.enter()
         root.forceActiveFocus()
     }
-    function notify(text) { notice = text; noticeTimer.restart() }
+    // Notices are information unless `success` (the only kind with a check mark); no trailing period.
+    property bool noticeSuccess: false
+    function notify(text, success) { notice = String(text).replace(/[。.]+$/, ""); noticeSuccess = !!success; noticeTimer.restart() }
     function clearNotice() { notice = ""; noticeTimer.stop() }
     function leaveQuick() {
         if (!store.save()) return false
@@ -503,18 +507,18 @@ Item {
         if (tools && games[selected].route) {
             const route = games[selected].route
             if (["files", "text", "transfer"].includes(route)) {
-                if (!filesAvailable) { notify("请先安装 Jume Files 运行时"); return }
+                if (!filesAvailable) { notify("文件管理器尚未安装"); return }
                 recordLaunch(games[selected].id)
                 if (route === "transfer") transferRequested()
                 else filesRequested(route === "text")
                 return
             }
             if (route === "terminal") {
-                if (!terminalAvailable) { notify("请先安装终端运行时"); return }
+                if (!terminalAvailable) { notify("终端尚未安装"); return }
                 terminalRequested(); return
             }
             if (route === "browser") {
-                if (!browserAvailable) { notify("请先安装 Jume Browser 预览运行时"); return }
+                if (!browserAvailable) { notify("Jume Browser 尚未安装"); return }
                 recordLaunch(games[selected].id); browserRequested(); return
             }
             if (["neo", "ports", "usb"].includes(route)) openTool(route)
@@ -580,8 +584,8 @@ Item {
         if (!game) return []
         const items = [{id: "start", label: focusedTask ? "继续" : game.route ? "打开" : "开始游戏", icon: "play", reason: game.reason || ""},
                        {id: "favorite", label: selectedFavorite ? "取消收藏" : "收藏", icon: "star", button: "X"}]
-        if (!game.route) items.push({id: "controls", label: "按键与画面", icon: "gamepad", reason: "每游戏设置尚未接入"},
-                                    {id: "saves", label: "存档管理", icon: "save", reason: "每游戏设置尚未接入"})
+        if (!game.route) items.push({id: "controls", label: "按键与画面", icon: "gamepad", reason: "暂不支持"},
+                                    {id: "saves", label: "存档管理", icon: "save", reason: "暂不支持"})
         if (store.recentApplications.some(function(recent) { return recent.id === game.id }))
             items.push({id: "forget", label: "从“最近”中移除", icon: "history-off"})
         return items
@@ -818,7 +822,7 @@ Item {
         Ui.PowerMenu {
             id: powerMenu; objectName: "powerMenuLayer"; anchors.fill: parent; z: 102
             fontScale: root.fontScale; reducedMotion: root.store.reducedMotion
-            readonly property string deviceReason: !root.hardware ? "预览中不可用" : !root.device.controls ? "需要设备控制权限" : ""
+            readonly property string deviceReason: !root.hardware ? "预览中不可用" : !root.device.controls ? "暂不可用" : ""
             reasons: ({reboot: deviceReason, poweroff: deviceReason})
             onChosen: function(id) { root.powerChosen(id) }
             onOpenChanged: if (!open) root.forceActiveFocus()
@@ -855,7 +859,7 @@ Item {
                 id: homeView; objectName: "homeView"
                 anchors.fill: parent; visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page === 0
                 shell: root; entries: root.homeEntries; index: root.homeIndex; dockFocused: root.dockFocused; dockIndex: root.dockIndex
-                active: !root.quickOpen; fontScale: root.fontScale; reducedMotion: root.motionReduced
+                ringVisible: !root.overlayOpen; fontScale: root.fontScale; reducedMotion: root.motionReduced
                 onIndexChanged: if (root.homeIndex !== index) { root.homeIndex = index; root.syncSelected() }
                 onDockFocusedChanged: if (root.dockFocused !== dockFocused) { root.dockFocused = dockFocused; root.syncSelected() }
                 onDockIndexChanged: root.dockIndex = dockIndex
@@ -866,7 +870,7 @@ Item {
                 id: libraryView; objectName: "libraryView"
                 anchors.fill: parent; visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page === 1
                 shell: root; entries: root.libraryEntries; filters: root.libraryFilters; filter: root.libraryFilter; index: root.libraryIndex
-                active: !root.quickOpen; fontScale: root.fontScale; reducedMotion: root.motionReduced
+                ringVisible: !root.overlayOpen; fontScale: root.fontScale; reducedMotion: root.motionReduced
                 onIndexChanged: if (root.libraryIndex !== index) { root.libraryIndex = index; root.syncSelected() }
                 onCardActivated: function(position) { root.forceActiveFocus(); root.activateSelected() }
                 onFilterActivated: function(position) { root.forceActiveFocus(); root.switchLibraryFilter(position) }
@@ -876,7 +880,7 @@ Item {
                 x: Ui.Theme.margin; y: Ui.Theme.pageTop; width: Ui.Theme.contentWidth; height: Ui.Theme.pageHeight
                 visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page === 3
                 items: root.builtinTools; index: root.toolsIndex
-                active: !root.quickOpen; fontScale: root.fontScale; reducedMotion: root.motionReduced
+                ringVisible: !root.overlayOpen; fontScale: root.fontScale; reducedMotion: root.motionReduced
                 onIndexChanged: root.toolsIndex = index
                 onActivated: function(position) { root.forceActiveFocus(); root.openToolEntry(position) }
             }
@@ -885,7 +889,7 @@ Item {
                 active: root.toolOpen && root.tools !== null; visible: active
                 sourceComponent: ToolPage {
                     tools: root.tools; kind: root.toolRoute
-                    navigationActive: root.windowVisible && !root.quickOpen && !root.dimmed
+                    navigationActive: root.windowVisible && !root.overlayOpen && !root.dimmed
                     onBackRequested: root.closeTool()
                     onSearchRequested: function(value) { root.openTextEditor("搜索游戏", value, "portSearch") }
                 }
@@ -893,7 +897,7 @@ Item {
             SettingsView {
                 id: settingsView; x: Ui.Theme.margin; y: Ui.Theme.pageTop; width: Ui.Theme.contentWidth; height: Ui.Theme.pageHeight
                 testerHold: root.holdAction === "testerExit" ? root.holdRing : -1
-                navigationActive: root.windowVisible && !root.quickOpen && !root.editing && !root.dimmed
+                navigationActive: root.windowVisible && !root.overlayOpen && !root.dimmed
                 visible: !root.toolOpen && !root.streamingOpen && !root.session && root.page === 2
                 store: root.store; metrics: root.metrics; controller: root.controller; device: root.device; network: root.network
                 browserVersions: root.browserVersions
@@ -906,7 +910,7 @@ Item {
             Item {
                 anchors.fill: parent; visible: !root.toolOpen && !root.streamingOpen && root.session
                 Ui.Label { id: sessionTitle; x: Ui.Theme.margin; y: 115; text: root.games[root.selected] ? root.games[root.selected].title : ""; textFormat: Text.PlainText; color: Ui.Theme.text; role: "display" }
-                Ui.Label { x: Ui.Theme.margin; y: sessionTitle.y + sessionTitle.height; text: "交互演示 · 方向键移动方块，Q 呼出快捷面板"; role: "caption" }
+                Ui.Label { x: Ui.Theme.margin; y: sessionTitle.y + sessionTitle.height; text: "交互演示 · 方向键移动方块，Select 快捷面板"; role: "caption" }
                 Rectangle {
                     x: Ui.Theme.margin; y: 219; width: Ui.Theme.contentWidth; height: 426; radius: 24; color: Ui.Theme.surface; border.color: Ui.Theme.outline
                     Repeater {
@@ -914,7 +918,6 @@ Item {
                         Rectangle { required property int index; x: 38 + index * 116; y: 0; width: 1; height: 426; color: Ui.Theme.outline }
                     }
                     Rectangle { x: 0; y: 213; width: parent.width; height: 1; color: Ui.Theme.outline }
-                    Ui.Label { x: 28; y: 25; text: "PREVIEW SESSION"; color: Ui.Theme.textTertiary; role: "micro"; font.letterSpacing: 3 }
                     Ui.Label { x: 28; y: 360; text: "未运行游戏或串流"; role: "caption" }
                 }
                 Rectangle { x: root.avatarX; y: root.avatarY; width: 38; height: 38; radius: 10; color: Ui.Theme.accent }
@@ -927,7 +930,7 @@ Item {
                 function dispatch(action, repeated) { if (item) item.dispatch(action, repeated) }
                 sourceComponent: StreamingView {
                     manager: root.streaming; store: root.store
-                    navigationActive: root.windowVisible && !root.quickOpen && !root.editing && !root.dimmed
+                    navigationActive: root.windowVisible && !root.overlayOpen && !root.dimmed
                     onEditRequested: function(key, label, value) { root.openTextEditor(label, value, key) }
                     onBackRequested: { root.streamingOpen = false; root.clearNotice(); root.forceActiveFocus() }
                 }
@@ -1052,7 +1055,7 @@ Item {
             objectName: "performancePanel"
             x: Ui.Theme.canvasWidth - Ui.Theme.perfPanelRight - width
             y: root.gameOverlay ? Ui.Theme.perfPanelTop : Ui.Theme.perfPanelDesktopTop
-            metrics: root.metrics; device: root.device; fontScale: root.fontScale
+            metrics: root.metrics; device: root.device; fontScale: root.fontScale; detail: root.store.monitorDetail
             // The quick panel covers the same corner; it owns the screen while open.
             visible: root.store.monitor && !empty && !root.quickOpen
         }
@@ -1080,9 +1083,11 @@ Item {
         Ui.Toast {
             objectName: "notice"; z: 103 // Above the task page and the options sheet.
             x: root.quickOpen ? Ui.Theme.margin : (parent.width - width) / 2
-            y: root.editing ? editorSheet.y - height - Ui.Theme.space16 : root.quickOpen ? 340 : Ui.Theme.canvasHeight - Ui.Theme.hintBarHeight - height - Ui.Theme.space16
+            // Above an open sheet or dialog, 16 px clear of it; otherwise above the hint bar.
+            readonly property real coverTop: root.editing ? editorSheet.y : optionsMenu.open ? optionsMenu.coverTop : powerMenu.open ? powerMenu.coverTop : -1
+            y: coverTop >= 0 ? coverTop - height - Ui.Theme.space16 : root.quickOpen ? 340 : Ui.Theme.canvasHeight - Ui.Theme.hintBarHeight - height - Ui.Theme.space16
             maximumWidth: root.quickOpen ? 530 : Ui.Theme.contentWidth
-            text: root.store.error || root.notice; error: root.store.error !== ""; fontScale: root.fontScale
+            text: root.store.error || root.notice; error: root.store.error !== ""; success: !error && root.noticeSuccess; fontScale: root.fontScale
         }
         Ui.Hud {
             id: volumeHud; objectName: "volumeHud"

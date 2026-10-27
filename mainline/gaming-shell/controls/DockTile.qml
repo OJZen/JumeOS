@@ -7,6 +7,8 @@ Item {
     property string iconName: ""
     property string label: ""
     property bool selected: false
+    // Off while an overlay owns the focus; the tile stays lifted.
+    property bool focusOutline: true
     property bool available: true
     property bool reducedMotion: Theme.reducedMotion
     property real fontScale: Theme.fontScale
@@ -31,7 +33,7 @@ Item {
             anchors.fill: parent; anchors.margins: -(Theme.focusGap + Theme.focusWidth)
             radius: Theme.radiusPanel + Theme.focusRadiusExtra; color: "transparent"
             border.width: Theme.focusWidth; border.color: Theme.focus
-            visible: tile.selected
+            visible: tile.selected && tile.focusOutline
         }
     }
     Label {

@@ -7,6 +7,7 @@ import QtQuick
 Item {
     id: menu
     property bool open: false
+    readonly property real coverTop: dialog.y
     property int index: 0
     property string confirming: ""
     property var apps: []

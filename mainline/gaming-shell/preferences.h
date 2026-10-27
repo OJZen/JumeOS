@@ -9,6 +9,8 @@ class Preferences final : public QObject {
     Q_PROPERTY(int brightness READ brightness NOTIFY changed)
     Q_PROPERTY(bool reducedMotion READ reducedMotion NOTIFY changed)
     Q_PROPERTY(bool monitor READ monitor NOTIFY changed)
+    // Performance overlay content: false = 简洁 (three rows), true = 详细 (one more row).
+    Q_PROPERTY(bool monitorDetail READ monitorDetail NOTIFY changed)
     Q_PROPERTY(int fontPercent READ fontPercent NOTIFY changed)
     Q_PROPERTY(QString nightMode READ nightMode NOTIFY changed)
     Q_PROPERTY(int dimSeconds READ dimSeconds NOTIFY changed)
@@ -24,6 +26,7 @@ public:
     int brightness() const { return m_brightness; }
     bool reducedMotion() const { return m_reducedMotion; }
     bool monitor() const { return m_monitor; }
+    bool monitorDetail() const { return m_monitorDetail; }
     int fontPercent() const { return m_fontPercent; }
     QString nightMode() const { return m_nightMode; }
     int dimSeconds() const { return m_dimSeconds; }
@@ -50,7 +53,7 @@ private:
     int m_volume = 55, m_brightness = 70;
     int m_fontPercent = 100, m_dimSeconds = 0, m_screenOffSeconds = 300;
     QString m_nightMode = QStringLiteral("off");
-    bool m_monitor = false;
+    bool m_monitor = false, m_monitorDetail = false;
     bool m_reducedMotion = false, m_dirty = false, m_loadFailed = false;
     QVariantList m_favorites;
     QVariantList m_applicationFavorites;

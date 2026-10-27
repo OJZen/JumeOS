@@ -77,7 +77,8 @@ Preferences::Preferences(QString directory, QObject *parent)
         valid = valid && validInteger(data.value("screenOffSeconds"), 0, 900)
             && QList<int>{0, 60, 180, 300, 600, 900}.contains(data.value("screenOffSeconds").toInt());
     if (version >= 5) {
-        valid = valid && NightModes.contains(data.value("nightMode").toString());
+        valid = valid && NightModes.contains(data.value("nightMode").toString())
+            && (!data.contains("monitorDetail") || data.value("monitorDetail").isBool());
         const auto values = data.value("recentApplications"); QSet<QString> recentIds;
         valid = valid && values.isArray() && values.toArray().size() <= RecentLimit;
         for (const auto &value : values.toArray()) {
@@ -107,6 +108,7 @@ Preferences::Preferences(QString directory, QObject *parent)
     if (version >= 4) m_screenOffSeconds = data.value("screenOffSeconds").toInt();
     if (version >= 5) {
         m_nightMode = data.value("nightMode").toString();
+        m_monitorDetail = data.value("monitorDetail").toBool();
         for (const auto &value : data.value("recentApplications").toArray()) {
             const auto entry = value.toObject();
             m_recentApplications.append(QVariantMap{{"id", entry.value("id").toString()}, {"playedAt", entry.value("playedAt").toInteger()}});
@@ -142,6 +144,12 @@ void Preferences::adjust(const QString &name, int step) {
 bool Preferences::isFavorite(int index) const { return m_favorites.contains(index); }
 
 bool Preferences::choose(const QString &name, int index) {
+    if (name == "monitorDetail") {
+        if (index < 0 || index > 1) return false;
+        m_monitorDetail = index == 1;
+        m_dirty = true; emit changed();
+        return save();
+    }
     if (name == "night") {
         if (index < 0 || index >= NightModes.size()) return false;
         m_nightMode = NightModes[index];
@@ -199,7 +207,7 @@ bool Preferences::save() {
     QSaveFile file(directory.filePath("preview.json"));
     const auto bytes = QJsonDocument(QJsonObject{
         {"version", 5}, {"volume", m_volume}, {"brightness", m_brightness},
-        {"monitor", m_monitor}, {"fontPercent", m_fontPercent}, {"dimSeconds", m_dimSeconds}, {"screenOffSeconds", m_screenOffSeconds},
+        {"monitor", m_monitor}, {"monitorDetail", m_monitorDetail}, {"fontPercent", m_fontPercent}, {"dimSeconds", m_dimSeconds}, {"screenOffSeconds", m_screenOffSeconds},
         {"nightMode", m_nightMode}, {"reducedMotion", m_reducedMotion}, {"favorites", QJsonArray::fromVariantList(m_favorites)},
         {"applicationFavorites", QJsonArray::fromVariantList(m_applicationFavorites)},
         {"recentApplications", QJsonArray::fromVariantList(m_recentApplications)}

@@ -136,10 +136,11 @@ private slots:
             state.adjust("brightness", -200); QCOMPARE(state.brightness(), 10);
             state.adjust("motion", 1);
             state.toggleFavorite(2); state.toggleFavorite(999);
+            QVERIFY(!state.monitorDetail()); QVERIFY(state.choose("monitorDetail", 1)); QVERIFY(!state.choose("monitorDetail", 2));
             QVERIFY(state.save()); QVERIFY(!state.dirty());
         }
         Preferences reloaded(directory.path());
-        QCOMPARE(reloaded.volume(), 100); QCOMPARE(reloaded.brightness(), 10);
+        QCOMPARE(reloaded.volume(), 100); QCOMPARE(reloaded.brightness(), 10); QVERIFY(reloaded.monitorDetail());
         QVERIFY(reloaded.reducedMotion()); QVERIFY(reloaded.isFavorite(2));
         reloaded.toggleFavorite(2); QVERIFY(!reloaded.isFavorite(2));
         const auto blockedPath = directory.filePath("blocked");
@@ -298,12 +299,17 @@ private slots:
         QCOMPARE(root->property("settingsCategory").toInt(), 7);
         QCOMPARE(settings->property("openedCategory").toInt(), 0);
         QVERIFY(!root->findChild<QQuickItem *>("settingsItems")); // Moving through categories builds no detail.
+        // Resting 300 ms previews the category's rows from data at hand; the focus stays on the category.
+        QTRY_VERIFY(root->findChild<QQuickItem *>("settingsItems"));
+        QVERIFY(root->property("settingsSidebar").toBool()); QVERIFY(!root->property("settingsDetailReady").toBool());
+        QCOMPARE(settings->property("rows").toList().size(), 12);
+        QVERIFY(!root->findChild<QQuickItem *>("settingsDetailFocus")->isVisible());
         for (int i = 0; i < 8; ++i) action("up");
         capture("settings-primary");
         action("right"); QVERIFY(!root->property("settingsSidebar").toBool());
         action("left"); // Leaving during asynchronous creation cancels the detail page.
         QVERIFY(root->property("settingsSidebar").toBool());
-        QTRY_VERIFY(!root->findChild<QQuickItem *>("settingsItems"));
+        QVERIFY(!root->property("settingsDetailReady").toBool()); // Back as an unfocusable preview.
         auto *categories = root->findChild<QQuickItem *>("settingsCategories"); QVERIFY(categories);
         auto row = [](QQuickItem *list) { return qobject_cast<QQuickItem *>(list->property("currentItem").value<QObject *>()); };
         QTRY_COMPARE(outline->x(), 0.); QTRY_COMPARE(outline->width(), row(categories)->width());
@@ -343,7 +349,7 @@ private slots:
         for (int i = 0; i < 7; ++i) action("down");
         QCOMPARE(root->property("settingsCategory").toInt(), 7);
         QVERIFY(outline->y() >= 0 && outline->y() + outline->height() <= settings->property("height").toReal());
-        QTest::qWait(300);
+        QTRY_VERIFY(root->findChild<QQuickItem *>("settingsItems")); QTest::qWait(1500); // Settled: the preview list's scrollbar has faded out.
         QSignalSpy idle(&view, &QQuickWindow::frameSwapped); QTest::qWait(500);
         QVERIFY2(idle.size() <= 3, qPrintable(QString("Settled settings repainted %1 times").arg(idle.size())));
     }
@@ -360,8 +366,8 @@ private slots:
         // §8: the old categories merge into eight; every row shows a value or why it has none, never "—".
         const QList<QStringList> expected{{"wifi", "netScan"}, {"brightness", "screenOff", "night", "font", "motion"}, {"volume", "audioOutput"},
             {"tester", "input"}, {"dim", "screenOffNow", "battery", "reboot", "poweroff"},
-            {"monitor", "p95", "decode", "drop", "queue", "audioQueue", "thermal", "gpuFrequency", "cpuAuto", "cpuPreset", "cpuGovernor", "cpuMin", "cpuMax", "cpuCurrent",
-             "swap", "zram", "zramAlgorithms", "zramMemory", "pressure"}, {"storage"}, {"", "systemCpu", "memory", "temperature", "", "", "", "browser", "browser", "browser"}};
+            {"cpuAuto", "cpuPreset", "cpuGovernor", "cpuMin", "cpuMax", "cpuCurrent", "swap", "zram", "zramAlgorithms", "zramMemory", "pressure", "monitor", "monitorDetail"},
+            {"storage"}, {"", "systemCpu", "memory", "temperature", "thermal", "gpuFrequency", "", "", "", "browser", "browser", "browser"}};
         QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString("settings"))));
         for (int category = 0; category < 8; ++category) {
             root->setProperty("settingsCategory", category); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
@@ -379,10 +385,7 @@ private slots:
         // Preview reasons: device rows say so; frame and stream details wait for a game or stream.
         auto reasonOf = [&](const char *key) { return call("rowReason", QVariantMap{{"key", key}}); };
         QCOMPARE(reasonOf("cpuPreset"), QStringLiteral("预览中不可用"));
-        QCOMPARE(reasonOf("p95"), QStringLiteral("游戏运行时显示"));
-        QCOMPARE(reasonOf("decode"), QStringLiteral("串流时显示"));
-        QCOMPARE(reasonOf("audioQueue"), QStringLiteral("串流时显示"));
-        QCOMPARE(reasonOf("audioOutput"), QStringLiteral("扬声器 / 耳机切换尚未接入"));
+        QCOMPARE(reasonOf("audioOutput"), QStringLiteral("暂不支持"));
         // 控制器: A on 摇杆测试 starts the test; the B hold returns to the row.
         root->setProperty("settingsCategory", 3); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
         action("accept"); QVERIFY(root->property("testingController").toBool());
@@ -441,20 +444,20 @@ private slots:
             }
         }
         QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QStringLiteral("about"))));
-        // 系统 › 关于 (rows 4–9); an unknown browser version is a disabled row with its reason, not "—".
-        QCOMPARE(root->property("settingsCategory").toInt(), 7); QCOMPARE(root->property("settingsIndex").toInt(), 4);
+        // 系统 › 关于 (rows 6–11); an unknown browser version is a disabled row with its reason, not "—".
+        QCOMPARE(root->property("settingsCategory").toInt(), 7); QCOMPARE(root->property("settingsIndex").toInt(), 6);
         QCOMPARE(root->findChild<QObject *>("brandName")->property("text").toString(), QStringLiteral("Jume"));
         auto *settingsObject = root->findChild<QObject *>("settingsView");
-        const auto about = settingsObject->property("rows").toList().mid(4);
+        const auto about = settingsObject->property("rows").toList().mid(6);
         QCOMPARE(about.size(), 6);
         QCOMPARE(about[0].toMap().value("value").toString(), QStringLiteral(JUME_LAUNCHER_NAME));
         QCOMPARE(about[1].toMap().value("value").toString(), QStringLiteral(JUME_LAUNCHER_VERSION));
         QCOMPARE(about[2].toMap().value("value").toString(), QStringLiteral("https://github.com/OJZen/JumeOS"));
         QCOMPARE(about[3].toMap().value("value").toString(), QString());
         QVariant browserReason; QVERIFY(QMetaObject::invokeMethod(settingsObject, "rowReason", Q_RETURN_ARG(QVariant, browserReason), Q_ARG(QVariant, about[3])));
-        QCOMPARE(browserReason.toString(), QStringLiteral("浏览器未安装或版本未知"));
+        QCOMPARE(browserReason.toString(), QStringLiteral("未安装"));
         root->setProperty("browserVersions", QVariantMap{{"webEngine", "6.10.2"}, {"chromium", "134.0.6998.208"}, {"securityPatch", "144.0.7559.96"}});
-        const auto versions = settingsObject->property("rows").toList().mid(4);
+        const auto versions = settingsObject->property("rows").toList().mid(6);
         QCOMPARE(versions[3].toMap().value("value").toString(), QStringLiteral("6.10.2"));
         QCOMPARE(versions[4].toMap().value("value").toString(), QStringLiteral("134.0.6998.208"));
         QCOMPARE(versions[5].toMap().value("value").toString(), QStringLiteral("144.0.7559.96"));
@@ -475,7 +478,7 @@ private slots:
         if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + "/settings-hud-120.png"));
         action("right"); QTest::qWait(200); // 网络 in the preview: the Wi-Fi switch is disabled with its reason.
         QVERIFY(!labels().contains("打开")); QVERIFY(!labels().contains("调整"));
-        action("accept"); QVERIFY(root->property("notice").toString().contains("尚未接入"));
+        action("accept"); QVERIFY(QStringList({"暂不支持", "暂不可用"}).contains(root->property("notice").toString())); // Plain reasons.
         action("left"); root->setProperty("settingsCategory", 1); action("right");
         QTRY_VERIFY(root->property("settingsDetailReady").toBool()); QTest::qWait(200);
         QVERIFY(labels().contains("调整")); QVERIFY(footer->width() <= 952); // Sliders: ←→ 调整.
@@ -917,7 +920,7 @@ private slots:
         QStringList ids; for (const auto &row : rows) ids << row.toMap().value("id").toString();
         QCOMPARE(ids, QStringList({"start", "favorite", "controls", "saves", "forget"}));
         QCOMPARE(rows[1].toMap().value("button").toString(), QString("X"));
-        QCOMPARE(rows[2].toMap().value("reason").toString(), QStringLiteral("每游戏设置尚未接入"));
+        QCOMPARE(rows[2].toMap().value("reason").toString(), QStringLiteral("暂不支持"));
         QCOMPARE(text("optionsSubtitle"), QStringLiteral("Neo Geo · FBNeo"));
         for (int i = 0; i < 4; ++i) action("down");
         action("accept"); QVERIFY(!options->property("open").toBool());
@@ -932,10 +935,19 @@ private slots:
         QVERIFY(state.choose("font", 3)); QTest::qWait(100);
         for (const auto *name : {"homeTitle", "homeCaption"}) QVERIFY2(!findItem(root, name)->property("truncated").toBool(), name);
         action("down"); action("accept"); QTest::qWait(100);
-        QList<QQuickItem *> pending{root};
-        while (!pending.isEmpty()) {
-            auto *item = pending.takeLast(); pending.append(item->childItems());
-            if (item->objectName() == "libraryTitle") QVERIFY2(!item->property("truncated").toBool(), qPrintable(item->property("text").toString()));
+        // §8 library at every font size: two full rows (art and title) above the hint bar.
+        for (const int font : {1, 2, 3}) {
+            QVERIFY(state.choose("font", font)); QTest::qWait(100);
+            QList<QQuickItem *> pending{root}; int titles = 0;
+            while (!pending.isEmpty()) {
+                auto *item = pending.takeLast(); pending.append(item->childItems());
+                if (item->objectName() != "libraryTitle" || !item->isVisible()) continue;
+                const auto box = item->mapRectToScene(item->boundingRect());
+                if (box.top() > 704) continue;
+                ++titles; QVERIFY2(box.bottom() <= 704, qPrintable(QString("%1 at font %2").arg(item->property("text").toString()).arg(font)));
+                QVERIFY2(!item->property("truncated").toBool(), qPrintable(item->property("text").toString()));
+            }
+            QVERIFY2(titles >= 8, qPrintable(QString("%1 full titles at font %2").arg(titles).arg(font)));
         }
         applications.stopAll(); QTRY_VERIFY_WITH_TIMEOUT(!applications.hasTasks(), 4000);
     }
@@ -994,7 +1006,7 @@ private slots:
                 if (night) { action("right"); QCOMPARE(root->property("selectedApplication").toString(), QString("native.gta3")); }
                 capture("home"); if (night) action("left");
                 action("options"); QTest::qWait(300); capture("options"); action("back");
-                QVERIFY(QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, QStringLiteral("已加入收藏")))); capture("notice");
+                QVERIFY(QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, QStringLiteral("已加入收藏")), Q_ARG(QVariant, true))); capture("notice");
                 QVERIFY(QMetaObject::invokeMethod(root, "clearNotice"));
                 action("down"); capture("home-dock"); action("up");
                 QVERIFY(QMetaObject::invokeMethod(root, "openPowerMenu")); QTest::qWait(250); capture("power-menu"); action("back");
@@ -1025,17 +1037,28 @@ private slots:
             for (const bool night : {false, true}) {
                 QVERIFY(state.choose("night", night ? 1 : 0));
                 mode = QString("%1-%2").arg(night ? "night" : "light").arg(percent);
-                QVERIFY(QMetaObject::invokeMethod(root, "showTasksOrDesktop", Q_ARG(QVariant, true))); capture("tasks");
-                // §8 carousel: the focused card 512×384 centered, its neighbour 420×315 and vertically centered.
-                QList<QQuickItem *> cards; QList<QQuickItem *> pending{root};
-                while (!pending.isEmpty()) {
-                    auto *item = pending.takeLast(); pending.append(item->childItems());
-                    if (item->objectName() == "taskCard" && item->isVisible()) cards << item;
+                QVERIFY(QMetaObject::invokeMethod(root, "showTasksOrDesktop", Q_ARG(QVariant, true)));
+                // §8 carousel at the first, middle and last task: the focused card 512×384 centered, the
+                // previous one showing at the left edge and the next at the right, both 420×315 and centered.
+                auto *taskView = findItem(root, "taskView"); QVERIFY(taskView);
+                const auto onScreen = [&] {
+                    QMap<int, QRectF> visible; QList<QQuickItem *> pending{taskView};
+                    while (!pending.isEmpty()) {
+                        auto *item = pending.takeLast(); pending.append(item->childItems());
+                        const QRectF box(item->position(), item->size());
+                        if (item->objectName() == "taskCard" && box.right() > 0 && box.left() < 1024) visible[item->property("index").toInt()] = box;
+                    }
+                    return visible;
+                };
+                for (int focus = 0; focus < 3; ++focus) {
+                    taskView->setProperty("selected", focus); const auto cards = onScreen();
+                    QCOMPARE(cards.value(focus), QRectF(256, 104, 512, 384));
+                    QCOMPARE(cards.contains(focus - 1), focus > 0);
+                    if (focus > 0) QCOMPARE(cards.value(focus - 1), QRectF(-196, 138.5, 420, 315));
+                    QCOMPARE(cards.contains(focus + 1), focus < 2);
+                    if (focus < 2) QCOMPARE(cards.value(focus + 1), QRectF(800, 138.5, 420, 315));
                 }
-                std::sort(cards.begin(), cards.end(), [](QQuickItem *a, QQuickItem *b) { return a->x() < b->x(); });
-                QCOMPARE(cards.size(), 3);
-                QCOMPARE(QRectF(cards[0]->position(), cards[0]->size()), QRectF(256, 104, 512, 384));
-                QCOMPARE(QRectF(cards[1]->position(), cards[1]->size()), QRectF(800, 138.5, 420, 315));
+                taskView->setProperty("selected", 1); capture("tasks");
                 QCOMPARE(findItem(root, "topBarBadge")->isVisible(), true);
                 // X held past 600 ms shows the HoldConfirm; releasing before 2 s cancels the force-quit.
                 action("itemAction"); QTest::qWait(HoldCaptureMs); capture("tasks-hold"); release("itemAction");
@@ -1676,7 +1699,11 @@ private slots:
         shell.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(&metrics)}, {"controller", QVariant::fromValue(&controller)}});
         shell.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml"))); QCOMPARE(shell.status(), QQuickView::Ready);
         auto *shellRoot = shell.rootObject(); auto *toast = shellRoot->findChild<QQuickItem *>("notice"); QVERIFY(toast);
-        QVERIFY(QMetaObject::invokeMethod(shellRoot, "notify", Q_ARG(QVariant, QStringLiteral("已加入收藏")))); QVERIFY(toast->isVisible());
+        // Only a success carries the check mark; information has no icon and no trailing period.
+        QVERIFY(QMetaObject::invokeMethod(shellRoot, "notify", Q_ARG(QVariant, QStringLiteral("暂不支持。")), Q_ARG(QVariant, false)));
+        QCOMPARE(shellRoot->property("notice").toString(), QStringLiteral("暂不支持")); QVERIFY(!toast->property("marked").toBool());
+        QVERIFY(QMetaObject::invokeMethod(shellRoot, "notify", Q_ARG(QVariant, QStringLiteral("已加入收藏")), Q_ARG(QVariant, true))); QVERIFY(toast->isVisible());
+        QVERIFY(toast->property("marked").toBool());
         QVERIFY(!toast->property("error").toBool()); QTest::qWait(2200); QVERIFY(toast->isVisible());
         QTRY_VERIFY_WITH_TIMEOUT(!toast->isVisible(), 600);
         state.adjust("volume", 5); QVERIFY(!state.save());
@@ -1846,11 +1873,18 @@ private slots:
         // §5: in game the compositor shows the shell only inside x 624–992, y 16–276, widened to
         // x 396 while the volume Hud is up (gaming-wayland/handheld-shell.cpp). Both must fit.
         QTemporaryDir directory;
-        Preferences state(directory.path()); Telemetry metrics(directory.path()); ControllerInput controller;
+        Preferences state(directory.path()); ControllerInput controller;
         QQuickView view;
         QQmlComponent fixtures(view.engine());
+        // A game reporting frames, so the overlay's first row and its 详细 row have data.
         fixtures.setData(R"(import QtQuick
 QtObject {
+    readonly property QtObject telemetry: QtObject {
+        property bool active: false; property real cpu: 30; property real submissions: 12; property real memoryMiB: 180
+        property var game: ({active: true, submissions: 60, intervalMedianMs: 16.7, intervalP95Ms: 18.2})
+        property var stream: ({}); property var history: []; property string system: "fixture"; property string storage: ""
+        function refreshStorage() {}
+    }
     readonly property QtObject game: QtObject {
         property bool running: true; property bool hasManifest: false; property var items: []
         property var tasks: [{id: "native.gta3", title: "GTA III", icon: "gamepad", foreground: true, paused: false, stopping: false, preview: ""}]
@@ -1871,7 +1905,8 @@ QtObject {
 })", QUrl());
         std::unique_ptr<QObject> fixture(fixtures.create()); QVERIFY2(fixture, qPrintable(fixtures.errorString()));
         auto *game = fixture->property("game").value<QObject *>(), *device = fixture->property("device").value<QObject *>();
-        view.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(&metrics)},
+        auto *telemetry = fixture->property("telemetry").value<QObject *>();
+        view.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(telemetry)},
             {"controller", QVariant::fromValue(&controller)}, {"applications", QVariant::fromValue(game)},
             {"device", QVariant::fromValue(device)}, {"sharedDisplay", true}});
         view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
@@ -1894,7 +1929,16 @@ QtObject {
             auto *load = panel->findChild<QQuickItem *>("performanceLoad"); QVERIFY(load);
             // At 130% the CPU row wraps only between "·" items: four rows, nothing cut.
             QCOMPARE(load->property("lineCount").toInt(), font == 3 ? 2 : 1); QVERIFY(!load->property("truncated").toBool());
+            const auto row = [&](const char *name) { return findItem(panel, name)->property("text").toString().replace(QChar(0xa0), ' '); };
+            QCOMPARE(row("performanceRate"), QStringLiteral("60 FPS · 16.7 ms")); // The game's frame rate leads.
             if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + QString("/overlay-game-%1.png").arg(font == 3 ? 130 : 100)));
+            // 详细 adds the game's P95 as a fourth reading and still fits the region at 130%.
+            QVERIFY(state.choose("monitorDetail", 1)); QTest::qWait(100);
+            const auto detailed = panel->mapRectToScene(panel->boundingRect());
+            QCOMPARE(row("performanceDetail"), QStringLiteral("P95 18.2 ms"));
+            QVERIFY2(region.contains(detailed) && detailed.height() <= 252, qPrintable(QString("detail %1").arg(detailed.height())));
+            if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + QString("/overlay-game-detail-%1.png").arg(font == 3 ? 130 : 100)));
+            QVERIFY(state.choose("monitorDetail", 0));
             root->setProperty("volumeVisible", false);
         }
         // §8 quick panel over a game: the app and its state, tiles, brightness (volume stays with the
@@ -1923,6 +1967,7 @@ QtObject {
         // On the desktop the overlay drops below the top bar and the Hud returns to the center.
         root->setProperty("sharedDisplay", false);
         QCOMPARE(panel->y(), 80.); QCOMPARE(panel->x() + panel->width(), 992.);
+        view.setSource(QUrl()); // Release the shell before its fixtures go.
     }
     void deviceSettingsReadbackAndGuards() {
         QTemporaryDir directory;
@@ -2023,7 +2068,7 @@ QtObject {
         QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("0"));
         tap("accept");QVERIFY(!root->property("screenOff").toBool());
         QCOMPARE(get("sys/class/backlight/backlight/brightness"),QByteArray("159"));
-        root->setProperty("settingsCategory",5);root->setProperty("settingsIndex",9);tap("accept");tap("down");tap("down");tap("accept"); // 性能 › 频率预设
+        root->setProperty("settingsCategory",5);root->setProperty("settingsIndex",1);tap("accept");tap("down");tap("down");tap("accept"); // 性能 › 频率预设
         QCOMPARE(get(cpu+"scaling_governor"),QByteArray("performance"));
         const auto captures=qEnvironmentVariable("R46H_UI_CAPTURE_DIR");QTest::qWait(200);
         if(!captures.isEmpty())QVERIFY(view.grabWindow().save(captures+"/device-cpu.png"));
@@ -2101,7 +2146,7 @@ QtObject {
         QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("settings"))));tap("right");
         QTRY_VERIFY(root->property("settingsDetailReady").toBool());
         QCOMPARE(keys(),QStringList({"wifi:Wi-Fi","netActive:Jume-5G","netScan:扫描附近的网络"}));
-        QCOMPARE(reason(0),QStringLiteral("无线开关尚未接入"));
+        QCOMPARE(reason(0),QStringLiteral("暂不支持"));
         tap("pageAction");QTRY_VERIFY(network.accessPoints().size()==3);QTRY_VERIFY(!network.busy());
         QCOMPARE(keys(),QStringList({"wifi:Wi-Fi","netActive:Jume-5G","netPoint:Home-2.4G","netPoint:Studio"}));
         tap("down");QCOMPARE(root->property("settingsIndex").toInt(),1);
