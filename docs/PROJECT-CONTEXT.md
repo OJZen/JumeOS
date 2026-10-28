@@ -1,24 +1,32 @@
 # R46H project context
 
-> Current checkpoint: 2026-09-27. Read the [experiment ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md)
-> before hardware work; it owns physical evidence and limitations.
+> Current checkpoint: 2026-09-27 (physical). Handoff reviewed: 2026-10-23 (host/docs only).
+> Read the [experiment ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) before hardware work.
 
 ## Scope
 
 JumeOS targets the R46H with Linux 6.12, Debian 13, Panfrost, a Qt handheld
 desktop, local gaming, streaming, and USB HID input. The
-[roadmap](PRODUCT-ROADMAP.md) owns product gates.
+[roadmap](PRODUCT-ROADMAP.md) owns product gates; [Jume desktop requirements](DEVICE-SHELL.md) map the scope and code owners.
+
+## Workspace handoff
+
+- `main` is at `87242d2`, 15 commits ahead of local `origin/main`, with a dirty worktree; no remote refresh, commit, push or device contact in this handoff.
+- Pending desktop work: `product-fallback.py`, `test-jume-fallback.py`, CI and linked runbooks/index.
+  Streaming Switch-loopback/test-client, general docs and untracked `CLAUDE.md` also have edits; preserve them and stage only intended paths.
+- 2026-10-12 cache cleanup reclaimed 3.54 GiB; receipt: `mainline/out/.cache/cache-cleanup-20261012.XdQ4wD/receipt.json`.
+  Clean compiler/source caches were removed; modified FBNeo/ES-DE sources, recovery data, Qt SDK, Mono and r6/r8/r9 were retained.
+  Reacquire build inputs when required; the prepared r9 fallback overlay needs no Qt rebuild or TF rewrite.
+- r9's 2 artifacts + 29 evidence files rehashed successfully on 2026-10-18.
+  Candidate and device evidence: [installed-session runbook](../mainline/gaming-wayland/PRODUCT.md).
+  Ignored `mainline/out/` is local-only, not supplied by a clone; verify receipt-bound inputs before reuse.
 
 ## Current baseline
 
-The device is **safely powered off after the 2026-09-27 [r9 recovery and GUI reboot tests](../mainline/gaming-wayland/PRODUCT.md#packaged-r9-recovery-and-gui-reboot--2026-09-27)** on unchanged p2 v0.18. Inactive r9 selected; sealed r6/r8/private backups retained; temporary services/staging/keys removed. Packaged failed-state rollback, bidirectional selection, receipt-mismatch cleanup refusal/recovery and GUI warm reboot pass. ES-DE remains default; all 167 prior files unchanged. Docker was not started. Prior browser/Files/PortMaster evidence: `mainline/out/.cache/r46h-unattended-20260927.cA9xEV/session.md`.
-Fixed-profile readback, cold identity, service health, policy/package hashes, permission scope and base smoke pass.
-R79 passed archive/1,741-file readback, preflight, transient Launcher/game lifecycle and forced-child recovery; ES-DE remains default.
-R74 is the accepted GTA candidate after attended picture/audio/control approval; R63/R60 remain rollbacks.
-Base-image evidence: `mainline/out/.cache/r46h-v018-device-20260920.FoS3wK/`; Files/Transfer:
-`mainline/out/.cache/r46h-transfer-device-20260922/`.
-The temporary power candidate passed attended AC/battery one-minute screen-off, immediate first-Down wake without focus motion, and volume wake/HUD. Machine samples confirmed 816/600 MHz caps and lease restoration; kernel suspend stays disabled.
-Task-page capture no longer blocks entry; missing-HOME terminal startup is fixed. Machine checks passed previews, resume, close/kill and two-app isolation; the operator accepted faster Select+Y, bottom-B resume, Select+X exit and sequential USB keyboard/mouse including reconnect. Next gate: physical long-hold kill, retained game/save/transfer state and power/standby. Evidence: `mainline/out/.cache/r46h-usb-attended-20260926.EGffXZ/session.md`; prior fix/power records are linked by the owning runbooks.
+Last observed device state: **serial-confirmed clean poweroff on 2026-09-27**, unchanged p2 v0.18,
+inactive r9 selected, sealed r6/r8/private backups retained, ES-DE default and all 167 prior files unchanged.
+The [r9 recovery and GUI reboot record](../mainline/gaming-wayland/PRODUCT.md#packaged-r9-recovery-and-gui-reboot--2026-09-27)
+owns the latest result; historical host build notes' "next boot" steps are not the current plan.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current card p2: [v0.18](../mainline/rootfs-debian13-gaming-v18/README.md)
@@ -37,16 +45,12 @@ skipped, so content equality remains unverified. See
 ## Current feature evidence
 
 - Jume Launcher has machine proof for status values, storage/settings,
-  PortMaster and routed remote control. R56 aligns Wi-Fi, battery and clock; R64
-  captured the HUD's `GPU 200 MHz` matching target state. R79 composed Home and
-  About captures show the aligned status row, live battery/charge state,
-  `0.1.0-dev` and the project URL on v0.18. Repeated normal expiry and a forced
-  input-router failure restored all services and removed transient leases.
-  The 2026-09-20 two-level candidate passed 39 target actions: focus motion left
-  Settings, Neo and PortMaster details unloaded; open/return and in-flight
-  PortMaster cancellation passed. On v0.18, caching the category list separately
-  raised two Settings focus runs from about 29.5 to 57.2--57.5 submissions/s;
-  HUD runs rose from 29.9 to 58.5--59.0, with p50 near 16.7 ms.
+  PortMaster and routed remote control. Home/About captures show aligned Wi-Fi,
+  battery/charge, clock, `0.1.0-dev` and project URL; GPU HUD matches target state.
+  R79 passed archive/1,741-file readback, preflight, transient lifecycle and forced-child recovery.
+  Two-level pages passed 39 actions, unloaded focus navigation and in-flight cancellation.
+  Cached categories raised Settings from ~29.5 to 57.2--57.5 submissions/s and HUD
+  from 29.9 to 58.5--59.0, p50 ~16.7 ms; exact samples remain in the ledger.
   ES-DE/services recovered with zero failed units or kernel/ext4/OOM errors; physical LCD/readability, L3+R3 and persistent promotion remain open.
   The [top-center volume capsule](../mainline/gaming-shell/DEVICE.md) passes ARM64 UI/event and Pixman/GL clipping checks;
   paired binaries ran during Transfer testing; attended screen-wake/HUD passed on 2026-09-26; in-game acceptance remains open.
@@ -55,11 +59,9 @@ skipped, so content equality remains unverified. See
   private Mesa 26.2.2 passed target integration. The R60 batch reached captured
   cutscenes, clean 121-second exits and relaunches without storage/GPU faults.
   R62/R63 isolated tiny-buffer upload cost; fixed-capacity reuse improved pacing.
-  Matched 480/400/300 MHz GPU samples then differed by only 2.7%, ruling out raw
-  GPU throughput as the primary cutscene limit. R69/R72 traced the remaining
-  bottleneck to per-character cutscene shadow maps. R73's ordinary-ped shadow
-  fallback cut profiler medians from 40.72 to 27.37 ms/frame and `PreRender` from
-  13.73 to 0.46 ms. The uninstrumented R74 run then recorded
+  Matched GPU-clock samples ruled out raw GPU throughput as the primary cutscene limit.
+  R69/R72 isolated per-character shadow maps; R73's ordinary-ped fallback cut
+  profiler medians from 40.72 to 27.37 ms/frame. The uninstrumented R74 recorded
   nine complete intro samples at 28.93 submissions/s and 33.89 ms median interval,
   captured the composed scene, and exited 0. The operator then accepted its LCD
   motion, picture, audio and controls; later open-world play remained below 30 FPS.
@@ -95,9 +97,9 @@ skipped, so content equality remains unverified. See
 - The requested CPU default is dynamic `schedutil` at 600--1008 MHz; earlier
   target/game/thermal and v0.17 warm-reboot checks passed. The current frozen p2
   v0.18 restores 600--1296 MHz outside Jume's transient scene policy, confirmed
-  on 2026-09-27. Default-cap image integration remains open; GPU devfreq is unchanged.
-- Moonlight v5 passes a Linux-host H.264/PCM/controller loopback. R46H-to-LAN
-  streaming is deferred by the user and remains open.
+  on 2026-09-27. Default-cap image integration remains open; GPU devfreq is unchanged; kernel suspend stays disabled.
+- Moonlight v5 passes the Linux-host H.264/PCM/controller loopback with [Switch Pro emulation](../mainline/gaming-stream-input-test/README.md#automated-protocol-check).
+  The 2026-10-18 configuration change and rerun are host-only; R46H-to-LAN streaming remains deferred and open.
 - [USB keyboard/mouse and Terminal](../mainline/gaming-wayland/PERIPHERALS.md) passed sequential attended keyboard typing/editing/Ctrl+C/D/reconnect and mouse cursor/move/click/scroll/reconnect. Simultaneous hub use and browser/game-specific focus remain open.
   DWC2 is host-only; USB **gadget** mode still needs hardware-route evidence and a recoverable kernel/DT candidate.
 - [Jume Files/Text](../mainline/gaming-files/README.md) passes target launch/privacy/exit and nine ARM64 offscreen functional cases. [Transfer](../mainline/gaming-files/TRANSFER.md) passes real Wi-Fi 16 MiB hash roundtrip, cancellation, readonly ROMs and disconnect revocation. Phone QR, physical controls/USB/A/V and promotion remain open; [file layout](FILESYSTEM-LAYOUT.md) preserves legacy data.
@@ -111,11 +113,9 @@ skipped, so content equality remains unverified. See
   A 128 MiB tile budget passed offline pressure and target regression. Background
   discard failed form-retention testing and was withdrawn. The browser-only cgroup passes target limit/child-kill, paired smoke and actual browser OOM/relaunch with the same launcher surviving; heavy-site/security/promotion remain open.
 
-Exact observations remain in the [ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) and feature runbooks.
-
 ## Immediate next work
 
-1. Prioritize the default-Jume trial in item 4; do not expand peripheral features before this transition.
+1. [Q1: Jume default with ES-DE crash recovery](../mainline/gaming-wayland/PRODUCT.md#optional-r9-es-de-fallback-overlay) is prepared and host-tested, not deployed; the user deferred device connection. Review the pending patch, then resume item 4 when connected.
    Use the [combined acceptance route](../mainline/gaming-shell/DEVICE.md#combined-acceptance-route) for remaining long-hold kill,
    game/save/transfer retention, Files/QR, LCD/audio and L3+R3 observations.
    Media, sequential USB, wake/HUD and task entry/resume/close already pass; do not replay them unchanged.
@@ -126,7 +126,7 @@ Exact observations remain in the [ledger](../mainline/board/r46h/EXPERIMENT-STAT
    with a new source-level hypothesis; the unchanged R78/R79 Mono/Mesa path has
    already failed before window creation at two clock profiles.
 4. Continue [installed r9](../mainline/gaming-wayland/PRODUCT.md): packaged failed-state rollback, release cycling, cleanup-receipt refusal/recovery, GUI warm reboot and 167-file retention pass. Two-hour endurance, GUI poweroff, actual interrupted lease cleanup and cold default boot remain open; receipt mismatch is not interruption proof.
-   ES-DE stays the recovery frontend; ROM-entry coverage, physical save/load and default-boot acceptance precede removal.
+   ES-DE stays the recovery frontend. L1 library coverage and Q2 full removal/endurance are separate from Q1 default-boot delivery; see the [desktop handoff](DEVICE-SHELL.md).
 5. Profile R74's below-30-FPS open-world phase only when a new software hypothesis
    exists. Keep R63/R60 available; do not repeat SGSR1 or a live GPU minimum-frequency
    raise unchanged.

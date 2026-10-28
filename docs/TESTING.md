@@ -111,7 +111,9 @@ cleanup/final state and remaining limitation. Avoid “works”, “done” or
 `mainline/tests/test-project-docs.py` enforces the short onboarding map,
 selected line budgets, the ledger's source readability, synchronized Context/
 ledger checkpoint dates and key identities, frozen-history banners, rootfs and
-bring-up indexing and local links across source Markdown. It is structural: content
+bring-up indexing and local links across source Markdown. A host-only handoff review
+gets its own date; it must not advance the physical checkpoint or close device gates.
+The check is structural: content
 accuracy still requires reviewing Project Context and the ledger whenever
 project state changes. AGENTS.md links to those owners instead of repeating a
 checkpoint. Known feature-test failures belong in the

@@ -1,10 +1,12 @@
 # R46H product roadmap
 
-Updated 2026-09-26. This owns the feature backlog and completion criteria.
+Updated 2026-10-23 (requirements/docs only). This owns the feature backlog and completion criteria.
 [Project Context](PROJECT-CONTEXT.md) owns the immediate order and current device
 state; the [ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) owns physical proof.
-P0 closes the first usable gameplay flows. P1 builds the product around them.
+P0 closes default entry/recovery and the first usable gameplay flows. P1 builds the product around them.
 P2 depends on additional runtime or hardware evidence. No row implies acceptance.
+The [Jume desktop entrypoint](DEVICE-SHELL.md) maps these IDs to code and runbooks.
+Q1 is the user's immediate request; deferred rows do not block it. Full ES-DE removal is Q2.
 
 | ID / priority | Deliverable | Completion gate |
 | --- | --- | --- |
@@ -12,6 +14,7 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
 | M2 / P0 | Reliable host/application management | Fix empty application-list results, preserve manual entry, validate errors/cancellation and reconnect; persist pairing/host/preset state across ordinary restarts without repeated PIN entry |
 | G1 / P0 | Metal Slug in the custom desktop | Reuse accepted FBNeo/ROM/BIOS; home/library card launches gameplay, coin/start/actions work, exit/crash returns correctly and a second launch succeeds |
 | G2 / P0 | Common game lifecycle and saves | Literal validated argv, per-game runtime/environment, one foreground owner, isolated writable saves/config/logs, native and supported quick-save/load checks, recovery without lost saves |
+| L1 / P1 | Existing ROM library coverage | Inventory actual ES-DE systems/ROM entries; map each supported entry to its emulator/core, BIOS, configuration and save paths; discover/select/launch supported ROMs and preserve existing metadata/resources. Fixed native cards or a hand-written application list do not close this gate; retain unsupported routes |
 | U1 / P0 | Responsive desktop | Diagnose focus frame pacing, land the narrower HUD and check 90–130% fonts in light and night themes; measure real frame intervals under navigation/input, targeting 60 Hz without treating idle submissions as FPS |
 | W1 / P1 | Fullscreen Wayland desktop | Remove diagnostic window decoration through the selected shell/fullscreen policy; run actual Moonlight and local games with correct Hantro/GL presentation and A/V |
 | W2 / P1 | Global quick panel and input ownership | Explicit stacking; opening takes game input, closing sends neutral/release and restores it; crash/disconnect cannot leave held buttons or a lost display |
@@ -29,7 +32,8 @@ P2 depends on additional runtime or hardware evidence. No row implies acceptance
 | F1 / P1 | [Files, previews and Text](../mainline/gaming-files/README.md) | Responsive large directories; copy/cut/paste/delete, ZIP, partitions/USB; safe cancellation, preserved originals, supported previews and editing on device |
 | F2 / P1 | [Wi-Fi Transfer](../mainline/gaming-files/TRANSFER.md) | Phone QR/link upload/download, bounded long transfers, background retention and disconnect revocation without data loss |
 | T1 / P1 | [Background tasks](../mainline/gaming-shell/APPLICATIONS.md) | Fast previews and isolated input; resume, normal close and physical long-hold kill; retained game/save/transfer/audio state |
-| Q1 / P1→P2 | Product installation and endurance | Make Jume Launcher the persistent default after settings/pairing/saves, bounded logs/caches, repeated launches and sustained gameplay pass; remove ES-DE only after cold-boot, crash recovery and upgrade/rollback no longer depend on it |
+| Q1 / P0 | Default Jume with ES-DE recovery | Cold boot opens Jume; failed startup/session crash cleans children/leases before starting only ES-DE for that boot; next boot selects Jume again. Normal power actions do not trigger recovery; incomplete cleanup refuses handoff. Keep explicit rollback and existing user state; prove the [prepared r9 overlay](../mainline/gaming-wayland/PRODUCT.md#optional-r9-es-de-fallback-overlay) on device |
+| Q2 / P2 | Complete ES-DE replacement and endurance | After Q1/L1/G2, prove repeated launches, sustained gameplay beyond two hours, settings/pairing/save retention, bounded logs/caches, upgrade/rollback and independent recovery; remove ES-DE only after its game-entry and rescue roles are covered and attended display/audio/control acceptance passes |
 
 ## Evidence owners
 

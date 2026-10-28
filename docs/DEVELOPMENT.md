@@ -65,6 +65,12 @@ to be written and booted.
   `CODEX_HOME` or another broad system variable.
 - Retain evidence explicitly named by a runbook/result record. Delete
   superseded disposable output only after the replacement is verified.
+- A `.cache/` name does not make its contents disposable: original-card/game
+  recovery data, pinned archives, SDKs and an active diagnostic runtime may live
+  there. Keep the cleanup receipt and verify actual APFS reclamation.
+- After removing compiler caches, rerun the owning configure/build entry point;
+  removed pinned source clones may need network access. Reuse accepted sealed
+  artifacts without rebuilding when the tested implementation is unchanged.
 - Do not remove unfamiliar `.tmp-r46h-*` directories, receipts or ignored
   evidence trees merely because Git does not track them. Inventory first and
   ask if ownership is unclear.

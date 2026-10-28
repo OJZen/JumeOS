@@ -3,13 +3,14 @@
 Version **0.1.0-dev**. The internal executable and control-protocol identifier
 remain `r46h-shell` for compatibility.
 
-**2026-09-20 TWO-LEVEL DEVICE PASS / ES-DE FALLBACK.** This is a desktop prototype,
-not the installed frontend. Its [shared R35/R36 path](../gaming-wayland/HANDHELD.md#r35r36-device-follow-up-2026-09-12)
-has composed-frame/remote-control proof; ordinary EGLFS previews have only a local panel. The [design and next gates](../../docs/DEVICE-SHELL.md)
-own the product direction. ES-DE and shared input mappings remain the fallback. Device writes require
-the explicit temporary lease. An explicit application list enables foreground process launch on
-shared-window platforms; the default list exposes built-in tools and optional applications. No host
-settings or Sunshine service are installed by this preview.
+Start with the [desktop requirements and handoff](../../docs/DEVICE-SHELL.md).
+[Project Context](../../docs/PROJECT-CONTEXT.md) owns current progress and device state;
+[PRODUCT](../gaming-wayland/PRODUCT.md) owns the installed r9 trial and prepared ES-DE fallback overlay.
+This runbook owns UI build/check commands. Ordinary EGLFS previews have only a local panel;
+shared Wayland supplies the separate application/input path. Device writes require an explicit
+lease. An explicit application list enables foreground process launch on shared-window platforms;
+the default list exposes built-in tools and optional applications. No host settings or Sunshine
+service are installed by this preview.
 
 R35's identified-device candidate showed actual Wi-Fi link quality,
 battery percentage and charge/discharge state beside the clock. Host previews keep

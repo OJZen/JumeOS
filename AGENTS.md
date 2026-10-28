@@ -11,6 +11,8 @@ These instructions apply to JumeOS. Active R46H work belongs in `mainline/`.
 3. Follow [Development](docs/DEVELOPMENT.md), [Testing](docs/TESTING.md) and the
    smallest relevant feature runbook. Do not infer current state from Git
    history or old logs.
+4. For Jume desktop work, use [requirements and handoff](docs/DEVICE-SHELL.md)
+   to find the owning code, acceptance gate and runbook.
 
 Keep changing baselines and the next gate in Project Context, not this file.
 
