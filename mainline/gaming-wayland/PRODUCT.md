@@ -97,8 +97,8 @@ Evidence: `mainline/out/.cache/jume-r9-device-20260927.uudLqJ/session.md`.
 
 `jume-launcher.service` supervises the existing Wayland session and applications.
 Launcher, Weston or seatd exit restarts the session, limited to three starts in
-120 seconds. No crash recovery branch launches ES-DE. Serial login remains the
-rescue route after restart exhaustion; explicit rollback restores ES-DE.
+120 seconds in sealed r9. Without the optional [ES-DE fallback overlay](#optional-r9-es-de-fallback-overlay),
+serial login remains the rescue route after restart exhaustion; explicit rollback restores ES-DE.
 
 Installed desktop/game/CPU-helper lifetimes have no diagnostic timer. Only exact
 `jume-launcher.service/desktop` membership permits unlimited native gameplay;
@@ -187,22 +187,80 @@ Host fixtures cover both interruption sides, reverse selection and refusal gates
 Same-service r6/r8 device cycling and unchanged user files pass; actual power-loss
 recovery remains open and is not established by host filesystem mocks.
 
+## Optional r9 ES-DE fallback overlay
+
+**2026-10-20 HOST ONLY / NOT DEPLOYED.** The requested policy is Jume at boot,
+then ES-DE after a failed startup or session crash, with Jume selected again on
+the next boot. The operator cannot connect the device yet; the installed r9 and
+ES-DE boot default remain unchanged. This is an opt-in configuration, not full
+game-library, save/load or endurance acceptance.
+
+[`product-fallback.py`](product-fallback.py) installs a separate helper/service
+and a Jume drop-in. It pins the installed r9 manifest and recovery-script hash,
+reuses its target, lock, file-seal and cleanup checks, and never edits its sealed
+release or user state. `Restart=no` and `OnFailure=` replace the three Jume
+restart attempts with one ES-DE handoff. The service runs after Jume's original
+`ExecStopPost` cleanup; any retained lease/mount/socket refuses recovery. A mutual
+exclusion prevents both frontends from running together.
+
+After verified cleanup, the helper adds only a `/run/systemd/system/` override
+to clear ES-DE's known Jume-default condition, reloads systemd and starts ES-DE.
+The persistent Jume enable marker is unchanged; `/run` clears at reboot. Foreign
+conditions/configuration are refused rather than overwritten. Jume's failed state
+and journal remain available for diagnosis. Ordinary stop and GUI reboot/poweroff
+do not invoke `OnFailure`; a hung process or successful exit is not a detected crash.
+This ordering follows the upstream [OnFailure](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html#OnFailure=)
+and [ExecStopPost](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html#ExecStopPost=) contracts.
+
+Deploy only after rediscovering the exact v0.18 device and opening serial. Transfer
+the reviewed script to a root-owned staging path, compare its host/target SHA-256,
+and run as root. `STAGED_SCRIPT` below is that verified path, not a bundled r9 file:
+
+```sh
+python3 -B /var/lib/jume-launcher/current/product-install.py --rollback
+python3 -B "$STAGED_SCRIPT" --install
+python3 -B /var/lib/jume-launcher/current/product-install.py --trial
+# Observe ready Home, then apply the user's requested boot default:
+python3 -B /var/lib/jume-launcher/current/product-install.py --enable
+```
+
+Installation alone does not promote Jume. It requires inactive/disabled r9,
+active/enabled ES-DE and a complete r9 seal. Matching completed files allow an
+idempotent retry. Foreign files or interrupted `.incoming` writes are retained
+and refused; inspect them before retrying. This is not power-loss recovery proof.
+Before selecting another release, explicitly roll back and remove this overlay:
+
+```sh
+python3 -B /var/lib/jume-launcher/current/product-install.py --rollback
+python3 -B /var/lib/jume-launcher/esde-fallback.py --remove
+```
+
+`test-jume-fallback.py` exercises current-boot recovery, unchanged default/save
+bytes, cleanup/foreign-config/active-session/lock refusal, install retry, removal
+and ES-DE start errors. It uses fake systemd calls, not a live service manager.
+The next device gate is ready Home, failed-start and Launcher/Weston loss returning
+to a single ES-DE, refusal with held leases, normal reboot/poweroff without an
+unwanted handoff, and cold boot back into Jume. Remove staging afterward; retain
+the overlay, r9/r6/r8 and recovery evidence. GUI/input/save/endurance gates stay open.
+
 ## Next combined target gate
 
-1. Keep installed r9 and retained r6/r8; packaged failed-state rollback and
+1. Deploy and verify the requested [r9 fallback overlay](#optional-r9-es-de-fallback-overlay)
+   when the device is connected. Keep installed r9 and retained r6/r8; packaged failed-state rollback and
    bidirectional selection pass. Receipt-mismatch cleanup refusal/recovery passes;
    actual interrupted lease cleanup remains open. Use the fixed-path r9 controller.
    Optional Browser pairing needs its guarded wrapper and a new complete seal.
-2. Supervised trial: ready Home, settings/saves, input ownership, representative
+2. Broader Q2 acceptance: ready Home, settings/saves, input ownership, representative
    native/browser launches and rollback. Test beyond the old 120/290/360-second
    bounds and separately beyond the former two-hour CPU-helper limit.
    Endurance needs guard/SSH lifetimes beyond that window; the old 45-minute guard cannot cover it.
 3. Individual Launcher/Weston/seatd recovery and old-child/lease cleanup pass;
    fast prepare-failure limiting and explicit rescue now pass on r6's identical unit.
    GUI warm reboot passes; test GUI poweroff and interrupted cleanup on target.
-4. After trial/save acceptance, enable and verify cold boot, Wi-Fi/settings/save
-   retention and serial rollback. Conduct endurance; schema/service migrations remain unsupported.
-5. Inventory actual ES-DE systems/ROM entries against Jume before removal;
+4. For the user's Q1 default request, observe ready Home and verify explicit rollback, then
+   enable and verify cold boot plus the overlay's automatic ES-DE return. Wi-Fi/settings/save
+   retention and endurance remain separate Q2 gates; schema/service migrations remain unsupported.
+5. L1: inventory actual ES-DE systems/ROM entries against Jume before Q2 removal;
    fixed Neo/native entries are not a full ROM scanner. Keep unsupported routes.
 
 Physical LCD/audio/controls, save retention and library coverage remain gates.
