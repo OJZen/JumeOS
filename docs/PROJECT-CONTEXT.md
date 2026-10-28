@@ -1,6 +1,6 @@
 # R46H project context
 
-> Current checkpoint: 2026-09-27 (physical). Handoff reviewed: 2026-10-23 (host/docs only).
+> Current checkpoint: 2026-10-28 (physical). Handoff reviewed: 2026-10-23 (host/docs only).
 > Read the [experiment ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) before hardware work.
 
 ## Scope
@@ -23,9 +23,9 @@ desktop, local gaming, streaming, and USB HID input. The
 
 ## Current baseline
 
-Last observed device state: **serial-confirmed clean poweroff on 2026-09-27**, unchanged p2 v0.18,
-inactive r9 selected, sealed r6/r8/private backups retained, ES-DE default and all 167 prior files unchanged.
-The [r9 recovery and GUI reboot record](../mainline/gaming-wayland/PRODUCT.md#packaged-r9-recovery-and-gui-reboot--2026-09-27)
+Last observed device state: **serial-confirmed clean poweroff on 2026-10-28**, unchanged p2 v0.18,
+inactive r11 (Jume UI v1) selected, r6/r8/r9/r10 and private backups retained, ES-DE default.
+The [UI v1 trial record](../mainline/gaming-wayland/PRODUCT.md#jume-ui-v1-trials-r10r11--2026-10-28)
 owns the latest result; historical host build notes' "next boot" steps are not the current plan.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.

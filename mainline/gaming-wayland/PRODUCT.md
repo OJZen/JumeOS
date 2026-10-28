@@ -93,6 +93,19 @@ Final state: r9 selected inactive, r6/r8 and private backups retained, ES-DE def
 SSH/guard/keys were removed; UART confirmed final clean poweroff.
 Evidence: `mainline/out/.cache/jume-r9-device-20260927.uudLqJ/session.md`.
 
+## Jume UI v1 trials (r10/r11) — 2026-10-28
+
+r10 (`169783b`, manifest `7dcbe3c6…`) and r11 (`38643e9`, manifest `c049d069…`, archive
+`4764be53…`) were built from clean worktrees with the full host gate, then staged over a
+temporary key/IP-restricted SFTP port with a UART-pinned host key, verified, selected from r9 and
+trialled. Captured Home, quick panel, options, power menu and tools show the v1 UI; the session held
+the `handle-power-key` inhibitor and the operator confirmed the power key (short off, wake, hold
+menu). r11 fixed the clipped row rings seen on r10. Rollback restored ES-DE with no failed units or
+kernel errors; staging/keys were removed and UART confirmed clean poweroff. Final state: inactive r11
+selected, r6/r8/r9/r10 and `pre-r10-IM577S` backup retained, ES-DE default. Not accepted: games,
+saves, LCD readability, Select chords on hardware, endurance or default promotion.
+Evidence: `mainline/out/.cache/jume-r10-device-20261028.IM577S/`.
+
 ## Ownership and recovery
 
 `jume-launcher.service` supervises the existing Wayland session and applications.

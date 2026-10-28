@@ -1,6 +1,6 @@
 # R46H experiment status ledger
 
-> Current checkpoint: 2026-09-27. This ledger owns physical evidence and open
+> Current checkpoint: 2026-10-28. This ledger owns physical evidence and open
 > hardware gates; commands, hashes and receipts stay in linked runbooks.
 
 ## How to read this ledger
@@ -62,7 +62,7 @@ broader LCD/USB coverage, Moonlight and PSP remain open.
   09-27 installed trial recovered separately from Launcher/Weston/seatd loss, clearing old children/leases.
   Same desktop survived 460 seconds; GTA III survived 273 seconds with a fresh intro frame, then requested exit.
   r9/r6 cycling, packaged failed-state rescue and cleanup-receipt refusal/recovery pass; 167 prior files unchanged.
-  r9 GUI warm reboot/ES-DE return and final poweroff pass; interrupted cleanup/default/endurance/save-load open.
+  r9 GUI reboot; 10-28 r10/r11 UI v1 + power key pass; interrupted cleanup/default/endurance/save-load open.
   [Installed-session runbook](../../gaming-wayland/PRODUCT.md) owns evidence and remaining gates.
 - **[Jume Browser](../../gaming-browser/README.md) — TARGET GPU/SANDBOX PASS / HEAVY-SITE OOM + SECURITY OPEN.**
   Offline input/IME/tabs/About, WebGL 2, sandbox and lifecycle/privacy pass; mi.com policy/OOM failures remain.
