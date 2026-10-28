@@ -95,7 +95,7 @@ int main(int argc, char **argv)
             if (controller && !SDL_GameControllerGetAttached(controller)) { SDL_GameControllerClose(controller); controller = nullptr; }
             if (!controller) for (int i = 0; i < SDL_NumJoysticks(); ++i) {
                 const auto selected=qEnvironmentVariable("SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT").section('/',1).toUInt(nullptr,16);
-                if (SDL_JoystickGetDeviceVendor(i) != (server ? 0x045e : 0x5246) || SDL_JoystickGetDeviceProduct(i) != (server ? 0x02ea : selected?selected:0x0049)) continue;
+                if (SDL_JoystickGetDeviceVendor(i) != (server ? 0x057e : 0x5246) || SDL_JoystickGetDeviceProduct(i) != (server ? 0x2009 : selected?selected:0x0049)) continue;
                 char guid[33]; SDL_JoystickGetGUIDString(SDL_JoystickGetDeviceGUID(i), guid, sizeof(guid));
                 state["guid"] = QString::fromLatin1(guid);
                 controller = SDL_GameControllerOpen(i); break;

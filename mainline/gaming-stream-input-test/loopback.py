@@ -68,7 +68,7 @@ def host_input():
 
 def discover_controllers():
     for name in Path('/sys/devices/virtual/input').glob('input*/name'):
-        if name.read_text().startswith('Sunshine X-Box One (virtual) pad'):
+        if name.read_text().startswith('Sunshine Nintendo (virtual) pad'):
             events = list(name.parent.glob('event*/dev'))
             if events and not (Path('/dev/input')/events[0].parent.name).exists(): nodes.append(fixture.event_node(name.parent.name))
 
@@ -103,7 +103,7 @@ try:
             values.extend((value, value))
         audio.writeframes(values.tobytes())
     host_env = {**common, 'QT_QUICK_BACKEND': 'software', 'SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS': '1',
-                'SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT': '0x045e/0x02ea', 'SDL_JOYSTICK_DISABLE_UDEV': '1'}
+                'SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT': '0x057e/0x2009', 'SDL_JOYSTICK_DISABLE_UDEV': '1'}
     # This container has no udev daemon; let SDL watch the real event nodes we create.
     Path('/dev/input').mkdir(exist_ok=True)
     (state/'host-input.json.fps').write_text('60')
@@ -112,7 +112,7 @@ try:
     assert host_input().get('controllers') == 0, 'Host test must start without a local source controller'
     apps = state/'host/apps.json'; apps.write_text(json.dumps({'env': {}, 'apps': [{'name': 'Loopback', 'cmd': ''}]}))
     config = state/'host/sunshine.conf'
-    config.write_text('\n'.join(['capture = x11', 'encoder = software', 'sw_preset = ultrafast', 'gamepad = xone',
+    config.write_text('\n'.join(['capture = x11', 'encoder = software', 'sw_preset = ultrafast', 'gamepad = switch',
         'keyboard = disabled', 'mouse = disabled', 'audio_sink = r46h-loop', 'upnp = disabled', 'flags = 0',
         'min_log_level = info', 'sunshine_name = R46H Loopback', 'address_family = ipv4',
         f'file_apps = {apps}', f'file_state = {state}/host/state.json', f'credentials_file = {state}/host/credentials.json',
@@ -122,7 +122,7 @@ try:
     assert sunshine.poll() is None, 'Sunshine exited during startup'
     if serving:
         start(['/bin/sh', '-c', 'while paplay --device=r46h-loop "$1"; do :; done', 'r46h-tone', tone], 'tone-loop')
-        print('HOST_READY app=Loopback input=Sunshine-Xbox-One display=private-Xvfb audio=private-null-sink', flush=True)
+        print('HOST_READY app=Loopback input=Sunshine-Switch-Pro display=private-Xvfb audio=private-null-sink', flush=True)
         print('When Moonlight pairs, enter its PIN here; input is hidden. Ctrl+C stops this temporary host.', flush=True)
         end = time.monotonic()+int(sys.argv[4]); prompts = 0; next_prompt_check = 0
         while time.monotonic()<end:
@@ -229,7 +229,7 @@ try:
     with wave.open(str(out/'decoded-tone.wav'),'wb') as audio:
         audio.setnchannels(1);audio.setsampwidth(2);audio.setframerate(48000)
         audio.writeframes(array('h',(round(max(-1,min(1,v))*32767) for v in loud)).tobytes())
-    report={'status':'REAL_LOOPBACK_HOST_PASS','sunshineVersion':'2026.516.143833','client':'v5',
+    report={'status':'REAL_LOOPBACK_HOST_PASS','sunshineVersion':'2026.516.143833','client':'v5','gamepad':'switch',
         'input':states,'videoStatistics':stats,'audio':{'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'rms':rms,'positiveCrossingsPerSecond':crossing},
         'boundary':'Real encrypted pairing, stream, software decode, virtual gamepad and captured PCM in one private Linux container. Synthetic source input; no physical R46H, Mac gamepad emulation, hardware decoder, audible output or LCD acceptance.'}
     (out/'result.json').write_text(json.dumps(report,indent=2)+'\n')
@@ -245,7 +245,7 @@ finally:
     for node in nodes: node.unlink(missing_ok=True)
     (out/'last-host-input.json').write_text(json.dumps(host_input(),indent=2)+'\n')
     if serving:
-        (out/'host-observation.json').write_text(json.dumps({'observedButtons':sorted(seen),'axisMinimum':minimum,'axisMaximum':maximum,
+        (out/'host-observation.json').write_text(json.dumps({'gamepad':'switch','observedButtons':sorted(seen),'axisMinimum':minimum,'axisMaximum':maximum,
             'boundary':'Samples from the Sunshine virtual controller only; physical origin and LCD/audio need separate observation.'},indent=2)+'\n')
     if 'stats' in globals():
         (out/'last-statistics.json').write_text(json.dumps(stats,indent=2)+'\n')

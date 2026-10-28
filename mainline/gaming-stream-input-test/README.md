@@ -1,6 +1,6 @@
 # Real streaming controller test
 
-Status: **LINUX PROTOCOL LOOPBACK PASS / R46H INPUT ACCEPTANCE OPEN**.
+Status: **SWITCH PRO LINUX PROTOCOL LOOPBACK PASS / R46H INPUT ACCEPTANCE OPEN**.
 The user accepts this milestone: R46H buttons/sticks → Moonlight → Sunshine's
 virtual gamepad → a host test program → the response streamed back to the LCD.
 
@@ -12,6 +12,8 @@ VM, without installing a Mac service or input driver. It captures only a private
 The test window changes from green to blue with A; the left stick moves a white
 square. Every observed button and the ranges of all six axes are recorded.
 This exercises Linux virtual input, not native macOS gamepad emulation.
+The host selects `gamepad = switch` (Switch Pro). Its receiver accepts only
+Sunshine's Nintendo virtual pad (`057e:2009`); the R46H client mapping is unchanged.
 
 Run in an **independent macOS Terminal**, with a freshly identified Mac IPv4
 address on the handheld's LAN:
@@ -55,15 +57,18 @@ rules as `run-linux-host.sh`; the self-test can use `--network none`.
 The self-test pairs the actual v5 Moonlight client, fetches the actual application
 list, streams H.264, checks native video statistics and decodes the known tone.
 A synthetic R46H source sends 14 buttons, two triggers and four signed axes;
-Sunshine's separate Xbox controller must receive each press, release and center.
+Sunshine's separate Switch Pro controller must receive each press, release and center.
 The host test explicitly ignores the synthetic source. Client-side green/blue
 captures prove the response returned through video. Individual shoulders remain
 usable; L1 + R1 exits the native client.
 
-The retained `r46h-stream-loopback/verified/` result passes these checks. A separate
+The 2026-10-18 Switch Pro run passed these checks; its source hashes and evidence
+are in `r46h-stream-loopback/switch-20261018.mGYZy1/receipt.json`. The result records
+`gamepad: switch`, and Sunshine confirms a Nintendo Pro virtual controller.
+The earlier `verified/` result retains the Xbox One baseline. Its separate
 `server-smoke.json` proves the published HTTP endpoint from Mac loopback and
-15-second automatic cleanup. The receipt records exact source and evidence.
-Neither check proves LAN traversal, R46H hardware decoding, physical controls,
+15-second automatic cleanup; that endpoint check was not repeated for Switch.
+These checks do not prove LAN traversal, R46H hardware decoding, physical controls,
 LCD presentation, audible output, or native Mac gamepad support.
 
 The container lacks udev, so its test process uses SDL's evdev directory watcher;
