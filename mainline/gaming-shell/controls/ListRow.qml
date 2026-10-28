@@ -20,6 +20,8 @@ T.ItemDelegate {
     property bool current: false
     property bool adjusting: false
     property bool focusOutline: true
+    // The ring reaches past the row; the selected row draws above its neighbours so they never cover it.
+    z: selected && focusOutline ? 1 : 0
     // A flat row sits on the page (category lists): no surface until current or pressed.
     property bool flat: false
     // An informational icon at the end of the row (e.g. a lock on a protected network).

@@ -1010,13 +1010,36 @@ private slots:
                 scene("home"); QCOMPARE(root->property("selectedApplication").toString(), QString("native.mslug"));
                 if (night) { action("right"); QCOMPARE(root->property("selectedApplication").toString(), QString("native.gta3")); }
                 capture("home"); if (night) action("left");
-                action("options"); QTest::qWait(300); capture("options"); action("back");
+                // A row's own focus ring reaches 8 px past it: never clipped, never under a neighbour.
+                const auto ringClear = [&](QQuickItem *scope) {
+                    QQuickItem *row = nullptr;
+                    QList<QQuickItem *> pending{scope};
+                    while (!pending.isEmpty() && !row) {
+                        auto *item = pending.takeFirst(); pending.append(item->childItems());
+                        if (item->isVisible() && item->property("focusOutline").toBool() && item->property("selected").toBool()) row = item;
+                    }
+                    if (!row) return QString("no selected row");
+                    const auto ring = row->mapRectToScene(row->boundingRect().adjusted(-8, -8, 8, 8));
+                    for (auto *item = row->parentItem(); item; item = item->parentItem())
+                        if (item->clip() && !item->mapRectToScene(item->boundingRect()).contains(ring)) return QString("clipped by ") + item->metaObject()->className();
+                    bool after = false;
+                    for (auto *sibling : row->parentItem()->childItems()) {
+                        if (sibling == row) { after = true; continue; }
+                        if (sibling->isVisible() && (after ? sibling->z() >= row->z() : sibling->z() > row->z())
+                                && sibling->mapRectToScene(sibling->boundingRect()).intersects(ring)) return QString("covered by ") + sibling->objectName();
+                    }
+                    return QString();
+                };
+                action("options"); QTest::qWait(300); capture("options");
+                QVERIFY2(ringClear(root->findChild<QQuickItem *>("optionsMenu")).isEmpty(), qPrintable(ringClear(root->findChild<QQuickItem *>("optionsMenu")))); action("back");
                 QVERIFY(QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, QStringLiteral("已加入收藏")), Q_ARG(QVariant, true))); capture("notice");
                 QVERIFY(QMetaObject::invokeMethod(root, "clearNotice"));
                 action("down"); capture("home-dock"); action("up");
-                QVERIFY(QMetaObject::invokeMethod(root, "openPowerMenu")); QTest::qWait(250); capture("power-menu"); action("back");
+                QVERIFY(QMetaObject::invokeMethod(root, "openPowerMenu")); QTest::qWait(250); capture("power-menu");
+                QVERIFY2(ringClear(root->findChild<QQuickItem *>("powerMenu")).isEmpty(), qPrintable(ringClear(root->findChild<QQuickItem *>("powerMenu")))); action("back");
                 scene("library"); root->setProperty("selected", 1); QCOMPARE(root->property("selectedApplication").toString(), QString("native.1944")); capture("library");
                 scene("tools"); capture("tools");
+                QVERIFY2(ringClear(root->findChild<QQuickItem *>("toolsList")).isEmpty(), qPrintable(ringClear(root->findChild<QQuickItem *>("toolsList"))));
                 scene("settings"); capture("settings");
                 root->setProperty("settingsCategory", 1); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool()); capture("settings-display");
                 for (const auto &[index, name] : {std::pair{2, "sound"}, {3, "controls"}, {4, "power"}, {5, "performance"}, {6, "storage"}, {7, "system"}}) {

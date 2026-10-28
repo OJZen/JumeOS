@@ -13,15 +13,16 @@ Item {
     signal activated(int position)
     Ui.ListView {
         // Rows draw their own focus ring, so the list keeps a ring's width of room on every side.
+        // ListView places rows at x 0, so the side room is a content margin, not a row offset.
         readonly property int ring: Ui.Theme.focusGap + Ui.Theme.focusWidth
         id: list; objectName: "toolsList"
         x: -ring; width: parent.width + 2 * ring; height: parent.height
-        topMargin: ring; bottomMargin: ring
+        topMargin: ring; bottomMargin: ring; leftMargin: ring; rightMargin: ring
         spacing: Ui.Theme.space8; model: toolsView.items; currentIndex: toolsView.index
         delegate: Ui.ListRow {
             required property var modelData
             required property int index
-            x: list.ring; width: list.width - 2 * list.ring; fontScale: toolsView.fontScale; reducedMotion: toolsView.reducedMotion
+            width: list.width - 2 * list.ring; fontScale: toolsView.fontScale; reducedMotion: toolsView.reducedMotion
             title: modelData.title; description: modelData.reason ? "" : modelData.detail
             iconName: modelData.icon; disabledReason: modelData.reason || ""; chevron: true
             selected: toolsView.index === index; focusOutline: toolsView.ringVisible

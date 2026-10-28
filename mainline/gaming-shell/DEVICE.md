@@ -162,6 +162,9 @@ press only wakes it. Held 1.5 s it opens the power menu (ring from 0.6 s); anoth
 The installed session wraps itself in a root `systemd-inhibit --what=handle-power-key` block so
 logind's default `HandlePowerKey=poweroff` stays off the key only while Jume runs; ES-DE keeps
 logind's behavior. The game is not paused before the screen turns off yet.
+2026-10-28, r10 trial (`169783b`) on R46H: the session held that inhibitor and the shell held the
+key node; the operator confirmed short press off, the next press waking only, and a held press
+showing the ring and then the power menu (closed with B; no reboot/poweroff chosen).
 
 R17 transient-unit value/permission
 restoration passed on device. In the later 2026-09-09 power-menu session, the
