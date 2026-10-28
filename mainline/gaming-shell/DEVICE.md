@@ -153,7 +153,17 @@ The local mode lasts 290 seconds inside a 300-second unit; remote mode has the
 existing 30/31-minute limits. GUI power dialogs default to Cancel. Confirming
 saves preferences and returns 77 (poweroff) or 78 (reboot); only the outer
 device-mode supervisor restores the lease, syncs, then requests the system action.
-An ordinary preview cannot power off the host. R17 transient-unit value/permission
+An ordinary preview cannot power off the host.
+
+Power key ([JUME-UI §7.2](../../docs/JUME-UI.md#72-系统层全局页面与工具不可占用)): on the fixed
+target `DeviceState` reads the `rk805 pwrkey` evdev node (KEY_POWER; ark is in `input`) and passes
+only press/release edges. A short press turns the screen off, over a game too; while off the
+press only wakes it. Held 1.5 s it opens the power menu (ring from 0.6 s); another key cancels.
+The installed session wraps itself in a root `systemd-inhibit --what=handle-power-key` block so
+logind's default `HandlePowerKey=poweroff` stays off the key only while Jume runs; ES-DE keeps
+logind's behavior. The game is not paused before the screen turns off yet.
+
+R17 transient-unit value/permission
 restoration passed on device. In the later 2026-09-09 power-menu session, the
 operator confirmed default Cancel and a GUI-triggered reboot back to ES-DE.
 After reboot, remote UI actions confirmed default Cancel for poweroff, then

@@ -162,10 +162,12 @@ QtObject {
     readonly property int quickPanelInset: 24
     readonly property int holdRingSize: 88
     // §5 performance overlay: top right. In game the compositor shows the shell only inside
-    // gameOverlayRegion (gaming-wayland/handheld-shell.cpp), widened to gameOverlayVolumeLeft while
-    // the volume Hud is up; on the desktop the overlay sits below the top bar.
+    // gameOverlayRegion (gaming-wayland/handheld-shell.cpp), widened to gameOverlayVolumeLeft (the
+    // centered Hud) and down to gameOverlayVolumeBottom while the volume Hud is up; on the desktop
+    // the overlay sits below the top bar.
     readonly property rect gameOverlayRegion: Qt.rect(624, 16, 368, 260)
-    readonly property int gameOverlayVolumeLeft: 396
+    readonly property int gameOverlayVolumeLeft: 372
+    readonly property int gameOverlayVolumeBottom: 348
     readonly property int perfPanelTop: 24
     readonly property int perfPanelDesktopTop: 80
     readonly property int perfPanelRight: 32
@@ -194,6 +196,7 @@ QtObject {
     readonly property int toastDwell: 2400
     readonly property int holdDelay: 600
     readonly property int forceHoldDuration: 2000
+    readonly property int powerHoldDuration: 1500
     readonly property int exitHoldDuration: 1000
     // Right-stick scrolling at full deflection, per 16 ms controller poll.
     readonly property int scrollStep: 24

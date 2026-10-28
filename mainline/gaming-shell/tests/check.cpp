@@ -39,6 +39,8 @@
 #include <QtTest>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <cstring>
 #include <signal.h>
 
 // The Theme singleton of an engine, resolved through the same directory import as ShellView.
@@ -628,7 +630,7 @@ private slots:
             input.routedState(0, axes);
             QCOMPARE(releases.size(), 1); QCOMPARE(releases.first().at(0).toString(), item.second);
         }
-        // The router delivers a lone Select as a press and release; Select + X stays with the system layer.
+        // The router delivers a lone Select as a press and release; Select with another key does nothing here.
         actions.clear(); input.routedState(1U << 8, axes); QVERIFY(actions.isEmpty());
         input.routedState(0, axes); QCOMPARE(actions.size(), 1); QCOMPARE(actions.first().at(0).toString(), QString("quick"));
         actions.clear(); releases.clear();
@@ -1820,6 +1822,60 @@ private slots:
         view.showNormal();QTRY_VERIFY(changes.size()>0);
         progress->setVisible(false);QTest::qWait(50);changes.clear();QTest::qWait(100);QCOMPARE(changes.size(),0);
     }
+    // §7.2 power key: device.cpp passes only the rk805 pwrkey press/release edges; the shell turns a
+    // short press into screen off (the next press only wakes) and a 1.5 s hold into the power menu.
+    void powerKeyEdgesAndHold() {
+        QTemporaryDir directory;
+        QDir().mkpath(directory.filePath("sys/class/input/event1/device")); QDir().mkpath(directory.filePath("dev/input"));
+        QFile name(directory.filePath("sys/class/input/event1/device/name")); QVERIFY(name.open(QIODevice::WriteOnly)); name.write("rk805 pwrkey\n"); name.close();
+        const auto node = QFile::encodeName(directory.filePath("dev/input/event1"));
+        QCOMPARE(::mkfifo(node.constData(), 0600), 0);
+        const int writer = ::open(node.constData(), O_RDWR | O_NONBLOCK); QVERIFY(writer >= 0); // Keeps the FIFO open.
+        {
+            DeviceState device(directory.path(), false, true); QSignalSpy edges(&device, &DeviceState::powerKey);
+            DeviceState untrusted(directory.path()); QSignalSpy ignored(&untrusted, &DeviceState::powerKey);
+            auto event = [&](quint16 type, quint16 code, qint32 value) {
+                char record[24]{}; std::memcpy(record + 16, &type, 2); std::memcpy(record + 18, &code, 2); std::memcpy(record + 20, &value, 4);
+                QCOMPARE(::write(writer, record, sizeof record), qint64(sizeof record));
+            };
+            // Press, sync, autorepeat, another key, release: only the two edges come out.
+            event(1, 116, 1); event(0, 0, 0); event(1, 116, 2); event(1, 115, 1); event(1, 116, 0);
+            QTRY_COMPARE(edges.size(), 2);
+            QCOMPARE(edges.at(0).at(0).toBool(), true); QCOMPARE(edges.at(1).at(0).toBool(), false);
+            QTest::qWait(50); QCOMPARE(edges.size(), 2); QVERIFY(ignored.isEmpty()); // Only the fixed target reads it.
+        }
+        ::close(writer);
+        Preferences state(directory.path()); Telemetry metrics(directory.path()); ControllerInput controller;
+        QQuickView view;
+        view.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(&metrics)}, {"controller", QVariant::fromValue(&controller)}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready); view.resize(1024, 768); view.show(); QVERIFY(QTest::qWaitForWindowExposed(&view));
+        auto *root = view.rootObject();
+        auto power = [&](bool pressed) { QVERIFY(QMetaObject::invokeMethod(root, "powerKey", Q_ARG(QVariant, pressed))); };
+        auto *ring = root->findChild<QQuickItem *>("powerHold"); QVERIFY(ring);
+        auto *menu = root->findChild<QObject *>("powerMenuLayer"); QVERIFY(menu);
+        // Short: the screen goes off on release; the next press only wakes it.
+        power(true); QTest::qWait(100); QVERIFY(root->property("powerHolding").toBool()); power(false);
+        QVERIFY(root->property("screenOff").toBool()); QVERIFY(!root->property("powerHolding").toBool());
+        power(true); QVERIFY(!root->property("screenOff").toBool()); power(false);
+        QVERIFY(!root->property("screenOff").toBool()); QVERIFY(!menu->property("open").toBool());
+        // Held: the ring appears after 0.6 s and the menu opens at 1.5 s; the release changes nothing.
+        power(true); QTest::qWait(400); QVERIFY(!ring->isVisible());
+        QTRY_VERIFY_WITH_TIMEOUT(ring->isVisible(), 600);
+        QTRY_VERIFY_WITH_TIMEOUT(menu->property("open").toBool(), 1500);
+        QVERIFY(!ring->isVisible()); power(false);
+        QVERIFY(menu->property("open").toBool()); QVERIFY(!root->property("screenOff").toBool());
+        // 息屏 in the menu turns the screen off the same way.
+        QVERIFY(QMetaObject::invokeMethod(root, "powerChosen", Q_ARG(QVariant, QString("screenOff"))));
+        QVERIFY(root->property("screenOff").toBool());
+        power(true); power(false); QVERIFY(!root->property("screenOff").toBool());
+        // Another key during the hold cancels it: no menu, and the release no longer turns the screen off.
+        QVERIFY(QMetaObject::invokeMethod(menu, "close"));
+        power(true); QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, QString("down")), Q_ARG(QVariant, false)));
+        QVERIFY(!root->property("powerHolding").toBool()); QTest::qWait(1600);
+        QVERIFY(!menu->property("open").toBool()); power(false); QVERIFY(!root->property("screenOff").toBool());
+        view.setSource(QUrl());
+    }
     void volumeHudAndAtomicUpdates() {
         QTemporaryDir directory; QVERIFY(directory.isValid());
         const auto stateDir=directory.filePath("var/lib/r46h-volume"), level=stateDir+"/level";
@@ -1927,7 +1983,8 @@ QtObject {
         auto *root = view.rootObject(); QVERIFY(root->property("gameOverlay").toBool());
         auto *panel = root->findChild<QQuickItem *>("performancePanel"); QVERIFY(panel);
         auto *hud = root->findChild<QQuickItem *>("volumeHud"); QVERIFY(hud);
-        const QRectF region(624, 16, 368, 260), volumeRegion(396, 16, 596, 260);
+        // The compositor masks of gaming-wayland/handheld-shell.cpp: the overlay alone, and with the Hud.
+        const QRectF region(624, 16, 368, 260), volumeRegion(372, 16, 620, 332);
         const auto captures = qEnvironmentVariable("R46H_UI_CAPTURE_DIR");
         state.adjust("monitor", 1);
         for (int font : {1, 3}) {
@@ -1949,10 +2006,17 @@ QtObject {
             const auto detailed = panel->mapRectToScene(panel->boundingRect());
             QCOMPARE(row("performanceDetail"), QStringLiteral("P95 18.2 ms"));
             QVERIFY2(region.contains(detailed) && detailed.height() <= 252, qPrintable(QString("detail %1").arg(detailed.height())));
+            const auto below = hud->mapRectToScene(hud->boundingRect()); // Right-aligned 16 px below the overlay.
+            QVERIFY(volumeRegion.contains(below) && !below.intersects(detailed)); QCOMPARE(below.right(), 992.);
             if (!captures.isEmpty()) QVERIFY(view.grabWindow().save(captures + QString("/overlay-game-detail-%1.png").arg(font == 3 ? 130 : 100)));
             QVERIFY(state.choose("monitorDetail", 0));
             root->setProperty("volumeVisible", false);
         }
+        // Without the overlay the Hud is centered: its left edge is the widened mask's 372.
+        state.adjust("monitor", 1); root->setProperty("volumeVisible", true); QTest::qWait(250);
+        const auto centered = hud->mapRectToScene(hud->boundingRect());
+        QCOMPARE(centered.left(), 372.); QCOMPARE(centered.center().x(), 512.); QVERIFY(volumeRegion.contains(centered));
+        root->setProperty("volumeVisible", false); state.adjust("monitor", 1);
         // §8 quick panel over a game: the app and its state, tiles, brightness (volume stays with the
         // device keys and never takes focus), 回到主页, 任务切换 and 结束游戏.
         state.adjust("monitor", 1);
@@ -2154,6 +2218,7 @@ QtObject {
             {"controller",QVariant::fromValue(&controller)},{"device",QVariant::fromValue(&device)},{"network",QVariant::fromValue(&network)}, {"testInputCapture",true}});
         view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));QCOMPARE(view.status(),QQuickView::Ready);
         view.resize(1024,768);view.show();QVERIFY(QTest::qWaitForWindowExposed(&view));auto *root=view.rootObject();
+        view.requestActivate();QVERIFY(QTest::qWaitForWindowActive(&view)); // B erases through the focused field.
         auto tap=[&](const char *key){QVERIFY(QMetaObject::invokeMethod(root,"dispatch",Q_ARG(QVariant,QString(key)),Q_ARG(QVariant,false)));};
         auto *settings=root->findChild<QObject *>("settingsView");QVERIFY(settings);
         auto keys=[&]{QStringList result;for(const auto &row:settings->property("rows").toList())result<<row.toMap().value("key").toString()+":"+row.toMap().value("name").toString();return result;};

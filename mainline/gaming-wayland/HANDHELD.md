@@ -362,8 +362,11 @@ proof only; the R46H pacing, colors, controls and thermal gate remain open.
 
 The 2026-09-22 [volume capsule](../gaming-shell/DEVICE.md) extends `overlay`
 requests with an optional boolean `volume` (default false). While true, the
-clip includes the top-center capsule; dismissal restores R55's narrow mask even
-if the performance HUD stays enabled. This never changes panel/input ownership
+clip includes the volume Hud: from x 372 of the 1024 canvas (the centered Hud) and down
+to y 348 (the Hud right-aligned below a performance overlay of at most 252); dismissal restores
+R55's narrow mask even if the performance HUD stays enabled. Jume stage 5 also shows every game
+overlay except the performance overlay and the Hud as a `panel` (power menu, dialogs, the
+Select + Start HoldConfirm); the hold keeps its keys with the router until it ends. This never changes panel/input ownership
 or capture privacy. Launcher and compositor must be deployed as one candidate.
 Pixman and software-GL pixel checks pass; R46H display/pacing remain untested.
 
@@ -558,14 +561,20 @@ parent-owned Unix `SOCK_SEQPACKET` connection. `input-route.h` owns the fixed lo
 packet contract (version 3); GUI and router must come from the same candidate.
 There is no listening socket or network input service in the router itself.
 Each application sees only its assigned endpoint. [Task controls](../gaming-shell/APPLICATIONS.md)
-own Select+Y, short/long Select+Start and Select+X. Select is a deferred modifier;
-all other ordinary buttons remain immediate. This new protocol has host proof only.
+own Select+Y and short/long Select+Start; Select+X is no longer a shortcut
+([JUME-UI §7.2](../../docs/JUME-UI.md#72-系统层全局页面与工具不可占用)). Select is a deferred
+modifier; all other ordinary buttons remain immediate. In a game, Select with any other key,
+or held 600 ms without a shortcut, reaches the game at once (Select first) and ends shortcut
+judgement until release; on the desktop such a combination does nothing. Start or Y pressed up
+to the chord window before Select still forms the shortcut (the game then sees that key
+released). The `Close` packet type stays reserved. This new protocol has host proof only.
 
 The controller selects UI/game ownership with a strictly increasing sequence.
 Each change sends neutral game/UI state and waits for physical neutral. A matched
 L3 + R3 chord releases game controls immediately and requests a panel transition;
 delivery stays paused until the controller acknowledges ownership. Only stick
-clicks wait for the configurable 40–300 ms chord window (120 ms test default).
+clicks wait for the configurable 40–300 ms chord window (the desktop passes 80 ms, §7.5;
+kernel tests use 120 ms).
 Standalone short clicks retain both edges; late overlap remains ordinary clicks.
 The physical feel of that window still needs operator acceptance. L1/R1 passthrough
 is unchanged. Input overruns resynchronize behind the neutral gate; source/channel

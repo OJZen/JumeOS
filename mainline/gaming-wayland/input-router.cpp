@@ -223,6 +223,8 @@ struct Router {
     void run() {
         while (!stopping) {
             int timeout = policy.deadline ? int(std::clamp<int64_t>(policy.deadline - nowMs(), 0, 100)) : 100;
+            // A held Select is timed: the 600 ms game hand-over and the hold progress.
+            if (policy.selecting) timeout = std::min(timeout, 20);
             if (remoteUntil) timeout = std::min(timeout, int(std::clamp<int64_t>(remoteUntil - nowMs(), 0, 100)));
             pollfd fds[]{{source, POLLIN, 0}, {control, POLLIN, 0}};
             const int result = poll(fds, 2, timeout);

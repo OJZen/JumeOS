@@ -79,11 +79,13 @@ entries were temporarily removed from the list.
 | Select + Y | Background current app and show task cards |
 | Select + Start, release before 2 seconds | Background current app and return Home |
 | Select + Start, held for 2 seconds | Kill the app that was foreground when the hold began |
-| Select + X | Request the current app's normal window close; on the task page, close the selected task. Stage 5 removes it ([JUME-UI §7.8](../../docs/JUME-UI.md#78-从现行映射迁移)) |
+| Select + Y on the task page | Return, like B |
 
-Press Select first or simultaneously with the other key. An unrelated face-button
+Press Select first or within 80 ms of the other key. An unrelated face-button
 press is never delayed to guess a future shortcut. Select alone delivers its
-ordinary press/release on release. Chord keys are consumed; L3+R3 still opens
+ordinary press/release on release; in a game, Select with another key or held
+600 ms reaches the game at once. Select + X is no longer a shortcut (emulator
+hotkeys keep it); a normal close is the task page's X or the quick panel's 结束游戏. Chord keys are consumed; L3+R3 still opens
 the existing quick panel. Holding Start+Select shows progress, not an early Home
 transition, and never retargets a kill to a newly activated process.
 

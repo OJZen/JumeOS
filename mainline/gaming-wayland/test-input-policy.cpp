@@ -30,12 +30,13 @@ int main() {
         policy.setMode(Ui); tick(0, 360); emitted.clear();
         tick(1U << 4 | 1U << 5, 370); assert(emitted.back().keys == (1U << 4 | 1U << 5));
     }
-    for(auto button:{X,Y,Start}) {
-        Policy policy(120);Sample sample;std::vector<Sample> output;std::vector<uint32_t> actions;
+    // Select shortcuts (§7.2): Y = Tasks, Start short = Home, Start 2 s = Kill; never seen by the owner.
+    for(auto button:{Y,Start}) {
+        Policy policy(80);Sample sample;std::vector<Sample> output;std::vector<uint32_t> actions;
         auto tick=[&](uint32_t keys,int64_t now){sample.keys=keys;policy.update(sample,!keys,now,[&](const Sample &s){output.push_back(s);},[&](uint32_t action){actions.push_back(action);});};
         tick(0,0);tick(Select,10);tick(Select|button,20);
         if(button==Start){assert(actions.empty());tick(Select|Start,2019);assert(actions.empty());tick(Select|Start,2020);}
-        assert(actions.size()==1&&actions[0]==(button==X?Close:button==Y?Tasks:Kill));
+        assert(actions.size()==1&&actions[0]==(button==Y?Tasks:Kill));
         tick(Select|button,3000);tick(0,3010);assert(actions.size()==1);
         for(const auto &s:output)assert(!(s.keys&(Select|button)));
         policy.setMode(Game);tick(0,4000);actions.clear();output.clear();
@@ -43,5 +44,32 @@ int main() {
         policy.setMode(Ui);tick(0,5000);actions.clear();output.clear();tick(Select,5010);tick(0,5020);
         assert(actions.empty()&&output[output.size()-2].keys==Select&&output.back().keys==0);
     }
-    std::puts("INPUT_POLICY_PASS: chords, short-home/long-kill, modifier suppression and neutral ownership");
+    {
+        Policy policy(80);Sample sample;std::vector<Sample> output;std::vector<uint32_t> actions;
+        auto tick=[&](uint32_t keys,int64_t now){sample.keys=keys;policy.update(sample,!keys,now,[&](const Sample &s){output.push_back(s);},[&](uint32_t action){actions.push_back(action);});};
+        auto delivered=[&](uint32_t keys){for(const auto &s:output)if(s.keys==keys)return true;return false;};
+        constexpr uint32_t A=1U<<1;
+        // Desktop: Select with another key does nothing, and its release opens nothing.
+        tick(0,0);tick(Select,10);tick(Select|A,20);tick(Select,30);tick(0,40);
+        assert(actions.empty());for(const auto &s:output)assert(!s.keys);
+        // Game: Select + X is no longer a shortcut; Select goes first, then X (emulator hotkeys).
+        policy.setMode(Game);tick(0,100);output.clear();
+        tick(Select,110);assert(!delivered(Select));
+        tick(Select|X,120);assert(actions.empty()&&output.size()>=2);
+        assert(output[output.size()-2].keys==Select&&output.back().keys==(Select|X));
+        tick(Select,130);tick(Select|Start,140);assert(actions.empty()); // Judgement ends until release.
+        tick(0,150);assert(actions.empty()&&output.back().keys==0);
+        // Game: Select held 600 ms without a shortcut is handed over at once.
+        output.clear();tick(Select,200);tick(Select,799);assert(!delivered(Select));
+        tick(Select,800);assert(output.back().keys==Select);
+        tick(Select|Y,810);assert(actions.empty()&&output.back().keys==(Select|Y));
+        tick(0,900);assert(output.back().keys==0);
+        // A shortcut key up to 80 ms before Select still counts; the game sees it released.
+        output.clear();tick(Start,1000);assert(output.back().keys==Start);
+        tick(Start|Select,1080);assert(!(output.back().keys&(Start|Select)));
+        tick(0,1100);assert(actions.size()==1&&actions[0]==Home);
+        policy.setMode(Game);tick(0,1200);actions.clear();output.clear();
+        tick(Start,1300);tick(Start|Select,1381);tick(Start,1400);tick(0,1410);assert(actions.empty()); // Too late.
+    }
+    std::puts("INPUT_POLICY_PASS: chords, short-home/long-kill, Select hand-over, 80 ms shortcut window and neutral ownership");
 }

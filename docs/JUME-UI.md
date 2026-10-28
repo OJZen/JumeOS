@@ -101,7 +101,7 @@
   “CPU 1.30 GHz · 45% · GPU 400 MHz”；第 3 行 micro“52 °C · 内存 380 / 1024 MB”。一行放不下时
   只在“·”处折行。浮窗内容可在设置 › 性能里选“简洁 / 详细”：详细多 1 行 micro，游戏中
   “P95 18.2 ms”，串流“解码 3.1 ms · 丢帧 0.2%”；130% 字号下（含详细与折行）高仍 ≤ 252。
-  没有数据的项整项隐藏，不显示“—”。游戏中音量 Hud 留在放行区内（音量显示时左界放宽到 x 396）；
+  没有数据的项整项隐藏，不显示“—”。游戏中音量 Hud 留在放行区内（音量显示时放宽到左界 x 372、下界 y 348，Hud 居中）；
   性能浮窗打开时，Hud 放在浮窗下方 16 px、与浮窗右对齐。
 
 ## 6. 动效
@@ -128,7 +128,7 @@
 ### 7.1 按键与分层
 
 可用按键：方向键、左摇杆（L3）、A B X Y、右摇杆（R3）、L1 R1 L2 R2、Select、Start、音量 − / +、
-电源（软件可读，事件来源待实机确认）。没有独立 Home 键，Select 兼任系统键。
+电源（2026-10-28 实机确认：`rk805 pwrkey` 的 KEY_POWER，按下与松开两个沿都按实际时长上报；ark 在 input 组可读。logind 默认 HandlePowerKey=poweroff，Jume 接管前必须阻止它）。没有独立 Home 键，Select 兼任系统键。
 
 输入分四层，上层处理过的按键不再下传：
 1. 系统层：任何时候生效（电源、音量、Select 组合、L3+R3）。
@@ -272,7 +272,7 @@
 | 2 | 共享组件（第 5 节） | `controls/*`、`SettingRow.qml`、`ControlHints.qml` → HintBar | 现有 controls `--check` |
 | 3 | 页面层输入（7.3–7.6，不含系统层） | `input.cpp/.h`、`ShellView.qml` 的 Keys 与 dispatch | 主机 `--check`、`test-shell-control.py` |
 | 4 | 界面（第 8 节） | `ShellView.qml`、`SettingsView.qml`、`TaskView.qml`、`KeyboardPanel.qml`、`ToolPage.qml`、`PortCatalog.qml`、`StreamingView.qml` | 截图与参考图逐张对照 |
-| 5 | 系统层（7.2、7.5 的组合与游戏中判定）；游戏中除性能浮窗、音量浮层外，其他浮层（电源菜单、按住确认、对话框）一律走 panel 模式；音量显示时合成器遮罩左界由 396 改为 372，使 Hud 居中，实机验证 | `handheld.cpp`、`device.cpp`、`gaming-wayland/handheld-shell.cpp` | 需要设备；先探测电源键事件 |
+| 5 | 系统层（7.2、7.5 的组合与游戏中判定）；游戏中除性能浮窗、音量浮层外，其他浮层（电源菜单、按住确认、对话框）一律走 panel 模式；音量显示时合成器遮罩左界由 396 改为 372，使 Hud 居中，实机验证（主机部分已完成：组合判定、panel 模式、遮罩、电源键短按息屏 / 按住电源菜单；Select + 音量、息屏前暂停游戏待做） | `handheld.cpp`、`device.cpp`、`gaming-wayland/handheld-shell.cpp` | 需要设备；先探测电源键事件 |
 | 6 | 实机验收 | — | 60 Hz 帧间隔、LCD、实体按键；只记录实际观察 |
 
 每个阶段单独提交；旧测试里编码的旧按键在同一提交里改成 v1 行为，不删除测试。

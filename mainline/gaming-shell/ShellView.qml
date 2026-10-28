@@ -29,7 +29,6 @@ Item {
     property int taskHoldPercent: 0
     readonly property int taskCount: applications ? applications.tasks.length : 0
     readonly property int taskPreviewCount: applications ? applications.tasks.filter(function(task){return !!task.preview}).length : 0
-    function closeSelectedTask() { if(tasksVisible && taskPage.item)taskPage.item.closeSelected() }
     function showTasksOrDesktop(tasks) {
         quickOpen=false;gameExitChoice.close();tasksVisible=tasks
         if(!tasks) { if(editing)closeEditor();showScene("home") }
@@ -353,7 +352,7 @@ Item {
         powerMenu.present(applications ? applications.tasks.map(function(task) { return task.title }) : [])
     }
     function powerChosen(id) {
-        if (id === "screenOff") { blankScreen(); return }
+        if (id === "screenOff") { powerScreenOff(); return }
         if (!store.save()) return
         if (!device.requestPower(id)) notify(device.error)
     }
@@ -431,6 +430,23 @@ Item {
         if (store.screenOffSeconds > 0 && idleEligible) offTimer.restart()
         else offTimer.stop()
         return wasDimmed
+    }
+    // §7.2 power key (device.cpp reports the edges): a short press turns the screen off, over a game
+    // too; while it is off the press only wakes it. Held 1.5 s it opens the power menu, its ring
+    // showing from 0.6 s; another key cancels the hold.
+    property bool powerWaking: false
+    readonly property bool powerHolding: holdAction === "power"
+    function powerKey(pressed) {
+        if (pressed) {
+            if (screenOff) { powerWaking = true; activity(); return }
+            activity(); beginHold("power", Ui.Theme.powerHoldDuration)
+        } else if (powerWaking) powerWaking = false
+        else if (holdAction === "power") { cancelHold(); powerScreenOff() }
+    }
+    function powerScreenOff() {
+        if (screenOff) return
+        if (hardware && !device.setScreenOff(true)) { notify(device.error); return }
+        screenOff = true; dimmed = false
     }
     function blankScreen() {
         if (!idleEligible || screenOff) return false
@@ -552,6 +568,7 @@ Item {
         cancelHold()
         if (action === "taskForce" && tasksVisible && taskPage.item) taskPage.item.forceSelected()
         else if (action === "testerExit") settingsView.leaveTester()
+        else if (action === "power") openPowerMenu()
     }
     Timer {
         id: holdTimer; interval: 16; repeat: true
@@ -815,12 +832,18 @@ Item {
                 onNotice: function(text) { root.notify(text) }
             }
         }
-        // Router Select+X holds (stage 5 replaces them) and the task page's X hold share one card.
+        // The router's Select + Start hold and the task page's X hold share one card.
         Ui.HoldConfirm {
             objectName: "taskHold"; z: 101; anchors.centerIn: parent
             progress: Math.max(root.taskHoldPercent / 100, root.holdAction === "taskForce" ? root.holdProgress : 0)
             duration: Ui.Theme.forceHoldDuration
             title: "继续按住以强制结束"; detail: "未保存的进度会丢失"; fontScale: root.fontScale
+        }
+        Ui.HoldConfirm {
+            objectName: "powerHold"; z: 101; anchors.centerIn: parent
+            progress: root.powerHolding ? root.holdProgress : 0
+            duration: Ui.Theme.powerHoldDuration
+            title: "继续按住打开电源菜单"; fontScale: root.fontScale
         }
         Ui.PowerMenu {
             id: powerMenu; objectName: "powerMenuLayer"; anchors.fill: parent; z: 102

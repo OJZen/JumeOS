@@ -5,6 +5,8 @@
 #include <QElapsedTimer>
 #include <QStorageInfo>
 #include <QFileSystemWatcher>
+#include <QSocketNotifier>
+#include <memory>
 
 // Linux device adapter. Writes require both the fixed R46H identity and a probe lease.
 // The fixture root is constructor-only: the application exposes no arbitrary sysfs path.
@@ -43,9 +45,13 @@ signals:
     void warning(const QString &message);
     void powerRequested(int exitCode);
     void volumeChanged(int percent);
+    // §7.2 power key edges; the shell owns the short/hold timing.
+    void powerKey(bool pressed);
 private:
     void watchVolume();
     void volumeFileChanged(const QString &name);
+    void openPowerKey();
+    void readPowerKey();
     QString path(const QString &relative) const;
     bool fail(const QString &text);
     bool writeValue(const QString &relative, const QString &value);
@@ -57,6 +63,9 @@ private:
     QElapsedTimer m_sampleClock;
     QTimer m_timer;
     QFileSystemWatcher m_volumeWatcher;
+    int m_powerFd = -1;
+    std::unique_ptr<QSocketNotifier> m_powerNotifier;
+    QByteArray m_powerEvents;
     bool m_target = false, m_controls = false, m_warned = false, m_automaticCpu = false;
     int m_beforeDim = -1, m_beforeOff = -1;
     QString m_powerScene = "desktop";

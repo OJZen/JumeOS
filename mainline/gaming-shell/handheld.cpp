@@ -126,7 +126,7 @@ bool HandheldSession::start(const QString &router, const QString &device, QStrin
         if (::fcntl(child, F_SETFD, 0) < 0) ::_exit(127);
         if(uinputFd>=0)for(int fd=uinputFd;fd<uinputFd+4;++fd)if(::fcntl(fd,F_SETFD,0)<0)::_exit(127);
     });
-    QStringList arguments{device, QString::number(child), "120"};
+    QStringList arguments{device, QString::number(child), "80"}; // §7.5 chord window.
     if (uinputFd >= 0) arguments.append(QString::number(uinputFd));
     m_router.start(router, arguments);
     // Startup is bounded before showing the UI. All steady-state IO is asynchronous.
@@ -164,16 +164,18 @@ void HandheldSession::readInput() {
         } else if(packet.type==Route::Hold && packet.keys<=100) {
             if(packet.keys&&!m_view->rootObject()->property("taskHoldPercent").toInt()){m_holdId=m_applications->activeId();m_holdPid=m_applications->processId();}
             m_view->rootObject()->setProperty("taskHoldPercent",int(packet.keys));
-        } else if(packet.type==Route::Tasks||packet.type==Route::Home||packet.type==Route::Close||packet.type==Route::Kill) {
+        } else if(packet.type==Route::Tasks||packet.type==Route::Home||packet.type==Route::Kill) {
+            // Select + X is no longer a system shortcut (§7.8); the router never sends Close.
             m_inputMode=-1;m_input->suppressUntilNeutral();
             if(packet.type!=Route::Kill||(m_holdPid>1&&m_applications->processId()==m_holdPid&&m_applications->activeId()==m_holdId))
-                emit systemAction(packet.type==Route::Tasks?"tasks":packet.type==Route::Home?"desktop":packet.type==Route::Close?"close":"kill");
+                emit systemAction(packet.type==Route::Tasks?"tasks":packet.type==Route::Home?"desktop":"kill");
             synchronize();
         } else if (packet.type == Route::Panel) {
             auto *root = m_view->rootObject();
             // The router is already neutral and paused; policy then grants the next owner.
             m_inputMode = -1; m_input->suppressUntilNeutral();
-            if (m_applications->running()) root->setProperty("quickOpen", !root->property("quickOpen").toBool());
+            // Through the panel's own open/leave, so it opens on brightness (§8) and saves on leaving.
+            if (m_applications->running()) QMetaObject::invokeMethod(root, root->property("quickOpen").toBool() ? "leaveQuick" : "openQuick");
             else QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, QString("quick")), Q_ARG(QVariant, false));
             synchronize();
         } else { fail(QStringLiteral("输入通道消息顺序无效。")); return; }
@@ -207,7 +209,7 @@ void HandheldSession::sceneChanged() {
     // A visible telemetry/volume overlay is not an input surface. USB pointer
     // events must reach the foreground app until the quick panel explicitly opens.
     m_view->setFlag(Qt::WindowTransparentForInput, m_applications->running()
-        && !m_view->rootObject()->property("quickOpen").toBool());
+        && !m_view->rootObject()->property("overlayOpen").toBool());
     // A low-priority sample must never delay an input/privacy transition.
     if (m_pending && m_request.value("op") == QJsonValue("observe")) {
         m_pending = false; m_deadline.stop(); m_policy.abort();
@@ -255,7 +257,7 @@ void HandheldSession::readFrameMetrics() {
 bool HandheldSession::gameInputAvailable() const {
     const auto *root = m_view->rootObject();
     return !m_failed && m_ready && m_routerReady && !m_remoteSequence && m_inputRequested < 0 && m_inputMode == Route::Game
-        && m_applications->processId() > 1 && root && !root->property("quickOpen").toBool()
+        && m_applications->processId() > 1 && root && !root->property("overlayOpen").toBool()
         && !root->property("panelVisible").toBool() && !root->property("sensitiveVisible").toBool();
 }
 bool HandheldSession::injectGame(quint32 keys, const qint32 axes[4], int milliseconds, quint64 expectedSequence, const QString &application) {
@@ -290,8 +292,12 @@ void HandheldSession::requestPolicy() {
     auto *root = m_view->rootObject();
     if (!root) return;
     const qint64 game = m_applications->processId();
-    const bool panel = game && root->property("quickOpen").toBool();
-    const bool volume = game && (root->property("volumeVisible").toBool()||root->property("taskHoldPercent").toInt()>0);
+    // §10 stage 5: in a game every overlay but the performance overlay and the volume Hud is a
+    // panel (the whole UI over the game). The Select + Start and power-key holds show as one too,
+    // while the keys stay with the router until the hold ends.
+    const bool panelInput = game && root->property("overlayOpen").toBool();
+    const bool panel = panelInput || (game && (root->property("taskHoldPercent").toInt() > 0 || root->property("powerHolding").toBool()));
+    const bool volume = game && root->property("volumeVisible").toBool();
     const bool overlay = game && (root->property("panelVisible").toBool() || root->property("monitorVisible").toBool() || volume);
     const bool privacy = m_capturePhase != Permit && m_capturePhase != Reading;
     QJsonObject request{{"version", 1}};
@@ -311,7 +317,7 @@ void HandheldSession::requestPolicy() {
         if (m_capturePhase == Permit) readCapture();
         if (m_capturePhase == Closing && !m_captureThread) finishCapture();
         if (!game && m_thumbnailSurface && m_thumbnailFrameReady && !m_thumbnailThread) readThumbnail();
-        selectInput(!game || panel);
+        selectInput(!game || panelInput);
         const bool ready = m_routerReady && m_inputRequested < 0;
         if (m_ready != ready) { m_ready = ready; emit changed(); }
         return;

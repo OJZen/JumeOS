@@ -108,11 +108,12 @@ static void arrange(Shell *shell)
         weston_view_set_position(item->view, output->pos);
         if (isUi && hasGame && shell->overlay && !shell->panel
             && (shell->compositor->capabilities & WESTON_CAP_VIEW_CLIP_MASK)) {
-            // Include the top-center volume capsule only while it is visible.
+            // Include the volume Hud only while it is visible: centered (372..652 on the 1024 canvas)
+            // or right-aligned below a performance overlay of at most 252 (down to 348).
             // Otherwise retain the accepted narrow performance-HUD blend region.
-            const int left = shell->volume ? 396 : 624;
+            const int left = shell->volume ? 372 : 624, bottom = shell->volume ? 348 : 276;
             weston_view_set_mask(item->view, output->width * left / 1024, output->height * 16 / 768,
-                (output->width * (992 - left) + 1023) / 1024, (output->height * 260 + 767) / 768);
+                (output->width * (992 - left) + 1023) / 1024, (output->height * (bottom - 16) + 767) / 768);
         } else if (isUi) weston_view_set_mask_infinite(item->view);
         weston_view_update_transform(item->view);
         const bool active = isUi ? (!hasGame || shell->panel) : isGame && !shell->panel;

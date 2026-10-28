@@ -9,6 +9,8 @@
 #include <QRegularExpression>
 #include <QSysInfo>
 #include <cmath>
+#include <cerrno>
+#include <cstring>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -134,9 +136,42 @@ DeviceState::DeviceState(QString root, bool allowControls, bool fixture):m_root(
     refresh();refreshStorage();m_originalCpu=m_info.value("cpu").toMap();m_warned=false;
     m_automaticCpu=controls() && m_originalCpu.value("governor")=="schedutil";
     m_timer.setInterval(2000);connect(&m_timer,&QTimer::timeout,this,&DeviceState::refresh);
-    if(m_target)m_timer.start();
+    if(m_target){m_timer.start();openPowerKey();}
 }
-DeviceState::~DeviceState(){if(m_beforeOff>=0)setScreenOff(false);if(m_beforeDim>=0)setDimmed(false);}
+DeviceState::~DeviceState(){
+    if(m_beforeOff>=0)setScreenOff(false);if(m_beforeDim>=0)setDimmed(false);
+    m_powerNotifier.reset();if(m_powerFd>=0)::close(m_powerFd);
+}
+// §7.2 power key: the fixed target's `rk805 pwrkey` evdev node, read-only (ark is in `input`).
+// Only press/release edges leave here. The installed session keeps logind off the key.
+void DeviceState::openPowerKey() {
+    const auto inputs=QDir(path("sys/class/input")).entryList({"event*"},QDir::Dirs|QDir::System|QDir::NoDotAndDotDot);
+    for(const auto &name:inputs) {
+        if(read(m_root,"sys/class/input/"+name+"/device/name").trimmed()!="rk805 pwrkey")continue;
+        m_powerFd=::open(QFile::encodeName(path("dev/input/"+name)).constData(),O_RDONLY|O_NONBLOCK|O_CLOEXEC);
+        if(m_powerFd<0)return;
+        m_powerNotifier=std::make_unique<QSocketNotifier>(m_powerFd,QSocketNotifier::Read);
+        connect(m_powerNotifier.get(),&QSocketNotifier::activated,this,&DeviceState::readPowerKey);
+        return;
+    }
+}
+void DeviceState::readPowerKey() {
+    // struct input_event on 64-bit Linux: 16-byte time, u16 type, u16 code, s32 value.
+    constexpr int Size=24;
+    char chunk[Size*16];
+    for(;;) {
+        const auto n=::read(m_powerFd,chunk,sizeof chunk);
+        if(n<0&&errno==EINTR)continue;
+        if(n<0&&errno==EAGAIN)return;
+        if(n<=0){m_powerNotifier.reset();::close(m_powerFd);m_powerFd=-1;return;}
+        m_powerEvents.append(chunk,int(n));
+        for(;m_powerEvents.size()>=Size;m_powerEvents.remove(0,Size)) {
+            quint16 type=0,code=0;qint32 value=0;
+            std::memcpy(&type,m_powerEvents.constData()+16,2);std::memcpy(&code,m_powerEvents.constData()+18,2);std::memcpy(&value,m_powerEvents.constData()+20,4);
+            if(type==1&&code==116&&(value==0||value==1))emit powerKey(value==1); // EV_KEY KEY_POWER; no autorepeat.
+        }
+    }
+}
 QString DeviceState::path(const QString &relative) const {return QDir(m_root).filePath(relative);}
 bool DeviceState::fail(const QString &text){m_error=text;emit changed();return false;}
 void DeviceState::watchVolume() {

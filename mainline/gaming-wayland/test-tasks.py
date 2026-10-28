@@ -84,6 +84,11 @@ ssize_t recvmsg(int fd, struct msghdr *message, int flags) {
             pad.emit((1,fixture.KEYS[8],1),(1,fixture.KEYS[button],1))
             time.sleep(hold)
             pad.emit((1,fixture.KEYS[8],0),(1,fixture.KEYS[button],0))
+        def close_from_tasks():
+            # Select + X is not a shortcut (JUME-UI §7.8): the task page's X (short, on release)
+            # requests the selected task's normal close.
+            combo(3);wait(lambda:state()['tasksVisible'] and state()['sharedReady'],'task page for close')
+            pad.emit((1,fixture.KEYS[2],1));time.sleep(.08);pad.emit((1,fixture.KEYS[2],0))
         wait(lambda:endpoint.exists() or shell.poll() is not None,'launcher startup')
         assert shell.poll() is None,(out/'shell.log').read_text()
         wait(lambda:state()['sharedReady'],'router ready')
@@ -124,10 +129,10 @@ ssize_t recvmsg(int fd, struct msghdr *message, int flags) {
         combo(3);wait(lambda:state()['tasksVisible'],'task reopen')
         observe('accept');wait(lambda:state()['activeApplication']=='builtin.files' and state()['sharedReady'],'resume existing app')
         assert game('files')['pid']==first and state()['taskCount']==2
-        combo(2);wait(lambda:(work/'files.allow-close.requests').exists(),'Wayland close was not delivered')
+        close_from_tasks();wait(lambda:(work/'files.allow-close.requests').exists(),'Wayland close was not delivered')
         time.sleep(1.8)
         assert Path(f'/proc/{first}').exists() and state()['externalSession'],'cooperative close escalated after refusal'
-        (work/'files.allow-close').touch();combo(2)
+        (work/'files.allow-close').touch();close_from_tasks()
         # QProcess reaps the PID before the bounded process-group cleanup timer
         # removes the task. Wait for that lifecycle boundary, not just /proc.
         closed={}

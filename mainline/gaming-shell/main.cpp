@@ -203,10 +203,12 @@ int main(int argc, char **argv) {
             fatalStatus = 1; qCritical("HANDHELD_SESSION_FAILURE %s", qPrintable(message)); window.close();
         });
         QObject::connect(root, SIGNAL(quickOpenChanged()), handheld.get(), SLOT(sceneChanged()));
+        QObject::connect(root, SIGNAL(overlayOpenChanged()), handheld.get(), SLOT(sceneChanged()));
         QObject::connect(root, SIGNAL(panelVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
         QObject::connect(root, SIGNAL(monitorVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
         QObject::connect(root, SIGNAL(volumeVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
         QObject::connect(root, SIGNAL(taskHoldPercentChanged()), handheld.get(), SLOT(sceneChanged()));
+        QObject::connect(root, SIGNAL(powerHoldingChanged()), handheld.get(), SLOT(sceneChanged()));
         QObject::connect(root, SIGNAL(tasksVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
         QObject::connect(root, SIGNAL(sensitiveVisibleChanged()), handheld.get(), SLOT(sceneChanged()));
         QString error;
@@ -224,8 +226,9 @@ int main(int argc, char **argv) {
     if(handheldMode) {
         QObject::connect(handheld.get(),&HandheldSession::systemAction,&window,[&](const QString &action){
             if(root->property("screenOff").toBool()){QMetaObject::invokeMethod(root,"activity");return;}
-            if(action=="tasks"||action=="desktop")QTimer::singleShot(0,&window,[&,action]{emit applications.backgroundRequested(action=="tasks");});
-            else if(action=="close") {if(root->property("tasksVisible").toBool())QMetaObject::invokeMethod(root,"closeSelectedTask");else {root->setProperty("quickOpen",false);applications.requestClose();}}
+            // Select + Y on the task page returns, like B (§7.2).
+            if(action=="tasks"&&root->property("tasksVisible").toBool())QMetaObject::invokeMethod(root,"dispatch",Q_ARG(QVariant,QString("back")),Q_ARG(QVariant,false));
+            else if(action=="tasks"||action=="desktop")QTimer::singleShot(0,&window,[&,action]{emit applications.backgroundRequested(action=="tasks");});
             else if(action=="kill")applications.forceKill();
         });
         QObject::connect(handheld.get(),&HandheldSession::notice,&window,[root](const QString &text){QMetaObject::invokeMethod(root,"notify",Q_ARG(QVariant,text));});
@@ -288,6 +291,7 @@ int main(int argc, char **argv) {
             QFile::remove(state+"/tools/native-request-"+game+".json");
     });
     QObject::connect(&device,&DeviceState::powerRequested,&app,[](int code){QCoreApplication::exit(code);});
+    QObject::connect(&device,&DeviceState::powerKey,&window,[root](bool pressed){if(root)QMetaObject::invokeMethod(root,"powerKey",Q_ARG(QVariant,pressed));});
     QObject::connect(&device,&DeviceState::warning,&window,[root](const QString &message){if(root)QMetaObject::invokeMethod(root,"notify",Q_ARG(QVariant,message));});
     QObject::connect(&network,&NetworkState::notice,&window,[root](const QString &message){if(root)QMetaObject::invokeMethod(root,"notify",Q_ARG(QVariant,message));});
     QObject::connect(&streaming, &Streaming::changed, &window, [&] {
@@ -332,7 +336,7 @@ int main(int argc, char **argv) {
     window.setMinimumSize(QSize(640, 480));
     QMetaObject::invokeMethod(window.rootObject(), "showScene", Q_ARG(QVariant, scene));
     const auto controllerOwnsUi = [&] {
-        return handheldMode ? handheld->ready() && (!applications.running() || root->property("quickOpen").toBool())
+        return handheldMode ? handheld->ready() && (!applications.running() || root->property("overlayOpen").toBool())
                             : window.isActive() && !applications.running();
     };
     QObject::connect(&controller, &ControllerInput::action, &window,

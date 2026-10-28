@@ -237,7 +237,12 @@ def run(executable):
             pad.emit((1,KEYS[0],0));time.sleep(.03);drain(sink)
         finally:
             os.close(other);other_path.unlink()
-        for seq,key,kind,hold in ((24,3,10,0),(25,2,12,0),(26,9,11,.05),(27,9,13,2.1)):
+        # Select + X is not a shortcut: in a game both reach the game (emulator hotkeys).
+        pad.emit((1,KEYS[8],1),(1,KEYS[2],1));time.sleep(.03)
+        events=drain(sink);assert (1,KEYS[8],1) in events and (1,KEYS[2],1) in events
+        assert events.index((1,KEYS[8],1))<events.index((1,KEYS[2],1)),'Select must arrive before the other key'
+        pad.emit((1,KEYS[8],0),(1,KEYS[2],0));time.sleep(.03);drain(sink)
+        for seq,key,kind,hold in ((24,3,10,0),(25,9,11,.05),(26,9,13,2.1)):
             pad.emit((1,KEYS[8],1),(1,KEYS[key],1))
             if key==9:
                 time.sleep(hold)
@@ -245,7 +250,7 @@ def run(executable):
             assert receive(controller,kind)[1]==kind
             assert not any(e[0]==1 and e[1] in (KEYS[8],KEYS[key]) and e[2]==1 for e in drain(sink))
             pad.emit((1,KEYS[8],0),(1,KEYS[key],0));command(controller,seq,1);receive(controller,5);time.sleep(.03)
-        print('TASK_INPUT_PASS: isolated slots, Select shortcuts, short release and 2-second forced exit')
+        print('TASK_INPUT_PASS: isolated slots, Select shortcuts, Select + X passthrough, short release and 2-second forced exit')
         command(controller, 3, 0)
         assert proc.wait(timeout=3) == 1
         pad.emit((1, KEYS[0], 1)); time.sleep(.03)

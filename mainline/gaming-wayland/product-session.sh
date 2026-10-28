@@ -31,7 +31,13 @@ case $1 in
     done
     [[ ${#inputs[@]} == 1 ]] || exit 1
     export R46H_ROUTED_SOURCE=${inputs[0]}
-    exec /usr/bin/setsid --wait /usr/bin/openvt -e -c 2 -s -f -- /bin/bash "$scope/session.sh" seat "$runtime/session" handheld
+    # Jume reads the power key itself (JUME-UI §7.2): keep logind's HandlePowerKey (poweroff) off it
+    # for exactly the session's lifetime. Without logind (containers) nothing else acts on the key.
+    inhibit=()
+    if [[ -x /usr/bin/systemd-inhibit ]] && /usr/bin/systemd-inhibit --list > /dev/null 2>&1; then
+        inhibit=(/usr/bin/systemd-inhibit --what=handle-power-key --mode=block --who=Jume --why='Jume handles the power key')
+    fi
+    exec ${inhibit[@]+"${inhibit[@]}"} /usr/bin/setsid --wait /usr/bin/openvt -e -c 2 -s -f -- /bin/bash "$scope/session.sh" seat "$runtime/session" handheld
     ;;
 --restore)
     # ExecStopPost runs only after systemd has killed every desktop/browser child.

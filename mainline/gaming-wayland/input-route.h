@@ -19,7 +19,7 @@ struct Packet {
 static_assert(sizeof(Packet) == 80, "local packet ABI changed");
 constexpr uint32_t L3 = 1U << 14, R3 = 1U << 15, Chord = L3 | R3;
 constexpr uint32_t Select = 1U << 8, Start = 1U << 9, X = 1U << 2, Y = 1U << 3;
-inline bool systemChord(uint32_t keys) { return (keys & Chord)==Chord || ((keys&Select)&&(keys&(Start|X|Y))); }
+inline bool systemChord(uint32_t keys) { return (keys & Chord)==Chord || ((keys&Select)&&(keys&(Start|Y))); }
 struct Sample {
     uint32_t keys = 0;
     std::array<int32_t, 4> axes{};
@@ -29,19 +29,25 @@ struct Sample {
 
 // Only stick clicks wait for the chord window; ordinary controls are immediate.
 // A short standalone click is emitted before its release, rather than discarded.
+// Select (§7.2, §7.5) is the system modifier: with Start (short = Home, 2 s = Kill) or Y (Tasks),
+// pressed after Select or up to the chord window before it. A lone Select is judged on release.
+// In a game, Select with any other key, or held 600 ms without a shortcut, goes to the game at
+// once (press first, then the other key) and ends shortcut judgement until it is released.
+// On the desktop Select with another key does nothing.
+constexpr int64_t SelectPassMs = 600, KillMs = 2000;
 struct Policy {
     explicit Policy(int milliseconds) : chordMs(milliseconds) {}
     int chordMs;
     uint32_t mode = Ui, pending = 0;
     int64_t deadline = 0;
     bool waiting = true, ownerPending = false, chordSpent = false;
-    uint32_t previous = 0, shortcut = 0;
-    int64_t heldAt = 0;
-    bool selecting = false, shortcutSpent = false;
+    uint32_t previous = 0, shortcut = 0, swallowed = 0;
+    int64_t heldAt = 0, selectAt = 0, startAt = -1, yAt = -1;
+    bool selecting = false, shortcutSpent = false, selectPassed = false;
     void setMode(uint32_t next) {
         mode = next; waiting = true; ownerPending = false;
         pending = 0; deadline = 0; chordSpent = false;
-        previous=shortcut=0;selecting=shortcutSpent=false;heldAt=0;
+        previous=shortcut=swallowed=0;selecting=shortcutSpent=selectPassed=false;heldAt=selectAt=0;startAt=yAt=-1;
     }
     template<class Emit, class Request>
     void update(const Sample &input, bool neutral, int64_t now, Emit deliver, Request request) {
@@ -51,27 +57,43 @@ struct Policy {
             waiting = false;
         }
         auto output = input;
-        // Select is a modifier: defer its standalone press until release. Face
-        // buttons stay immediate; a shortcut requires Select first or simultaneous.
+        const auto fresh = input.keys & ~previous;
+        if (fresh & Start) startAt = now;
+        if (fresh & Y) yAt = now;
+        auto requestNow = [&](uint32_t action) {
+            shortcutSpent = true; ownerPending = true; waiting = true; request(action); previous = input.keys;
+        };
         if(input.keys&Select) {
-            if(!selecting){selecting=true;shortcutSpent=false;shortcut=0;}
-            const auto pressed=(input.keys&~previous)&(Start|X|Y);
-            if(!shortcut&&!shortcutSpent&&pressed) {
-                shortcut=(pressed&Start)?Start:(pressed&Y)?Y:X;heldAt=now;
-                if(shortcut!=Start){shortcutSpent=true;ownerPending=true;waiting=true;request(shortcut==Y?Tasks:Close);previous=input.keys;return;}
+            auto pressed = fresh & (Start|Y);
+            if(!selecting) {
+                selecting=true;shortcutSpent=selectPassed=false;shortcut=0;selectAt=now;
+                // Start or Y pressed just before Select still makes the shortcut.
+                if ((input.keys & Start) && startAt >= 0 && now - startAt <= chordMs) pressed |= Start;
+                if ((input.keys & Y) && yAt >= 0 && now - yAt <= chordMs) pressed |= Y;
             }
-            output.keys&=~Select;
-            if(shortcut)output.keys&=~(Start|X|Y);
+            const auto others = fresh & ~(Select|Start|Y);
+            if(!shortcut&&!shortcutSpent&&!selectPassed&&pressed) {
+                shortcut=(pressed&Start)?Start:Y;heldAt=now;
+                if(shortcut==Y){requestNow(Tasks);return;}
+            } else if(!shortcut&&!shortcutSpent&&!selectPassed&&mode==Game&&(others||now-selectAt>=SelectPassMs)) {
+                selectPassed=true;
+                if(others){auto press=input;press.keys&=~others;deliver(press);}
+            }
+            // Desktop: keys pressed with Select (other than its shortcut) do nothing, nor does the release.
+            if(mode==Ui){swallowed|=fresh&~(Select|shortcut);if(others&&!shortcut)shortcutSpent=true;}
+            if(!selectPassed)output.keys&=~Select;
+            if(shortcut)output.keys&=~(Start|Y);
             if(shortcut==Start&&!shortcutSpent) {
-                if(!(input.keys&Start)){shortcutSpent=true;ownerPending=true;waiting=true;request(Home);previous=input.keys;return;}
-                if(now-heldAt>=2000){shortcutSpent=true;ownerPending=true;waiting=true;request(Kill);previous=input.keys;return;}
+                if(!(input.keys&Start)){requestNow(Home);return;}
+                if(now-heldAt>=KillMs){requestNow(Kill);return;}
             }
         } else if(selecting) {
             selecting=false;
-            if(shortcut==Start&&!shortcutSpent){shortcutSpent=true;ownerPending=true;waiting=true;request(Home);previous=input.keys;return;}
-            if(!shortcutSpent&&!shortcut){auto pulse=output;pulse.keys|=Select;deliver(pulse);}
-            shortcut=0;
+            if(shortcut==Start&&!shortcutSpent){requestNow(Home);return;}
+            if(!shortcutSpent&&!shortcut&&!selectPassed){auto pulse=output;pulse.keys|=Select;deliver(pulse);}
+            shortcut=0;selectPassed=false;
         }
+        swallowed&=input.keys;output.keys&=~swallowed;
         previous=input.keys;
         const auto clicks = input.keys & Chord;
         if (!chordSpent && !pending && clicks) {
