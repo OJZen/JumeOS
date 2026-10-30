@@ -1,8 +1,9 @@
 # Jume default-desktop candidate
 
-Status: **r9 packaged recovery + GUI reboot MACHINE PASS; default promotion open**.
-This is the first Q1 step, not permission to remove ES-DE. The current clean-source
-candidate is from `5126d40`, under `mainline/out/.cache/jume-product-arm64-20260927-r9/`.
+Status: **r11 default cold/warm boot and ES-DE failure recovery PASS for observed paths**.
+The [default activation](#r11-default-activation--2026-10-30) adds recovery proof to the
+[r11 desktop soak](#r11-two-hour-desktop-soak--2026-10-29). One operator-confirmed cold start now passes; gameplay remains open. Keep ES-DE.
+The original r9 clean-source candidate is from `5126d40`, under `mainline/out/.cache/jume-product-arm64-20260927-r9/`.
 Its `receipt.json` records source, archive and evidence hashes; all were rechecked.
 Qt checks (10 tools + 13 shell), desktop/tasks, PortMaster, packaged session/power
 exits and full installer seal passed. Fresh-container SSH passed with the final
@@ -106,12 +107,94 @@ selected, r6/r8/r9/r10 and `pre-r10-IM577S` backup retained, ES-DE default. Not 
 saves, LCD readability, Select chords on hardware, endurance or default promotion.
 Evidence: `mainline/out/.cache/jume-r10-device-20261028.IM577S/`.
 
+## R11 two-hour desktop soak — 2026-10-29
+
+Status: **PASS_DESKTOP_ONLY / UART-CONFIRMED POWEROFF**. The sealed r11 trial on p2 v0.18
+ran **7203.1 seconds** from **00:03:49.986 CST**, with the same service/GUI PID and IPC
+generation, 680 health samples, 114 Home/Right/Left cycles and inspected start/end composed frames.
+No game was launched, setting edited, default promoted or r9-only fallback overlay applied.
+
+During the soak, CPU/GPU peaked at **66.153/67.307 C**, available RAM stayed above
+**602644 KiB (588.5 MiB)** and GUI RSS peaked at **192684 KiB (188.2 MiB)**.
+AC stayed present, voltage >=4.015600 V, and the storage/Panfrost/OOM scan found zero faults.
+All 177 files in the aggregate state snapshot matched before/after the run, before rollback;
+this is byte-retention evidence, not gameplay/save-load or a post-poweroff readback.
+
+The device-owned finish hook rolled back to ES-DE with zero failed units. Its post-cleanup
+CPU/GPU sample was 71.666/69.615 C, separate from the soak peaks. It synced, exported a
+179761-byte archive (SHA256 `0a8908a4b10ce918975b08090cb1a0ecafbdaa21b2e09801906b22bf86d31acd`)
+and requested poweroff. UART at about **02:04 CST** confirmed `/roms` unmount, root read-only,
+all filesystems/loops detached and `Powering off`; the emergency timer was not needed.
+
+Archive bytes/hash, fixed member allowlist, all health extrema, state hashes and original guard
+source were independently checked on the host. Serial capture is closed; heartbeat `r46h` was
+deleted. No SSH service/key was installed. Upload staging was removed; bounded named target
+evidence remains at `/var/lib/jume-soak-0czawbe0` for later deliberate cleanup, with a verified
+host copy at `mainline/out/.cache/jume-r11-soak-20261028.0czawbe0/` (`receipt.json`, `target-evidence/`).
+Final selection is inactive/disabled r11 with ES-DE boot default; retained releases/backups remain.
+This closes only desktop/light-navigation endurance. Gameplay, saves, physical LCD/audio/controls,
+GUI poweroff, interrupted cleanup, default cold boot and crash fallback still need their own proof.
+
+## R11 default activation — 2026-10-30
+
+Status: **DEFAULT WARM BOOT + AUTOMATIC FAILURE RECOVERY MACHINE PASS / COLD OPEN**.
+On the freshly identified v0.18/card, the requested default is now r11 Jume, with
+ES-DE retained for this boot after a failed startup or session crash. The next
+boot retries Jume. The sealed r11 archive and complete installed release passed
+hash/seal checks; only the separate fallback overlay's r9 pin changed to r11.
+Its installer, unit and session hooks are byte-identical to the reviewed sources.
+Installed helper SHA256: `ad6ff7e57c46caaec7fbbe722ceb146496fa5b5bf5d5c25238292b4bc6c8cec2`.
+
+Ready Home/IPC and `--enable` passed. Killing the identified Launcher GUI caused
+exit 137, verified lease cleanup and automatic ES-DE start with no Jume restart.
+A task-owned `/run` override forcing `ExecStartPre=/bin/false` independently
+produced the same recovery; the exact override was removed before reboot.
+Both paths preserved the persistent Jume default marker and ran a single frontend.
+
+Warm reboot produced a new verified boot ID and automatically entered Jume Home;
+ES-DE stayed inactive, and no trial marker or runtime fallback override survived.
+The composed Home frame and IPC were inspected; full seal/preflight took about
+44 seconds from the service start request. Normal stop cleaned all session
+resources without invoking fallback, while Jume remained enabled for next boot.
+The same 177 state files matched before, after reboot and after normal stop.
+No failed units or detected kernel/storage/Panfrost/OOM faults remained in that boot.
+
+The eight-file export was size/SHA-256 checked and extracted by fixed regular-file
+allowlist. Evidence and exact receipts: `mainline/out/.cache/jume-r11-default-20261030.1pm7oq/`.
+Task uploads, temporary failure configuration, target staging and poweroff timer
+were removed. Existing releases/backups and prior named soak evidence remain.
+After sync, UART confirmed `/roms` unmount, root read-only, device detachment and
+`Powering off` at about **21:45 CST**; serial capture is closed. The device is off,
+with **r11 enabled/default and the ES-DE fallback installed**. No commit/push.
+
+This does not prove cold power-on, Weston-only loss with this overlay, interrupted
+cleanup, GUI power actions, hung-process recovery, games/save-load or new physical
+LCD/audio/control acceptance. No game or additional endurance run was started.
+
+## User cold start and boot image — 2026-10-30
+
+The user powered on again and initially saw the Linux login screen. Read-only
+serial inspection found r11 already active/enabled with zero restarts; neither
+ES-DE nor recovery had run. The user then confirmed Jume Home, with no agent
+start/restart command. This closes one attended cold-start sample. Systemd
+reported 60.946 seconds; Jume preparation/start occupied 45.251 seconds of it.
+Evidence: `mainline/out/.cache/jume-r11-cold-start-20261030.gwXAXZ/`.
+
+At the user's request, the separate [boot image](BOOT-SPLASH.md) now covers this
+waiting interval. It preserves sealed release verification and the ES-DE fallback.
+The owning runbook records its exact payload, boot handoff and UART-confirmed
+cleanup. The user accepted the image; final terminal-flash verification was
+deferred when the user requested wrap-up and commit. Startup latency is unchanged; this is not a percentage
+progress meter or bootloader/kernel splash.
+
 ## Ownership and recovery
 
 `jume-launcher.service` supervises the existing Wayland session and applications.
-Launcher, Weston or seatd exit restarts the session, limited to three starts in
-120 seconds in sealed r9. Without the optional [ES-DE fallback overlay](#optional-r9-es-de-fallback-overlay),
-serial login remains the rescue route after restart exhaustion; explicit rollback restores ES-DE.
+Without the [ES-DE fallback overlay](#optional-r11-es-de-fallback-overlay), Launcher,
+Weston or seatd exit restarts the session, limited to three starts in 120 seconds
+in sealed r9/r11. Serial login then remains the rescue route after restart
+exhaustion; explicit rollback restores ES-DE. The installed overlay instead
+returns to ES-DE on the first detected failure after verified cleanup.
 
 Installed desktop/game/CPU-helper lifetimes have no diagnostic timer. Only exact
 `jume-launcher.service/desktop` membership permits unlimited native gameplay;
@@ -200,16 +283,16 @@ Host fixtures cover both interruption sides, reverse selection and refusal gates
 Same-service r6/r8 device cycling and unchanged user files pass; actual power-loss
 recovery remains open and is not established by host filesystem mocks.
 
-## Optional r9 ES-DE fallback overlay
+## Optional r11 ES-DE fallback overlay
 
-**2026-10-20 HOST ONLY / NOT DEPLOYED.** The requested policy is Jume at boot,
-then ES-DE after a failed startup or session crash, with Jume selected again on
-the next boot. The operator cannot connect the device yet; the installed r9 and
-ES-DE boot default remain unchanged. This is an opt-in configuration, not full
-game-library, save/load or endurance acceptance.
+**2026-10-30: r11 adaptation.** The requested policy is Jume at boot, then ES-DE
+after a failed startup or session crash, with Jume selected again on the next
+boot. The r11 archive/manifest and unchanged installer/service hooks were checked
+before replacing the old r9 pin. This is an opt-in configuration, not full
+game-library, save/load or endurance acceptance. See the [activation result](#r11-default-activation--2026-10-30).
 
 [`product-fallback.py`](product-fallback.py) installs a separate helper/service
-and a Jume drop-in. It pins the installed r9 manifest and recovery-script hash,
+and a Jume drop-in. It pins the installed r11 manifest and recovery-script hash,
 reuses its target, lock, file-seal and cleanup checks, and never edits its sealed
 release or user state. `Restart=no` and `OnFailure=` replace the three Jume
 restart attempts with one ES-DE handoff. The service runs after Jume's original
@@ -227,7 +310,7 @@ and [ExecStopPost](https://www.freedesktop.org/software/systemd/man/latest/syste
 
 Deploy only after rediscovering the exact v0.18 device and opening serial. Transfer
 the reviewed script to a root-owned staging path, compare its host/target SHA-256,
-and run as root. `STAGED_SCRIPT` below is that verified path, not a bundled r9 file:
+and run as root. `STAGED_SCRIPT` below is that verified path, not a bundled release file:
 
 ```sh
 python3 -B /var/lib/jume-launcher/current/product-install.py --rollback
@@ -237,11 +320,12 @@ python3 -B /var/lib/jume-launcher/current/product-install.py --trial
 python3 -B /var/lib/jume-launcher/current/product-install.py --enable
 ```
 
-Installation alone does not promote Jume. It requires inactive/disabled r9,
-active/enabled ES-DE and a complete r9 seal. Matching completed files allow an
+Installation alone does not promote Jume. It requires inactive/disabled r11,
+active/enabled ES-DE and a complete r11 seal. Matching completed files allow an
 idempotent retry. Foreign files or interrupted `.incoming` writes are retained
 and refused; inspect them before retrying. This is not power-loss recovery proof.
-Before selecting another release, explicitly roll back and remove this overlay:
+Before selecting another release, remove the optional [boot image](BOOT-SPLASH.md) if installed,
+then explicitly roll back and remove this recovery overlay:
 
 ```sh
 python3 -B /var/lib/jume-launcher/current/product-install.py --rollback
@@ -251,28 +335,28 @@ python3 -B /var/lib/jume-launcher/esde-fallback.py --remove
 `test-jume-fallback.py` exercises current-boot recovery, unchanged default/save
 bytes, cleanup/foreign-config/active-session/lock refusal, install retry, removal
 and ES-DE start errors. It uses fake systemd calls, not a live service manager.
-The next device gate is ready Home, failed-start and Launcher/Weston loss returning
-to a single ES-DE, refusal with held leases, normal reboot/poweroff without an
-unwanted handoff, and cold boot back into Jume. Remove staging afterward; retain
-the overlay, r9/r6/r8 and recovery evidence. GUI/input/save/endurance gates stay open.
+Ready Home, failed startup, Launcher loss, default warm boot and normal stop
+and one attended cold start now pass on r11. Weston loss with this overlay,
+held-lease recovery and GUI power actions remain separate device gates. Preserve the installed
+overlay and recovery evidence; GUI/input/save/gameplay-endurance gates stay open.
 
 ## Next combined target gate
 
-1. Deploy and verify the requested [r9 fallback overlay](#optional-r9-es-de-fallback-overlay)
-   when the device is connected. Keep installed r9 and retained r6/r8; packaged failed-state rollback and
+1. Use the [r11 fallback overlay](#optional-r11-es-de-fallback-overlay) for Q1.
+   Keep installed r11 and retained releases; packaged failed-state rollback and
    bidirectional selection pass. Receipt-mismatch cleanup refusal/recovery passes;
-   actual interrupted lease cleanup remains open. Use the fixed-path r9 controller.
+   actual interrupted lease cleanup remains open. Use the fixed-path r11 controller.
    Optional Browser pairing needs its guarded wrapper and a new complete seal.
-2. Broader Q2 acceptance: ready Home, settings/saves, input ownership, representative
-   native/browser launches and rollback. Test beyond the old 120/290/360-second
-   bounds and separately beyond the former two-hour CPU-helper limit.
-   Endurance needs guard/SSH lifetimes beyond that window; the old 45-minute guard cannot cover it.
+2. Broader Q2 acceptance: settings/saves, input ownership and representative native/browser
+   launches/rollback under sustained load. The r11 desktop/light-navigation two-hour run above
+   passes; do not repeat it unchanged or count it as gameplay endurance. Longer game tests need
+   guards and transport lifetimes covering the full run, not the old 45-minute guard.
 3. Individual Launcher/Weston/seatd recovery and old-child/lease cleanup pass;
    fast prepare-failure limiting and explicit rescue now pass on r6's identical unit.
    GUI warm reboot passes; test GUI poweroff and interrupted cleanup on target.
-4. For the user's Q1 default request, observe ready Home and verify explicit rollback, then
-   enable and verify cold boot plus the overlay's automatic ES-DE return. Wi-Fi/settings/save
-   retention and endurance remain separate Q2 gates; schema/service migrations remain unsupported.
+4. Q1 default activation, one attended cold start and automatic ES-DE return pass;
+   retain the fallback and observe broader reliability separately. Wi-Fi/settings/save retention and gameplay
+   endurance remain Q2 gates; schema/service migrations remain unsupported.
 5. L1: inventory actual ES-DE systems/ROM entries against Jume before Q2 removal;
    fixed Neo/native entries are not a full ROM scanner. Keep unsupported routes.
 

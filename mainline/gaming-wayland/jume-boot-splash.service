@@ -1,0 +1,18 @@
+[Unit]
+Description=Jume boot image
+After=local-fs.target
+Before=jume-launcher.service r46h-gaming-frontend.service getty@tty1.service
+ConditionPathExists=/var/lib/jume-launcher/enabled
+ConditionPathExists=/dev/fb0
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/python3 -B /var/lib/jume-launcher/boot-splash/boot-splash.py
+ExecStopPost=/usr/bin/python3 -B /var/lib/jume-launcher/boot-splash/boot-splash.py --restore
+ExecStopPost=-/usr/bin/systemctl --no-block start getty@tty1.service
+RuntimeDirectory=jume-boot-splash
+RuntimeDirectoryMode=0700
+TimeoutStartSec=5
+TimeoutStopSec=5
+RuntimeMaxSec=150
+UMask=0077

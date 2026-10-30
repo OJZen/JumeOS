@@ -275,10 +275,15 @@ CI runs it without root or a systemd daemon. It does not prove installed service
 ordering, cgroup/VT recovery, an ARM64 build or cold boot; those are tracked in
 the [product-session gate](../gaming-wayland/PRODUCT.md).
 
-`test-jume-fallback.py` owns the optional r9 ES-DE fallback overlay: current-boot
+`test-jume-fallback.py` owns the optional r11 ES-DE fallback overlay: current-boot
 recovery without changing the next-boot marker, cleanup/active-session/foreign-file/
 lock refusal, install retry/removal and failed ES-DE start. Its systemd calls are
-fixtures; live crash handoff, normal power actions and cold boot remain untested.
+fixtures; device results and the remaining cold/power-action gates live in
+the [installed-session runbook](../gaming-wayland/PRODUCT.md).
+
+`test-jume-boot-splash.py` covers framebuffer waiting-image bounds, active-desktop
+refusal, readback/write failure cleanup, timed exit and tty1 ownership restoration.
+Its device observations live in [Boot splash](../gaming-wayland/BOOT-SPLASH.md).
 
 `streamingApplicationListAndFallback` covers bounded upstream-style list parsing,
 literal names, cancellation, host-cache invalidation, shared choices and manual

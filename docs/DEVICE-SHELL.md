@@ -1,6 +1,6 @@
 # Jume 桌面需求与接手入口
 
-本页负责 Jume Launcher 的产品约定、工作范围和代码入口；最后整理于 2026-10-23。
+本页负责 Jume Launcher 的产品约定、工作范围和代码入口；最后整理于 2026-10-30。
 当前进度、未提交工作和下一步只维护在 [Project Context](PROJECT-CONTEXT.md)；
 完整需求编号与验收条件在 [Product Roadmap](PRODUCT-ROADMAP.md)，实机结果在
 [R46H ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md)。不要用旧实验编号推断当前状态。
@@ -9,9 +9,9 @@
 
 - Jume 是手柄优先的掌机桌面：Switch 风格首页、游戏库和设置，Steam Deck 风格快捷面板。
 - 近期交付是**开机进入 Jume，启动失败或崩溃后退回 ES-DE，下次开机仍尝试 Jume**。
-  ES-DE 保留为恢复入口；设置默认桌面与完整替换 ES-DE 是两个独立交付。
-- 用户最近选择“暂时无法连接，先准备配置”。继续主机准备；设备接入后再部署和记录实机结果。
-  配置文件存在、主机测试通过，都不表示默认启动已经改变。
+  ES-DE 保留为恢复入口；设置默认桌面与完整替换 ES-DE 是两个独立交付。启动等待使用 [Jume 开屏](../mainline/gaming-wayland/BOOT-SPLASH.md)。
+- 用户已要求将 Jume 设置为默认启动；按当前设备版本部署并记录实机结果。
+  默认状态及验证边界以 [Project Context](PROJECT-CONTEXT.md) 为准。
 - 保留游戏资源、原有存档、设置及回退版本；已有数据不能因安装、导入、升级或卸载而被静默覆盖。
 - 优先完成启动与恢复、实际游戏流程和存档；浏览器、zram、USB gadget 等不能阻塞首次桌面试用。
 
@@ -62,7 +62,7 @@ EGLFS 是单应用预览/专用直接显示路径；不能通过再开一个 EGL
 
 1. 先读 [AGENTS](../AGENTS.md)、[文档索引](README.md)、[Context](PROJECT-CONTEXT.md) 和本页；执行 `git status --short --branch`，核对已有改动。
 2. 以 Context 的第一项为当前任务；读该行负责文档、源码、最近证据和 [测试索引](../mainline/tests/README.md)。不要把路线图全部当成本轮任务。
-3. 默认/回退工作从 [r9 overlay](../mainline/gaming-wayland/PRODUCT.md#optional-r9-es-de-fallback-overlay) 继续，复用封存的 r9；无需重建 Qt 或重写 TF 卡。
+3. 默认/回退工作从 [r11 overlay](../mainline/gaming-wayland/PRODUCT.md#optional-r11-es-de-fallback-overlay) 继续，复用封存的 r11；无需重建 Qt 或重写 TF 卡。
    没有设备时可审查补丁、运行主机测试、检查部署与撤销步骤；真实 systemd/冷启动/回退结果保持待验收。
 4. 设备接入后按 [Development](DEVELOPMENT.md) 重新识别卡、串口、地址和版本，再执行 runbook 的有界验证。
    既有授权无需重复确认；仍需设备实际接入及对应的人眼、音频、按键观察，不能把“先准备”当作“已部署”。

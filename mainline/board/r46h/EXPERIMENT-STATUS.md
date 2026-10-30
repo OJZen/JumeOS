@@ -1,6 +1,6 @@
 # R46H experiment status ledger
 
-> Current checkpoint: 2026-10-28. This ledger owns physical evidence and open
+> Current checkpoint: 2026-10-30. This ledger owns physical evidence and open
 > hardware gates; commands, hashes and receipts stay in linked runbooks.
 
 ## How to read this ledger
@@ -53,16 +53,16 @@ broader LCD/USB coverage, Moonlight and PSP remain open.
   still required after a new image write.
 - **Remote input — V0.16/V0.17 10 MS DEVICE PASS.** Self-test and exact
   screenshot-verified right/left single-step roundtrip passed; v0.15 uses 100 ms.
-- **[Jume Launcher](../../gaming-shell/DEVICE.md) — DEVICE/PERFORMANCE PASS / PHYSICAL + PROMOTION OPEN.**
+- **[Jume Launcher](../../gaming-shell/DEVICE.md) — DEFAULT BOOT/RECOVERY PASS / BROADER PHYSICAL OPEN.**
   R79 readback/preflight, Home/About captures and transient lease restoration passed.
   The 09-20 two-level pages passed 39 actions, async open/return and cancellation.
   Same-device A/B raised Settings from ~29.5 to 57.2--57.5 submissions/s and HUD
   from 29.9 to 58.5--59.0; p50 16.64--16.71 ms. LCD/L3+R3 remain open.
   09-26 faster tasks/resume/close and sequential USB keyboard/mouse passed; long-hold/hub remain open.
   09-27 installed trial recovered separately from Launcher/Weston/seatd loss, clearing old children/leases.
-  Same desktop survived 460 seconds; GTA III survived 273 seconds with a fresh intro frame, then requested exit.
+  10-29 r11 desktop passed 7203.1 s, 114 navigation cycles, stable PID/IPC and 177-file state hashes.
   r9/r6 cycling, packaged failed-state rescue and cleanup-receipt refusal/recovery pass; 167 prior files unchanged.
-  r9 GUI reboot; 10-28 r10/r11 UI v1 + power key pass; interrupted cleanup/default/endurance/save-load open.
+  10-30 cold/warm default and ES-DE recovery pass; splash visible/VT handoff pass, final terminal-flash check open.
   [Installed-session runbook](../../gaming-wayland/PRODUCT.md) owns evidence and remaining gates.
 - **[Jume Browser](../../gaming-browser/README.md) — TARGET GPU/SANDBOX PASS / HEAVY-SITE OOM + SECURITY OPEN.**
   Offline input/IME/tabs/About, WebGL 2, sandbox and lifecycle/privacy pass; mi.com policy/OOM failures remain.

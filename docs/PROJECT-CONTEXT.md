@@ -1,6 +1,6 @@
 # R46H project context
 
-> Current checkpoint: 2026-10-28 (physical). Handoff reviewed: 2026-10-23 (host/docs only).
+> Current checkpoint: 2026-10-30 (physical). Handoff reviewed: 2026-10-30 (r11 default and boot image).
 > Read the [experiment ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) before hardware work.
 
 ## Scope
@@ -11,22 +11,22 @@ desktop, local gaming, streaming, and USB HID input. The
 
 ## Workspace handoff
 
-- `main` is at `87242d2`, 15 commits ahead of local `origin/main`, with a dirty worktree; no remote refresh, commit, push or device contact in this handoff.
-- Pending desktop work: `product-fallback.py`, `test-jume-fallback.py`, CI and linked runbooks/index.
-  Streaming Switch-loopback/test-client, general docs and untracked `CLAUDE.md` also have edits; preserve them and stage only intended paths.
+- Active branch `jume-ui-v1`; this default/splash batch is based on `68dbbd5`; sealed r11 UI source is `38643e9`.
+- [r11 default activation](../mainline/gaming-wayland/PRODUCT.md#r11-default-activation--2026-10-30), one attended cold start and ES-DE failure recovery pass; the requested [boot image](../mainline/gaming-wayland/BOOT-SPLASH.md) passes framebuffer readback and VT_PROCESS handoff.
+  This batch contains fallback pin/tests, boot-image files and handoff docs; sealed binaries unchanged. Named evidence retained; no push requested.
 - 2026-10-12 cache cleanup reclaimed 3.54 GiB; receipt: `mainline/out/.cache/cache-cleanup-20261012.XdQ4wD/receipt.json`.
   Clean compiler/source caches were removed; modified FBNeo/ES-DE sources, recovery data, Qt SDK, Mono and r6/r8/r9 were retained.
-  Reacquire build inputs when required; the prepared r9 fallback overlay needs no Qt rebuild or TF rewrite.
+  Reacquire build inputs when required; the deployed r11 fallback overlay needed no Qt rebuild or TF rewrite.
 - r9's 2 artifacts + 29 evidence files rehashed successfully on 2026-10-18.
   Candidate and device evidence: [installed-session runbook](../mainline/gaming-wayland/PRODUCT.md).
   Ignored `mainline/out/` is local-only, not supplied by a clone; verify receipt-bound inputs before reuse.
 
 ## Current baseline
 
-Last observed device state: **serial-confirmed clean poweroff on 2026-10-28**, unchanged p2 v0.18,
-inactive r11 (Jume UI v1) selected, r6/r8/r9/r10 and private backups retained, ES-DE default.
-The [UI v1 trial record](../mainline/gaming-wayland/PRODUCT.md#jume-ui-v1-trials-r10r11--2026-10-28)
-owns the latest result; historical host build notes' "next boot" steps are not the current plan.
+Last observed device state: **serial-confirmed clean poweroff on 2026-10-30 at about 22:43 CST**.
+Jume remains enabled/default with ES-DE failure recovery and the optional boot image; p2 remains v0.18.
+One user cold start, warm boot and two failure paths pass; r6/r8/r9/r10, ES-DE and private backups remain.
+The [activation record](../mainline/gaming-wayland/PRODUCT.md#user-cold-start-and-boot-image--2026-10-30) owns evidence. The prior 7203.1-second desktop soak remains accepted; final splash-to-desktop terminal flash is unverified.
 
 - Fixed card profile: `hl-r46h-v22-g92-62534975488-v1`.
 - Current card p2: [v0.18](../mainline/rootfs-debian13-gaming-v18/README.md)
@@ -35,8 +35,8 @@ owns the latest result; historical host build notes' "next boot" steps are not t
   v0.17 BOOT/power-settle DTB.
 - Accepted fallbacks: attended p2 v0.7, automated p2 v0.15, and the p2 v0.5
   full-card recovery reference.
-- Installed frontend: ES-DE 3.4.1/r51. Jume Launcher `0.1.0-dev` remains an
-  experimental, non-default Qt candidate.
+- Default frontend: Jume Launcher `0.1.0-dev` r11; ES-DE 3.4.1/r51 remains installed
+  for automatic failure recovery and explicit rollback. Full replacement is not accepted.
 
 The card's p3 contains imported EASYROMS. Its full target checksum/readback was
 skipped, so content equality remains unverified. See
@@ -51,7 +51,7 @@ skipped, so content equality remains unverified. See
   Two-level pages passed 39 actions, unloaded focus navigation and in-flight cancellation.
   Cached categories raised Settings from ~29.5 to 57.2--57.5 submissions/s and HUD
   from 29.9 to 58.5--59.0, p50 ~16.7 ms; exact samples remain in the ledger.
-  ES-DE/services recovered with zero failed units or kernel/ext4/OOM errors; physical LCD/readability, L3+R3 and persistent promotion remain open.
+  r11 default cold/warm boot and failure recovery pass; broader LCD/readability and L3+R3 remain open.
   The [top-center volume capsule](../mainline/gaming-shell/DEVICE.md) passes ARM64 UI/event and Pixman/GL clipping checks;
   paired binaries ran during Transfer testing; attended screen-wake/HUD passed on 2026-09-26; in-game acceptance remains open.
 - Repaired GTA III/Vice City accept the Switch-layout controls and no longer
@@ -103,7 +103,7 @@ skipped, so content equality remains unverified. See
 - [USB keyboard/mouse and Terminal](../mainline/gaming-wayland/PERIPHERALS.md) passed sequential attended keyboard typing/editing/Ctrl+C/D/reconnect and mouse cursor/move/click/scroll/reconnect. Simultaneous hub use and browser/game-specific focus remain open.
   DWC2 is host-only; USB **gadget** mode still needs hardware-route evidence and a recoverable kernel/DT candidate.
 - [Jume Files/Text](../mainline/gaming-files/README.md) passes target launch/privacy/exit and nine ARM64 offscreen functional cases. [Transfer](../mainline/gaming-files/TRANSFER.md) passes real Wi-Fi 16 MiB hash roundtrip, cancellation, readonly ROMs and disconnect revocation. Phone QR, physical controls/USB/A/V and promotion remain open; [file layout](FILESYSTEM-LAYOUT.md) preserves legacy data.
-- [Background tasks](../mainline/gaming-shell/APPLICATIONS.md) passed corrected target close/kill/two-app checks and attended faster entry/preview, resume and normal close. Physical long-hold kill and real game/transfer retention remain open. ES-DE remains default.
+- [Background tasks](../mainline/gaming-shell/APPLICATIONS.md) passed corrected target close/kill/two-app checks and attended faster entry/preview, resume and normal close. Physical long-hold kill and real game/transfer retention remain open; ES-DE remains the recovery frontend.
 - [Jume Browser](../mainline/gaming-browser/README.md) is an optional Chromium/
   Qt WebEngine preview with dual-stick control, tabs/address/IME and launcher
   lifecycle/privacy integration. WebEngine 6.10.2 retains base Qt 6.8.2; both About
@@ -115,7 +115,7 @@ skipped, so content equality remains unverified. See
 
 ## Immediate next work
 
-1. [Q1: Jume default with ES-DE crash recovery](../mainline/gaming-wayland/PRODUCT.md#optional-r9-es-de-fallback-overlay) is prepared and host-tested, not deployed; the user deferred device connection. Review the pending patch, then resume item 4 when connected.
+1. User requested wrap-up/commit. The [boot image](../mainline/gaming-wayland/BOOT-SPLASH.md) is visible and VT handoff passes; terminal-flash cleanup/final visual check is deferred. Do not resume testing until requested; remove/revalidate both overlays before changing the pinned release.
    Use the [combined acceptance route](../mainline/gaming-shell/DEVICE.md#combined-acceptance-route) for remaining long-hold kill,
    game/save/transfer retention, Files/QR, LCD/audio and L3+R3 observations.
    Media, sequential USB, wake/HUD and task entry/resume/close already pass; do not replay them unchanged.
@@ -125,7 +125,7 @@ skipped, so content equality remains unverified. See
 3. Keep R45 direct Stardew as fallback. Revisit the shared-Wayland stall only
    with a new source-level hypothesis; the unchanged R78/R79 Mono/Mesa path has
    already failed before window creation at two clock profiles.
-4. Continue [installed r9](../mainline/gaming-wayland/PRODUCT.md): packaged failed-state rollback, release cycling, cleanup-receipt refusal/recovery, GUI warm reboot and 167-file retention pass. Two-hour endurance, GUI poweroff, actual interrupted lease cleanup and cold default boot remain open; receipt mismatch is not interruption proof.
+4. Continue [installed-session acceptance](../mainline/gaming-wayland/PRODUCT.md): r11 desktop endurance passes, while game/save endurance, GUI poweroff, interrupted cleanup and broader boot reliability remain open. The UI review also found a 130%-font power-menu overflow with four long task names; reproduce/fix separately from the sealed run.
    ES-DE stays the recovery frontend. L1 library coverage and Q2 full removal/endurance are separate from Q1 default-boot delivery; see the [desktop handoff](DEVICE-SHELL.md).
 5. Profile R74's below-30-FPS open-world phase only when a new software hypothesis
    exists. Keep R63/R60 available; do not repeat SGSR1 or a live GPU minimum-frequency
