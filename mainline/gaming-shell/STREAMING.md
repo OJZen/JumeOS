@@ -1,5 +1,48 @@
 # Moonlight management experiment
 
+## Session lifetime — 2026-10-31
+
+The stream worker now waits for Moonlight to exit without a fixed session timer,
+including when called with `--attended`. Client startup, pairing, app-list,
+disconnect and forced-stop handling retain their existing deadlines. A positive
+`runPending(seconds)` remains available to bounded tests; zero means unlimited.
+ARM64 regression covers the default wait and explicit timeout cleanup. Release
+and real-device results belong in [PRODUCT](../gaming-wayland/PRODUCT.md).
+
+## Sunshine shortcut — 2026-10-31
+
+Home pins **Sunshine 直连** before recent applications. It uses the selected
+saved host/application/preset; an absent or unpaired profile opens host management
+without inventing pairing success. After pairing, A requests that stream directly.
+Host addresses and client identities remain in private device state, not source.
+
+**Select + R1** toggles Jume diagnostics once per chord without opening a panel,
+changing input ownership or pausing the game. Press Select before R1, within the
+existing 600 ms Select hand-over window. R1 alone, L1 + R1 exit, L3 + R3 panel and
+the task shortcuts retain their behavior. The switch saves through the existing
+preference path. The streaming setting controls diagnostics at launch; shared
+Wayland uses Jume's overlay only, so hiding it also removes the native duplicate.
+The older direct-display worker still uses Moonlight's native overlay.
+
+The operator subsequently reported that Select + R1 did not appear to toggle;
+its physical acceptance is deferred. L3 + R3 and the performance-overlay menu
+were accepted on 2026-10-31. Do not present the new chord as physically verified.
+
+The 2026-10-31 Select short-tap fix keeps a standalone game tap down for 50 ms
+after release, instead of sending press/release back-to-back. It also schedules
+release without another input event and clears the pulse on ownership change.
+Host policy and ARM64/Linux uinput tests pass; the calibration task installed the
+combined fix in [R13](../gaming-wayland/PRODUCT.md#stick-calibration-successor-r13--2026-10-31).
+Actual game/stream tap acceptance remains open. The validated patch, binary and exact
+handoff are in `mainline/out/.cache/jume-stream-fixes-20261031/HANDOFF.md`.
+
+The sibling `sunshine-window-host` project supplies the window-bound Mac host.
+Its `scripts/start-totk.command` retains a private pairing identity; start that
+host before using the device shortcut. One initial normal PIN exchange is required.
+This feature does not add remote host startup. The former 120-second stream-worker
+limit is removed; current artifact/device results belong in
+[PRODUCT](../gaming-wayland/PRODUCT.md); actual TOTK gameplay remains separate.
+
 Revision 17, 2026-09-09. Remote handoff and v3 native HUD/A/V have short attended
 proof. Long-session stability and application-list retrieval remain open. [Game Streaming](../../docs/GAME-STREAMING.md)
 owns accepted streaming results and the next hardware gate.
@@ -87,7 +130,7 @@ does not establish Moonlight under a compositor.
 
 ## Interface and state
 
-The default home Moonlight card opens host management; `--scene streaming`
+The Moonlight card opens host management; `--scene streaming`
 opens it directly. X adds an IPv4 address or DNS name. A enters the selected
 host, Up/Down selects a setting, and Left/B returns to the host list.
 The shared keyboard edits host name, address and Sunshine application name;

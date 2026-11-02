@@ -46,6 +46,7 @@ private:
     void readPolicy();
     void fail(const QString &message);
     void selectInput(bool ui);
+    void sendCalibration();
     void fenceCapture();
     void readCapture();
     void cancelCapture(const QString &error);
@@ -60,7 +61,7 @@ private:
     QProcess m_router;
     std::unique_ptr<QSocketNotifier> m_notifier;
     QLocalSocket m_policy;
-    QTimer m_deadline, m_inputDeadline;
+    QTimer m_deadline, m_inputDeadline, m_calibrationDeadline;
     QByteArray m_response;
     QJsonObject m_state, m_request;
     QJsonObject m_frameMetrics, m_previousFrames;
@@ -72,6 +73,8 @@ private:
     quint64 m_inputSequence = 0;
     quint64 m_modeSequence = 0;
     quint64 m_remoteSequence = 0;
+    quint64 m_calibrationSequence = 0;
+    bool m_calibrationSupported = false;
     qint64 m_compositorPid = 0;
     int m_inputMode = -1, m_inputRequested = -1, m_retries = 0;
     int m_inputSlot = -1, m_requestedSlot = -1;

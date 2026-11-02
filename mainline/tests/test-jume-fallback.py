@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the r11 fallback overlay against owned files and fake systemd calls."""
+"""Exercise the release-pinned fallback overlay against owned files and fake systemd calls."""
 import fcntl
 import importlib.util
 import os
@@ -32,7 +32,7 @@ class FallbackTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         root = Path(self.temp.name)
         self.root = root / 'product'
-        self.release = self.root / 'releases' / fallback.R11
+        self.release = self.root / 'releases' / fallback.RELEASE
         self.release.mkdir(parents=True)
         service = (CODE / 'jume-launcher.service').read_bytes()
         (self.release / 'jume-launcher.service').write_bytes(service)

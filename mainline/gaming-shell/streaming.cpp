@@ -252,7 +252,9 @@ int Streaming::runPending(int timeoutSeconds){
     if(!checkClient())return 2;QFile request(m_directory+"/request.json");struct stat st{};
     if(::lstat(QFile::encodeName(request.fileName()).constData(),&st)!=0||!S_ISREG(st.st_mode)||st.st_uid!=geteuid()||(st.st_mode&077)!=0||st.st_size>8192||!request.open(QIODevice::ReadOnly))return 2;
     const auto d=QJsonDocument::fromJson(request.readAll()).object();request.close();
-    const auto host=d.value("host").toObject();const auto arguments=streamArguments(host);if(d.value("version")!=QJsonValue(1)||arguments.isEmpty())return 2;
+    const auto host=d.value("host").toObject();auto arguments=streamArguments(host);if(d.value("version")!=QJsonValue(1)||arguments.isEmpty())return 2;
+    // Jume owns the shared-display diagnostics, so its shortcut hides the entire overlay.
+    if(qEnvironmentVariable("QT_QPA_PLATFORM")=="wayland")arguments.removeAll("--performance-overlay");
     const bool forwardStats = qEnvironmentVariable("R46H_STREAM_STATS") == "1" && StreamStats::preparePipe();
     auto environment = clientEnvironment(false);
     environment.insert("R46H_STREAM_STATS", forwardStats ? "1" : "0");
@@ -269,6 +271,6 @@ int Streaming::runPending(int timeoutSeconds){
     connect(&process,&QProcess::readyReadStandardOutput,this,drainOutput);
     connect(&process,&QProcess::readyReadStandardError,this,drainError);
     process.start(m_client,arguments);int result=1;
-    if(process.waitForStarted(5000)){if(process.waitForFinished(timeoutSeconds*1000))result=process.exitStatus()==QProcess::NormalExit?process.exitCode():1;else{process.terminate();if(!process.waitForFinished(3000)){process.kill();process.waitForFinished(2000);}result=124;}}
+    if(process.waitForStarted(5000)){if(process.waitForFinished(timeoutSeconds>0?timeoutSeconds*1000:-1))result=process.exitStatus()==QProcess::NormalExit?process.exitCode():1;else{process.terminate();if(!process.waitForFinished(3000)){process.kill();process.waitForFinished(2000);}result=124;}}
     drainOutput();drainError();if(!writeJson("result.json",{{"version",1},{"host",host.value("id")},{"exit",result}}))return 2;return result;
 }

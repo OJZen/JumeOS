@@ -73,7 +73,7 @@ Item {
     property bool editing: false
     property bool dimmed: false
     property bool screenOff: false
-    readonly property bool idleEligible: (!hardware || device.controls) && !session && !externalSession && !streamingBusy && !editing && !testingController && !choicesOpen
+    readonly property bool idleEligible: (!hardware || device.controls) && !session && !externalSession && !streamingBusy && !editing && !testingController && !settingsView.calibrating && !choicesOpen
     readonly property string powerScene: screenOff ? "off" : externalSession ? "game" : "desktop"
     property bool windowVisible: true
     readonly property real fontScale: store.fontPercent / 100
@@ -213,9 +213,11 @@ Item {
     // labelled demos. Tools sit behind the dock's 工具 and settings behind 设置.
     readonly property var games: customApplications
         ? applications.items.map(function(item) { return Object.assign({}, item, {reason: item.supported === false ? "尚未适配" : ""}) })
-            .concat(builtinApps.filter(function(entry) { return entry.route === "streaming" ? root.streaming !== null : !entry.reason }))
+            .concat(builtinApps.filter(function(entry) { return ["streaming", "stream-connect"].includes(entry.route) ? root.streaming !== null : !entry.reason }))
         : tools ? builtinApps : demoGames
     readonly property var builtinApps: [
+        {id: "builtin.sunshine", title: "Sunshine 直连", detail: streaming && streaming.current.id
+            ? streaming.current.name + " · " + streaming.current.application : "连接已配置的电脑", palette: 2, route: "stream-connect", icon: "streaming"},
         {id: "builtin.moonlight", title: "Moonlight", detail: "电脑游戏串流", palette: 2, route: "streaming", icon: "streaming"},
         {id: "builtin.browser", title: "Jume Browser", detail: "网页浏览",
             palette: 2, route: "browser", icon: "globe", plain: true, reason: browserAvailable ? "" : "尚未安装"},
@@ -244,6 +246,7 @@ Item {
     readonly property var homeEntries: {
         const result = []
         const add = function(index) { if (index >= 0 && result.indexOf(index) < 0 && result.length < 12) result.push(index) }
+        add(games.findIndex(function(game) { return game.id === "builtin.sunshine" }))
         store.recentApplications.forEach(function(recent) { add(games.findIndex(function(game) { return game.id === recent.id })) })
         games.forEach(function(game, index) { if (entryFavorite(index)) add(index) })
         games.forEach(function(game, index) { if (!game.reason && result.length < 5) add(index) })
@@ -520,6 +523,15 @@ Item {
         if (!sharedReady) return
         if (!games[selected]) return
         if (games[selected].reason === "尚未适配") { notify("尚未适配，无法启动"); return }
+        if (games[selected].route === "stream-connect") {
+            if (!streaming || !streaming.current.id || !streaming.current.paired) {
+                showScene("streaming"); notify("请先添加本机 Sunshine 并完成一次配对"); return
+            }
+            if (!store.save()) return
+            if (streaming.requestStream()) recordLaunch(games[selected].id)
+            else notify(streaming.error || "暂时无法连接，请稍后重试")
+            return
+        }
         if (games[selected].route === "streaming" && streaming) { showScene("streaming"); clearNotice(); return }
         if (tools && games[selected].route) {
             const route = games[selected].route
@@ -655,8 +667,14 @@ Item {
         else if ((action === "up" || action === "down") && keyboard && keyboard.navigateVertical(action)) return
         else if (keyboardEnabled && ["up", "down", "left", "right", "accept"].indexOf(action) >= 0) controller.keyboardAction(action)
     }
+    function toggleDiagnostics() {
+        if (activity()) return
+        store.adjust("monitor", 1)
+        store.save()
+    }
     function dispatch(action, repeated) {
         if (screenOff) { activity(); return }
+        if (action === "diagnostics") { if (!repeated) toggleDiagnostics(); return }
         if (holdAction !== "" && !repeated) cancelHold()
         if (repeated && ["accept", "quick", "home", "itemAction", "pageAction", "options", "prevSection", "nextSection"].indexOf(action) >= 0) return
         if (tasksVisible && taskPage.item) {
@@ -689,6 +707,7 @@ Item {
         if (streamingOpen) { streamingView.dispatch(action, repeated); return }
         if (settingsView.choiceOpen) { settingsView.dispatch(action, repeated); return }
         root.forceActiveFocus()
+        if (page === 2 && settingsView.calibrating && action !== "home" && action !== "quick") { settingsView.dispatch(action, repeated); return }
         if (action === "quick") { openQuick(); return }
         if (action === "options") { openOptions(); return }
         if (toolOpen) {

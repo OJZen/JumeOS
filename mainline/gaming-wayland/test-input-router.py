@@ -237,6 +237,20 @@ def run(executable):
             pad.emit((1,KEYS[0],0));time.sleep(.03);drain(sink)
         finally:
             os.close(other);other_path.unlink()
+        # A short Select stays observable to frame-polling games, then releases without new input.
+        def select_down():
+            bits=bytearray(96)
+            fcntl.ioctl(sink,ioctl_code(2,'E',0x18,len(bits)),bits)
+            return bool(bits[KEYS[8]//8] & (1 << (KEYS[8]%8)))
+        pad.emit((1,KEYS[8],1));time.sleep(.01)
+        assert not select_down()
+        pad.emit((1,KEYS[8],0))
+        deadline=time.monotonic()+.03
+        while not select_down() and time.monotonic()<deadline:time.sleep(.001)
+        assert select_down(),'short Select was not held for a game frame'
+        time.sleep(.015);assert select_down(),'Select press and release collapsed together'
+        time.sleep(.1);assert not select_down(),'Select did not release without another event'
+        drain(sink)
         # Select + X is not a shortcut: in a game both reach the game (emulator hotkeys).
         pad.emit((1,KEYS[8],1),(1,KEYS[2],1));time.sleep(.03)
         events=drain(sink);assert (1,KEYS[8],1) in events and (1,KEYS[2],1) in events
@@ -306,5 +320,70 @@ def run(executable):
     print('INPUT_ROUTER_DISCONNECT_PASS: lost controller and lost source destroy the routed device')
 
 
+def calibration(executable):
+    pad = Pad()
+    controller, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+    proc = subprocess.Popen([executable, str(pad.path), str(child.fileno()), '120'], pass_fds=[child.fileno()])
+    child.close()
+    sink = -1; routed = None
+    bounds = [(-24000, 500, 28000), (-27000, -700, 22000), (-21000, 1000, 26000), (-25000, -500, 23000)]
+
+    def configure(sequence, enabled, profile):
+        centers = [axis[1] for axis in profile]
+        limits = struct.pack('<8i', *(value for axis in profile for value in (axis[0], axis[2])))
+        controller.sendall(PACKET.pack(3, 16, sequence, 0, 0, int(enabled), *centers, limits, 0))
+        return receive(controller, 17)
+
+    def physical(values):
+        # Synthetic -32768..32767 input maps to the broker's symmetric UI units.
+        pad.emit(*((3, axis, value if value >= 0 else value - 1) for axis, value in zip(AXES, values)))
+        time.sleep(.04)
+
+    try:
+        ready = receive(controller, 2); assert ready[4] & 8
+        routed = event_node(ready[10].split(b'\0')[0].decode())
+        sink = os.open(routed, os.O_RDONLY | os.O_NONBLOCK)
+        command(controller, 1, 0); receive(controller, 5)
+        assert configure(2, True, bounds)[5] == 1
+        physical([axis[1] for axis in bounds])
+        sample = receive(controller, 3)
+        while sample[6:10] != (0, 0, 0, 0): sample = receive(controller, 3)
+        physical([axis[2] for axis in bounds])
+        sample = receive(controller, 3)
+        while sample[6:10] != (32767,) * 4: sample = receive(controller, 3)
+        assert sample[4] & 16 and struct.unpack('<4i', sample[10][:16]) == tuple(axis[2] for axis in bounds)
+        physical([axis[2] + 1000 for axis in bounds])
+        sample = receive(controller, 3)
+        assert sample[6:10] == (32767,) * 4 and struct.unpack('<4i', sample[10][:16]) == tuple(axis[2] + 1000 for axis in bounds)
+        physical([axis[1] for axis in bounds])
+        command(controller, 3, 1); receive(controller, 5); drain(sink)
+        physical([axis[0] for axis in bounds])
+        assert {(3, axis, -32768) for axis in AXES} <= set(drain(sink))
+        physical([axis[2] for axis in bounds])
+        assert {(3, axis, 32767) for axis in AXES} <= set(drain(sink))
+        physical([axis[1] for axis in bounds])
+        assert {(3, axis, 0) for axis in AXES} <= set(drain(sink))
+        inject(controller, 4, 0, (16000, 0, 0, 0), 100)
+        time.sleep(.04); assert (3, 0, 16000) in drain(sink), 'Logical remote axes were calibrated twice'
+        receive(controller, 8); drain(sink)
+        assert configure(5, False, bounds)[5] == 0, 'Calibration changed during game ownership'
+        assert not drain(sink)
+        command(controller, 6, 0); receive(controller, 5)
+        assert configure(7, True, [(-1000, 0, 1000)] * 4)[5] == 0
+        assert configure(8, False, [(-32767, 0, 32767)] * 4)[5] == 1
+        physical([0] * 4)
+        command(controller, 9, 1); receive(controller, 5); drain(sink)
+        pad.emit((3, 0, 12345)); time.sleep(.04)
+        assert (3, 0, 12345) in drain(sink), 'Default calibration changed original raw output'
+        print('STICK_CALIBRATION_KERNEL_PASS: asymmetric UI/game extrema, center, raw feedback, remote axes, invalid/game-mode refusal and reset')
+    finally:
+        controller.close()
+        if proc.poll() is None: proc.terminate(); proc.wait(timeout=3)
+        if sink >= 0: os.close(sink)
+        if routed: routed.unlink()
+        pad.close()
+
+
 if __name__ == '__main__':
     run(sys.argv[1])
+    calibration(sys.argv[1])

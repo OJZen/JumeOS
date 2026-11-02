@@ -5,7 +5,7 @@ remain `r46h-shell` for compatibility.
 
 Start with the [desktop requirements and handoff](../../docs/DEVICE-SHELL.md).
 [Project Context](../../docs/PROJECT-CONTEXT.md) owns current progress and device state;
-[PRODUCT](../gaming-wayland/PRODUCT.md) owns the installed r9 trial and prepared ES-DE fallback overlay.
+[PRODUCT](../gaming-wayland/PRODUCT.md) owns the installed release and ES-DE fallback overlay.
 This runbook owns UI build/check commands. Ordinary EGLFS previews have only a local panel;
 shared Wayland supplies the separate application/input path. Device writes require an explicit
 lease. An explicit application list enables foreground process launch on shared-window platforms;
@@ -39,6 +39,8 @@ versus forced close, including accepted device paths and remaining retention gat
 presets and the separate, bounded desktop-exit/stream/restart experiment.
 Its attended record also tracks the current rendering, input-UX and backlight gaps.
 The generic example application list is not activated automatically.
+[Built-in stick calibration](CONTROLLER-CALIBRATION.md) owns the controller
+settings wizard, asymmetric range correction and paired input-router checks.
 
 [Jume Files/Text](../gaming-files/README.md) adds optional file-manager and editor
 entries, including with a custom application list. Its file content is excluded
@@ -74,6 +76,7 @@ Page keys follow [JUME-UI §7.3–7.6](../../docs/JUME-UI.md#73-页面层每个�
 | Page action (add host, game catalog, search) | Y | Y |
 | Options menu of the focused item | M | Start |
 | Quick panel, decided on release | Q | Select / Guide |
+| Toggle diagnostics without changing game focus | — | Select + R1 |
 | Previous / next section | `[` / `]` | L1 / R1 |
 | Page up / down | PgUp / PgDn | L2 / R2 (analog past 50%) |
 | Scroll without moving focus | — | Right stick |

@@ -19,7 +19,11 @@ static QString buttonAction(SDL_GameControllerButton button) {
     }
 }
 static bool direction(const QString &name) { return name == "up" || name == "down" || name == "left" || name == "right"; }
-ControllerInput::ControllerInput(QObject *parent, bool routed) : QObject(parent), m_routed(routed) {
+ControllerInput::ControllerInput(QObject *parent, bool routed) : QObject(parent), m_calibration(this), m_routed(routed) {
+    connect(&m_calibration, &StickCalibration::changed, this, [this] {
+        if (m_calibrating && !m_calibration.active()) suppressUntilNeutral();
+        m_calibrating = m_calibration.active();
+    });
     connect(&m_timer, &QTimer::timeout, this, &ControllerInput::poll);
     if (m_routed) { m_timer.start(16); return; }
     // This opens a controller for this process only; it never grabs system input.
@@ -63,7 +67,10 @@ void ControllerInput::press(const QString &name) {
     m_down.insert(name);
     if (name == "quick") { m_selectChord = false; return; }
     // Select + another key belongs to the system layer; the page sees neither (§7.2).
-    if (m_down.contains("quick")) { m_selectChord = true; m_swallowed.insert(name); return; }
+    if (m_down.contains("quick")) {
+        if (!m_selectChord && name == "nextSection") emit action("diagnostics", false);
+        m_selectChord = true; m_swallowed.insert(name); return;
+    }
     emit action(name, false);
     if (direction(name) || (name == "back" && m_backRepeat)) { m_held = name; m_heldClock.restart(); m_nextRepeat = RepeatDelay; }
 }
@@ -169,9 +176,10 @@ void ControllerInput::poll() {
     update(down, axes[3].toDouble(), neutral);
     m_timer.setInterval(m_controller ? 16 : 250);
 }
-void ControllerInput::routedState(quint32 keys, const qint32 rawAxes[4]) {
+void ControllerInput::routedState(quint32 keys, const qint32 rawAxes[4], const qint32 originalAxes[4]) {
     if (!m_routed || (keys & ~0x1ffffU)) return;
     for (int i = 0; i < 4; ++i) if (rawAxes[i] < -32767 || rawAxes[i] > 32767) return;
+    if (originalAxes) m_calibration.observe(originalAxes);
     // Preserve the accepted R46H physical layout: East=A and South=B.
     constexpr SDL_GameControllerButton mapping[]{SDL_CONTROLLER_BUTTON_B, SDL_CONTROLLER_BUTTON_A,
         SDL_CONTROLLER_BUTTON_X, SDL_CONTROLLER_BUTTON_Y, SDL_CONTROLLER_BUTTON_LEFTSHOULDER,

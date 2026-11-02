@@ -13,6 +13,7 @@
 #include <QGuiApplication>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <sys/stat.h>
 #include <unistd.h>
 #ifdef Q_OS_LINUX
@@ -37,6 +38,9 @@ HandheldSession::HandheldSession(QQuickView *view, ControllerInput *input, Appli
     });
     m_inputDeadline.setSingleShot(true); m_inputDeadline.setInterval(2000);
     connect(&m_inputDeadline, &QTimer::timeout, this, [this] { fail(QStringLiteral("输入归属切换超时。")); });
+    m_calibrationDeadline.setSingleShot(true); m_calibrationDeadline.setInterval(2000);
+    connect(&m_calibrationDeadline, &QTimer::timeout, this, [this] { fail(QStringLiteral("摇杆校准应用超时。")); });
+    connect(m_input->calibration(), &StickCalibration::configurationRequested, this, &HandheldSession::sendCalibration);
     connect(&m_policy, &QLocalSocket::connected, this, [this] {
 #ifdef Q_OS_LINUX
         ucred peer{}; socklen_t length = sizeof(peer);
@@ -77,7 +81,7 @@ HandheldSession::~HandheldSession() {
 #endif
     if (m_captureThread) { m_captureThread->wait(); delete m_captureThread; }
     if (m_thumbnailThread) { m_thumbnailThread->wait(); delete m_thumbnailThread; }
-    m_failed = true; m_deadline.stop(); m_inputDeadline.stop(); m_notifier.reset();
+    m_failed = true; m_deadline.stop(); m_inputDeadline.stop(); m_calibrationDeadline.stop(); m_notifier.reset();
     m_router.disconnect(this);
     if (m_control >= 0) ::close(m_control);
     if (m_router.state() != QProcess::NotRunning) {
@@ -87,7 +91,8 @@ HandheldSession::~HandheldSession() {
 }
 void HandheldSession::fail(const QString &message) {
     if (m_failed) return;
-    m_failed = true; m_ready = false; m_deadline.stop(); m_inputDeadline.stop(); m_frameTimer.stop(); m_notifier.reset();
+    m_failed = true; m_ready = false; m_deadline.stop(); m_inputDeadline.stop(); m_calibrationDeadline.stop(); m_frameTimer.stop(); m_notifier.reset();
+    m_input->calibration()->setAvailable(false);
     m_frameMetrics = {{"active", false}}; emit frameMetricsChanged();
     if (m_control >= 0) { ::close(m_control); m_control = -1; }
     m_input->suppressUntilNeutral(); m_applications->stopAll();
@@ -146,24 +151,34 @@ void HandheldSession::readInput() {
         if (size < 0 && errno == EINTR) continue;
         if (size < 0 && errno == EAGAIN) return;
         if (size != sizeof(packet) || packet.version != Route::Version || packet.reserved>=Route::Slots || packet.mode > Route::Game
-            || packet.flags & ~(Route::WaitingNeutral | Route::WaitingOwner | Route::InjectionCancelled) || packet.sequence > m_inputSequence) {
+            || packet.flags & ~(Route::WaitingNeutral | Route::WaitingOwner | Route::InjectionCancelled | Route::CalibrationSupported | Route::RawAxes) || packet.sequence > m_inputSequence) {
             fail(QStringLiteral("输入通道状态无效。")); return;
         }
         if ((packet.type == Route::InjectDone || packet.type == Route::InjectDenied) && packet.sequence == m_remoteSequence) {
             m_remoteSequence = 0;
             emit gameInputFinished(packet.type == Route::InjectDenied ? "unavailable" : packet.flags & Route::InjectionCancelled ? "cancelled" : "completed");
         } else if (packet.type == Route::Ready && !m_routerReady) {
+            m_calibrationSupported = packet.flags & Route::CalibrationSupported;
             m_routerReady = true; m_inputDeadline.stop(); synchronize();
         } else if (packet.type == Route::State) {
             // Old reports can be queued while an ownership change is awaiting its ack.
-            if (packet.sequence == m_inputSequence && packet.mode == Route::Ui && m_inputRequested < 0)
-                m_input->routedState(packet.keys, packet.axes);
+            if (packet.sequence == m_inputSequence && packet.mode == Route::Ui && m_inputRequested < 0) {
+                qint32 raw[4]; std::memcpy(raw, packet.device, sizeof(raw));
+                m_input->routedState(packet.keys, packet.axes, packet.flags & Route::RawAxes ? raw : nullptr);
+            }
+        } else if (packet.type == Route::CalibrationAck && m_calibrationSequence && packet.sequence == m_calibrationSequence && packet.keys <= 1) {
+            m_calibrationSequence = 0; m_calibrationDeadline.stop();
+            m_input->calibration()->applied(packet.keys == 1); synchronize();
         } else if (packet.type == Route::Ack && packet.sequence == m_modeSequence && int(packet.mode) == m_inputRequested) {
             if(int(packet.reserved)!=m_requestedSlot){fail(QStringLiteral("输入槽位不匹配。"));return;}
-            m_inputSlot=m_requestedSlot;m_inputMode = m_inputRequested; m_inputRequested = -1; m_inputDeadline.stop(); synchronize();
+            m_inputSlot=m_requestedSlot;m_inputMode = m_inputRequested; m_inputRequested = -1; m_inputDeadline.stop();
+            m_input->calibration()->setAvailable(m_calibrationSupported && m_inputMode == Route::Ui);
+            sendCalibration(); synchronize();
         } else if(packet.type==Route::Hold && packet.keys<=100) {
             if(packet.keys&&!m_view->rootObject()->property("taskHoldPercent").toInt()){m_holdId=m_applications->activeId();m_holdPid=m_applications->processId();}
             m_view->rootObject()->setProperty("taskHoldPercent",int(packet.keys));
+        } else if(packet.type==Route::Diagnostics) {
+            emit systemAction("diagnostics");
         } else if(packet.type==Route::Tasks||packet.type==Route::Home||packet.type==Route::Kill) {
             // Select + X is no longer a system shortcut (§7.8); the router never sends Close.
             m_inputMode=-1;m_input->suppressUntilNeutral();
@@ -187,6 +202,7 @@ void HandheldSession::selectInput(bool ui) {
     const int mode = ui ? Route::Ui : Route::Game;
     const int slot=m_applications->inputSlot();
     if (!m_routerReady || m_inputRequested >= 0 || (m_inputMode == mode && m_inputSlot==slot) || m_failed) return;
+    if (!ui) m_input->calibration()->setAvailable(false);
     Route::Packet packet; packet.type = Route::Mode; packet.mode = mode; packet.sequence = ++m_inputSequence;
     packet.reserved=uint32_t(slot);m_requestedSlot=slot;
     m_modeSequence = packet.sequence; // A later cancellation may advance the channel before this mode ack arrives.
@@ -198,6 +214,26 @@ void HandheldSession::selectInput(bool ui) {
     m_inputRequested = mode; m_inputDeadline.start();
 #else
     Q_UNUSED(ui);
+#endif
+}
+void HandheldSession::sendCalibration() {
+#ifdef Q_OS_LINUX
+    auto *calibration = m_input->calibration();
+    if (!m_calibrationSupported || !m_routerReady || m_failed || m_inputMode != Route::Ui
+        || m_inputRequested >= 0 || m_calibrationSequence || !calibration->needsApply()) return;
+    Route::Packet packet; packet.type = Route::Calibration; packet.mode = Route::Ui;
+    packet.sequence = ++m_inputSequence; packet.reserved = uint32_t(m_inputSlot); packet.keys = calibration->configured();
+    qint32 limits[8];
+    for (int i = 0; i < 4; ++i) {
+        const auto &axis = calibration->profile()[i]; packet.axes[i] = axis.center;
+        limits[2*i] = axis.minimum; limits[2*i+1] = axis.maximum;
+    }
+    std::memcpy(packet.device, limits, sizeof(limits));
+    if (::send(m_control, &packet, sizeof(packet), MSG_NOSIGNAL | MSG_DONTWAIT) != sizeof(packet)) {
+        fail(QStringLiteral("无法应用摇杆校准。")); return;
+    }
+    m_calibrationSequence = packet.sequence; m_calibrationDeadline.start();
+    if (m_ready) { m_ready = false; emit changed(); }
 #endif
 }
 void HandheldSession::synchronize() {
@@ -318,7 +354,7 @@ void HandheldSession::requestPolicy() {
         if (m_capturePhase == Closing && !m_captureThread) finishCapture();
         if (!game && m_thumbnailSurface && m_thumbnailFrameReady && !m_thumbnailThread) readThumbnail();
         selectInput(!game || panelInput);
-        const bool ready = m_routerReady && m_inputRequested < 0;
+        const bool ready = m_routerReady && m_inputRequested < 0 && !m_calibrationSequence;
         if (m_ready != ready) { m_ready = ready; emit changed(); }
         return;
     }

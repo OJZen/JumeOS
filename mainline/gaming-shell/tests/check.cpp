@@ -356,6 +356,34 @@ private slots:
         QSignalSpy idle(&view, &QQuickWindow::frameSwapped); QTest::qWait(500);
         QVERIFY2(idle.size() <= 3, qPrintable(QString("Settled settings repainted %1 times").arg(idle.size())));
     }
+    void stickCalibrationSettingsFlow() {
+        QTemporaryDir directory;
+        Preferences state(directory.path()); Telemetry metrics(directory.path()); ControllerInput controller(nullptr, true);
+        auto *calibration = controller.calibration(); calibration->load(directory.path()); calibration->setAvailable(true);
+        QQuickView view;
+        view.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(&metrics)}, {"controller", QVariant::fromValue(&controller)}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml")));
+        QCOMPARE(view.status(), QQuickView::Ready); view.resize(1024, 768); view.show(); QVERIFY(QTest::qWaitForWindowExposed(&view));
+        auto *root = view.rootObject();
+        auto action = [&](const char *name) { QVERIFY(QMetaObject::invokeMethod(root, "dispatch", Q_ARG(QVariant, QString(name)), Q_ARG(QVariant, false))); };
+        QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString("settings"))));
+        root->setProperty("settingsCategory", 3); action("right"); QTRY_VERIFY(root->property("settingsDetailReady").toBool());
+        root->setProperty("settingsIndex", 2); action("accept"); QVERIFY(calibration->active());
+        QVERIFY(!root->property("idleEligible").toBool());
+        action("left"); action("down"); action("options");
+        QCOMPARE(calibration->phase(), 1); QCOMPARE(root->property("settingsIndex").toInt(), 2);
+        const qint32 center[]{500, -700, 1000, -500}, low[]{-23000, -26000, -21000, -24500}, high[]{29000, 24000, 27000, 22000};
+        calibration->observe(center); for (int n = 0; n < 30; ++n) calibration->sampleCenter();
+        action("accept"); QCOMPARE(calibration->phase(), 2);
+        calibration->observe(low); calibration->observe(high); action("accept"); QCOMPARE(calibration->phase(), 3);
+        action("accept"); QVERIFY(!QFile::exists(directory.filePath("stick-calibration.json")));
+        action("back"); QVERIFY(!calibration->active()); QCOMPARE(root->property("page").toInt(), 2);
+        action("accept"); QVERIFY(calibration->active());
+        action("quick"); QTRY_VERIFY(!calibration->active()); QVERIFY(root->property("quickOpen").toBool());
+        action("back"); action("accept"); QVERIFY(calibration->active());
+        action("home");
+        QVERIFY(!calibration->active()); QVERIFY(!QFile::exists(directory.filePath("stick-calibration.json")));
+    }
     void settingsCategoriesAndReasons() {
         QTemporaryDir directory;
         Preferences state(directory.path()); Telemetry metrics(directory.path()); ControllerInput controller;
@@ -368,7 +396,7 @@ private slots:
         auto call = [&](const char *name, const QVariant &row) { QVariant value; QMetaObject::invokeMethod(settings, name, Q_RETURN_ARG(QVariant, value), Q_ARG(QVariant, row)); return value.toString(); };
         // §8: the old categories merge into eight; every row shows a value or why it has none, never "—".
         const QList<QStringList> expected{{"wifi", "netScan"}, {"brightness", "screenOff", "night", "font", "motion"}, {"volume", "audioOutput"},
-            {"tester", "input"}, {"dim", "screenOffNow", "battery", "reboot", "poweroff"},
+            {"tester", "input", "calibration", "calibrationReset"}, {"dim", "screenOffNow", "battery", "reboot", "poweroff"},
             {"monitor", "monitorDetail", "cpuAuto", "cpuPreset", "cpuGovernor", "cpuMin", "cpuMax", "cpuCurrent", "swap", "zram", "zramAlgorithms", "zramMemory", "pressure"},
             {"storage"}, {"", "systemCpu", "memory", "temperature", "thermal", "gpuFrequency", "", "", "", "browser", "browser", "browser"}};
         QVERIFY(QMetaObject::invokeMethod(root, "showScene", Q_ARG(QVariant, QString("settings"))));
@@ -606,6 +634,12 @@ private slots:
         SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_A, 0); input.poll();
         SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_BACK, 0); input.poll();
         QVERIFY(actions.isEmpty()); QVERIFY(releases.isEmpty());
+        SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_BACK, 1); input.poll();
+        SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, 1); input.poll(); input.poll();
+        QCOMPARE(actions.size(), 1); QCOMPARE(actions.first().at(0).toString(), QString("diagnostics"));
+        SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_BACK, 0); input.poll();
+        SDL_JoystickSetVirtualButton(joystick, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, 0); input.poll();
+        QCOMPARE(actions.size(), 1); QVERIFY(releases.isEmpty());
         // Right stick scrolls, faster the further it is pushed.
         SDL_JoystickSetVirtualAxis(joystick, SDL_CONTROLLER_AXIS_RIGHTY, 32767); input.poll();
         QVERIFY(!scrolls.isEmpty()); QVERIFY(qAbs(scrolls.last().at(0).toDouble() - 1.) < 0.01);
@@ -1431,16 +1465,28 @@ private slots:
         QVERIFY(arguments.contains("1024x768")); QVERIFY(arguments.contains("8000")); QVERIFY(!arguments.contains("--performance-overlay"));
         auto malformed = host; malformed["address"] = " 127.0.0.1 "; QVERIFY(Streaming::streamArguments(malformed).isEmpty());
         QFile fake(directory.filePath("client")); QVERIFY(fake.open(QIODevice::WriteOnly));
-        fake.write("#!/bin/sh\nif [ \"$1\" = pair ]; then exit 0; fi\nprintf 'FPS 60\\nExecuting request: http://fixture/?rikey=fixture-secret\\n'\nexit 0\n"); fake.close();
+        fake.write("#!/bin/sh\nif [ \"$1\" = pair ]; then exit 0; fi\nsleep .05\nprintf '%s\\n' \"$@\" > arguments.txt\nprintf 'FPS 60\\nExecuting request: http://fixture/?rikey=fixture-secret\\n'\nexit 0\n"); fake.close();
         QVERIFY(fake.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
         QVERIFY(fake.open(QIODevice::ReadOnly)); const auto hash = QCryptographicHash::hash(fake.readAll(), QCryptographicHash::Sha256).toHex(); fake.close();
         restored.configureClient(fake.fileName(), QString::fromLatin1(hash)); restored.pair();
         QCOMPARE(restored.pin().size(), 4); QTRY_VERIFY(!restored.busy()); QVERIFY(restored.pin().isEmpty());
         QVERIFY(restored.current().value("paired").toBool());
         QSignalSpy requested(&restored, &Streaming::launchRequested); QVERIFY(restored.requestStream()); QCOMPARE(requested.size(), 1);
-        QCOMPARE(restored.runPending(2), 0); QVERIFY(!QFile::exists(directory.filePath("streaming/request.json")));
+        QCOMPARE(restored.runPending(), 0); QVERIFY(!QFile::exists(directory.filePath("streaming/request.json")));
         QFile log(directory.filePath("streaming/stream.log")); QVERIFY(log.open(QIODevice::ReadOnly)); const auto text = log.readAll();
         QVERIFY(text.contains("FPS 60")); QVERIFY(!text.contains("fixture-secret"));
+        restored.toggleOverlay(); QVERIFY(restored.current().value("overlay").toBool());
+        QVERIFY(restored.requestStream());
+        const auto platform=qgetenv("QT_QPA_PLATFORM");qputenv("QT_QPA_PLATFORM","wayland");
+        const auto sharedResult=restored.runPending(2);
+        if(platform.isNull())qunsetenv("QT_QPA_PLATFORM");else qputenv("QT_QPA_PLATFORM",platform);
+        QCOMPARE(sharedResult,0);
+        QFile sharedArgs(directory.filePath("streaming/arguments.txt"));QVERIFY(sharedArgs.open(QIODevice::ReadOnly));
+        QVERIFY(!sharedArgs.readAll().contains("--performance-overlay"));
+        QVERIFY(fake.open(QIODevice::WriteOnly|QIODevice::Truncate));fake.write("#!/bin/sh\nexec sleep 3\n");fake.close();
+        QVERIFY(fake.open(QIODevice::ReadOnly));const auto slowHash=QCryptographicHash::hash(fake.readAll(),QCryptographicHash::Sha256).toHex();fake.close();
+        restored.configureClient(fake.fileName(),QString::fromLatin1(slowHash));
+        QVERIFY(restored.requestStream());QCOMPARE(restored.runPending(1),124); // Explicit test deadlines still clean up.
         restored.streamFinished(7); QVERIFY(restored.status().contains(QStringLiteral("未正常结束")));
         restored.streamFinished(0); QCOMPARE(restored.status(), QStringLiteral("串流已结束"));
         Streaming afterStop(directory.path()); QCOMPARE(afterStop.status(), QStringLiteral("串流已结束"));
@@ -1451,6 +1497,36 @@ private slots:
         Streaming unsafe(directory.path()); QVERIFY(!unsafe.error().isEmpty()); QVERIFY(!unsafe.addHost("example.test"));
         QVERIFY(QFile::remove(directory.filePath("streaming/hosts.json"))); QVERIFY(QFile::rename(original, directory.filePath("streaming/hosts.json")));
         QVERIFY(restored.removeSelected()); QVERIFY(restored.hosts().isEmpty());
+    }
+    void streamingShortcutAndDiagnostics() {
+        QTemporaryDir directory; Preferences state(directory.path()); Telemetry metrics(directory.path());
+        ControllerInput controller; Streaming manager(directory.path()); ToolState tools(directory.path(), directory.path(), false);
+        QQuickView view;
+        view.setInitialProperties({{"store", QVariant::fromValue(&state)}, {"metrics", QVariant::fromValue(&metrics)},
+            {"controller", QVariant::fromValue(&controller)}, {"streaming", QVariant::fromValue(&manager)}, {"tools", QVariant::fromValue(&tools)}});
+        view.setSource(QUrl::fromLocalFile(QStringLiteral(SHELL_SOURCE_DIR "/ShellView.qml"))); QCOMPARE(view.status(), QQuickView::Ready);
+        auto *root=view.rootObject();
+        auto activate=[&]{QVERIFY(QMetaObject::invokeMethod(root,"activateSelected"));};
+        QSignalSpy requested(&manager,&Streaming::launchRequested);
+        activate();QVERIFY(root->property("streamingOpen").toBool());QVERIFY(requested.isEmpty());
+        QVERIFY(manager.addHost("127.0.0.1"));QVERIFY(manager.edit("name", "本机 Sunshine"));QVERIFY(manager.edit("application", "TOTK Recompiled"));manager.adjustPreset(2);
+        QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("home"))));
+        activate();QVERIFY(root->property("streamingOpen").toBool());QVERIFY(requested.isEmpty()); // Pairing is never fabricated.
+        QFile fake(directory.filePath("client"));QVERIFY(fake.open(QIODevice::WriteOnly));fake.write("#!/bin/sh\nexit 0\n");fake.close();
+        QVERIFY(fake.setPermissions(QFile::ReadOwner|QFile::WriteOwner|QFile::ExeOwner));QVERIFY(fake.open(QIODevice::ReadOnly));
+        manager.configureClient(fake.fileName(),QString::fromLatin1(QCryptographicHash::hash(fake.readAll(),QCryptographicHash::Sha256).toHex()));fake.close();
+        manager.pair();QTRY_VERIFY(!manager.busy());QVERIFY(manager.current().value("paired").toBool());
+        QVERIFY(QMetaObject::invokeMethod(root,"showScene",Q_ARG(QVariant,QString("home"))));activate();
+        QCOMPARE(requested.size(),1);QVERIFY(!root->property("streamingOpen").toBool());
+        QFile request(directory.filePath("streaming/request.json"));QVERIFY(request.open(QIODevice::ReadOnly));
+        const auto host=QJsonDocument::fromJson(request.readAll()).object().value("host").toObject();
+        QCOMPARE(host.value("application").toString(),QString("TOTK Recompiled"));QCOMPARE(host.value("preset").toInt(),2);
+        const bool before=state.monitor();
+        QVERIFY(QMetaObject::invokeMethod(root,"dispatch",Q_ARG(QVariant,QString("diagnostics")),Q_ARG(QVariant,false)));
+        QCOMPARE(state.monitor(),!before);QVERIFY(!root->property("quickOpen").toBool());
+        Preferences saved(directory.path());QCOMPARE(saved.monitor(),!before);
+        QVERIFY(QMetaObject::invokeMethod(root,"dispatch",Q_ARG(QVariant,QString("diagnostics")),Q_ARG(QVariant,true)));QCOMPARE(state.monitor(),!before);
+        QVERIFY(QMetaObject::invokeMethod(root,"toggleDiagnostics"));QCOMPARE(state.monitor(),before);
     }
     void streamingNavigation() {
         QTemporaryDir directory; Preferences state(directory.path()); Telemetry metrics(directory.path());

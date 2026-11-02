@@ -21,6 +21,8 @@ Item {
     property bool adjustingValue: false
     property bool navigationActive: true
     property bool tester: false
+    readonly property var calibration: controller && controller.calibration ? controller.calibration : null
+    readonly property bool calibrating: calibration !== null && calibration.active
     // The shell's B-hold progress while the controller test runs (-1 before the ring shows).
     property real testerHold: -1
     // §7.3: L1/R1 return to the row each category had when it was left.
@@ -32,7 +34,7 @@ Item {
     // 控制器 = 摇杆测试 + 文字输入, 性能 = 浮窗 + CPU + 内存, 系统 = 系统信息 + 关于.
     readonly property var categories: ["网络", "显示", "声音", "控制器", "电源", "性能", "存储", "系统"]
     readonly property var categoryIcons: ["wifi", "display", "volume", "gamepad", "battery", "cpu", "storage", "info"]
-    readonly property var categoryNotes: ["已连接与附近的 Wi-Fi", "亮度、自动息屏、夜间模式与字号", "音量与声音输出", "摇杆测试与文字输入",
+    readonly property var categoryNotes: ["已连接与附近的 Wi-Fi", "亮度、自动息屏、夜间模式与字号", "音量与声音输出", "摇杆测试、校准与文字输入",
         "变暗、息屏、电池、重启与关机", "性能浮窗、CPU 频率与内存", "分区与可用空间", "系统状态与关于"]
     readonly property var nightModes: ["off", "on", "auto"]
     readonly property var nightLabels: ["关闭", "开启", "跟随时间"]
@@ -44,6 +46,9 @@ Item {
         : row.key === "storage" ? "刷新" : row.key === "tester" ? "开始测试" : row.key === "netActive" ? "详情"
         : row.key === "netPoint" ? "连接" : row.key === "netScan" ? "扫描" : choiceRow(row.key) ? "选择" : "打开"
     readonly property var hints: choices.visible ? choices.hints
+        : calibrating ? (calibration.canAdvance ? [{button: "A", label: calibration.phase === 1 ? "记录中点" : calibration.phase === 2 ? "检查结果" : calibration.phase === 3 ? "保存" : "恢复默认"}] : [])
+            .concat(calibration.phase === 2 || calibration.phase === 3 ? [{button: "X", label: "重新开始"}] : [])
+            .concat([{button: "B", label: "取消"}])
         : sidebar ? [{button: "A", label: "进入"}, {button: "B", label: "返回"}]
         : tester ? [{button: "B", label: "按住退出", progress: testerHold}]
         : !detailReady ? [{button: "B", label: "返回分类"}]
@@ -73,7 +78,9 @@ Item {
             {name: "夜间模式", key: "night", section: "外观"}, {name: "界面字号", key: "font", section: "外观"}, {name: "减少动态效果", key: "motion", section: "外观"}]
         case 2: return [{name: "音量", key: "volume", section: "", icon: "volume"}, {name: "声音输出", key: "audioOutput", section: ""}]
         case 3: return [{name: "摇杆测试", key: "tester", section: ""},
-            {name: "文字输入测试", key: "input", detail: "退出后清空", section: ""}]
+            {name: "文字输入测试", key: "input", detail: "退出后清空", section: ""},
+            {name: "摇杆校准", key: "calibration", detail: "内置双摇杆 · 中点与各方向行程", section: "校准"},
+            {name: "恢复默认校准", key: "calibrationReset", section: "校准"}]
         case 4: return [{name: "空闲变暗", key: "dim", section: "节能"}, {name: "立即息屏", key: "screenOffNow", detail: "首个按键仅唤醒", section: "节能"},
             {name: "电池与供电", key: "battery", section: "电池"}, {name: "重启…", key: "reboot", section: "系统电源"}, {name: "关机…", key: "poweroff", section: "系统电源"}]
         case 5: return [{name: "性能浮窗", key: "monitor", section: "性能浮窗"}, {name: "浮窗内容", key: "monitorDetail", section: "性能浮窗"},
@@ -125,6 +132,8 @@ Item {
         return ["font", "night", "dim", "screenOff", "monitorDetail"].indexOf(key) >= 0 || (!!key && key.indexOf("cpu") === 0 && key !== "cpuCurrent" && key !== "cpuAuto")
     }
     function canActivate(key) {
+        if (key === "calibration" || key === "calibrationReset") return calibration !== null && calibration.available && !calibration.busy
+            && (key !== "calibrationReset" || calibration.configured || !!calibration.error)
         if (!key || readings.indexOf(key) >= 0 || key === "wifi" || key === "audioOutput") return false
         if (["tester", "input", "motion", "monitor", "monitorDetail", "font", "night"].indexOf(key) >= 0) return true
         if (key.indexOf("net") === 0) return network !== null && network.available && !network.busy && (key === "netRefresh" || (hardware && device.controls && network.controls && (key !== "netDisconnect" || activeNetworks.length === 1)))
@@ -140,6 +149,8 @@ Item {
     function rowReason(row) {
         if (!row) return ""
         const key = row.key || ""
+        if (key === "calibration" || key === "calibrationReset") return calibration && calibration.busy ? "正在应用校准…"
+            : !calibration || !calibration.available ? "仅支持 R46H 内置摇杆" : key === "calibrationReset" && !calibration.configured && !calibration.error ? "已使用默认范围" : ""
         if (informational(row)) {
             if (rowValue(row) !== "") return ""
             if (key === "p95") return "游戏运行时显示"
@@ -157,6 +168,7 @@ Item {
     }
     function signalText(percent) { return percent >= 70 ? "信号良好" : percent >= 40 ? "信号一般" : percent >= 0 ? "信号较弱" : "" }
     function rowDescription(row) {
+        if (row.key === "calibration" && calibration && calibration.error) return calibration.error
         if (row.key === "netActive") return ["已连接", network !== null ? signalText(network.signal) : ""].filter(function(part) { return !!part }).join(" · ")
         if (hardware && row.key && row.key.indexOf("storage") === 0 && row.key !== "storage") {
             const value = device.storage[Number(row.key.slice(-1))]
@@ -165,6 +177,7 @@ Item {
         return row.info === "storage" ? metrics.storage : row.info === "system" ? metrics.system : row.detail || ""
     }
     function rowValue(row) {
+        if (row.key === "calibration") return calibration && calibration.configured ? "已校准" : "默认范围"
         if (row.key && row.key.indexOf("storage") === 0 && row.key !== "storage") {
             const value = device.storage[Number(row.key.slice(-1))]
             return value && value.available ? (value.availableBytes / 1073741824).toFixed(1) + " / " + (value.totalBytes / 1073741824).toFixed(1) + " GiB 可用" : "未挂载或不可用"
@@ -230,6 +243,7 @@ Item {
         activateKey(id, id === "netProfiles" ? "已保存的网络" : id === "netForget" ? "忘记网络" : "")
     }
     function enter() {
+        if (calibrating) calibration.cancel()
         sidebar = true; tester = false; adjustingValue = false; rowIndex = 0; previewCategory = -1
         categoryList.positionViewAtIndex(category, ListView.Contain)
         previewTimer.restart()
@@ -294,6 +308,10 @@ Item {
     }
     function activateKey(key, name, row) {
         if (!canActivate(key)) { notice(rowReason({key: key})); return }
+        if (key === "calibration" || key === "calibrationReset") {
+            if (key === "calibration") calibration.begin(); else calibration.confirmReset()
+            activity(); return
+        }
         choiceKey = key
         if (key === "netRefresh") { network.refresh(); return }
         if (key === "screenOffNow") { screenOffRequested(); return }
@@ -342,6 +360,14 @@ Item {
     }
     // Returns false only for B on the category list, which leaves settings.
     function dispatch(action, repeated) {
+        if (calibrating) {
+            if (!repeated) {
+                if (action === "back" || action === "home") calibration.cancel()
+                else if (action === "accept") calibration.advance()
+                else if (action === "itemAction" && calibration.phase !== 4) calibration.begin()
+            }
+            return true
+        }
         if (choices.dispatch(action, repeated)) return true
         if (tester) return true
         if (action === "prevSection" || action === "nextSection") { switchCategory(action === "nextSection" ? 1 : -1); return true }
@@ -398,14 +424,26 @@ Item {
     // Right stick: scroll the detail without moving the focused row.
     function scroll(velocity) {
         const list = detailList()
-        if (tester || sidebar || !list || list.contentHeight <= list.height) return
+        if (tester || calibrating || sidebar || !list || list.contentHeight <= list.height) return
         list.contentY = Math.max(list.originY, Math.min(list.originY + list.contentHeight - list.height, list.contentY + velocity * Ui.Theme.scrollStep))
     }
     onCategoryChanged: if (!sidebar) openedCategory = category
+    onVisibleChanged: if (!visible && calibrating) calibration.cancel()
+    onNavigationActiveChanged: if (!navigationActive && calibrating) calibration.cancel()
+    Loader {
+        anchors.fill: parent; active: settings.calibrating
+        sourceComponent: Component {
+            StickCalibrationView {
+                objectName: "stickCalibrationView"
+                calibration: settings.calibration; fontScale: settings.fontScale
+            }
+        }
+    }
     // §8 Settings: categories on the left (280), the detail on the right with section captions.
     // While the categories have focus the detail is not built; the right pane names the category.
     Item {
         anchors.fill: parent
+        visible: !settings.calibrating
         Ui.ListView {
             id: categoryList; objectName: "settingsCategories"
             x: 0; y: Ui.Theme.space8; width: settings.twoPane ? Ui.Theme.settingsSidebarWidth : parent.width; height: parent.height - y

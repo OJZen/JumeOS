@@ -5,6 +5,7 @@
 #include <QTimer>
 #include <QVariantList>
 #include <SDL.h>
+#include "stickcalibration.h"
 
 // Page-layer controller input (docs/JUME-UI.md §7.3–7.5). Presses emit `action`
 // immediately; Select ("quick") is decided on release and swallows chords.
@@ -18,13 +19,15 @@ class ControllerInput final : public QObject {
     Q_PROPERTY(QString buttons READ buttons NOTIFY stateChanged)
     Q_PROPERTY(bool fastRepeat READ fastRepeat WRITE setFastRepeat NOTIFY fastRepeatChanged)
     Q_PROPERTY(bool backRepeat READ backRepeat WRITE setBackRepeat NOTIFY backRepeatChanged)
+    Q_PROPERTY(StickCalibration *calibration READ calibration CONSTANT)
 public:
     static constexpr int RepeatDelay = 380, RepeatInterval = 90, FastAfter = 2000, FastInterval = 50;
     explicit ControllerInput(QObject *parent = nullptr, bool routed = false);
     ~ControllerInput() override;
     void poll();
     void suppressUntilNeutral();
-    void routedState(quint32 keys, const qint32 axes[4]);
+    void routedState(quint32 keys, const qint32 axes[4], const qint32 rawAxes[4] = nullptr);
+    StickCalibration *calibration() { return &m_calibration; }
     // Left stick: 55% of full scale engages the primary axis, below 35% releases it.
     static QString stickDirection(Sint16 x, Sint16 y, const QString &current = {});
     QString deviceName() const { return m_deviceName; }
@@ -46,6 +49,8 @@ signals:
     void fastRepeatChanged();
     void backRepeatChanged();
 private:
+    StickCalibration m_calibration;
+    bool m_calibrating = false;
     void openFirst();
     void press(const QString &name);
     void release(const QString &name);

@@ -71,5 +71,27 @@ int main() {
         policy.setMode(Game);tick(0,1200);actions.clear();output.clear();
         tick(Start,1300);tick(Start|Select,1381);tick(Start,1400);tick(0,1410);assert(actions.empty()); // Too late.
     }
-    std::puts("INPUT_POLICY_PASS: chords, short-home/long-kill, Select hand-over, 80 ms shortcut window and neutral ownership");
+    {
+        Policy policy(80);policy.setMode(Game);Sample input,last;std::vector<uint32_t> actions;
+        auto tick=[&](uint32_t keys,int64_t now){input.keys=keys;policy.update(input,!keys,now,[&](const Sample &s){last=s;},[&](uint32_t action){actions.push_back(action);});};
+        tick(0,0);tick(Select,10);tick(0,20);
+        assert(last.keys==Select); // A frame-based consumer must see a short tap after release.
+        input.axes={123,-456,789,-1000};tick(X,35);
+        assert(last.keys==(Select|X)&&last.axes==input.axes);
+        tick(0,69);assert(last.keys==Select);tick(0,70);assert(last.keys==0&&actions.empty());
+        tick(Select,100);tick(0,110);policy.setMode(Ui);tick(0,111);assert(last.keys==0);
+    }
+    for(auto mode:{Ui,Game}) for(auto releaseFirst:{Select,R1}) {
+        Policy policy(80);policy.setMode(mode);Sample sample;sample.axes={120,-240,360,-480};
+        std::vector<Sample> output;std::vector<uint32_t> actions;
+        auto tick=[&](uint32_t keys,int64_t now){sample.keys=keys;policy.update(sample,!keys,now,[&](const Sample &s){output.push_back(s);},[&](uint32_t action){actions.push_back(action);});};
+        tick(0,0);tick(Select,10);tick(Select|R1,20);tick(Select|R1,500);
+        assert(actions.size()==1&&actions[0]==Diagnostics&&!policy.ownerPending&&!policy.waiting&&policy.mode==mode);
+        tick((Select|R1)&~releaseFirst,510);tick(0,520);
+        for(const auto &s:output){assert(!(s.keys&(Select|R1)));assert(s.axes==sample.axes);}
+        tick(Select,530);tick(Select|R1,540);tick(0,550);assert(actions.size()==2);
+        tick(R1,560);assert(output.back().keys==R1);tick(0,570);
+        if(mode==Game){tick(Select,600);tick(Select,1200);tick(Select|R1,1210);assert(actions.size()==2&&output.back().keys==(Select|R1));}
+    }
+    std::puts("INPUT_POLICY_PASS: chords, diagnostics without ownership change, Select hand-over and neutral ownership");
 }

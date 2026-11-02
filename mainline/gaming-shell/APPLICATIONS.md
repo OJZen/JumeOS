@@ -77,13 +77,15 @@ entries were temporarily removed from the list.
 | Physical shortcut | Result |
 | --- | --- |
 | Select + Y | Background current app and show task cards |
+| Select + R1 | Toggle diagnostics without backgrounding the app |
 | Select + Start, release before 2 seconds | Background current app and return Home |
 | Select + Start, held for 2 seconds | Kill the app that was foreground when the hold began |
 | Select + Y on the task page | Return, like B |
 
 Press Select first or within 80 ms of the other key. An unrelated face-button
 press is never delayed to guess a future shortcut. Select alone delivers its
-ordinary press/release on release; in a game, Select with another key or held
+ordinary press/release on release; the short-tap fix holds a game tap for 50 ms
+so frame-based consumers can observe it. In a game, Select with another key or held
 600 ms reaches the game at once. Select + X is no longer a shortcut (emulator
 hotkeys keep it); a normal close is the task page's X or the quick panel's 结束游戏. Chord keys are consumed; L3+R3 still opens
 the existing quick panel. Holding Start+Select shows progress, not an early Home

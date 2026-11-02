@@ -14,10 +14,10 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Quick Test Network DBus)
 find_package(SDL2 REQUIRED)
 qt_standard_project_setup(REQUIRES 6.8)
 set_source_files_properties(controls/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
-qt_add_executable(r46h-shell main.cpp fonts.h input.cpp input.h handheld.cpp handheld.h preferences.cpp preferences.h telemetry.cpp telemetry.h control.cpp control.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
+qt_add_executable(r46h-shell main.cpp fonts.h input.cpp input.h stickcalibration.cpp stickcalibration.h handheld.cpp handheld.h preferences.cpp preferences.h telemetry.cpp telemetry.h control.cpp control.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
 target_compile_definitions(r46h-shell PRIVATE JUME_LAUNCHER_NAME="Jume Launcher" JUME_LAUNCHER_VERSION="${JUME_LAUNCHER_VERSION}")
 qt_add_qml_module(r46h-shell URI R46H.Shell VERSION 1.0
-    QML_FILES ShellView.qml HomeView.qml LibraryView.qml ToolsView.qml QuickPanelView.qml TaskView.qml SettingsView.qml PerformancePanel.qml StreamingView.qml ToolPage.qml PortCatalog.qml
+    QML_FILES ShellView.qml HomeView.qml LibraryView.qml ToolsView.qml QuickPanelView.qml TaskView.qml SettingsView.qml StickCalibrationView.qml PerformancePanel.qml StreamingView.qml ToolPage.qml PortCatalog.qml
         controls/Theme.qml controls/PageHeader.qml controls/Motion.qml controls/Label.qml controls/Icon.qml controls/FocusFrame.qml
         controls/Button.qml controls/Switch.qml controls/ProgressBar.qml controls/ScrollBar.qml controls/TextField.qml controls/Slider.qml
         controls/ListView.qml controls/TableView.qml controls/Page.qml controls/Tabs.qml controls/ChoicePopup.qml
@@ -48,7 +48,12 @@ qt_add_resources(r46h-shell keyboard PREFIX "/qt/qml/R46H/Shell" FILES KeyboardP
 set_target_properties(r46h-shell PROPERTIES MACOSX_BUNDLE FALSE)
 include(CTest)
 if(BUILD_TESTING)
-    qt_add_executable(shell-check tests/check.cpp fonts.h preferences.cpp preferences.h input.cpp input.h telemetry.cpp telemetry.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
+    qt_add_executable(calibration-check tests/calibration-check.cpp fonts.h stickcalibration.cpp stickcalibration.h)
+    target_include_directories(calibration-check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(calibration-check PRIVATE Qt6::Quick Qt6::Test)
+    target_compile_definitions(calibration-check PRIVATE SHELL_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    add_test(NAME calibration-check COMMAND calibration-check)
+    qt_add_executable(shell-check tests/check.cpp fonts.h preferences.cpp preferences.h input.cpp input.h stickcalibration.cpp stickcalibration.h telemetry.cpp telemetry.h applications.cpp applications.h streaming.cpp streaming.h device.cpp device.h network.cpp network.h tools.cpp tools.h usbgamepad.cpp usbgamepad.h)
     target_include_directories(shell-check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(shell-check PRIVATE Qt6::Quick Qt6::Test Qt6::Network Qt6::DBus SDL2::SDL2)
     target_compile_definitions(shell-check PRIVATE SHELL_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}" JUME_LAUNCHER_NAME="Jume Launcher" JUME_LAUNCHER_VERSION="${JUME_LAUNCHER_VERSION}")

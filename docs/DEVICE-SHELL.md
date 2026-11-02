@@ -1,6 +1,6 @@
 # Jume 桌面需求与接手入口
 
-本页负责 Jume Launcher 的产品约定、工作范围和代码入口；最后整理于 2026-10-30。
+本页负责 Jume Launcher 的产品约定、工作范围和代码入口；最后整理于 2026-11-02。
 当前进度、未提交工作和下一步只维护在 [Project Context](PROJECT-CONTEXT.md)；
 完整需求编号与验收条件在 [Product Roadmap](PRODUCT-ROADMAP.md)，实机结果在
 [R46H ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md)。不要用旧实验编号推断当前状态。
@@ -55,6 +55,8 @@ EGLFS 是单应用预览/专用直接显示路径；不能通过再开一个 EGL
 移植串流显示路径必须重新验证硬件帧导入、颜色、帧间隔和音画同步，保留既有回退。
 
 窗口焦点不阻止游戏直接读取手柄；全局面板必须经过 broker 分配输入，并在切换、退出、故障时发送释放/中立状态。
+R46H 内置左右摇杆提供[中点与方向行程校准](../mainline/gaming-shell/CONTROLLER-CALIBRATION.md)，
+从设置的控制器分类进入；校准作用于 Jume 及其游戏/串流输入，保留取消和恢复默认入口。
 游戏内快捷面板使用 L3+R3；桌面预览用 Select，串流退出用 L1+R1。任务组合键以
 [Applications](../mainline/gaming-shell/APPLICATIONS.md#lifecycle-and-limits) 为准，不把旧 ES-DE 快捷键直接搬到共享会话。
 
@@ -62,7 +64,7 @@ EGLFS 是单应用预览/专用直接显示路径；不能通过再开一个 EGL
 
 1. 先读 [AGENTS](../AGENTS.md)、[文档索引](README.md)、[Context](PROJECT-CONTEXT.md) 和本页；执行 `git status --short --branch`，核对已有改动。
 2. 以 Context 的第一项为当前任务；读该行负责文档、源码、最近证据和 [测试索引](../mainline/tests/README.md)。不要把路线图全部当成本轮任务。
-3. 默认/回退工作从 [r11 overlay](../mainline/gaming-wayland/PRODUCT.md#optional-r11-es-de-fallback-overlay) 继续，复用封存的 r11；无需重建 Qt 或重写 TF 卡。
+3. 默认/回退工作先核对 [当前封存版本](../mainline/gaming-wayland/PRODUCT.md) 和对应的回退/开屏脚本固定哈希；按该版本的切换流程继续，不复用旧版本部署命令。
    没有设备时可审查补丁、运行主机测试、检查部署与撤销步骤；真实 systemd/冷启动/回退结果保持待验收。
 4. 设备接入后按 [Development](DEVELOPMENT.md) 重新识别卡、串口、地址和版本，再执行 runbook 的有界验证。
    既有授权无需重复确认；仍需设备实际接入及对应的人眼、音频、按键观察，不能把“先准备”当作“已部署”。

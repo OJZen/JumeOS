@@ -1,6 +1,6 @@
 # Jume boot image
 
-An optional r11 overlay covers the tty1 login screen while the sealed desktop
+An optional overlay covers the tty1 login screen while the sealed desktop
 performs its approximately 45-second verification/preparation. It renders the
 existing Jume mark, UI palette and Noto Sans SC text “正在准备桌面，请稍候”. This
 is a static waiting image, not a measured percentage and not a startup-speed fix.
@@ -20,7 +20,7 @@ remain available. It does not alter BOOT, the sealed release or ES-DE recovery.
 The root-owned files live under `/var/lib/jume-launcher/boot-splash/`, with the
 unit under `/etc/systemd/system/` and drop-ins under `jume-launcher.service.d/`
 and `getty@tty1.service.d/`. The serial getty is unchanged.
-The helper authenticates the current r11 recovery helper/installer and fixed
+The helper authenticates the pinned recovery helper/installer and fixed
 card/kernel/rootfs before display access. It accepts only the verified
 rockchipdrmfb 1024×768 XR24 layout. It refuses an existing graphics owner and
 skips an already active desktop on tty2.
@@ -63,8 +63,10 @@ operator observation. Keep an independent bounded poweroff backstop while testin
 Removal: stop `jume-boot-splash.service` first and verify tty1 restoration; remove
 only the byte-matching launcher/getty drop-ins, unit and three installed payload
 files, then daemon-reload. Do not disable Jume or delete the ES-DE fallback.
-Before changing the pinned r11 recovery helper/release, remove or revalidate this
-overlay too; its hashes deliberately reject an unreviewed successor.
+Before changing the pinned recovery helper/release, remove or revalidate this
+overlay too; its hashes deliberately reject an unreviewed successor. The
+[installed-session record](PRODUCT.md) owns the current pin and selection;
+the r11 boot observations below do not establish successor boot acceptance.
 
 ## Device evidence
 

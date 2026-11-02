@@ -47,7 +47,7 @@ public:
     Q_INVOKABLE bool chooseApplication(int index);
     static bool parseApplications(const QByteArray &output, QStringList *names);
     Q_INVOKABLE bool requestStream();
-    int runPending(int timeoutSeconds);
+    int runPending(int timeoutSeconds = 0);
     void streamFinished(int exitCode);
     QVariantMap statistics() const { return m_statistics; }
     void setStatisticsActive(bool active);

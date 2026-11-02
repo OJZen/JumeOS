@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Optional r11 boot image on tty1; release it when a frontend switches to tty2."""
+"""Optional r14 boot image on tty1; release it when a frontend switches to tty2."""
 import array
 import fcntl
 import gzip
@@ -45,10 +45,10 @@ def load(path, expected):
 
 def helpers():
     fallback = load(Path('/var/lib/jume-launcher/esde-fallback.py'),
-                    'ad6ff7e57c46caaec7fbbe722ceb146496fa5b5bf5d5c25238292b4bc6c8cec2')
+                    'db3bbd54c8217d408a1cbf276587ee06e131bbd07eee0457735040e22b24209c')
     product = fallback.load_installer()
     product.target()
-    require((fallback.ROOT / 'current').resolve() == fallback.ROOT / 'releases' / fallback.R11,
+    require((fallback.ROOT / 'current').resolve() == fallback.ROOT / 'releases' / fallback.RELEASE,
             'Wrong selected release')
     for path in (BASE, *BASE.parents, ASSET, BASE / 'r46h-display-diagnostic.py'):
         product.sealed(path)

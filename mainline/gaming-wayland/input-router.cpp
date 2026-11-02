@@ -1,5 +1,6 @@
 // Own the accepted merged evdev device and expose one game-only uinput endpoint.
 #include "input-route.h"
+#include "stick-calibration.h"
 #include <linux/input.h>
 #include <linux/uinput.h>
 #include <sys/ioctl.h>
@@ -37,7 +38,9 @@ struct Router {
     uint32_t slot = 0, holdProgress = 0;
     bool grabbed = false, created = false, syncing = false;
     input_absinfo calibration[4]{};
-    Sample input, center, game, ui;
+    Sample input, center, game, ui, rawUi;
+    Stick::Profile stickProfile{};
+    bool calibrated = false;
     Policy policy;
     uint64_t commandSequence = 0;
     uint64_t remoteSequence = 0;
@@ -60,13 +63,22 @@ struct Router {
         require(n == sizeof(packet), "controller disconnected or stopped consuming reports");
     }
     Packet uiPacket(const Sample &sample) {
-        Packet packet; packet.type = State; packet.keys = sample.keys;
+        Packet packet; packet.type = State; packet.keys = sample.keys; packet.flags |= RawAxes;
+        int32_t raw[4];
         for (int i = 0; i < 4; ++i) {
-            const int64_t delta = int64_t(sample.axes[i]) - center.axes[i];
-            const int64_t range = delta < 0 ? int64_t(center.axes[i]) - calibration[i].minimum : int64_t(calibration[i].maximum) - center.axes[i];
-            packet.axes[i] = int32_t(std::clamp(delta * 32767 / std::max<int64_t>(1, range), int64_t(-32767), int64_t(32767)));
+            packet.axes[i] = Stick::normalized(sample.axes[i], calibration[i].minimum, calibration[i].maximum);
+            raw[i] = Stick::normalized(input.axes[i], calibration[i].minimum, calibration[i].maximum);
         }
+        std::memcpy(packet.device, raw, sizeof(raw));
         return packet;
+    }
+    Sample adjusted() const {
+        auto sample = input;
+        if (calibrated) for (int i = 0; i < 4; ++i) {
+            const auto value = stickProfile[i].apply(Stick::normalized(input.axes[i], calibration[i].minimum, calibration[i].maximum));
+            sample.axes[i] = Stick::native(value, calibration[i].minimum, calibration[i].maximum);
+        }
+        return sample;
     }
     void writeGame(const Sample &sample) {
         input_event events[22]{}; unsigned count = 0;
@@ -103,20 +115,22 @@ struct Router {
     }
     bool neutral() const {
         if (input.keys) return false;
+        const auto sample = adjusted();
         for (unsigned i = 0; i < 4; ++i) {
             // Match the shell's 0.3 neutral gate while preserving full raw game ranges.
             const int64_t half = (int64_t(calibration[i].maximum) - calibration[i].minimum) / 2;
-            if (std::abs(int64_t(input.axes[i]) - center.axes[i]) > std::max<int64_t>(calibration[i].flat, half * 3 / 10)) return false;
+            if (std::abs(int64_t(sample.axes[i]) - center.axes[i]) > std::max<int64_t>(calibration[i].flat, half * 3 / 10)) return false;
         }
         return true;
     }
     void tick() {
         if (remoteUntil && (nowMs() >= remoteUntil || !neutral())) endRemote(!neutral());
-        policy.update(input, neutral(), nowMs(), [&](const Sample &sample) {
+        policy.update(adjusted(), neutral(), nowMs(), [&](const Sample &sample) {
             if (policy.mode == Game) writeGame(remoteUntil ? remote : sample);
-            else if (sample != ui) { ui = sample; sendPacket(uiPacket(sample)); }
+            else if (sample != ui || input != rawUi) { ui = sample; rawUi = input; sendPacket(uiPacket(sample)); }
         }, [&](uint32_t action) {
-            endRemote(true);neutralize(); Packet packet; packet.type = action; sendPacket(packet);
+            if(action!=Diagnostics){endRemote(true);neutralize();}
+            Packet packet; packet.type = action; sendPacket(packet);
         });
         const uint32_t progress=policy.shortcut==Start&&!policy.shortcutSpent&&policy.selecting
             ? uint32_t(std::clamp<int64_t>((nowMs()-policy.heldAt)/20,1,100)):0;
@@ -173,7 +187,7 @@ struct Router {
         created = true; game = ui = center;
         require(ioctl(source, EVIOCGRAB, 1) == 0, "combined controller is already grabbed"); grabbed = true;
         readState();
-        Packet ready; ready.type = Ready;
+        Packet ready; ready.type = Ready; ready.flags |= CalibrationSupported;
         require(ioctl(output, UI_GET_SYSNAME(sizeof(ready.device)), ready.device) >= 0, "cannot identify routed gamepad");
         sendPacket(ready);
     }
@@ -182,14 +196,26 @@ struct Router {
         const auto n = recv(control, &packet, sizeof(packet), MSG_DONTWAIT | MSG_TRUNC);
         if (n < 0 && (errno == EINTR || errno == EAGAIN)) return;
         require(n == sizeof(packet), "invalid or disconnected control channel");
-        require(packet.version == Version && (packet.type == Mode || packet.type == Inject || packet.type == CancelInject)
+        require(packet.version == Version && (packet.type == Mode || packet.type == Inject || packet.type == CancelInject || packet.type == Calibration)
             && packet.mode <= Game && packet.reserved<Slots && packet.sequence == commandSequence + 1
             && commandSequence < UINT64_MAX, "invalid or stale input ownership command");
         Packet expected; expected.type = packet.type; expected.mode = packet.mode; expected.sequence = packet.sequence;
         expected.reserved=packet.reserved;
         if (packet.type == Inject) { expected.keys = packet.keys; expected.flags = packet.flags; std::copy(std::begin(packet.axes), std::end(packet.axes), expected.axes); }
+        if (packet.type == Calibration) { expected.keys = packet.keys; std::copy(std::begin(packet.axes), std::end(packet.axes), expected.axes); std::memcpy(expected.device, packet.device, sizeof(packet.device)); }
         require(!std::memcmp(&expected, &packet, sizeof(packet)), "unexpected control payload");
         ++commandSequence;
+        if (packet.type == Calibration) {
+            Stick::Profile profile; int32_t limits[8]; std::memcpy(limits, packet.device, sizeof(limits));
+            for (int i = 0; i < 4; ++i) profile[i] = {limits[2*i], packet.axes[i], limits[2*i+1]};
+            const bool valid = packet.keys <= 1 && packet.mode == Ui && policy.mode == Ui
+                && !policy.ownerPending && packet.reserved == slot && Stick::valid(profile);
+            if (valid) {
+                endRemote(true); neutralize(); stickProfile = profile; calibrated = packet.keys;
+                policy.setMode(Ui); neutralize(); readState(); tick();
+            }
+            Packet ack; ack.type = CalibrationAck; ack.keys = valid ? 1 : 0; sendPacket(ack); return;
+        }
         if (packet.type == CancelInject) { endRemote(true); tick(); return; }
         if (packet.type == Inject) {
             readState();
@@ -225,6 +251,7 @@ struct Router {
             int timeout = policy.deadline ? int(std::clamp<int64_t>(policy.deadline - nowMs(), 0, 100)) : 100;
             // A held Select is timed: the 600 ms game hand-over and the hold progress.
             if (policy.selecting) timeout = std::min(timeout, 20);
+            if (policy.selectPulseUntil) timeout = std::min(timeout, int(std::clamp<int64_t>(policy.selectPulseUntil - nowMs(), 0, 100)));
             if (remoteUntil) timeout = std::min(timeout, int(std::clamp<int64_t>(remoteUntil - nowMs(), 0, 100)));
             pollfd fds[]{{source, POLLIN, 0}, {control, POLLIN, 0}};
             const int result = poll(fds, 2, timeout);

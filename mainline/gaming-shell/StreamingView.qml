@@ -86,7 +86,8 @@ Item {
         delegate: Ui.ListRow {
             required property int index
             width: detailRows.width
-            title: ["主机名称", "地址", "应用", "画质", "性能信息", "配对", "开始串流", "从列表移除"][index]
+            title: ["主机名称", "地址", "应用", "画质", "启动时显示诊断", "配对", "开始串流", "从列表移除"][index]
+            description: index === 4 ? "串流中按 Select＋R1 切换" : ""
             value: index === 0 ? view.host.name || "" : index === 1 ? view.host.address || "" : index === 2 ? view.host.application || ""
                 : index === 3 ? view.presets[view.host.preset || 0] : index === 5 ? (view.host.paired ? "重新配对" : "开始配对") : ""
             choice: index === 2 || index === 3

@@ -1,6 +1,6 @@
 # R46H project context
 
-> Current checkpoint: 2026-10-30 (physical). Handoff reviewed: 2026-10-30 (r11 default and boot image).
+> Current checkpoint: 2026-10-31 (physical). Handoff reviewed: 2026-11-02 (R14 source and host regression review).
 > Read the [experiment ledger](../mainline/board/r46h/EXPERIMENT-STATUS.md) before hardware work.
 
 ## Scope
@@ -11,9 +11,9 @@ desktop, local gaming, streaming, and USB HID input. The
 
 ## Workspace handoff
 
-- Active branch `jume-ui-v1`; this default/splash batch is based on `68dbbd5`; sealed r11 UI source is `38643e9`.
+- R14 is installed/default and removes the stream timer; [lifetime successor](../mainline/gaming-wayland/PRODUCT.md#stream-lifetime-successor-r14--2026-10-31) owns the receipt. R13 calibration/Select and all 249 prior state files are preserved. The 125.9 s device worker, health/sync/cleanup pass; UART is closed. Audio work stays separate: `mainline/out/.cache/jume-stream-fixes-20261031/HANDOFF.md`.
+- Active branch `jume-ui-v1`; the installed-session runbook owns sealed source and artifact identities.
 - [r11 default activation](../mainline/gaming-wayland/PRODUCT.md#r11-default-activation--2026-10-30), one attended cold start and ES-DE failure recovery pass; the requested [boot image](../mainline/gaming-wayland/BOOT-SPLASH.md) passes framebuffer readback and VT_PROCESS handoff.
-  This batch contains fallback pin/tests, boot-image files and handoff docs; sealed binaries unchanged. Named evidence retained; no push requested.
 - 2026-10-12 cache cleanup reclaimed 3.54 GiB; receipt: `mainline/out/.cache/cache-cleanup-20261012.XdQ4wD/receipt.json`.
   Clean compiler/source caches were removed; modified FBNeo/ES-DE sources, recovery data, Qt SDK, Mono and r6/r8/r9 were retained.
   Reacquire build inputs when required; the deployed r11 fallback overlay needed no Qt rebuild or TF rewrite.
@@ -23,8 +23,8 @@ desktop, local gaming, streaming, and USB HID input. The
 
 ## Current baseline
 
-Last observed device state: **serial-confirmed clean poweroff on 2026-10-30 at about 22:43 CST**.
-Jume remains enabled/default with ES-DE failure recovery and the optional boot image; p2 remains v0.18.
+Latest observation on 2026-10-31: **R14 running/default**, with all 249 prior Jume state hashes preserved, including R13's calibration profile.
+Jume retains ES-DE recovery and the boot image with R14 pins; p2 remains v0.18. The 125.9-second synthetic worker passed and the device was returned on and ready; UART is closed. No game or temporary network service was started.
 One user cold start, warm boot and two failure paths pass; r6/r8/r9/r10, ES-DE and private backups remain.
 The [activation record](../mainline/gaming-wayland/PRODUCT.md#user-cold-start-and-boot-image--2026-10-30) owns evidence. The prior 7203.1-second desktop soak remains accepted; final splash-to-desktop terminal flash is unverified.
 
@@ -35,7 +35,7 @@ The [activation record](../mainline/gaming-wayland/PRODUCT.md#user-cold-start-an
   v0.17 BOOT/power-settle DTB.
 - Accepted fallbacks: attended p2 v0.7, automated p2 v0.15, and the p2 v0.5
   full-card recovery reference.
-- Default frontend: Jume Launcher `0.1.0-dev` r11; ES-DE 3.4.1/r51 remains installed
+- Default frontend at that observation: Jume Launcher `0.1.0-dev` R14; ES-DE 3.4.1/r51 remains installed
   for automatic failure recovery and explicit rollback. Full replacement is not accepted.
 
 The card's p3 contains imported EASYROMS. Its full target checksum/readback was
@@ -51,7 +51,7 @@ skipped, so content equality remains unverified. See
   Two-level pages passed 39 actions, unloaded focus navigation and in-flight cancellation.
   Cached categories raised Settings from ~29.5 to 57.2--57.5 submissions/s and HUD
   from 29.9 to 58.5--59.0, p50 ~16.7 ms; exact samples remain in the ledger.
-  r11 default cold/warm boot and failure recovery pass; broader LCD/readability and L3+R3 remain open.
+  r11 default cold/warm boot and recovery pass; R12's L3+R3 and performance-overlay menu were user-accepted during streaming. Broader LCD/readability and successor boot/recovery remain open.
   The [top-center volume capsule](../mainline/gaming-shell/DEVICE.md) passes ARM64 UI/event and Pixman/GL clipping checks;
   paired binaries ran during Transfer testing; attended screen-wake/HUD passed on 2026-09-26; in-game acceptance remains open.
 - Repaired GTA III/Vice City accept the Switch-layout controls and no longer
@@ -115,7 +115,7 @@ skipped, so content equality remains unverified. See
 
 ## Immediate next work
 
-1. User requested wrap-up/commit. The [boot image](../mainline/gaming-wayland/BOOT-SPLASH.md) is visible and VT handoff passes; terminal-flash cleanup/final visual check is deferred. Do not resume testing until requested; remove/revalidate both overlays before changing the pinned release.
+1. [Built-in stick calibration](../mainline/gaming-shell/CONTROLLER-CALIBRATION.md) and saved-profile session restart are complete; preserve the device profile and combined Select fix. Game/stream feel and successor cold boot/recovery remain open. The prior [boot image](../mainline/gaming-wayland/BOOT-SPLASH.md) terminal-flash check remains deferred; do not replay it or the completed two-hour soak.
    Use the [combined acceptance route](../mainline/gaming-shell/DEVICE.md#combined-acceptance-route) for remaining long-hold kill,
    game/save/transfer retention, Files/QR, LCD/audio and L3+R3 observations.
    Media, sequential USB, wake/HUD and task entry/resume/close already pass; do not replay them unchanged.

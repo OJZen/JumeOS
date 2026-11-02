@@ -1,5 +1,7 @@
 # Jume default-desktop candidate
 
+Current successor: **R14 installed/default, fixed stream timer removed**; see the [lifetime record](#stream-lifetime-successor-r14--2026-10-31). R13 calibration, R12 streaming and R11 boot/recovery evidence remain version-specific.
+
 Status: **r11 default cold/warm boot and ES-DE failure recovery PASS for observed paths**.
 The [default activation](#r11-default-activation--2026-10-30) adds recovery proof to the
 [r11 desktop soak](#r11-two-hour-desktop-soak--2026-10-29). One operator-confirmed cold start now passes; gameplay remains open. Keep ES-DE.
@@ -20,6 +22,88 @@ the payload exceeds the 192 MiB `/run` tmpfs, and macOS binds do not retain test
 Build caches, final artifacts and evidence stay on the external workspace.
 Compilation/session and SSH checks run in separate, equally memory-limited
 containers; previous input fixtures and build memory do not carry into SSH tests.
+
+## Sunshine shortcut successor R12 — 2026-10-31
+
+R12 reuses the complete R11 payload and changes only `usr/bin/r46h-shell`,
+`usr/bin/input-router`, `usr/bin/moonlight-qt` and `MOONLIGHT_SHA256`.
+Clean runtime source: `131fcb425d6a6876a8e4eea1ab2c66fae35eb991`.
+Manifest: `1e7cf25f6b607b33e5269e171d06d1b99f290d47e03d8c0fcac72bc2359c9279`.
+Archive: `d1346a9f9a1fd4bc86614b515621949d99e59bb63ef282122355de0d5e60ccfc`.
+Evidence owner: `mainline/out/.cache/jume-sunshine-shortcut/`.
+
+The full target seal, normal PIN pairing and Home A → Moonlight launch passed.
+An active 1024×768 device capture shows the isolated Mac test window with Jume
+diagnostics. No real game was started for this acceptance. R12 was enabled and
+read back as the default; R11 and `/var/lib/jume-launcher/shortcut-r12-update/`
+retain rollback inputs. The recovery/splash pins were revalidated for R12;
+its cold-boot/recovery behavior was not re-accepted. The last shutdown trace
+reached filesystem detach and `Powering off`, without a final `Power down` line.
+
+The operator later accepted L3+R3 and the performance-overlay menu, but reported
+Select short-tap loss, distorted audio and asymmetric full stick travel. Select
+and audio source regressions are recorded in the [streaming runbook](../gaming-shell/STREAMING.md);
+the combined Select/calibration fix is recorded in R13 below. Select+R1 remains
+unaccepted/deferred. Preserve the existing default and sealed-release rules when
+combining fixes; do not replace a file inside an installed release in place.
+
+## Stream lifetime successor R14 — 2026-10-31
+
+R14 removes the stream worker's fixed 120-second/attended ceiling. Moonlight exit,
+startup/connection failures and user stop still use the existing cleanup path;
+explicit deadlines remain in host tests and historical diagnostic wrappers.
+The Mac `sunshine-window-host` launcher also defaults to unlimited session time,
+using the existing private runtime's zero-timer mode. Resource guards remain.
+
+Clean source: `b9622686e89ed277b11e68d6e95bcba88a9aecf9`, based on R13.
+Manifest: `09227a2d6f862a2b5937e61f212c445b17dc1289d0a04ccb3250d92059cfab69`.
+Only `usr/bin/r46h-shell` differs among 2,342 payload files; the calibrated R13
+router is unchanged. The four-file update is 2,202,400 bytes, SHA-256
+`15e7e0880e9267831949cca719c452b364f5b547169ddc82edeedafeb02e54cd`.
+Evidence/source bundle: `mainline/out/.cache/jume-stream-lifetime-20261031/`.
+
+ARM64 shell/streaming 9/9 and calibration 8/8 checks pass; fallback/splash host
+checks pass. Exact target seals, new ready desktop/default selection and all 249
+existing Jume state hashes pass. R13 remains for rollback; recovery/splash pins
+follow R14. On R46H, the exact installed worker remained alive after 120 seconds
+and exited normally at 125.86 seconds using a synthetic client; its request was
+removed. Final health/state checks passed, temporary transport/test/build files
+were cleaned, sync completed and UART closed. The device stays on for the operator.
+No game was launched; real stream endurance, audio, saves and R14 cold boot remain open.
+
+## Stick calibration successor R13 — 2026-10-31
+
+R13 retains R12's payload, including Sunshine direct-connect, and changes only
+`usr/bin/r46h-shell` and `usr/bin/input-router`. The combined router includes the
+parallel Select short-tap fix. Clean source: `09599bea3c0d9786a8044edaf31f332077138efb`,
+based on Select validation source `6feab507ca352a7c0967846576eb032c82df9a04`.
+Manifest: `f11689d713ec280da3e7b4dd4da1ea276e123b14fce07455c91ca1d43e102e07`.
+The five-file UART update package is 2,216,816 bytes, SHA-256
+`3e0aa86d5e4688bcdf9b79863bf7f25491c9f2cab445299bbc0c79b28655c694`.
+Evidence and complete source bundle: `mainline/out/.cache/jume-stick-calibration-20261031.dMCp5H/`.
+
+Both host Qt and clean ARM64 builds pass calibration, input and selected streaming
+regressions. Linux uinput plus real Qt/Weston synthetic-pad checks cover asymmetric
+endpoints, raw capture, live application, reset and saved-profile session restart.
+The [calibration runbook](../gaming-shell/CONTROLLER-CALIBRATION.md) owns the workflow and contract.
+
+On the freshly verified v0.18 device, active R12 verification correctly refused
+its mounted Mono runtime. Normal rollback/unmount then allowed the complete old
+and new seals to pass; no sealed file was changed to bypass that guard. Inactive
+selection, re-pinned ES-DE recovery/boot helpers, exact-binary ready desktop and
+default enable passed. All 248 existing Jume state files retained their hashes.
+The composed 1024×768 capture shows a stable-center calibration page. The operator
+completed both sticks and confirmed all directions reach full scale. Four separate
+axis ranges were saved with mode 0600; their per-half gains are 1.011–1.273.
+One Jume session restart retained the exact profile hash and reached a new ready
+IPC generation with saved-profile acknowledgement; the settings capture shows 已校准.
+Final checks found no kernel/UI errors or failed units, with 60.416 C temperature
+and all 248 original state hashes unchanged. Transfer/build staging was cleaned,
+`sync` completed and UART closed. The device was handed back **on at Home** to
+the attending operator; this was not another unattended soak or poweroff test.
+R12 and `/var/lib/jume-launcher/calibration-r13-update/` retain rollback inputs.
+No game was launched. R13 cold boot, injected failure recovery, physical game
+controls/audio and saves are not established by this update.
 
 ## Installed trial — 2026-09-27
 
@@ -291,8 +375,11 @@ boot. The r11 archive/manifest and unchanged installer/service hooks were checke
 before replacing the old r9 pin. This is an opt-in configuration, not full
 game-library, save/load or endurance acceptance. See the [activation result](#r11-default-activation--2026-10-30).
 
+The successor records above own the current release pin and installation state;
+the r11 boot/recovery observations do not establish later-version acceptance.
+
 [`product-fallback.py`](product-fallback.py) installs a separate helper/service
-and a Jume drop-in. It pins the installed r11 manifest and recovery-script hash,
+and a Jume drop-in. It pins the installed release manifest and recovery-script hash,
 reuses its target, lock, file-seal and cleanup checks, and never edits its sealed
 release or user state. `Restart=no` and `OnFailure=` replace the three Jume
 restart attempts with one ES-DE handoff. The service runs after Jume's original
@@ -320,8 +407,8 @@ python3 -B /var/lib/jume-launcher/current/product-install.py --trial
 python3 -B /var/lib/jume-launcher/current/product-install.py --enable
 ```
 
-Installation alone does not promote Jume. It requires inactive/disabled r11,
-active/enabled ES-DE and a complete r11 seal. Matching completed files allow an
+Installation alone does not promote Jume. It requires the pinned release to be
+inactive/disabled with a complete seal, and ES-DE active/enabled. Matching completed files allow an
 idempotent retry. Foreign files or interrupted `.incoming` writes are retained
 and refused; inspect them before retrying. This is not power-loss recovery proof.
 Before selecting another release, remove the optional [boot image](BOOT-SPLASH.md) if installed,
@@ -342,10 +429,10 @@ overlay and recovery evidence; GUI/input/save/gameplay-endurance gates stay open
 
 ## Next combined target gate
 
-1. Use the [r11 fallback overlay](#optional-r11-es-de-fallback-overlay) for Q1.
-   Keep installed r11 and retained releases; packaged failed-state rollback and
+1. Use the [pinned fallback overlay](#optional-r11-es-de-fallback-overlay) with the current sealed release above.
+   Keep r11 and the other retained releases; packaged failed-state rollback and
    bidirectional selection pass. Receipt-mismatch cleanup refusal/recovery passes;
-   actual interrupted lease cleanup remains open. Use the fixed-path r11 controller.
+   actual interrupted lease cleanup remains open. Use the selected release's fixed-path controller.
    Optional Browser pairing needs its guarded wrapper and a new complete seal.
 2. Broader Q2 acceptance: settings/saves, input ownership and representative native/browser
    launches/rollback under sustained load. The r11 desktop/light-navigation two-hour run above
@@ -354,8 +441,8 @@ overlay and recovery evidence; GUI/input/save/gameplay-endurance gates stay open
 3. Individual Launcher/Weston/seatd recovery and old-child/lease cleanup pass;
    fast prepare-failure limiting and explicit rescue now pass on r6's identical unit.
    GUI warm reboot passes; test GUI poweroff and interrupted cleanup on target.
-4. Q1 default activation, one attended cold start and automatic ES-DE return pass;
-   retain the fallback and observe broader reliability separately. Wi-Fi/settings/save retention and gameplay
+4. r11 Q1 default activation, one attended cold start and automatic ES-DE return pass;
+   successor boot/recovery and broader reliability remain open. Wi-Fi/settings/save retention and gameplay
    endurance remain Q2 gates; schema/service migrations remain unsupported.
 5. L1: inventory actual ES-DE systems/ROM entries against Jume before Q2 removal;
    fixed Neo/native entries are not a full ROM scanner. Keep unsupported routes.

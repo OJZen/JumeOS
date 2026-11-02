@@ -70,12 +70,12 @@ int main(int argc, char **argv) {
     }
     for (int i = 1; i < argc; ++i) if (QByteArray(argv[i]) == "--stream-worker") {
         QCoreApplication worker(argc, argv); QCommandLineParser options;
-        options.addOptions({{"stream-worker", "Run one validated stream request."}, {"attended", "Operator-present stream ceiling: 35 minutes."}, {"state-dir", "State directory.", "path"},
+        options.addOptions({{"stream-worker", "Run one validated stream request."}, {"attended", "Operator-present stream session."}, {"state-dir", "State directory.", "path"},
                             {"moonlight-client", "Client binary.", "path"}, {"moonlight-sha256", "Client SHA-256.", "hash"}});
         options.process(worker);
         if (!QDir::isAbsolutePath(options.value("state-dir"))) return 2;
         Streaming stream(options.value("state-dir")); stream.configureClient(options.value("moonlight-client"), options.value("moonlight-sha256"));
-        return stream.runPending(options.isSet("attended") ? 2100 : 120);
+        return stream.runPending();
     }
     for (int i = 1; i < argc; ++i) if (QByteArray(argv[i]) == "--tool-worker" || QByteArray(argv[i]) == "--native-worker") {
         QCoreApplication worker(argc, argv); QCommandLineParser options;
@@ -157,6 +157,7 @@ int main(int argc, char **argv) {
     tools.configureCatalog(parser.isSet("portmaster-backend") ? parser.value("portmaster-backend") : share + "/ports/manager.py",
                            parser.isSet("portmaster-runtime") ? parser.value("portmaster-runtime") : share + "/portmaster");
     ControllerInput controller(nullptr, handheldMode);
+    controller.calibration()->load(state);
     if (parser.isSet("stream-handoff") || parser.isSet("native-handoff")) controller.suppressUntilNeutral();
     Streaming streaming(state);
     streaming.configureClient(parser.value("moonlight-client"), parser.value("moonlight-sha256"));
@@ -217,6 +218,7 @@ int main(int argc, char **argv) {
         }
     }
     QObject::connect(&tools, &ToolState::notice, &window, [root](const QString &message) { if (root) QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, message)); });
+    QObject::connect(controller.calibration(), &StickCalibration::notice, &window, [root](const QString &message) { if (root) QMetaObject::invokeMethod(root, "notify", Q_ARG(QVariant, message), Q_ARG(QVariant, true)); });
     QObject::connect(&applications,&Applications::notice,&window,[root](const QString &message){if(root)QMetaObject::invokeMethod(root,"notify",Q_ARG(QVariant,message));});
     QObject::connect(root,SIGNAL(backgroundRequested(bool)),&applications,SIGNAL(backgroundRequested(bool)));
     QObject::connect(&applications,&Applications::backgroundRequested,&window,[&](bool tasks){
@@ -230,6 +232,7 @@ int main(int argc, char **argv) {
             if(action=="tasks"&&root->property("tasksVisible").toBool())QMetaObject::invokeMethod(root,"dispatch",Q_ARG(QVariant,QString("back")),Q_ARG(QVariant,false));
             else if(action=="tasks"||action=="desktop")QTimer::singleShot(0,&window,[&,action]{emit applications.backgroundRequested(action=="tasks");});
             else if(action=="kill")applications.forceKill();
+            else if(action=="diagnostics")QMetaObject::invokeMethod(root,"toggleDiagnostics");
         });
         QObject::connect(handheld.get(),&HandheldSession::notice,&window,[root](const QString &text){QMetaObject::invokeMethod(root,"notify",Q_ARG(QVariant,text));});
     } else {
@@ -307,6 +310,8 @@ int main(int argc, char **argv) {
         if (!preferences.save()) return;
         if (handheldMode) {
             if (!handheld->ready() || applications.running()) return;
+            if (preferences.monitor() != streaming.current().value("overlay").toBool()) preferences.adjust("monitor", 1);
+            if (!preferences.save()) return;
             auto environment = QProcessEnvironment::systemEnvironment();
             environment.insert("QT_QPA_PLATFORM", "wayland");
             environment.insert("SDL_VIDEODRIVER", "wayland");

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Optional r11 service overlay: failed Jume -> ES-DE for this boot only."""
+"""Optional r14 service overlay: failed Jume -> ES-DE for this boot only."""
 import fcntl
 import hashlib
 import importlib.util
@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 ROOT = Path('/var/lib/jume-launcher')
-R11 = 'c049d069a37797a67e032b4a1bbfdcf04ef3745ab9a380396494416dd2db3b8e'
+RELEASE = '09227a2d6f862a2b5937e61f212c445b17dc1289d0a04ccb3250d92059cfab69'
 INSTALLER_SHA256 = '8702148559762f6a8aae5948d5d7afa8e0d15738ad901caf26924eb44fcdaa30'
 HELPER = ROOT / 'esde-fallback.py'
 SERVICE = Path('/etc/systemd/system/jume-esde-fallback.service')
@@ -44,15 +44,15 @@ def require(condition, message):
 def load_installer():
     # Pin the trusted recovery code before importing it; a broken payload must
     # not prevent cleanup verification, nor supply different privileged code.
-    path = ROOT / 'releases' / R11 / 'product-install.py'
+    path = ROOT / 'releases' / RELEASE / 'product-install.py'
     meta = path.lstat()
     require(stat.S_ISREG(meta.st_mode) and meta.st_nlink == 1 and 0 < meta.st_size <= 65536,
-            'Invalid r11 recovery script type/size')
+            'Invalid r14 recovery script type/size')
     for parent in (path, *path.parents):
         meta = parent.lstat()
         require(meta.st_uid == 0 and not meta.st_mode & 0o022 and not stat.S_ISLNK(meta.st_mode),
-                'Unsealed r11 recovery path')
-    require(hashlib.sha256(path.read_bytes()).hexdigest() == INSTALLER_SHA256, 'r11 installer differs')
+                'Unsealed r14 recovery path')
+    require(hashlib.sha256(path.read_bytes()).hexdigest() == INSTALLER_SHA256, 'r14 installer differs')
     spec = importlib.util.spec_from_file_location('jume_installed_product', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -72,14 +72,14 @@ def owned_file(product, path, data):
 
 
 def check_integration(product):
-    release = ROOT / 'releases' / R11
+    release = ROOT / 'releases' / RELEASE
     current = ROOT / 'current'
     require(current.is_symlink() and current.lstat().st_uid == os.geteuid()
-            and current.resolve() == release, 'Select the sealed r11 release first')
+            and current.resolve() == release, 'Select the sealed r14 release first')
     for path, data in ((product.UNIT, (release / 'jume-launcher.service').read_bytes()),
                        (product.DROPIN, product.DROPIN_CONTENT)):
         owned_file(product, path, data)
-        require(path.is_file(), 'Missing r11 service integration')
+        require(path.is_file(), 'Missing r14 service integration')
     # Clearing the boot condition must never discard an unrelated safety guard.
     text = subprocess.check_output(['systemctl', 'cat', 'r46h-gaming-frontend.service'], text=True, timeout=10)
     conditions = [line.strip() for line in text.splitlines()
@@ -108,11 +108,11 @@ def perform(action, product):
         print('JUME_ESDE_FALLBACK_STARTED current boot only; next boot still selects Jume')
         return
     require(product.unit_value('UnitFileState') == 'disabled' and not os.path.lexists(ROOT / 'enabled')
-            and not os.path.lexists(product.TRIAL), 'Run r11 --rollback before installing/removing the overlay')
+            and not os.path.lexists(product.TRIAL), 'Run r14 --rollback before installing/removing the overlay')
     product.systemctl('is-active', '--quiet', 'r46h-gaming-frontend.service')
     product.systemctl('is-enabled', '--quiet', 'r46h-gaming-frontend.service')
     if action == '--install':
-        product.verify(ROOT / 'releases' / R11, R11)
+        product.verify(ROOT / 'releases' / RELEASE, RELEASE)
         for path, data in files:
             path.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
             product.durable_write(path, data)
